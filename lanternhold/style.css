@@ -29,6 +29,9 @@ svg{display:block}
 .stat.gold span{color:var(--gold)}
 .stat.dps{color:#e7d6b8}
 .stat.ember span{color:var(--ember)}
+.support{display:flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:10px;border:1px solid #6a4a1a;background:linear-gradient(180deg,#3d2c14,#2a1e0e);color:#f6dca0;font-weight:700;font-size:15px;text-decoration:none;white-space:nowrap}
+.support:hover{border-color:var(--gold);color:#fff3dc}
+.support svg{width:20px;height:20px;color:var(--gold)}
 .iconbtn{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:40px;height:40px;display:grid;place-items:center;color:var(--muted)}
 .iconbtn:hover{color:var(--text);border-color:var(--line2)}
 .iconbtn svg{width:22px;height:22px}
@@ -194,10 +197,14 @@ svg{display:block}
   .top{padding:10px 16px;gap:10px;flex-wrap:wrap}
   .brand small{display:none}
   .brand b{font-size:19px}
+  .top .brand{margin-right:auto}
   .purse{order:3;width:100%;justify-content:space-between;margin:0;gap:6px}
   .stat{font-size:15px;padding:5px 10px 5px 6px}
   .stat svg{width:18px;height:18px}
-  .iconbtn{margin-left:auto}
+  .iconbtn{margin-left:0}
+  .support{margin-left:auto;padding:0 11px}
+  .support span{display:none}
+  .support:not([hidden])+.iconbtn{margin-left:0}
   .floorinfo{min-width:0}
   .floorname b{font-size:24px}
   .arena{aspect-ratio:4/3}

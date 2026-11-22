@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://tools.born2develop.com/sitemap.xml

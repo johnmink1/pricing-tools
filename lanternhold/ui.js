@@ -1,4 +1,4 @@
-/* lh-build 202611231429 */
+/* lh-build 202611231437 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1294,15 +1294,17 @@
 
   // ---------- mass scrap ----------
   const scrapOpts = { common: true, fine: true, rare: false, epic: false, set: false, keepBest: true, keepUp: true };
-  function scrapList() {
+  // Items a bulk action may take, by rarity ticks and keep rules. Worn and locked items are always left alone.
+  function bulkList(o) {
     const best = new Set();
-    if (scrapOpts.keepBest) {
+    if (o.keepBest) {
       const top = {};
       for (const it of S.bag) { const k = it.cls + it.slot; if (!top[k] || L.gearPct(it) > L.gearPct(top[k])) top[k] = it; }
       Object.values(top).forEach(it => best.add(it.uid));
     }
-    return S.bag.filter(it => scrapOpts[it.rar] && !it.lk && !L.wearer(S, it.uid) && !best.has(it.uid) && !(scrapOpts.keepUp && it.up > 0));
+    return S.bag.filter(it => o[it.rar] && !it.lk && !L.wearer(S, it.uid) && !best.has(it.uid) && !(o.keepUp && it.up > 0));
   }
+  const scrapList = () => bulkList(scrapOpts);
   function openScrap() {
     const draw = () => {
       const list = scrapList(), gold = list.reduce((a, it) => a + L.salvageValue(it), 0);
@@ -3150,6 +3152,10 @@
       ['Locking items', 'i:lock', 'Tap an item in your pack and choose Lock to protect it.', [
         'Locked items show a small padlock and are skipped by <b>Mass scrap</b>, auto-selling when your pack is full, and the <b>Loot Goblin</b>.',
         'You can still equip and upgrade a locked item. Unlock it to sell, send or salvage it.']],
+      ['Mass scrap and Mass sell', 'i:coin', 'Clear out your pack in one go from the Gear tab.', [
+        '<b>Mass scrap</b> turns the rarities you tick into gold right away.',
+        '<b>Mass sell</b> lists them on the market at their current value, up to 25 listings at a time. You get mail with the gold as each one sells.',
+        'Worn and locked items are never touched by either.']],
       ['Gear basics', 's:chest', 'Gear drops from monsters, chests and guardians. Each piece fits one class and slot.', [
         'Slots: main hand, offhand, helmet, trinket, chest, legs, feet, ring. Robes cover chest and legs.',
         'Change gear at <b>camp</b>. <b>Equip best</b> does it in one tap.',
@@ -3231,6 +3237,10 @@
         '<b>Sell</b>: tap an item in Gear, choose <b>Sell on market</b>. Listings last a week.',
         '<b>Mail</b>: send to someone you recruited or chatted with, as a gift or for a price.',
         'Gold and gear have no real-money value.']],
+      ['The Ember Ring (PvP)', 'i:sword', 'Duel other players\u2019 heroes for Laurels and rating.', [
+        'Open the <b>PvP</b> tab and press <b>Duel</b>. Only your own hero fights; companions, tonics and Sigils never count.',
+        '10 challenges, one back every 30 minutes. Wins give Laurels and rating; your hero also defends while you are away.',
+        'Laurels buy the <b>Ringwarden kit</b>: PvP gear with <b>Edge</b> (more damage to heroes) and <b>Resolve</b> (less damage from heroes). It works only in the Ring.']],
       ['Your profile', 'i:user', 'The card other players see.', [
         'Tap your portrait, then <b>Customize profile</b>: frame, title, color, banner, emblems and a bio.']],
     ] },
@@ -3256,6 +3266,15 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 42, date: 'November 23, 2026', title: 'The Ember Ring: duels between players', items: [
+      'Open the new PvP tab to duel other players\u2019 heroes one on one. Only your own hero fights: no companions, tonics or Sigils.',
+      'Wins earn Laurels and rating. Climb from Ashen through Ironclad, Emberborn, Gilded and Lanternsworn to Riftbreaker on the Ring standings.',
+      'Spend Laurels on the Ringwarden kit, a separate set of PvP gear with 15 ranks per piece. Its Edge and Resolve count only in the Ring.',
+      'You get 10 challenges, and one returns every 30 minutes. Your hero also defends while you are away and earns Laurels for every challenger it beats.'] },
+    { v: 42, date: 'November 23, 2026', title: 'Mass sell', items: [
+      'New Mass sell button next to Mass scrap in your Gear tab. Pick rarities and list many pieces on the market at once, each at its current value.',
+      'Worn and locked items are never listed. You can keep the best piece of each kind and anything you have upgraded.',
+      'You can now have up to 25 items on the market at a time, up from 10.'] },
     { v: 41, date: 'November 23, 2026', title: 'Lock your favorite gear', items: [
       'Tap any item in your pack and choose Lock. A small padlock shows on its tile.',
       'Locked items are never touched by Mass scrap, auto-selling when your pack is full, or the Loot Goblin.',
@@ -3489,7 +3508,7 @@
     if (what === 'send' && e && e.status === 404) return 'That player could not be found. They may need to sign in again.';
     if (what === 'send' && e && e.status === 400) return 'That offer could not be sent. You may have 20 offers waiting already.';
     if (what === 'sig') return c === 'full' ? 'You have 5 Sigil listings already. Take one down first.' : c === 'state' ? 'You do not have that many Sigils.' : c === 'gone' || (e && e.status === 404) ? 'Someone else bought those Sigils first.' : e && e.status === 401 ? 'Sign in again to trade.' : 'The Sigil exchange could not be reached. Try again in a moment.';
-    return c === 'full' ? (what === 'list' ? 'You have 10 items listed already. Cancel one first.' : 'You have 20 offers waiting already. Recall one first.')
+    return c === 'full' ? (what === 'list' ? 'You have ' + MKT_CAP + ' items listed already. Take one down first.' : 'You have 20 offers waiting already. Recall one first.')
       : c === 'gone' || (e && e.status === 404) ? 'That is no longer available.'
       : c === 'nobody' ? 'That player has not published a hero yet.'
       : e && e.status === 401 ? 'Sign in again to trade.' : 'The Trading Post could not be reached. Try again in a moment.';
@@ -3757,6 +3776,49 @@
         }, 'send');
       });
   }
+  // ---------- mass sell: list many pack items on the market in one go ----------
+  const MKT_CAP = 25, sellOpts = { common: false, fine: true, rare: true, epic: false, set: false, keepBest: true, keepUp: true };
+  async function openMassSell() {
+    if (!CL) return;
+    if (!signedIn()) { toast('lock', 'Sign in to trade', 'The market needs a free account.', 'warn'); authForm('in'); return; }
+    let used = null;
+    // Each piece is listed at its current value: the same price the Sell button suggests for it.
+    const unit = it => Math.max(10, Math.round(L.salvageValue(it) * 3));
+    const draw = () => {
+      const free = used === null ? 0 : Math.max(0, MKT_CAP - used);
+      const all = bulkList(sellOpts).sort((a, b) => unit(b) - unit(a)), list = all.slice(0, free), gold = list.reduce((a, it) => a + unit(it), 0);
+      const chk = (k, label, sub) => '<label class="chk"><input type="checkbox" data-opt="' + k + '"' + (sellOpts[k] ? ' checked' : '') + '><span><b>' + label + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></label>';
+      modal('<h2>Mass sell</h2><p>List many pieces on the market at once, each at its current value. Other players can buy them for a week, and you get mail with the gold when each one sells. Worn and locked items are never listed.</p>' +
+        '<div class="scrapgrid">' + L.RARITY.map(r => chk(r.id, '<span class="r-' + r.id + '" style="color:var(--rc)">' + r.name + '</span>', S.bag.filter(x => x.rar === r.id && !x.lk && !L.wearer(S, x.uid)).length + ' to sell')).join('') + '</div>' +
+        chk('keepBest', 'Keep the best of each kind', 'Saves your strongest spare piece for every class and slot.') +
+        chk('keepUp', 'Keep upgraded pieces', 'Anything you have spent gold upgrading stays.') +
+        '<p class="scrapsum">' + (used === null ? 'Checking your market slots…' : !free ? 'All ' + MKT_CAP + ' of your market slots are in use. Take something down under My listings first.' : list.length ? 'Lists <b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' for <b>' + fmt(gold) + ' gold</b> in total.' + (all.length > list.length ? ' ' + (all.length - list.length) + ' more will not fit.' : '') + ' <small>' + free + ' of ' + MKT_CAP + ' market slots free.</small>' : 'Nothing matches. Tick more rarities above.') + '</p>' +
+        '<div class="row"><button class="btn" id="ms-go"' + (list.length ? '' : ' disabled') + '>List ' + list.length + '</button><button class="btn ghost" id="ms-x">Cancel</button></div>', md => {
+          md.querySelectorAll('[data-opt]').forEach(c => c.onchange = () => { sellOpts[c.dataset.opt] = c.checked; draw(); });
+          md.querySelector('#ms-x').onclick = closeModal;
+          md.querySelector('#ms-go').onclick = () => tradeAct(async () => {
+            const go = md.querySelector('#ms-go'); go.disabled = true;
+            let n = 0, g = 0;
+            try {
+              for (const it of list) {
+                if (!L.itemOf(S, it.uid) || it.lk || L.wearer(S, it.uid)) continue;
+                go.textContent = 'Listing ' + (n + 1) + ' of ' + list.length + '…';
+                await chatCall('POST', '/market/list', { item: tradeItem(it), price: unit(it), name: S.hero.name });
+                takeFromBag(it.uid); n++; g += unit(it);
+              }
+            } finally {
+              if (n) { afterTrade(); sfx.buy(); }
+              closeModal();
+              if (n) toast('coin', 'Listed ' + n + (n === 1 ? ' piece' : ' pieces'), 'Worth ' + fmt(g) + ' gold in total. You will get mail as they sell.', 'feat');
+            }
+          }, 'list');
+        });
+    };
+    draw();
+    try { const r = await chatCall('GET', '/market?mine=1'); used = (r.listings || []).length; } catch (e) { used = MKT_CAP; toast('lock', 'Could not reach the market', 'Try again in a moment.', 'warn'); }
+    if (!$('modal').hidden && $('ms-go')) draw();
+  }
+  if ($('g-msell')) { $('g-msell').hidden = !CL; $('g-msell').addEventListener('click', openMassSell); }
   if (CL) {
     setInterval(() => { if (signedIn() && !document.hidden) loadMail(true); }, 90000);
     setTimeout(() => { if (signedIn()) loadMail(true); }, 4000);
@@ -3768,7 +3830,7 @@
   const wbDur = ms => { const s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return d ? d + 'd ' + h + 'h' : h ? h + 'h ' + m + 'm' : m + ':' + String(x).padStart(2, '0'); };
   async function loadBoss() {
     if (!CL || !signedIn()) { wb.st = null; return; }
-    try { wb.st = await api('GET', null, '/boss'); wb.at = Date.now(); } catch (e) {}
+    try { const r = await api('GET', null, '/boss'); if (r && r.w && r.me) { wb.st = r; wb.at = Date.now(); } } catch (e) {}
   }
   // What the player can do right now: join, wait for the cooldown, claim, or wait for the next weekend.
   function wbState() {
@@ -3853,6 +3915,176 @@
   setTimeout(() => loadBoss().then(paintBoss), 3000);
   setInterval(() => { if (!document.hidden) loadBoss().then(paintBoss); }, 120000);
   setInterval(paintBoss, 1000);
+  // ---------- The Ember Ring (PvP) ----------
+  // Only the player's own hero fights here, one on one, against the saved build of another player's hero.
+  // The server fights the duel (infra/lambda/duel.js); this part sends our build, shows challengers, plays the
+  // duel back, sells Ringwarden kit ranks for Laurels and shows the Ring standings. No Sigils, no tonics.
+  // Keep RING_KIT, ringGate, ringCost and the stat formula in step with infra/lambda/arena.js and duel.js.
+  const RING_KIT = [
+    { id: 'helm', name: 'Helm', slot: 'head', R: 5, E: 0, hp: .02, at: 0 },
+    { id: 'hauberk', name: 'Hauberk', slot: 'chest', R: 7, E: 0, hp: .015, at: 0 },
+    { id: 'signet', name: 'Signet', slot: 'ring', R: 0, E: 5, hp: 0, at: .015 },
+    { id: 'greaves', name: 'Greaves', slot: 'legs', R: 3, E: 3, hp: .01, at: .01 },
+    { id: 'arms', name: 'Arms', slot: 'main', R: 0, E: 7, hp: 0, at: .02 },
+  ];
+  const RING_ARMS = { tank: 'Warhammer', healer: 'Censer', rogue: 'Twin Fangs', mage: 'Focus Rod', necro: 'Grave Scythe' };
+  const RING_MAX = 15, RING_EMAX = 10, RING_EINT = 30 * 6e4;
+  const ringGate = r => r >= 10 ? 1600 : r >= 5 ? 1300 : 0, ringCost = r => 40 + 25 * r;
+  const RING_TIER = r => r <= 0 ? ['Plain', 'common'] : r <= 5 ? ['Ironbound', 'rare'] : r <= 10 ? ['Emberforged', 'epic'] : ['Starwrought', 'set'];
+  const RING_TITLES = [[1900, 'Riftbreaker'], [1700, 'Lanternsworn'], [1500, 'Gilded'], [1300, 'Emberborn'], [1100, 'Ironclad'], [0, 'Ashen']];
+  const ringTitle = r => RING_TITLES.find(t => r >= t[0])[1];
+  // A rough strength score for "even match" hints: damage per hit times health, Edge and Resolve included.
+  const ringPower = s => s.at * (1 + s.E / (s.E + 300)) * s.hp / (1 - .5 * s.R / (s.R + 300));
+  const rg = { st: null, at: 0, view: 'foes', busy: false, err: '', sent: 0 };
+  const laurel = n => '<span class="laurel">' + icon('crown') + Number(n).toLocaleString('en-US') + '</span>';
+  // Our build: the log of the hero's own damage and health, with no tonics, abilities or knocked-out state.
+  function ringBuild() {
+    const keep = { t: S.tonic, d: S.down, a: S.abil, f: S.fx };
+    let dps = 0, hp = 0;
+    try { S.tonic = {}; S.down = {}; S.abil = {}; S.fx = {}; dps = L.memberDps(S, 'you', Date.now()); hp = L.maxHpOf(S, 'you'); }
+    catch (e) {} finally { S.tonic = keep.t; S.down = keep.d; S.abil = keep.a; S.fx = keep.f; }
+    const lg = x => Math.round(Math.log(1 + Math.max(0, x || 0)) * 10) / 10;
+    return { m: lg(dps), v: lg(hp) };
+  }
+  const ringEnergy = me => me ? Math.max(0, RING_EMAX - Math.ceil(Math.max(0, me.et - Date.now()) / RING_EINT)) : 0;
+  async function loadRing(force) {
+    if (!CL || !signedIn() || !S.hero || rg.busy) return;
+    if (!force && rg.st && Date.now() - rg.at < 60000) return;
+    rg.busy = true; rg.err = '';
+    try {
+      // The hero board row must exist first (it holds the name); publishing is quick and harmless.
+      if (Date.now() - rg.sent > 5 * 6e4) { try { await api('PUT', { name: S.hero.name, cls: S.hero.cls, side: S.hero.side, level: L.lvl(S, 'you'), floor: S.maxFloorEver }, '/hero'); } catch (e) {} await api('PUT', ringBuild(), '/arena'); rg.sent = Date.now(); }
+      rg.st = await api('GET', null, '/arena'); rg.at = Date.now();
+      ringDefenseNews();
+    } catch (e) { rg.err = 'The Ring could not be reached right now. Try again in a minute.'; }
+    rg.busy = false; paintRing();
+  }
+  // Tell the player how their hero did while others challenged it.
+  function ringDefenseNews() {
+    const me = rg.st && rg.st.me; if (!me) return;
+    let old = null; try { old = JSON.parse(localStorage.getItem('lh_ringdef') || 'null'); } catch (e) {}
+    try { localStorage.setItem('lh_ringdef', JSON.stringify({ dw: me.dw, dl: me.dl })); } catch (e) {}
+    if (!old) return;
+    const w = me.dw - old.dw, l = me.dl - old.dl;
+    if (w > 0 || l > 0) toast('shield', 'Your hero held the Ring', (w ? w + (w === 1 ? ' challenger beaten' : ' challengers beaten') : '') + (w && l ? ', ' : '') + (l ? l + ' lost' : '') + ' while you were away.' + (w ? ' +' + (w * 4) + ' Laurels.' : ''), w >= l ? 'feat' : '');
+  }
+  function ringFig(cls, hue, size) { return '<img class="ringspr" src="' + SP.spriteURL(cls, size || 3, hue || 0) + '" alt="">'; }
+  function ringStatLine(s) { return fmt(s.hp) + ' health &middot; ' + fmt(s.at) + ' attack' + (s.E ? ' &middot; Edge ' + s.E : '') + (s.R ? ' &middot; Resolve ' + s.R : ''); }
+  function paintRing() {
+    const box = $('ringbox'); if (!box || typeof tab === 'undefined' || tab !== 'ring') return;
+    const intro = '<p class="note">Duel other players’ heroes one on one. Only your own hero steps into the Ring: no companions, tonics or Sigils. Win Laurels and climb the standings.</p>';
+    if (!CL) { box.innerHTML = '<div class="ringempty"><h3>The Ember Ring</h3>' + intro + '<p class="note">The Ring needs the online server.</p></div>'; return; }
+    if (!signedIn() || !S.hero) { box.innerHTML = '<div class="ringempty"><h3>The Ember Ring</h3>' + intro + '<button class="btn" id="ring-in">Sign in to enter the Ring</button></div>'; $('ring-in').onclick = () => authForm('in'); return; }
+    const st = rg.st;
+    if (!st || !st.me) { box.innerHTML = '<div class="ringempty"><h3>The Ember Ring</h3>' + intro + '<p class="note">' + (rg.err || 'Stepping into the Ring…') + '</p>' + (rg.err ? '<button class="btn small" id="ring-retry">Try again</button>' : '') + '</div>'; const b = $('ring-retry'); if (b) b.onclick = () => loadRing(true); return; }
+    const me = st.me, you = L.memberById('you'), en = ringEnergy(me), nextIn = me.et - Date.now() - (RING_EMAX - en - 1) * RING_EINT;
+    let h = '<div class="ringhead"><div class="rhfig">' + ringFig(you.cls, you.hue, 3) + '</div><div class="rhinfo"><div class="rhtop"><h3>The Ember Ring</h3><span class="rtitle rt-' + ringTitle(me.r).toLowerCase() + '">' + ringTitle(me.r) + '</span></div>' +
+      '<div class="rhrate"><b>' + me.r.toLocaleString('en-US') + '</b> rating' + (st.rank ? ' &middot; rank ' + st.rank + ' of ' + st.n : '') + (me.pk > me.r ? ' &middot; best ' + me.pk.toLocaleString('en-US') : '') + '</div>' +
+      '<div class="rhchips"><span title="Wins and losses">' + icon('sword') + me.w + '&ndash;' + me.l + '</span>' + '<span title="Laurels, spent on the Ringwarden kit">' + laurel(me.ll) + '</span>' +
+      '<span title="Challenges refill one every 30 minutes, up to 10" class="' + (en ? '' : 'out') + '">' + icon('flame') + en + '/' + RING_EMAX + (en < RING_EMAX ? ' <small>+1 in ' + fmtTime(Math.max(1, Math.ceil(nextIn / 1000))) + '</small>' : '') + '</span></div></div></div>' +
+      '<div class="seg ringseg">' + [['foes', 'Challengers'], ['kit', 'Ringwarden kit'], ['top', 'Standings']].map(v => '<button data-rv="' + v[0] + '"' + (rg.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>').join('') + '</div>';
+    if (rg.view === 'foes') {
+      const ms = me.s, mp = ringPower(ms);
+      h += '<p class="note small ringbuild"><b>Your hero in the Ring:</b> ' + ringStatLine(ms) + '. Deeper delving helps a little; the Ringwarden kit helps a lot.</p>';
+      h += st.foes.length ? '<div class="ringfoes">' + st.foes.map(f => {
+        const q = ringPower(f.s) / mp, odd = q > 1.35 ? ['tough', 'Tough fight'] : q < 0.75 ? ['easy', 'You are favored'] : ['even', 'Even match'];
+        return '<div class="ringfoe"><div class="rffig">' + ringFig(f.c, 0, 2) + '</div><div class="rfinfo"><div class="nm">' + esc(f.n) + ' ' + classTag(f.c) + '</div><small><span class="rtitle sm rt-' + ringTitle(f.r).toLowerCase() + '">' + ringTitle(f.r) + '</span> ' + f.r.toLocaleString('en-US') + ' &middot; ' + f.w + '&ndash;' + f.l + ' &middot; <i class="odds ' + odd[0] + '">' + odd[1] + '</i></small><small class="dim">' + ringStatLine(f.s) + '</small></div>' +
+          '<button class="btn small" data-duel="' + f.id + '"' + (en ? '' : ' disabled title="No challenges left. One returns every 30 minutes."') + '>Duel</button></div>';
+      }).join('') + '</div>' : '<p class="note">No other heroes have entered the Ring yet. Check back soon, or tell a friend to bring their hero.</p>';
+      h += '<div class="row"><button class="btn ghost small" id="ring-ref">' + icon('refresh') + ' New challengers</button></div>';
+    } else if (rg.view === 'kit') {
+      h += '<p class="note small">Ringwarden gear is separate from your dungeon gear and works only in the Ring. <b>Edge</b> adds damage against heroes; <b>Resolve</b> softens their blows. Each piece has ' + RING_MAX + ' ranks: Ironbound, then Emberforged (needs a best rating of 1,300), then Starwrought (1,600).</p><div class="ringkit">';
+      h += RING_KIT.map((p, i) => {
+        const r = me.k[i] || 0, t = RING_TIER(r), nt = RING_TIER(r + 1), g = ringGate(r), cost = ringCost(r);
+        const nm = (r ? t[0] + ' ' : 'Ringwarden ') + (p.id === 'arms' ? RING_ARMS[you.cls] : p.name) + (r ? ' <em>+' + r + '</em>' : '');
+        const fx = x => [p.R ? 'Resolve +' + p.R * x : '', p.E ? 'Edge +' + p.E * x : '', p.hp ? 'health +' + Math.round(p.hp * x * 1000) / 10 + '%' : '', p.at ? 'attack +' + Math.round(p.at * x * 1000) / 10 + '%' : ''].filter(Boolean).join(' &middot; ');
+        let act;
+        if (r >= RING_MAX) act = '<span class="rkmax">Mastered</span>';
+        else if (me.pk < g) act = '<span class="rklock" title="Reach a rating of ' + g.toLocaleString('en-US') + ' once to unlock ' + nt[0] + ' ranks">' + icon('lock') + g.toLocaleString('en-US') + ' rating</span>';
+        else act = '<button class="btn small" data-kit="' + i + '"' + (me.ll < cost ? ' disabled title="Not enough Laurels"' : '') + '>' + (r ? 'Upgrade' : 'Claim') + ' ' + laurel(cost) + '</button>';
+        return '<div class="ringpiece r-' + t[1] + '"><div class="tile r-' + t[1] + (r ? '' : ' ghost') + '"><img class="iimg" src="' + SP.itemIcon(you.cls, p.slot, r ? t[1] : 'common') + '" alt=""></div><div class="rpinfo"><b>' + nm + '</b><small>' + (r ? fx(r) : 'Not claimed yet') + '</small>' + (r < RING_MAX ? '<small class="dim">Next rank: ' + fx(1) + '</small>' : '') + '</div><div class="rpact">' + act + '</div></div>';
+      }).join('') + '</div>';
+    } else {
+      h += st.top.length ? '<ol class="ringtop">' + st.top.map((t, i) => '<li class="' + (t.id === me.id ? 'me' : '') + '"><span class="rk">' + (i + 1) + '</span>' + ringFig(t.c, 0, 1) + '<span class="nm c-' + esc(t.c) + '">' + esc(t.n) + '</span><span class="rtitle sm rt-' + ringTitle(t.r).toLowerCase() + '">' + ringTitle(t.r) + '</span><b>' + t.r.toLocaleString('en-US') + '</b><small>' + t.w + '&ndash;' + t.l + '</small></li>').join('') + '</ol>' : '<p class="note">Nobody has fought yet. The first win puts you on top.</p>';
+      h += '<p class="note small">Everyone starts at 1,000. Beating a higher-rated hero is worth more. Heroes that defend well while their owner is away climb too.</p>';
+    }
+    box.innerHTML = h;
+  }
+  async function ringKit(i, btn) {
+    if (rg.busy) return; rg.busy = true; if (btn) btn.disabled = true;
+    try {
+      const r = await api('POST', { p: i }, '/arena/kit');
+      if (!r || !r.me) throw 0;
+      rg.st.me = r.me; sfx.buy();
+      const p = RING_KIT[i], k = r.me.k[i];
+      toast('shield', RING_TIER(k)[0] + ' ' + (p.id === 'arms' ? RING_ARMS[L.memberById('you').cls] : p.name) + ' +' + k, 'Your Ringwarden kit grows stronger. It only counts in the Ring.', 'feat');
+    } catch (e) { toast('lock', 'Could not upgrade', 'Check your Laurels and try again in a moment.', 'warn'); }
+    rg.busy = false; paintRing();
+  }
+  // ---- the duel itself, played back from the server's log ----
+  async function ringDuel(id, btn) {
+    if (rg.busy) return;
+    const me = rg.st && rg.st.me; if (!me || !ringEnergy(me)) return;
+    rg.busy = true; if (btn) btn.disabled = true;
+    let r;
+    try { if (Date.now() - rg.sent > 5 * 6e4) { await api('PUT', ringBuild(), '/arena'); rg.sent = Date.now(); } r = await api('POST', { id }, '/arena/fight'); if (!r || !r.log) throw 0; }
+    catch (e) { rg.busy = false; if (btn) btn.disabled = false; toast('lock', 'The duel did not start', 'The Ring could not be reached. Your challenge was not spent.', 'warn'); return; }
+    rg.st.me = r.me; rg.busy = false;
+    playDuel(r);
+  }
+  function playDuel(r) {
+    const you = L.memberById('you'), A = r.a, B = r.b, hp = [A.s.hp, B.s.hp];
+    const side = (x, i, hue) => '<div class="rdside s' + i + '"><div class="rdname"><b>' + esc(x.n) + '</b>' + classTag(x.c) + '</div><div class="rdfig"><img src="' + SP.spriteURL(x.c, 5, hue || 0) + '" alt=""><div class="rdpop" id="rd-pop' + i + '"></div></div>' +
+      '<div class="bar rdhp"><i id="rd-hp' + i + '" style="width:100%"></i><span id="rd-ht' + i + '">' + fmt(hp[i]) + '</span></div><small>' + ringTitle(x.r) + ' &middot; ' + x.r.toLocaleString('en-US') + '</small></div>';
+    modal('<div class="maphead"><div><h2>The Ember Ring</h2><small>' + esc(A.n) + ' challenges ' + esc(B.n) + '</small></div><button class="iconbtn" id="rd-x" aria-label="Close">&times;</button></div>' +
+      '<div class="ringduel">' + side(A, 0, you.hue) + '<div class="rdvs">VS</div>' + side(B, 1, 0) + '</div><div class="rdlog" id="rd-log"></div><div class="rdres" id="rd-res" hidden></div>' +
+      '<div class="row"><button class="btn ghost" id="rd-skip">Skip to the end</button></div>', md => {
+      $('modal').dataset.lock = '1';
+      const cur = hp.slice(), lines = [];
+      let i = 0, timer = 0, done = false;
+      const nm = [A.n, B.n];
+      const pop = (k, txt, cls) => { const p = md.querySelector('#rd-pop' + k); if (!p) return; const s = document.createElement('span'); s.className = cls; s.textContent = txt; p.appendChild(s); setTimeout(() => s.remove(), 900); };
+      const paint = () => { for (const k of [0, 1]) { const w = Math.max(0, cur[k] / hp[k] * 100); md.querySelector('#rd-hp' + k).style.width = w + '%'; md.querySelector('#rd-ht' + k).textContent = fmt(Math.max(0, cur[k])); } md.querySelector('#rd-log').innerHTML = lines.slice(-3).map(l => '<p>' + l + '</p>').join(''); };
+      const step = quiet => {
+        const e = r.log[i++]; if (!e) return false;
+        const [a, d, c, hl] = e, t = 1 - a;
+        cur[t] -= d; cur[a] = Math.min(hp[a], cur[a] + hl);
+        if (!quiet) {
+          const fig = md.querySelector('.rdside.s' + a + ' .rdfig'), tf = md.querySelector('.rdside.s' + t + ' .rdfig');
+          fig.classList.remove('lunge'); void fig.offsetWidth; fig.classList.add('lunge');
+          if (c !== 2) { tf.classList.remove('struck'); void tf.offsetWidth; tf.classList.add('struck'); }
+          pop(t, c === 2 ? 'Miss' : '-' + fmt(d), c === 2 ? 'miss' : c ? 'crit' : 'dmg'); if (hl) pop(a, '+' + fmt(hl), 'heal');
+          c === 2 ? sfx.thud() : sfx.hit(c === 1);
+          lines.push('<b>' + esc(nm[a]) + '</b> ' + (c === 2 ? 'misses.' : (c ? 'lands a <em>critical</em> blow for ' : 'hits for ') + fmt(d) + (hl ? ' and recovers ' + fmt(hl) : '') + '.'));
+        }
+        return true;
+      };
+      const finish = () => {
+        if (done) return; done = true; clearInterval(timer);
+        while (step(true)); paint();
+        md.querySelector('.rdside.s' + (r.win ? 1 : 0)).classList.add('fallen');
+        const res = md.querySelector('#rd-res'); res.hidden = false; res.className = 'rdres ' + (r.win ? 'won' : 'lost');
+        res.innerHTML = '<h3>' + (r.win ? 'Victory' : 'Defeat') + '</h3><p>' + (r.dr >= 0 ? '+' : '') + r.dr + ' rating &middot; +' + r.ll + ' Laurels' + (r.fw ? ' (first win of the day bonus)' : '') + '</p>';
+        r.win ? sfx.relic() : sfx.fail();
+        const sk = md.querySelector('#rd-skip'); sk.textContent = 'Back to the Ring'; sk.className = 'btn'; sk.onclick = close;
+        rg.at = 0; loadRing(true);
+      };
+      const close = () => { clearInterval(timer); delete $('modal').dataset.lock; closeModal(); paintRing(); };
+      md.querySelector('#rd-x').onclick = () => { finish(); close(); };
+      md.querySelector('#rd-skip').onclick = finish;
+      paint(); sfx.boss();
+      timer = setInterval(() => { if (!step(false)) return finish(); paint(); }, 420);
+    });
+  }
+  if ($('ringbox')) $('ringbox').addEventListener('click', e => {
+    const v = e.target.closest('[data-rv]'); if (v) { rg.view = v.dataset.rv; paintRing(); if (v.dataset.rv !== 'kit') loadRing(); return; }
+    const d = e.target.closest('[data-duel]'); if (d) { ringDuel(d.dataset.duel, d); return; }
+    const k = e.target.closest('[data-kit]'); if (k) { ringKit(+k.dataset.kit, k); return; }
+    if (e.target.closest('#ring-ref')) { rg.sent = 0; loadRing(true); }
+  });
+  document.querySelectorAll('.tabs [data-tab="ring"]').forEach(b => b.addEventListener('click', () => { paintRing(); loadRing(); }));
+  // Keep the challenge timer fresh while the tab is open.
+  setInterval(() => { if (typeof tab !== 'undefined' && tab === 'ring' && !document.hidden && !$('modal').dataset.lock) { const a = document.activeElement; if (!a || !$('ringbox') || !$('ringbox').contains(a)) paintRing(); } }, 30000);
   // ---------- boot ----------
   checkEpoch(); wipedNotice(); paintAdminTab(); if (signedIn()) idToken().then(paintAdminTab);
   resize();

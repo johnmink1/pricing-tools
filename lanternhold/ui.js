@@ -1,4 +1,4 @@
-/* lh-build 202611231643 */
+/* lh-build 202611231722 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -3593,7 +3593,7 @@
     modal('<div class="maphead"><div><h2>Delver’s Guide</h2><small>Pick a topic.</small></div><button class="iconbtn" id="g-x" aria-label="Close guide">&times;</button></div>' +
       '<div class="gwrap"><nav class="gnav">' + GUIDE.map(x => '<button class="' + (x.id === c.id ? 'on' : '') + '" data-gcat="' + x.id + '">' + icon(x.icon) + '<span>' + x.name + '</span></button>').join('') + '</nav>' +
       '<div class="gbody">' + c.topics.map(([t, pic, sum, pts]) => '<section class="gcard">' + guidePic(pic) + '<div class="gtext"><h3>' + t + '</h3><p class="gsum">' + sum + '</p><ul>' + pts.map(x => '<li>' + x + '</li>').join('') + '</ul></div></section>').join('') + '</div></div>' +
-      '<div class="row"><button class="btn ghost" id="g-notes">What’s new</button><button class="btn ghost" id="g-tut">Replay the tutorial</button><button class="btn" id="g-ok">Close</button></div>', md => {
+      '<div class="row"><a class="btn ghost" href="https://lanternhold.born2gamellc.com/wiki/" target="_blank" rel="noopener">Full wiki</a><button class="btn ghost" id="g-notes">What’s new</button><button class="btn ghost" id="g-tut">Replay the tutorial</button><button class="btn" id="g-ok">Close</button></div>', md => {
         md.className = 'sheet wide guidesheet';
         md.querySelectorAll('[data-gcat]').forEach(b => b.onclick = () => { openGuide(b.dataset.gcat); const gb = $('modalbody').querySelector('.gbody'); if (gb) gb.scrollTop = 0; });
         md.querySelector('#g-notes').onclick = openNotes;
@@ -3606,6 +3606,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 54, date: 'November 23, 2026', title: 'The Lanternhold Wiki', items: [
+      'New: the <b>Lanternhold Wiki</b> at lanternhold.born2gamellc.com/wiki. Every class and skill tree, companion, region, monster, set, enchant and relic, with search.',
+      'It is built from the game itself, so it updates whenever the game does. Open it from <b>Full wiki</b> in the Guide (the ? at the top).'] },
     { v: 53, date: 'November 23, 2026', title: 'Easier sign-up', items: [
       'Fixed: confirming a new account could reject a correct-looking code after asking for several. The game no longer sends extra codes on its own, tells you when the newest one was sent, and ignores spaces in the code.',
       'Every sign-in screen now has <b>Play without an account</b>. Accounts are optional and only keep your save safe across devices.',

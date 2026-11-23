@@ -1958,80 +1958,249 @@
     });
     document.addEventListener('visibilitychange', () => { if (!document.hidden && chat.open) pollChat(); });
   }
-
   // ---------- map of the Lantern Deep ----------
-  // A cut-away of the descent: the Hold on top, one band per region, a winding trail of floors.
-  const MAP_W = 360, BAND = 168, TOP = 96;
+  // An illustrated cut-away of the descent: the Hold on top, one painted band per region, a winding trail
+  // of floors, rival delvers from the leaderboard, the Act One seal at the bottom, and a dossier per region.
+  const MAP_W = 360, BAND = 168, TOP = 104;
   function storyFloor(b) { const m = String(b.when).match(/maxFloorEver >= (\d+)/); return m ? +m[1] : 1; }
   function mapNode(f) {
     const r = Math.floor((f - 1) / 10), i = (f - 1) % 10, ltr = r % 2 === 0;
     const col = ltr ? i : 9 - i;
-    const x = 34 + col * 32.4, y = TOP + r * BAND + 76 + Math.sin(i * 1.3 + r) * 12 + (i % 2 ? 18 : 0);
+    const x = 34 + col * 32.4, y = TOP + r * BAND + 80 + Math.sin(i * 1.3 + r) * 12 + (i % 2 ? 18 : 0);
     return { x: Math.round(x), y: Math.round(y) };
+  }
+  const mrand = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  // Background art for each region, drawn behind the trail. Everything is original line art.
+  function scenery(r, y0, c) {
+    const R = mrand(r * 977 + 13), Y = y0 + BAND, g = [];
+    const spread = (n, fn) => { for (let k = 0; k < n; k++) g.push(fn(18 + (k + R() * 0.6) * (MAP_W - 30) / n, R())); };
+    switch (r) {
+      case 0: // barrels and hanging lamps
+        spread(5, (x, q) => '<g transform="translate(' + x + ' ' + (Y - 30 - q * 8) + ')"><rect x="-11" y="0" width="22" height="26" rx="6" fill="#3a2716"/><path d="M-11 7h22M-11 19h22" stroke="#6b4a2a" stroke-width="2"/></g>');
+        spread(4, (x, q) => '<path d="M' + x + ' ' + y0 + 'v' + (40 + q * 14) + '" stroke="#5b4630" stroke-width="1"/><circle cx="' + x + '" cy="' + (y0 + 44 + q * 14) + '" r="4" fill="' + c + '"/><circle cx="' + x + '" cy="' + (y0 + 44 + q * 14) + '" r="13" fill="' + c + '" opacity=".18" class="flick"/>');
+        break;
+      case 1: // gravestones and a crypt arch
+        spread(7, (x, q) => '<path d="M' + (x - 8) + ' ' + Y + 'v-' + (18 + q * 10) + 'a8 8 0 0 1 16 0v' + (18 + q * 10) + 'z" fill="#1d3024"/><path d="M' + x + ' ' + (Y - 12 - q * 8) + 'v-7M' + (x - 3) + ' ' + (Y - 16 - q * 8) + 'h6" stroke="#2f4a37" stroke-width="1.5"/>');
+        g.push('<path d="M250 ' + Y + 'v-62a36 36 0 0 1 72 0v62" fill="none" stroke="#24382b" stroke-width="6"/>');
+        break;
+      case 2: // glowing mushrooms and drifting spores
+        spread(8, (x, q) => { const h = 14 + q * 26, w = 9 + q * 12; return '<path d="M' + x + ' ' + Y + 'v-' + h + '" stroke="#3a2b4c" stroke-width="' + (3 + q * 3) + '"/><path d="M' + (x - w) + ' ' + (Y - h) + 'q' + w + ' -' + (w * 1.2) + ' ' + (2 * w) + ' 0z" fill="' + c + '" opacity=".55"/><ellipse cx="' + x + '" cy="' + (Y - h) + '" rx="' + (w * 1.6) + '" ry="' + w + '" fill="' + c + '" opacity=".12" class="flick"/>'; });
+        spread(10, (x, q) => '<circle cx="' + x + '" cy="' + (y0 + 40 + q * 90) + '" r="1.4" fill="' + c + '" class="drift"/>');
+        break;
+      case 3: // ribcages and salt crystals
+        spread(3, (x, q) => '<g transform="translate(' + x + ' ' + (Y - 6) + ')" stroke="#cfd9dc" stroke-width="2" fill="none" opacity=".7"><path d="M-30 0h60"/>' + [-20, -10, 0, 10, 20].map(d => '<path d="M' + d + ' 0q' + (d / 3) + ' -' + (22 - Math.abs(d) / 2) + ' ' + (d / 2) + ' -' + (30 - Math.abs(d) / 2) + '"/>').join('') + '</g>');
+        spread(6, (x, q) => '<path d="M' + x + ' ' + Y + 'l5 -' + (14 + q * 18) + 'l5 ' + (14 + q * 18) + 'z" fill="#b9d6de" opacity=".4"/>');
+        break;
+      case 4: // forge anvils and a lava river
+        g.push('<path d="M0 ' + (Y - 10) + 'Q90 ' + (Y - 22) + ' 180 ' + (Y - 12) + 'T360 ' + (Y - 14) + 'V' + Y + 'H0z" fill="#ff5a1f" opacity=".55" class="flick"/><path d="M0 ' + (Y - 10) + 'Q90 ' + (Y - 22) + ' 180 ' + (Y - 12) + 'T360 ' + (Y - 14) + '" stroke="#ffb15a" stroke-width="1.5" fill="none"/>');
+        spread(3, x => '<path d="M' + (x - 16) + ' ' + (Y - 18) + 'h32l-6 -8h10v-8h-40v8h10z" fill="#2a120a"/>');
+        spread(12, (x, q) => '<circle cx="' + x + '" cy="' + (Y - 30 - q * 100) + '" r="1.3" fill="#ffb15a" class="rise"/>');
+        break;
+      case 5: // a drowned window and the waterline
+        g.push('<path d="M262 ' + (y0 + 118) + 'v-58a26 26 0 0 1 52 0v58" fill="#0a1722" stroke="#2a4a5e" stroke-width="3"/><path d="M288 ' + (y0 + 40) + 'v78M262 ' + (y0 + 80) + 'h52" stroke="#2a4a5e" stroke-width="2"/><circle cx="288" cy="' + (y0 + 62) + '" r="8" fill="none" stroke="#6cc4e8" stroke-width="1.5" opacity=".7"/>');
+        g.push('<rect x="0" y="' + (Y - 34) + '" width="' + MAP_W + '" height="34" fill="#1b4a66" opacity=".35"/>' + [0, 1, 2].map(k => '<path d="M0 ' + (Y - 34 + k * 9) + 'q15 -5 30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0" stroke="#6cc4e8" stroke-width="1" fill="none" opacity="' + (0.5 - k * 0.14) + '" class="wave"/>').join(''));
+        break;
+      case 6: // roots reaching down from the ceiling
+        spread(6, (x, q) => '<path d="M' + x + ' ' + y0 + 'q' + (q * 30 - 15) + ' ' + (30 + q * 20) + ' ' + (q * 10 - 5) + ' ' + (60 + q * 40) + 'q-8 12 -2 ' + (20 + q * 10) + '" stroke="#5a4c22" stroke-width="' + (3 + q * 4) + '" fill="none" stroke-linecap="round"/>');
+        spread(5, (x, q) => '<path d="M' + (x - 14) + ' ' + Y + 'q14 -' + (16 + q * 14) + ' 28 0" fill="#2c2812"/>');
+        break;
+      case 7: // a vault of dead stars
+        spread(26, (x, q) => '<circle cx="' + x + '" cy="' + (y0 + 8 + q * (BAND - 16)) + '" r="' + (0.6 + R() * 1.4) + '" fill="#cfd4ff" opacity="' + (0.3 + R() * 0.6).toFixed(2) + '"' + (q > 0.6 ? ' class="twink"' : '') + '/>');
+        g.push('<circle cx="300" cy="' + (y0 + 128) + '" r="22" fill="#05040b" stroke="#9aa6ff" stroke-width="1" opacity=".8"/><circle cx="300" cy="' + (y0 + 128) + '" r="32" fill="none" stroke="#9aa6ff" stroke-width=".5" stroke-dasharray="2 4" opacity=".6"/>');
+        break;
+      case 8: // shards of Rift-glass
+        spread(9, (x, q) => '<path d="M' + x + ' ' + Y + 'l' + (4 + q * 6) + ' -' + (20 + q * 42) + 'l' + (6 + q * 4) + ' ' + (20 + q * 42) + 'z" fill="' + c + '" opacity="' + (0.18 + q * 0.3).toFixed(2) + '"/><path d="M' + (x + 4 + q * 6) + ' ' + (Y - 20 - q * 42) + 'l-2 ' + (12 + q * 20) + '" stroke="#e8fbff" stroke-width=".8" opacity=".6"/>');
+        break;
+      case 9: // the Bastion walls
+        g.push('<path d="M0 ' + Y + 'V' + (Y - 40) + Array.from({ length: 36 }, (_, k) => 'h10v' + (k % 2 ? 8 : -8)).join('') + 'V' + Y + 'z" fill="#1f1d18" stroke="#3a362c"/>');
+        g.push('<rect x="286" y="' + (Y - 84) + '" width="40" height="84" fill="#26231d" stroke="#3a362c"/><path d="M306 ' + (Y - 84) + 'v-22" stroke="#6b6658"/><path d="M306 ' + (Y - 106) + 'h18l-4 6 4 6h-18z" fill="#9fb4c8" class="flap"/>');
+        break;
+      case 10: // aqueduct arches and running water
+        g.push('<path d="M0 ' + (Y - 70) + 'H360v10H0z" fill="#1c3236"/>' + Array.from({ length: 6 }, (_, k) => '<path d="M' + (k * 62 + 6) + ' ' + Y + 'v-40a25 25 0 0 1 50 0v40" fill="none" stroke="#1c3236" stroke-width="7"/>').join(''));
+        spread(6, (x, q) => '<path d="M' + x + ' ' + (Y - 60) + 'v' + (30 + q * 30) + '" stroke="#5fd0c0" stroke-width="1" opacity=".5" stroke-dasharray="3 5" class="fall"/>');
+        break;
+      case 11: // pale trees of the Bone Orchard
+        spread(5, (x, q) => { const h = 40 + q * 40, a = 10 + q * 8; return '<path d="M' + x + ' ' + Y + 'v-' + h + 'm0 ' + (h * 0.35) + 'l-' + a + ' -' + (16 + q * 8) + 'm' + a + ' ' + (h * 0.2 + 16 + q * 8) + 'l' + (12 + q * 8) + ' -' + (20 + q * 10) + '" stroke="#e8dcc0" stroke-width="' + (2 + q * 2) + '" fill="none" stroke-linecap="round" opacity=".55"/><circle cx="' + (x - a) + '" cy="' + (Y - h * 0.65 - 16 - q * 8) + '" r="2.4" fill="#c84a4a" opacity=".8"/>'; });
+        break;
+      case 12: // the Stormglass Spire with lightning
+        g.push('<path d="M296 ' + Y + 'l10 -150l10 150z" fill="#1d2448" stroke="#3a4a8a"/><circle cx="306" cy="' + (y0 + 22) + '" r="5" fill="#cfe0ff" class="flick"/><path d="M306 ' + (y0 + 26) + 'l-14 24l10 -2l-12 26" stroke="#9ab8ff" stroke-width="1.6" fill="none" class="bolt"/><path d="M306 ' + (y0 + 26) + 'l18 20l-9 0l12 22" stroke="#9ab8ff" stroke-width="1.2" fill="none" class="bolt b2"/>');
+        spread(4, (x, q) => '<path d="M' + (x - 9) + ' ' + Y + 'l9 -' + (16 + q * 14) + 'l9 ' + (16 + q * 14) + 'z" fill="#151a33" stroke="#2a3466"/>');
+        break;
+      case 13: // the Nexus Scar: three alliance banners over a burning crack
+        g.push('<path d="M0 ' + (Y - 18) + 'l40 6l30 -10l40 12l36 -8l44 10l30 -6l40 8l40 -10l60 8" stroke="#ff6a8a" stroke-width="2" fill="none" opacity=".7" class="flick"/>');
+        ['#9fb4c8', '#ffd36b', '#d06bff'].forEach((col, k) => { const x = 210 + k * 46; g.push('<path d="M' + x + ' ' + Y + 'v-' + (78 - k * 6) + '" stroke="#4a3a40" stroke-width="2"/><path d="M' + x + ' ' + (Y - 78 + k * 6) + 'h22l-6 9l6 9h-22z" fill="' + col + '" opacity=".75" class="flap"/>'); });
+        break;
+      case 14: // the Rift Threshold itself
+        g.push('<path d="M300 ' + (y0 + 22) + 'q-18 40 6 70q-20 30 -4 66" stroke="#c9a6ff" stroke-width="7" fill="none" opacity=".25" class="flick"/><path d="M300 ' + (y0 + 22) + 'q-18 40 6 70q-20 30 -4 66" stroke="#efe2ff" stroke-width="1.6" fill="none"/>');
+        spread(12, (x, q) => '<circle cx="' + x + '" cy="' + (y0 + 20 + q * 140) + '" r="1.2" fill="#c9a6ff" class="drift"/>');
+        break;
+    }
+    // rocky ceiling between regions
+    let rock = 'M0 ' + y0; for (let x = 0; x <= MAP_W; x += 15) rock += 'L' + x + ' ' + Math.round(y0 + 3 + R() * (x % 30 ? 6 : 13));
+    return '<g class="mscene">' + g.join('') + '</g><path d="' + rock + 'L' + MAP_W + ' ' + y0 + 'z" fill="rgba(0,0,0,.55)"/>';
+  }
+  // Rival delvers from the public leaderboard, cached for a few minutes.
+  let rivals = null, rivalsAt = 0;
+  async function loadRivals() {
+    if (!CL || Date.now() - rivalsAt < 180000) return rivals; rivalsAt = Date.now();
+    try { const r = await fetch(CL.api.replace(/\/$/, '') + '/leaderboard'); if (r.ok) rivals = (await r.json()).top || []; } catch (e) {}
+    return rivals;
+  }
+  const ROMAN = ['', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+  let mapRegion = -1;
+  function regionInfo(r, base, reached) {
+    const b = L.BIOMES[r], first = base + r * 10 + 1, last = first + 9;
+    const known = first <= reached || (base === 0 && r === 0);
+    const cleared = reached > last, floors = Math.max(0, Math.min(10, reached - first + 1));
+    return { b, r, first, last, known, cleared, floors };
+  }
+  function dossier(r, base, reached) {
+    const x = regionInfo(r, base, reached), b = x.b, sd = L.SIDES[b.war.side];
+    if (!x.known) return '<div class="dos locked"><span class="dos-k">Region ' + (r + 1) + ' of ' + L.BIOMES.length + ' · Floors ' + x.first + '–' + x.last + '</span><h3>Unexplored</h3><p class="note">Nobody from the Hold has mapped this far. Reach floor ' + x.first + ' to chart it.</p></div>';
+    const lore = L.LORE.find(l => l.id === 'biome' + r), gl = L.LORE.find(l => l.id === 'g' + r);
+    const hasLore = lore && S.lore[lore.id], hasG = gl && S.lore[gl.id];
+    const mod = b.mod && L.MODS[b.mod];
+    const beats = base === 0 ? L.STORY.filter(s => S.story.seen[s.id] && s.id !== 'intro' && storyFloor(s) >= x.first && storyFloor(s) <= x.last) : [];
+    const here = (rivals || []).filter(p => p.floor >= x.first && p.floor <= x.last);
+    const to = Math.min(reached, x.last);
+    return '<div class="dos" style="--acc:' + b.accent + '">' +
+      '<span class="dos-k">Region ' + (r + 1) + ' of ' + L.BIOMES.length + ' · Floors ' + x.first + '–' + x.last + '</span>' +
+      '<h3>' + esc(b.name) + '</h3>' +
+      '<div class="dos-bar"><i style="width:' + x.floors * 10 + '%"></i></div><small class="dos-st">' + (x.cleared ? 'Conquered. The guardian is down.' : x.floors + ' of 10 floors charted') + '</small>' +
+      '<p class="dos-lore">' + (hasLore ? esc(lore.text) : '<i>Push deeper into this region to uncover its history in the Journal.</i>') + '</p>' +
+      '<dl class="dos-facts">' +
+        '<dt>Held by</dt><dd><b style="color:' + sd.color + '">' + esc(sd.name) + '</b> warbands: ' + b.war.units.map(esc).join(', ') + '</dd>' +
+        (b.foe ? '<dt>Native foe</dt><dd>' + esc(b.foe.name) + '</dd>' : '') +
+        (mod ? '<dt>Monster trick</dt><dd><b>' + esc(mod.name) + '.</b> ' + esc(mod.desc) + '</dd>' : '') +
+        '<dt>Guardian</dt><dd><b>' + esc(b.boss) + '</b>, floor ' + x.last + (x.cleared ? ' <span class="dos-ok">defeated</span>' : '') + (hasG ? '<br><small>' + esc(gl.text) + '</small>' : '') + '</dd>' +
+        (beats.length ? '<dt>Story</dt><dd>' + beats.map(s => '<button class="linkbtn" data-scene="' + s.id + '">Chapter ' + s.ch + ': ' + esc(s.title) + '</button>').join('') + '</dd>' : '') +
+        (here.length ? '<dt>Delvers here</dt><dd>' + here.slice(0, 6).map(p => esc(p.name) + ' <small>(floor ' + p.floor + ')</small>').join(', ') + '</dd>' : '') +
+      '</dl>' +
+      '<div class="dos-go"><button class="btn small" data-go="' + to + '">Travel to floor ' + to + '</button>' + (to > x.first ? '<button class="btn small ghost" data-go="' + x.first + '">Region entrance</button>' : '') + '</div></div>';
+  }
+  function overview(base, reached) {
+    const regs = L.BIOMES.map((_, r) => regionInfo(r, base, reached));
+    const known = regs.filter(x => x.known).length, done = regs.filter(x => x.cleared).length;
+    const ch = L.STORY.filter(s => S.story.seen[s.id] && s.id !== 'intro').length, chT = L.STORY.filter(s => s.id !== 'intro').length;
+    const sealed = !L.actTwoOpen(), days = Math.max(0, Math.ceil((L.ACT_TWO_AT - Date.now()) / 864e5));
+    return '<div class="dos"><span class="dos-k">Act One · The Lantern Deep</span><h3>Expedition record</h3>' +
+      '<div class="dos-grid"><div><small>Regions charted</small><b>' + known + '/' + regs.length + '</b></div><div><small>Guardians felled</small><b>' + done + '</b></div><div><small>Chapters</small><b>' + ch + '/' + chT + '</b></div><div><small>Deepest</small><b>' + reached + '</b></div></div>' +
+      '<p class="dos-lore">The Hold sits on a tear in the Shattered Reach. Below it the stair runs through fifteen regions, each held by a warband of the Grand War, down to the Nyx Rift. Tap a region on the map or in the strip above to read its dossier.</p>' +
+      (sealed ? '<p class="note">The way past floor ' + L.ACT_ONE_END + ' is sealed until Season 2 of the Grand War, ' + days + ' day' + (days === 1 ? '' : 's') + ' from now.</p>' : '') + '</div>';
   }
   function openMap() {
     const cyc = L.depthCycle(S.floor), base = cyc * 10 * L.BIOMES.length;
     const reached = S.maxFloor, cur = S.floor;
-    const H_ = TOP + L.BIOMES.length * BAND + 70;
-    let svg = '<svg class="deepmap" viewBox="0 0 ' + MAP_W + ' ' + H_ + '" role="img" aria-label="Map of the Lantern Deep">';
-    svg += '<defs>' + L.BIOMES.map((b, r) => '<linearGradient id="mg' + r + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + b.bg[0] + '"/><stop offset="1" stop-color="' + b.bg[1] + '"/></linearGradient>').join('') +
-      '<radialGradient id="mglow"><stop offset="0" stop-color="#ffcf7a" stop-opacity=".9"/><stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/></radialGradient></defs>';
-    // the Hold, on the surface
-    svg += '<rect x="0" y="0" width="' + MAP_W + '" height="' + TOP + '" fill="#2a2015"/><path d="M0 ' + (TOP - 8) + ' Q 90 ' + (TOP - 22) + ' 180 ' + (TOP - 10) + ' T 360 ' + (TOP - 12) + ' V ' + TOP + ' H 0 Z" fill="#1a130c"/>' +
-      '<g transform="translate(272 14)" fill="#c9a46a"><rect x="0" y="26" width="60" height="34" rx="2"/><rect x="8" y="10" width="14" height="18"/><rect x="38" y="10" width="14" height="18"/><rect x="24" y="0" width="12" height="28"/><circle cx="30" cy="40" r="7" fill="#ffd27a"/></g>' +
-      '<circle cx="302" cy="54" r="26" fill="url(#mglow)"/><text x="16" y="30" class="mt">The Hold</text><text x="16" y="46" class="ms">Iron Covenant fortress, Shattered Reach</text>';
-    L.BIOMES.forEach((b, r) => {
-      const y0 = TOP + r * BAND, first = base + r * 10 + 1, known = first <= reached || (cyc === 0 && r === 0);
-      svg += '<rect x="0" y="' + y0 + '" width="' + MAP_W + '" height="' + BAND + '" fill="url(#mg' + r + ')"/>';
-      svg += '<path d="M0 ' + (y0 + 2) + ' Q 120 ' + (y0 + 10 + (r % 2) * 8) + ' 240 ' + (y0 + 4) + ' T 360 ' + (y0 + 6) + '" stroke="rgba(0,0,0,.45)" stroke-width="3" fill="none"/>';
-      const sd = L.SIDES[b.war.side];
-      svg += '<text x="14" y="' + (y0 + 22) + '" class="mt" fill="' + b.accent + '">' + esc(known ? b.name : 'Unexplored') + '</text>';
-      svg += '<text x="14" y="' + (y0 + 37) + '" class="ms">Floors ' + first + '–' + (first + 9) + (known ? ' · ' + sd.name + ' warbands' : '') + '</text>';
-      if (!known) svg += '<rect x="0" y="' + (y0 + 44) + '" width="' + MAP_W + '" height="' + (BAND - 44) + '" fill="rgba(5,4,3,.55)"/>';
-    });
-    // the trail
+    const H_ = TOP + L.BIOMES.length * BAND + 96;
     const nodes = []; for (let k = 1; k <= 10 * L.BIOMES.length; k++) nodes.push(Object.assign({ f: base + k }, mapNode(k)));
-    const path = nodes.map((n, i) => (i ? 'L' : 'M') + n.x + ' ' + n.y).join(' ');
-    svg += '<path d="' + path + '" stroke="#000" stroke-opacity=".5" stroke-width="5" fill="none" stroke-linejoin="round"/>';
-    const lastIdx = Math.max(0, Math.min(nodes.length - 1, reached - base - 1));
-    svg += '<path d="' + nodes.slice(0, lastIdx + 1).map((n, i) => (i ? 'L' : 'M') + n.x + ' ' + n.y).join(' ') + '" stroke="#e9c98a" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round" fill="none"/>';
-    // story moments
-    const beats = cyc === 0 ? L.STORY.filter(b => S.story.seen[b.id] && b.id !== 'intro') : [];
-    for (const b of beats) { const f = Math.min(storyFloor(b), 80), n = nodes[f - 1]; if (!n) continue; svg += '<g class="mbeat" data-scene="' + b.id + '"><title>' + esc('Chapter ' + b.ch + ': ' + b.title) + '</title><circle cx="' + (n.x + 9) + '" cy="' + (n.y - 12) + '" r="6" fill="#1b140d" stroke="#e9c98a"/><text x="' + (n.x + 9) + '" y="' + (n.y - 9.5) + '" class="mb">' + b.ch + '</text></g>'; }
-    for (const n of nodes) {
-      const boss = L.isBossFloor(n.f), big = n.f % 10 === 0, ok = n.f <= reached, here = n.f === cur;
-      const b = L.BIOMES[Math.floor((n.f - base - 1) / 10)];
-      const r = big ? 9 : boss ? 6.5 : 3.6;
-      svg += '<g class="mnode' + (ok ? ' ok' : '') + (here ? ' here' : '') + '" data-floor="' + n.f + '"><title>' + (boss ? (big ? b.boss : 'Guardian') + ', floor ' + n.f : 'Floor ' + n.f) + (ok ? '' : ' (not reached)') + '</title>' +
-        (here ? '<circle cx="' + n.x + '" cy="' + n.y + '" r="16" fill="url(#mglow)" class="pulse"/>' : '') +
-        '<circle cx="' + n.x + '" cy="' + n.y + '" r="' + (r + 6) + '" fill="transparent"/>' +
-        '<circle cx="' + n.x + '" cy="' + n.y + '" r="' + r + '" fill="' + (ok ? (boss ? b.accent : '#e9c98a') : '#2b241c') + '" stroke="' + (boss ? '#1a120b' : 'rgba(0,0,0,.6)') + '" stroke-width="' + (boss ? 2 : 1) + '"/>' +
-        (big ? '<text x="' + n.x + '" y="' + (n.y + 3.5) + '" class="mk">' + (n.f < reached ? '✓' : '!') + '</text>' : '') +
-        (big && ok ? '<text x="' + n.x + '" y="' + (n.y + 24) + '" class="mg">' + esc(b.boss) + '</text>' : '') + '</g>';
-    }
-    // you are here
     const hn = nodes[cur - base - 1];
-    if (hn) svg += '<g class="youhere"><path d="M' + hn.x + ' ' + (hn.y - 12) + ' l-6 -11 h12 z" fill="#f2c14e" stroke="#1a120b"/><text x="' + hn.x + '" y="' + (hn.y - 27) + '" class="mh">You</text></g>';
-    // the Rift below
-    const yb = TOP + L.BIOMES.length * BAND;
-    svg += '<rect x="0" y="' + yb + '" width="' + MAP_W + '" height="70" fill="#07050d"/><path d="M150 ' + (yb + 14) + ' l12 18 l-8 4 l16 22 l-22 -18 l8 -4 z" fill="#9a7cff" opacity=".8"/><text x="' + MAP_W / 2 + '" y="' + (yb + 64) + '" class="mr">' + (S.story.seen.end ? 'The Nyx Rift. The stair keeps going.' : 'Something waits below.') + '</text>';
-    svg += '</svg>';
-    const depthName = cyc ? ' · Depth ' + ['', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'][Math.min(cyc, 7)] : '';
-    modal('<div class="maphead"><div><h2>The Lantern Deep' + depthName + '</h2><small>Deepest floor reached: <b>' + reached + '</b>. Tap a lit floor to travel there, or a numbered marker to replay that chapter.</small></div><button class="iconbtn" id="map-x" aria-label="Close map">&times;</button></div><div class="mapscroll">' + svg + '</div>' +
-      '<div class="maplegend"><span><i class="lg-f"></i>Floor</span><span><i class="lg-g"></i>Guardian</span><span><i class="lg-s">3</i>Story chapter</span><span><i class="lg-y"></i>You</span></div>', md => {
-        md.closest('.sheet') && md.closest('.sheet').classList.add('mapsheet');
-        const sc = md.querySelector('.mapscroll'), here = md.querySelector('.mnode.here');
-        if (here && sc) { const svgEl = md.querySelector('svg'), k = svgEl.getBoundingClientRect().height / H_; sc.scrollTop = Math.max(0, (hn ? hn.y : 0) * k - sc.clientHeight / 2); }
+    const build = () => {
+      let svg = '<svg class="deepmap" viewBox="0 0 ' + MAP_W + ' ' + H_ + '" role="img" aria-label="Map of the Lantern Deep">';
+      svg += '<defs>' + L.BIOMES.map((b, r) => '<linearGradient id="mg' + r + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + b.bg[0] + '"/><stop offset="1" stop-color="' + b.bg[1] + '"/></linearGradient>').join('') +
+        '<radialGradient id="mglow"><stop offset="0" stop-color="#ffcf7a" stop-opacity=".9"/><stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/></radialGradient>' +
+        '<radialGradient id="mrift"><stop offset="0" stop-color="#c9a6ff" stop-opacity=".7"/><stop offset="1" stop-color="#c9a6ff" stop-opacity="0"/></radialGradient>' +
+        '<pattern id="mfog" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#07060a"/><path d="M0 12L12 0" stroke="#15121a" stroke-width="2"/></pattern></defs>';
+      // the Hold on the surface, under the war sky
+      svg += '<rect x="0" y="0" width="' + MAP_W + '" height="' + TOP + '" fill="#0a0d18"/>' + Array.from({ length: 22 }, (_, k) => '<circle cx="' + ((k * 73) % MAP_W) + '" cy="' + (6 + (k * 37) % 50) + '" r="' + (k % 3 ? 0.7 : 1.2) + '" fill="#e8e2ff" opacity=".6"/>').join('') +
+        '<path d="M0 ' + (TOP - 26) + 'l40 -14l30 8l46 -22l40 18l50 -10l40 12l44 -20l40 14l30 -6V' + TOP + 'H0z" fill="#171425"/>' +
+        '<path d="M0 ' + (TOP - 8) + ' Q 90 ' + (TOP - 22) + ' 180 ' + (TOP - 10) + ' T 360 ' + (TOP - 12) + ' V ' + TOP + ' H 0 Z" fill="#1a130c"/>' +
+        '<g transform="translate(262 ' + (TOP - 82) + ')" fill="#3b3226" stroke="#c9a46a" stroke-width="1"><rect x="0" y="34" width="76" height="40"/><rect x="6" y="14" width="16" height="22"/><rect x="54" y="14" width="16" height="22"/><rect x="31" y="0" width="14" height="36"/><path d="M6 14l8 -8l8 8M54 14l8 -8l8 8M31 0l7 -8l7 8"/><rect x="32" y="52" width="12" height="22" fill="#1a130c"/></g>' +
+        '<circle cx="300" cy="' + (TOP - 56) + '" r="30" fill="url(#mglow)" class="flick"/><circle cx="300" cy="' + (TOP - 56) + '" r="4" fill="#ffe3a0"/>' +
+        '<text x="14" y="30" class="mt">The Hold</text><text x="14" y="46" class="ms">Iron Covenant fortress, Shattered Reach</text><text x="14" y="60" class="ms">The lantern seals the tear below.</text>';
+      L.BIOMES.forEach((b, r) => {
+        const x = regionInfo(r, base, reached), y0 = TOP + r * BAND, sd = L.SIDES[b.war.side];
+        svg += '<g class="mreg' + (mapRegion === r ? ' sel' : '') + '" data-region="' + r + '">';
+        svg += '<rect x="0" y="' + y0 + '" width="' + MAP_W + '" height="' + BAND + '" fill="url(#mg' + r + ')"/>';
+        if (x.known) svg += scenery(r, y0, b.accent);
+        else svg += '<rect x="0" y="' + y0 + '" width="' + MAP_W + '" height="' + BAND + '" fill="url(#mfog)" opacity=".92"/><path d="M0 ' + y0 + 'h' + MAP_W + '" stroke="#000" stroke-width="3"/>';
+        // the name plate sits on the side away from where the trail comes down into the region
+        const sub = 'Floors ' + x.first + '–' + x.last, w = x.known ? Math.max(160, Math.round(b.name.length * 8.6 + 22)) + (x.cleared ? 26 : 0) : 120;
+        const px = r % 2 === 0 ? MAP_W - 8 - w : 8, tx = px + 8;
+        svg += '<rect class="mplate" x="' + px + '" y="' + (y0 + 12) + '" width="' + w + '" height="36" rx="6" fill="rgba(4,7,13,.66)"/>';
+        svg += '<text x="' + tx + '" y="' + (y0 + 27) + '" class="mt" fill="' + (x.known ? b.accent : '#6b6375') + '">' + esc(x.known ? b.name : 'Unexplored') + '</text>';
+        svg += '<text x="' + tx + '" y="' + (y0 + 41) + '" class="ms">' + sub + (x.known ? ' · ' + esc(sd.name) : '') + '</text>';
+        if (x.cleared) svg += '<g transform="translate(' + (px + w - 16) + ' ' + (y0 + 30) + ')"><title>Guardian defeated</title><circle r="9" fill="none" stroke="' + b.accent + '"/><path d="M-4 0l2.5 3.5l5.5 -7" stroke="' + b.accent + '" stroke-width="2" fill="none"/></g>';
+        svg += '</g>';
+      });
+      // the trail
+      const path = nodes.map((n, i) => (i ? 'L' : 'M') + n.x + ' ' + n.y).join(' ');
+      svg += '<path d="M300 ' + (TOP - 30) + 'L' + nodes[0].x + ' ' + nodes[0].y + '" stroke="#e9c98a" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round" fill="none"/>';
+      svg += '<path d="' + path + '" stroke="#000" stroke-opacity=".55" stroke-width="6" fill="none" stroke-linejoin="round"/><path d="' + path + '" stroke="#3a3024" stroke-width="2" fill="none" stroke-linejoin="round"/>';
+      const lastIdx = Math.max(0, Math.min(nodes.length - 1, reached - base - 1));
+      svg += '<path d="' + nodes.slice(0, lastIdx + 1).map((n, i) => (i ? 'L' : 'M') + n.x + ' ' + n.y).join(' ') + '" stroke="#e9c98a" stroke-width="2.4" stroke-dasharray="1 4" stroke-linecap="round" fill="none" class="march"/>';
+      // story moments
+      const beats = cyc === 0 ? L.STORY.filter(b => S.story.seen[b.id] && b.id !== 'intro') : [];
+      for (const b of beats) { const n = nodes[Math.min(storyFloor(b), nodes.length) - 1]; if (!n) continue; svg += '<g class="mbeat" data-scene="' + b.id + '"><title>' + esc('Chapter ' + b.ch + ': ' + b.title) + '</title><path d="M' + (n.x + 9) + ' ' + (n.y - 5) + 'v-4" stroke="#e9c98a"/><circle cx="' + (n.x + 9) + '" cy="' + (n.y - 15) + '" r="7" fill="#1b140d" stroke="#e9c98a" stroke-width="1.4"/><text x="' + (n.x + 9) + '" y="' + (n.y - 12) + '" class="mb">' + b.ch + '</text></g>'; }
+      for (const n of nodes) {
+        const boss = L.isBossFloor(n.f), big = n.f % 10 === 0, ok = n.f <= reached, here = n.f === cur;
+        const b = L.BIOMES[Math.floor((n.f - base - 1) / 10)];
+        const r = big ? 10 : boss ? 6.5 : 3.8, d = r + 5;
+        svg += '<g class="mnode' + (ok ? ' ok' : '') + (here ? ' here' : '') + '" data-floor="' + n.f + '"><title>' + (boss ? (big ? b.boss : 'Guardian') + ', floor ' + n.f : 'Floor ' + n.f) + (ok ? '' : ' (not reached)') + '</title>' +
+          (here ? '<circle cx="' + n.x + '" cy="' + n.y + '" r="18" fill="url(#mglow)" class="pulse"/>' : '') +
+          '<circle cx="' + n.x + '" cy="' + n.y + '" r="' + (r + 6) + '" fill="transparent"/>' +
+          (big ? '<path d="M' + n.x + ' ' + (n.y - d) + 'l' + d + ' ' + d + 'l-' + d + ' ' + d + 'l-' + d + ' -' + d + 'z" fill="rgba(4,7,13,.75)" stroke="' + (ok ? b.accent : '#3a3340') + '" stroke-width="1.5"/>' : '') +
+          '<circle cx="' + n.x + '" cy="' + n.y + '" r="' + r + '" fill="' + (ok ? (boss ? b.accent : '#e9c98a') : '#2b241c') + '" stroke="' + (boss ? '#1a120b' : 'rgba(0,0,0,.6)') + '" stroke-width="' + (boss ? 2 : 1) + '"/>' +
+          (big ? (ok && n.f < reached ? '<path d="M' + (n.x - 4) + ' ' + n.y + 'l3 4l6 -8" stroke="#1a120b" stroke-width="2.2" fill="none"/>' : '<path d="M' + (n.x - 4) + ' ' + (n.y - 4) + 'l8 8M' + (n.x + 4) + ' ' + (n.y - 4) + 'l-8 8" stroke="' + (ok ? '#1a120b' : '#6b6375') + '" stroke-width="2"/>') : '') +
+          (big && ok ? '<text x="' + n.x + '" y="' + (n.y + 28) + '" class="mg">' + esc(b.boss) + '</text>' : '') + '</g>';
+      }
+      // rival delvers from the leaderboard
+      const me = S.hero && S.hero.name, seen = {};
+      for (const p of (rivals || []).slice(0, 20)) {
+        if (p.name === me || p.floor <= base || p.floor > base + nodes.length) continue;
+        const k = p.floor - base, n = nodes[k - 1]; if (!n) continue; const stack = seen[k] = (seen[k] || 0) + 1; if (stack > 2) continue;
+        const col = (L.SIDES[p.side] || L.SIDES.unsworn).color, ox = n.x - 10 - (stack - 1) * 9, oy = n.y + 13;
+        svg += '<g class="mrival"><title>' + esc(p.name + ', level ' + p.level + ', deepest floor ' + p.floor) + '</title><circle cx="' + ox + '" cy="' + oy + '" r="4.5" fill="' + col + '" stroke="#04070d" stroke-width="1.5"/>' + (stack === 1 ? '<text x="' + (ox - 7) + '" y="' + (oy + 3) + '" class="mrn">' + esc(p.name.slice(0, 12)) + '</text>' : '') + '</g>';
+      }
+      // you are here
+      if (hn) svg += '<g class="youhere"><path d="M' + hn.x + ' ' + (hn.y - 13) + ' l-7 -12 h14 z" fill="#f5c242" stroke="#1a120b"/><text x="' + hn.x + '" y="' + (hn.y - 30) + '" class="mh">' + esc(me || 'You') + '</text></g>';
+      // the seal and the Rift below
+      const yb = TOP + L.BIOMES.length * BAND, sealed = !L.actTwoOpen();
+      svg += '<rect x="0" y="' + yb + '" width="' + MAP_W + '" height="96" fill="#05030b"/><ellipse cx="' + MAP_W / 2 + '" cy="' + (yb + 56) + '" rx="150" ry="40" fill="url(#mrift)" class="flick"/>' +
+        '<path d="M' + (MAP_W / 2 - 8) + ' ' + (yb + 16) + 'q-14 22 6 40q-12 16 2 30" stroke="#efe2ff" stroke-width="2" fill="none"/>' +
+        (sealed ? '<g transform="translate(' + (MAP_W / 2) + ' ' + (yb + 40) + ')"><circle r="17" fill="#120d1e" stroke="#f5c242" stroke-width="1.5"/><rect x="-6" y="-2" width="12" height="10" rx="1.5" fill="#f5c242"/><path d="M-4 -2v-4a4 4 0 0 1 8 0v4" stroke="#f5c242" stroke-width="2" fill="none"/></g><text x="' + MAP_W / 2 + '" y="' + (yb + 78) + '" class="mr">Sealed until Season 2 · Act Two</text>' :
+          '<text x="' + MAP_W / 2 + '" y="' + (yb + 84) + '" class="mr">' + (S.story.seen.end ? 'The Nyx Rift. The stair keeps going.' : 'Something waits below.') + '</text>');
+      return svg + '</svg>';
+    };
+    const regs = L.BIOMES.map((_, r) => regionInfo(r, base, reached));
+    const chips = regs.map(x => '<button class="mchip' + (x.known ? '' : ' fog') + (x.cleared ? ' done' : '') + (mapRegion === x.r ? ' on' : '') + '" data-chip="' + x.r + '" style="--acc:' + x.b.accent + '" title="' + esc(x.known ? x.b.name : 'Unexplored') + '"><b>' + (x.r + 1) + '</b><span>' + esc(x.known ? x.b.name.replace(/^The /, '') : 'Unexplored') + '</span></button>').join('');
+    const depthName = cyc ? ' · Depth ' + ROMAN[Math.min(cyc, 7)] : '';
+    modal('<div class="maphead"><div><h2>The Lantern Deep' + depthName + '</h2><small>Deepest floor <b>' + reached + '</b>. Tap a lit floor to travel, a region to read its dossier, or a numbered marker to replay a chapter.</small></div><button class="iconbtn" id="map-x" aria-label="Close map">&times;</button></div>' +
+      '<div class="mchips" id="mchips">' + chips + '</div>' +
+      '<div class="mapbody"><div class="mapscroll">' + build() + '</div><aside class="mapdos" id="mapdos">' + (mapRegion >= 0 ? dossier(mapRegion, base, reached) : overview(base, reached)) + '</aside></div>' +
+      '<div class="maplegend"><span><i class="lg-f"></i>Floor</span><span><i class="lg-g"></i>Guardian</span><span><i class="lg-s">3</i>Chapter</span><span><i class="lg-r"></i>Other delvers</span><span><i class="lg-y"></i>You</span></div>', md => {
+        md.classList.add('mapsheet');
+        const sc = md.querySelector('.mapscroll');
+        const k = () => sc.querySelector('svg').getBoundingClientRect().height / H_;
+        const centre = (y, smooth) => sc.scrollTo({ top: Math.max(0, y * k() - sc.clientHeight / 2), behavior: smooth ? 'smooth' : 'auto' });
+        if (hn) centre(hn.y, false);
+        const pick = (r, scroll) => {
+          mapRegion = r;
+          md.querySelectorAll('.mreg').forEach(g => g.classList.toggle('sel', +g.dataset.region === r));
+          md.querySelectorAll('.mchip').forEach(c => c.classList.toggle('on', +c.dataset.chip === r));
+          $('mapdos').innerHTML = r >= 0 ? dossier(r, base, reached) : overview(base, reached);
+          $('mapdos').scrollTop = 0;
+          if (scroll && r >= 0) centre(TOP + r * BAND + BAND / 2, true);
+        };
+        const travel = f => { closeMap(); if (f !== S.floor) { L.gotoFloor(S, f); S.autoAdvance = f >= S.maxFloor; updateStage(); toast('map', 'Travelled to floor ' + f, L.biomeOf(f).name + (f < S.maxFloor ? '. Descend automatically is off so you stay here. Turn it back on to push deeper.' : '.'), ''); } };
         md.querySelector('#map-x').onclick = closeMap;
-        md.querySelector('svg').addEventListener('click', e => {
+        md.querySelector('#mchips').onclick = e => { const c = e.target.closest('[data-chip]'); if (c) pick(+c.dataset.chip === mapRegion ? -1 : +c.dataset.chip, true); };
+        $('mapdos').onclick = e => {
+          const go = e.target.closest('[data-go]'); if (go) { travel(+go.dataset.go); return; }
+          const sb = e.target.closest('[data-scene]'); if (sb) { const b = L.STORY.find(x => x.id === sb.dataset.scene); closeMap(); if (b) playScene(b, true); }
+        };
+        sc.onclick = e => {
           const bt = e.target.closest('.mbeat'); if (bt) { const b = L.STORY.find(x => x.id === bt.dataset.scene); closeMap(); if (b) playScene(b, true); return; }
-          const g = e.target.closest('.mnode.ok'); if (!g) return;
-          const f = +g.dataset.floor; closeMap();
-          if (f !== S.floor) { L.gotoFloor(S, f); S.autoAdvance = f >= S.maxFloor; updateStage(); toast('map', 'Travelled to floor ' + f, L.biomeOf(f).name + (f < S.maxFloor ? '. Descend automatically is off so you stay here. Turn it back on to push deeper.' : '.'), ''); }
+          const g = e.target.closest('.mnode.ok'); if (g) { travel(+g.dataset.floor); return; }
+          const rg = e.target.closest('.mreg'); if (rg) pick(+rg.dataset.region, false);
+        };
+        // rival delvers arrive a moment later from the leaderboard
+        if (CL && Date.now() - rivalsAt > 180000) loadRivals().then(() => {
+          if (!md.classList.contains('mapsheet') || $('modal').hidden || !rivals || !rivals.length) return;
+          const top = sc.scrollTop; sc.innerHTML = build(); sc.scrollTop = top; if (mapRegion >= 0) pick(mapRegion, false);
         });
       });
   }
-  function closeMap() { const sh = document.querySelector('.modal .sheet.mapsheet'); if (sh) sh.classList.remove('mapsheet'); closeModal(); }
+  function closeMap() { $('modalbody').classList.remove('mapsheet'); closeModal(); }
   $('btn-map').addEventListener('click', openMap);
 
   // ---------- update available ----------
@@ -2118,7 +2287,7 @@
     ['Job gear', '<p>A few pieces of gear carry a camp-job bonus, shown by an orange dot. It counts while the wearer works that job at the campfire. Fine gear has about a 2% chance, rare 6% and epic 15%.</p><p>Each job also has its own three-piece job set (helmet, feet and ring). These drop very rarely from guardians and chests from floor 20. Two pieces add +40% to that job and all three add +100%.</p>'],
     ['Resting at camp', '<p>When you return to camp, or drink a Campfire Draught, the party sits down around the fire. Nobody fights while you rest, and everyone heals up. Press Descend to head back down.</p>'],
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
-    ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten and where you are. Tap a floor you have reached to travel there.</p>'],
+    ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten, where you are and where other delvers have reached. Tap a floor you have reached to travel there, or tap a region to read its dossier: its history, who holds it, its monsters and its guardian.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
     ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
@@ -2141,6 +2310,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 18, date: 'November 22, 2026', title: 'A map worth reading', items: [
+      'The Map of the Deep is redrawn. Every region has its own painted scenery: lamp-lit cellars, glowing fungus, a lava river in the Cinder Forges, the drowned chapel window, the Bastion walls, lightning on the Stormglass Spire and the Rift itself.',
+      'Tap any region for its dossier: its history, which alliance’s warbands hold it, its native monster and trick, its guardian, the story chapters that happen there, and quick travel buttons.',
+      'A strip of all fifteen regions across the top. Unexplored regions stay under the fog until you reach them.',
+      'Other delvers from the leaderboard now appear on the map at their deepest floor.',
+      'An expedition record shows regions charted, guardians felled and chapters seen, and the Act One seal waits at the bottom.'] },
     { v: 17, date: 'November 22, 2026', title: 'Auto-train and the night watch', items: [
       'New Auto toggle under each Train button. Switch it on and that character trains whenever you have the gold, cheapest level first. Companions at the campfire auto-train while you are at camp.',
       'While you are away your party earns a quarter of its usual gold, for up to 8 hours.',

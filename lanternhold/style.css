@@ -1254,3 +1254,71 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
  .gpic.sprites img{height:58px}
 }
 .modal .sheet.wide{max-width:720px}
+/* Loot Goblin */
+.tag.thief{background:#2a3a14;color:#c8f08a;border-color:#4a6a24}
+.bar.lantern.flee i{background:linear-gradient(180deg,#c8f08a,#5aa042)}
+.gobhunt{display:flex;align-items:center;gap:8px;margin:0 auto;max-width:100%;padding:6px 12px;border-radius:999px;border:1px solid #4a6a24;background:linear-gradient(90deg,#14200e,#1a2a12);color:#cfe8b8;font-size:13px;cursor:pointer;text-align:left}
+.gobhunt[hidden]{display:none}
+.gobhunt svg{width:16px;height:16px;flex:none;color:#8fd16a}
+.gobhunt b{color:#fff}
+.gobhunt em{font-style:normal;font-weight:800;font-size:12px;color:#14200e;background:#8fd16a;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.gobhunt:hover{border-color:#8fd16a}
+.gobhunt b[class^="r-"]{color:var(--rc)}
+/* ---------- Dashboard v2: one screen on desktop, clear ability buttons, floating chat ---------- */
+.stagebar{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+.stagebar .mapbtn{margin:0}
+.stagebar .goal{flex:0 1 auto}
+.floorname b{font-size:26px}
+/* ability buttons: icon on top, full name, status line, cooldown fills along the bottom */
+.stage .skills,.stage .skills.more{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.stage .skill{flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:3px;padding:10px 6px 9px;min-height:86px;border-width:1.5px;transition:border-color .2s,box-shadow .2s,transform .1s}
+.stage .skill>div:not(.cd){width:100%}
+.stage .skill svg{width:30px;height:30px;padding:6px;box-sizing:content-box;border-radius:50%;background:color-mix(in srgb,var(--cc,var(--accent)) 14%,transparent)}
+.stage .skill b{font-size:13.5px;white-space:normal;line-height:1.15;overflow:visible;text-overflow:clip}
+.stage .skill small{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage .skill .cd{inset:auto 0 0 0;height:4px;background:var(--cc,var(--accent));opacity:.9;transform-origin:left}
+.stage .skill.ready{border-color:color-mix(in srgb,var(--cc,var(--accent)) 70%,transparent);box-shadow:0 0 14px color-mix(in srgb,var(--cc,var(--accent)) 22%,transparent)}
+.stage .skill.ready small{color:var(--text)}
+.stage .skill.ready:hover{transform:translateY(-1px)}
+.stage .skill:not(.ready):not(.active) svg{opacity:.55}
+.stage .skill.active{border-color:var(--cc,var(--accent));box-shadow:0 0 0 1px var(--cc,var(--accent)) inset,0 0 20px color-mix(in srgb,var(--cc,var(--accent)) 35%,transparent)}
+.stage .skill kbd{top:6px;right:8px;font-size:11px;color:var(--muted);background:var(--bg2);border:1px solid var(--line2);border-radius:5px;padding:0 5px;line-height:16px}
+.stage .skill.locked svg{background:none}
+/* the foe card, a little tighter */
+.stage .foe{padding:10px 14px;gap:6px}
+.stage .foename{font-size:17px}
+.stage .toggles{font-size:13.5px;gap:16px}
+/* desktop: everything fits on one screen; only the side panel's tab scrolls */
+@media (min-width:901px) and (min-height:620px){
+  #app{height:100vh;height:100dvh;min-height:0;overflow:hidden}
+  .layout{min-height:0;grid-template-rows:minmax(0,1fr);padding:12px 20px 14px}
+  .stage{min-height:0;gap:8px}
+  .stage .arena{flex:1 1 0;min-height:200px;aspect-ratio:auto}
+  .panel{position:static;max-height:none;height:100%}
+  .tabbody{padding-bottom:64px}
+}
+@media (min-width:901px) and (max-height:760px) and (min-height:620px){
+  .stage .skill{min-height:70px;padding:7px 6px}
+  .stage .skill svg{width:24px;height:24px;padding:4px}
+  .floorbar .nav{width:34px;height:34px}
+  .floorname b{font-size:22px}
+}
+/* Guild tab has room to breathe */
+#tab-guild .sub:first-child{margin-top:0}
+.tabs button{position:relative}
+.tabs .tdot{top:2px;right:0}
+/* floating chat */
+.chatfab{position:fixed;right:18px;bottom:18px;z-index:39;display:flex;align-items:center;gap:8px;padding:10px 16px 10px 12px;border-radius:999px;border:1px solid var(--line2);background:linear-gradient(180deg,#121b2c,#0b1220);color:var(--text);font:700 14px var(--body);box-shadow:0 10px 30px rgba(0,0,0,.5);cursor:pointer}
+.chatfab[hidden]{display:none}
+.chatfab svg{width:20px;height:20px;color:var(--accent)}
+.chatfab:hover{border-color:var(--accent)}
+.chatfab small{color:var(--muted);font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chatfab small:empty{display:none}
+.chatfab #chatdot{position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;background:var(--ember);border:2px solid var(--bg)}
+.chattitle{display:flex;align-items:center;justify-content:space-between;padding:8px 8px 0 14px}
+.chattitle b{font-family:var(--title);letter-spacing:.12em;text-transform:uppercase;font-size:13px;color:var(--muted)}
+.chattitle .iconbtn{width:32px;height:32px}
+.chattitle .iconbtn svg{width:18px;height:18px}
+.chat{height:440px}
+@media (max-width:720px){.chatfab{bottom:calc(76px + env(safe-area-inset-bottom));right:12px;padding:9px 13px 9px 10px}.chatfab span{display:none}.chat{bottom:calc(66px + env(safe-area-inset-bottom));height:60vh}}
+.campbar>div{min-width:120px}.campbar .btn.small{padding:6px 10px}

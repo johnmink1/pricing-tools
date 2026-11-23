@@ -3,6 +3,24 @@
   'use strict';
   const S = {};
 
+  S.goblin = { pal: { k: '#14120f', g: '#5aa042', l: '#8fd16a', s: '#8c6a3a', y: '#f2c14e', e: '#ffb020', v: '#53302a' }, px: [
+    '................',
+    '..kk.......kk...',
+    '.kssk.kkkkklgk..',
+    'kssssklllllgk...',
+    'ksyssklekleglk..',
+    'ksssskllllllk...',
+    'kssssklkyykk....',
+    '.kssssklllk.....',
+    '..kssskvvvlk....',
+    '...kssvvvvglk...',
+    '....kkvvvvgk....',
+    '.....kvvvvk.....',
+    '.....kggkggk....',
+    '.....kgk.kgk....',
+    '....kggk.kggk...',
+    '....kkkk.kkkk...',
+  ] };
   S.slime = { pal: { k: '#1b1020', g: '#5fbf5a', l: '#a6ea7e', d: '#327a3e', w: '#f4fbe8', e: '#14200f' }, px: [
     '................',
     '................',

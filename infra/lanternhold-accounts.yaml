@@ -1227,6 +1227,151 @@ Resources:
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub 'integrations/${WorldBossIntegration}'
 
+  # The Ember Ring (PvP): hero builds, ratings, Laurels and Ringwarden kit ranks, one row per player.
+  ArenaTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: lanternhold-arena
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pid
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pid
+          KeyType: HASH
+      Tags:
+        - Key: app
+          Value: lanternhold
+
+  ArenaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: arena-data
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:Scan, dynamodb:UpdateItem]
+                Resource: !GetAtt ArenaTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource: !GetAtt HeroesTable.Arn
+
+  ArenaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-arena
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 10
+      Role: !GetAtt ArenaFunctionRole.Arn
+      Environment:
+        Variables:
+          ARENA: !Ref ArenaTable
+          HEROES: !Ref HeroesTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/arena.js by infra/build.py
+          const E=require("@aws-sdk/client-dynamodb"),R=require("crypto"),T=new E.DynamoDBClient({}),{ARENA:g,HEROES:_}=process.env,a=(t,o)=>({statusCode:t,headers:{"content-type":"application/json"},body:JSON.stringify(o)}),v=t=>({S:String(t)}),S=t=>({N:String(t)}),I=t=>R.createHash("sha256").update("lh:"+t).digest("hex").slice(0,16),q=[[5,0,.02,0],[7,0,.015,0],[0,5,0,.015],[3,3,.01,.01],[0,7,0,.02]],j=t=>t>=10?1600:t>=5?1300:0,K=t=>40+25*t,D=10,z=30*6e4,y=1e3;function B(t){let o=0,c=0,b=1,h=1;return t.k.forEach((m,f)=>{const p=q[f];o+=p[0]*m,c+=p[1]*m,b+=p[2]*m,h+=p[3]*m}),{hp:Math.round((800+28*t.v)*b),at:Math.round((100+4*t.m)*h),E:c,R:o,c:t.c}}const l=(t,o,c)=>t&&t[o]?+t[o].N:c,M=t=>({id:t.pid.S,n:t.n.S,c:t.c.S,sd:t.sd.S,lv:l(t,"lv",1),m:l(t,"m",0),v:l(t,"v",0),k:(t.k?t.k.S:"0.0.0.0.0").split(".").map(Number),r:l(t,"r",y),pk:l(t,"pk",y),w:l(t,"w",0),l:l(t,"l",0),dw:l(t,"dw",0),dl:l(t,"dl",0),ll:l(t,"ll",0),et:l(t,"et",0),fd:t.fd?t.fd.S:""}),C=t=>({id:t.id,n:t.n,c:t.c,sd:t.sd,lv:t.lv,r:t.r,w:t.w,l:t.l,k:t.k,s:B(t)});exports.handler=async t=>{const o=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!o||!o.sub)return a(401,{error:1});const c=I(o.sub),b=Date.now(),h=t.routeKey,m=e=>({pid:v(e)});let f={};try{f=JSON.parse(t.isBase64Encoded?Buffer.from(t.body||"","base64").toString():t.body||"{}")}catch{return a(400,{error:1})}const p=async(e,i)=>(await T.send(new E.GetItemCommand({TableName:e,Key:m(i),ConsistentRead:!0}))).Item,A=(e,i,r,s)=>T.send(new E.UpdateItemCommand(Object.assign({TableName:g,Key:m(e),UpdateExpression:i,ExpressionAttributeValues:r,ReturnValues:"ALL_NEW"},s?{ConditionExpression:s}:{}))),N=e=>e&&Object.assign(C(e),{pk:e.pk,dw:e.dw,dl:e.dl,ll:e.ll,en:Math.max(0,D-Math.ceil(Math.max(0,e.et-b)/z)),et:e.et});try{if(h==="GET /arena"){const r=[];let s;do{const n=await T.send(new E.ScanCommand({TableName:g,ExclusiveStartKey:s}));r.push(...(n.Items||[]).filter(u=>u.n).map(M)),s=n.LastEvaluatedKey}while(s);const d=r.find(n=>n.id===c),w=d?d.r:y,O=r.slice().sort((n,u)=>u.r-n.r||u.w-n.w),k=r.filter(n=>n.id!==c).sort((n,u)=>Math.abs(n.r-w)-Math.abs(u.r-w)).slice(0,8);for(let n=k.length-1;n>0;n--){const u=Math.floor(Math.random()*(n+1));[k[n],k[u]]=[k[u],k[n]]}return a(200,{me:N(d),rank:d?O.indexOf(d)+1:0,n:r.length,top:O.slice(0,25).map(C),foes:k.slice(0,4).map(C)})}if(h==="PUT /arena"){const r=await p(_,c),s=w=>Math.max(0,Math.min(60,Math.round((+w||0)*10)/10));if(!r||!r.name||r.ban)return a(403,{error:"hero"});const d=await A(c,"SET n = :n, c = :c, sd = :s, lv = :l, m = :m, v = :v, t = :t, r = if_not_exists(r, :r), pk = if_not_exists(pk, :r)",{":n":r.name,":c":r.cls,":s":r.sd||v("unsworn"),":l":r.lv,":m":S(s(f.m)),":v":S(s(f.v)),":t":S(b),":r":S(y)});return a(200,{me:N(M(d.Attributes))})}const e=await p(g,c),i=e&&M(e);if(!i)return a(409,{error:"build"});if(h==="POST /arena/kit"){const r=Math.floor(f.p),s=i.k[r];if(!(r>=0&&r<5)||s>=15)return a(400,{error:"piece"});if(i.pk<j(s))return a(409,{error:"rating",need:j(s)});if(i.ll<K(s))return a(409,{error:"laurels"});const d=i.k.slice();d[r]++;const w=await A(c,"SET k = :k, ll = ll - :c",{":k":v(d.join(".")),":c":S(K(s)),":o":v(i.k.join("."))},"ll >= :c AND (k = :o OR attribute_not_exists(k))");return a(200,{me:N(M(w.Attributes))})}}catch(e){if(e.name==="ConditionalCheckFailedException")return a(409,{error:"state"});throw e}return a(404,{error:1})};
+
+  ArenaIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ArenaFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  ArenaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ArenaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  DuelFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-duel
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 10
+      Role: !GetAtt ArenaFunctionRole.Arn
+      Environment:
+        Variables:
+          ARENA: !Ref ArenaTable
+          HEROES: !Ref HeroesTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/duel.js by infra/build.py
+          const C=require("@aws-sdk/client-dynamodb"),j=require("crypto"),q=new C.DynamoDBClient({}),{ARENA:N,HEROES:J}=process.env,M=(t,a)=>({statusCode:t,headers:{"content-type":"application/json"},body:JSON.stringify(a)}),B=t=>({S:String(t)}),p=t=>({N:String(t)}),U=t=>j.createHash("sha256").update("lh:"+t).digest("hex").slice(0,16),_=[[5,0,.02,0],[7,0,.015,0],[0,5,0,.015],[3,3,.01,.01],[0,7,0,.02]],V=t=>t>=10?1600:t>=5?1300:0,G=t=>40+25*t,K=10,D=30*6e4,z=1e3;function O(t){let a=0,d=0,n=1,S=1;return t.k.forEach((h,s)=>{const c=_[s];a+=c[0]*h,d+=c[1]*h,n+=c[2]*h,S+=c[3]*h}),{hp:Math.round((800+28*t.v)*n),at:Math.round((100+4*t.m)*S),E:d,R:a,c:t.c}}const l=(t,a,d)=>t&&t[a]?+t[a].N:d,T=t=>({id:t.pid.S,n:t.n.S,c:t.c.S,sd:t.sd.S,lv:l(t,"lv",1),m:l(t,"m",0),v:l(t,"v",0),k:(t.k?t.k.S:"0.0.0.0.0").split(".").map(Number),r:l(t,"r",z),pk:l(t,"pk",z),w:l(t,"w",0),l:l(t,"l",0),dw:l(t,"dw",0),dl:l(t,"dl",0),ll:l(t,"ll",0),et:l(t,"et",0),fd:t.fd?t.fd.S:""}),A=t=>({id:t.id,n:t.n,c:t.c,sd:t.sd,lv:t.lv,r:t.r,w:t.w,l:t.l,k:t.k,s:O(t)});function x(t,a,d){const n=[O(t),O(a)],S=[],h=d()<.5?0:1;n.forEach(s=>s.h=s.hp);for(let s=0;s<80&&n[0].h>0&&n[1].h>0;s++){const c=(s+h)%2,o=n[c],b=n[1-c],e=d(),r=e<(o.c==="rogue"?.25:.12),i=e>.9,u=i?0:Math.round(o.at*(.7+.6*d())*(r?o.c==="rogue"?2:1.7:1)*(1+o.E/(o.E+300))*(1-.5*b.R/(b.R+300))*(b.c==="tank"?.85:1)*(o.c==="mage"&&s<4?1.7:1)*(s>=40?1.5:1));b.h-=u;const m=Math.max(0,Math.min(o.hp-o.h,Math.round(o.c==="healer"?o.hp*.025:o.c==="necro"?u*.2:0)));o.h+=m,S.push([c,u,i?2:r?1:0,m])}return{win:n[1].h<=0||n[0].h>0&&n[0].h/n[0].hp>=n[1].h/n[1].hp,log:S,first:h}}exports.handler=async t=>{const a=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!a||!a.sub)return M(401,{error:1});const d=U(a.sub),n=Date.now(),S=t.routeKey,h=e=>({pid:B(e)});let s={};try{s=JSON.parse(t.isBase64Encoded?Buffer.from(t.body||"","base64").toString():t.body||"{}")}catch{return M(400,{error:1})}const c=async(e,r)=>(await q.send(new C.GetItemCommand({TableName:e,Key:h(r),ConsistentRead:!0}))).Item,o=(e,r,i,u)=>q.send(new C.UpdateItemCommand(Object.assign({TableName:N,Key:h(e),UpdateExpression:r,ExpressionAttributeValues:i,ReturnValues:"ALL_NEW"},u?{ConditionExpression:u}:{}))),b=e=>e&&Object.assign(A(e),{pk:e.pk,dw:e.dw,dl:e.dl,ll:e.ll,en:Math.max(0,K-Math.ceil(Math.max(0,e.et-n)/D)),et:e.et});try{const e=await c(N,d),r=e&&T(e);if(!r)return M(409,{error:"build"});if(S==="POST /arena/fight"){const i=String(s.id||""),u=/^[0-9a-f]{16}$/.test(i)&&i!==d&&await c(N,i),m=u&&T(u);if(!m)return M(404,{error:"foe"});if(r.et>n+(K-1)*D)return M(429,{error:"tired"});let g=j.randomBytes(4).readUInt32LE(0);const E=x(r,m,()=>{g=g+1831565813|0;let w=Math.imul(g^g>>>15,1|g);return w=w+Math.imul(w^w>>>7,61|w)^w,((w^w>>>14)>>>0)/4294967296}),f=E.win?1:0,R=1/(1+Math.pow(10,(m.r-r.r)/400)),y=Math.round(32*(f-R)),H=Math.round(16*(f-R)),v=new Date(n).toISOString().slice(0,10),k=f&&r.fd!==v,I=f?Math.min(40,20+Math.max(0,Math.round((m.r-r.r)/20)))+(k?40:0):6,L=await o(d,"SET r = :r, pk = :pk, et = :et, fd = :fd ADD "+(f?"w":"l")+" :one, ll :ll",{":r":p(Math.max(0,r.r+y)),":pk":p(Math.max(r.pk,r.r+y)),":et":p(Math.max(r.et,n)+D),":fd":B(k?v:r.fd||"-"),":one":p(1),":ll":p(I),":o":p(r.et)},"et = :o OR attribute_not_exists(et)");return await o(i,"SET r = :r ADD "+(f?"dl :one":"dw :one, ll :d"),Object.assign({":r":p(Math.max(0,m.r-H)),":one":p(1)},f?{}:{":d":p(4)})),M(200,{win:!!f,log:E.log,first:E.first,dr:y,ll:I,fw:!!k,a:A(r),b:A(m),me:b(T(L.Attributes))})}}catch(e){if(e.name==="ConditionalCheckFailedException")return M(409,{error:"state"});throw e}return M(404,{error:1})};
+
+  DuelIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt DuelFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  DuelInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DuelFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  ArenaGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /arena
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ArenaIntegration}'
+
+  ArenaPutRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PUT /arena
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ArenaIntegration}'
+
+  ArenaKitRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /arena/kit
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ArenaIntegration}'
+
+  DuelRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /arena/fight
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${DuelIntegration}'
+
   PerksFunctionRole:
     Type: AWS::IAM::Role
     Properties:

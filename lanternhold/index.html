@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- lh-build 202611231443 -->
+<!-- lh-build 202611231444 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -51,7 +51,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611231443">
+<link rel="stylesheet" href="style.css?v=202611231444">
 </head>
 <body>
 <div id="app">
@@ -126,6 +126,7 @@
         <button data-tab="rekindle"><svg><use href="#i-star"/></svg><span>Skills</span><em id="kindcount"></em></button>
         <button data-tab="market"><svg><use href="#i-coin"/></svg><span>Market</span><i id="tradedot" class="tdot" hidden></i></button>
         <button data-tab="guild"><svg><use href="#i-crown"/></svg><span>Guild</span></button>
+        <button data-tab="ring"><svg><use href="#i-sword"/></svg><span>PvP</span></button>
         <button data-tab="codex"><svg><use href="#i-book"/></svg><span>Codex</span></button>
         <button data-tab="admin" id="tabadmin" hidden><svg><use href="#i-lock"/></svg><span>Admin</span></button>
       </nav>
@@ -146,6 +147,7 @@
         <div id="tradebox"></div>
       </div>
       <div class="tabbody" id="tab-guild" hidden><div id="boardwrap"></div></div>
+      <div class="tabbody" id="tab-ring" hidden><div id="ringbox"></div></div>
       <div class="tabbody" id="tab-gear" hidden>
         <div id="gearcamp"></div>
         <div class="whoseg" id="gearwho"></div>
@@ -245,12 +247,12 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611231443";</script>
-<script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611231443"></script>
-<script src="sprites.js?v=202611231443"></script>
-<script src="vector.js?v=202611231443"></script>
-<script src="ui.js?v=202611231443"></script>
 <div class="tip" id="tip" role="tooltip" hidden></div>
+<script>window.LH_BUILD = "202611231444";</script>
+<script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
+<script src="core.js?v=202611231444"></script>
+<script src="sprites.js?v=202611231444"></script>
+<script src="vector.js?v=202611231444"></script>
+<script src="ui.js?v=202611231444"></script>
 </body>
 </html>

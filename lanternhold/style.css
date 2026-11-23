@@ -1198,3 +1198,8 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 .invites .seat{gap:8px}
 .invwait{font-size:12px;font-weight:700;color:#f5c242;margin-right:6px;white-space:nowrap}
 .invact{display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:auto}
+/* Bag of Holding */
+.bohart{display:flex;justify-content:center;margin:6px 0 10px}
+.bohart svg{width:64px;height:64px;color:#f5c242;filter:drop-shadow(0 0 14px rgba(245,194,66,.45))}
+.sigbal.boh{margin-top:8px}
+.sigbal.boh svg{width:22px;height:22px;color:#f5c242;flex-shrink:0}

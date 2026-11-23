@@ -51,18 +51,18 @@ exports.handler = async (e) => {
     return res(200, { ok: true, add, bal: bal + add, mask: nm });
   }
   // Lantern Pass: 500 Sigils for 30 days of convenience perks, stacking onto any time left.
-  // The same route sells a stat reset ({ what: 'respec' }) for 50 Sigils.
+  // The same route sells a stat reset ({ what: 'respec' }) for 50 Sigils and the Bag of Holding ({ what: 'boh' }), once, for 6,500.
   if (e.routeKey === 'POST /store/pass') {
-    const K = { userId: S(cl.sub) }, w = (await db.send(new D.GetItemCommand({ TableName: W, Key: K }))).Item, rs = b.what === 'respec', c = rs ? 50 : 500;
+    const K = { userId: S(cl.sub) }, w = (await db.send(new D.GetItemCommand({ TableName: W, Key: K }))).Item, bh = b.what === 'boh', rs = bh || b.what === 'respec', c = bh ? 6500 : rs ? 50 : 500;
     const bal = w && w.bal ? +w.bal.N : 100, was = w && w.pass ? +w.pass.N : 0, until = Math.max(Date.now(), was) + 2592e6;
     if (bal < c) return res(400, { error: 'funds' });
     const v = { ':g': N(100), ':c': N(c), ':o': { SS: ['f.plain'] } };
     if (!rs) { v[':p'] = N(until); if (was) v[':w'] = N(was); }
     try {
-      await db.send(new D.UpdateItemCommand({ TableName: W, Key: K, UpdateExpression: 'SET bal = if_not_exists(bal, :g) - :c, own = if_not_exists(own, :o)' + (rs ? '' : ', pass = :p'),
-        ConditionExpression: (rs ? '' : (was ? 'pass = :w' : 'attribute_not_exists(pass)') + ' AND ') + '(attribute_not_exists(bal) OR bal >= :c)', ExpressionAttributeValues: v }));
+      await db.send(new D.UpdateItemCommand({ TableName: W, Key: K, UpdateExpression: 'SET bal = if_not_exists(bal, :g) - :c, own = if_not_exists(own, :o)' + (bh ? ', boh = :c' : rs ? '' : ', pass = :p'),
+        ConditionExpression: (bh ? 'attribute_not_exists(boh) AND ' : rs ? '' : (was ? 'pass = :w' : 'attribute_not_exists(pass)') + ' AND ') + '(attribute_not_exists(bal) OR bal >= :c)', ExpressionAttributeValues: v }));
     } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'state' }); throw x; }
-    return res(200, rs ? { ok: true, bal: bal - c } : { ok: true, pass: until, bal: bal - c });
+    return res(200, rs ? { ok: true, bal: bal - c, boh: bh || undefined } : { ok: true, pass: until, bal: bal - c });
   }
   return res(404, { error: 1 });
 };

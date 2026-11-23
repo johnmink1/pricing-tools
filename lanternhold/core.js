@@ -311,7 +311,7 @@
       mode: null, hero: null, guests: [],
       unlocked: [], levels: {}, party: [null, null, null, null, null],
       hp: {}, down: {}, abil: {}, minions: [], items: { draught: 1, oil: 0 }, campUntil: 0, jobs: {},
-      skills: {}, kindling: 0, bagUps: 0, unlocks: {},
+      skills: {}, kindling: 0, bagUps: 0, unlocks: {}, kup: {},
       relics: {}, embers: 0, feats: {},
       bag: [], gear: {}, lore: { hold: 1 },
       story: { seen: {}, queue: [] },
@@ -368,7 +368,7 @@
     const m = memberById(id);
     return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + 0.04 * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp') * (1 + campBonus(s, 'hp')) * (1 + sk(s, 'php') + (id === 'you' ? sk(s, 'hp') : 0)));
   }
-  function partyMult(s) { return emberMult(s) * (1 + 0.02 * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')) * (1 + sk(s, 'pdps')); }
+  function partyMult(s) { return emberMult(s) * (1 + kup(s, 'edge')) * (1 + 0.02 * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')) * (1 + sk(s, 'pdps')); }
   function memberDps(s, id, now) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id), c = CLASSES[m.cls];
@@ -391,9 +391,9 @@
     return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + 0.04 * s.embers) * (1 + 0.02 * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0));
   }
   function clickDamage(s, now) { return (1 + totalDps(s, now) * 0.05) * (1 + relicVal(s, 'whet')); }
-  function goldMult(s) { return emberMult(s) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
+  function goldMult(s) { return emberMult(s) * (1 + kup(s, 'purse')) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
   function critChance(s) { return 0.04 + relicVal(s, 'dice') + sk(s, 'crit'); }
-  function lanternTime(s) { return BASE_LANTERN + relicVal(s, 'lamp') + campBonus(s, 'lamp') + sk(s, 'lantern'); }
+  function lanternTime(s) { return BASE_LANTERN + kup(s, 'oil') + relicVal(s, 'lamp') + campBonus(s, 'lamp') + sk(s, 'lantern'); }
   function chestChance(s) { return 0.03 + relicVal(s, 'moth') + sk(s, 'chest'); }
   function abilityDuration(s, ab) { return ab.dur * (1 + relicVal(s, 'hourglass')); }
 
@@ -773,6 +773,32 @@
     if ((s.bagUps || 0) >= BAG_UPS_MAX || s.kindling < bagUpCost(s)) return false;
     s.kindling -= bagUpCost(s); s.bagUps = (s.bagUps || 0) + 1; return true;
   }
+  // Kindling upgrades: permanent account bonuses bought with Kindling. They are never refunded.
+  const KINDLE_UPS = [
+    { id: 'edge',    name: 'Lantern Edge',        desc: '+3% party damage per rank',                     per: 0.03, max: 5, base: 2, icon: 'sword' },
+    { id: 'purse',   name: 'Ember Purse',         desc: '+5% gold per rank',                             per: 0.05, max: 5, base: 2, icon: 'coin' },
+    { id: 'oil',     name: 'Deep Reservoir',      desc: '+3s lantern time against guardians per rank',   per: 3,    max: 5, base: 2, icon: 'lantern' },
+    { id: 'draught', name: 'Slow-burning Draught', desc: 'Campfire Draughts last 20s longer per rank',   per: 20,   max: 3, base: 1, icon: 'flame' },
+  ];
+  const kup = (s, id) => { const u = KINDLE_UPS.find(x => x.id === id); return ((s.kup || {})[id] || 0) * u.per; };
+  const kupCost = (s, id) => { const u = KINDLE_UPS.find(x => x.id === id), r = (s.kup || {})[id] || 0; return r >= u.max ? 0 : u.base + r * 2; };
+  function buyKup(s, id) {
+    const c = kupCost(s, id); if (!c || (s.kindling || 0) < c) return false;
+    s.kindling -= c; s.kup = s.kup || {}; s.kup[id] = (s.kup[id] || 0) + 1; return true;
+  }
+  // Class change: a costly respec. Kindling spent on the skill tree comes back; everything else stays spent.
+  const CLASS_CHANGE_COST = 15;
+  function changeClass(s, cls) {
+    if (!s.hero || !CLASSES[cls] || cls === s.hero.cls) return false;
+    const pool = (s.kindling || 0) + skillSpent(s);
+    if (pool < CLASS_CHANGE_COST) return false;
+    s.kindling = pool - CLASS_CHANGE_COST; s.skills = {};
+    s.gear.you = {}; // old-class gear goes back to the pack
+    for (const k in s.abil) if (k === 'you' || k.startsWith('you:')) delete s.abil[k];
+    s.hero.cls = cls; registerHero(s);
+    s.hp.you = maxHpOf(s, 'you'); delete s.down.you;
+    return true;
+  }
   // kind 'ring' opens the next ring (2 to 5), 'neck2' opens the second trinket.
   function unlockCost(s, id, kind) { const u = unlocksOf(s, id); return kind === 'neck2' ? (u.neck2 ? 0 : 3) : u.rings >= 4 ? 0 : u.rings + 1; }
   function unlockSlot(s, id, kind) {
@@ -969,7 +995,7 @@
   function useDraught(s, now) {
     now = now || Date.now();
     if (!s.items || !(s.items.draught > 0)) return false;
-    s.items.draught--; s.campUntil = Math.max(now, s.campUntil || 0) + DRAUGHT_TIME * 1000; return true;
+    s.items.draught--; s.campUntil = Math.max(now, s.campUntil || 0) + (DRAUGHT_TIME + kup(s, 'draught')) * 1000; return true;
   }
   function useOil(s) {
     if (!s.foe || !isBossFloor(s.floor) || !s.items || !(s.items.oil > 0) || s.lantern <= 0) return false;
@@ -1359,7 +1385,7 @@
     s.guests = o.guests || [];
     s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
     // Skill trees arrived after some players had already rekindled: 2 points for each past rekindle.
-    s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
+    s.kup = o.kup || {}; s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
     s.bagUps = o.bagUps || 0; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0;
     if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
     s.bag = (o.bag || []).map(normItem); s.gear = o.gear || {};
@@ -1375,7 +1401,7 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

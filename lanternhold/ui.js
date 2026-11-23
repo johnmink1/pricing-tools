@@ -1259,7 +1259,7 @@
   });
 
   // ---------- tabs ----------
-  let tab = 'party', cx = 'journal';
+  let tab = 'party', cx = 'war';
   $('codexseg').addEventListener('click', e => {
     const b = e.target.closest('[data-cx]'); if (!b) return;
     cx = b.dataset.cx;
@@ -1292,6 +1292,7 @@
     if (tab === 'gear') updateGear(force);
     if (tab === 'codex') {
       if (cx === 'journal' && force) updateJournal();
+      if (cx === 'war' && force) paintWarRoom();
       if (cx === 'relics' && (force || lastRelicCount !== Object.keys(S.relics).length)) updateRelics();
       if (cx === 'stats') { if (force || lastFeatCount !== L.featCount(S)) updateFeats(); updateLedger(); }
     }
@@ -1404,7 +1405,7 @@
     const draw = () => modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Lanternhold</h2></div>' +
       (note ? '<p class="center">' + note + '</p>' : '<p class="center">The Grand War burns across the Shattered Reach. Beneath a forgotten Hold, a single lantern keeps a tear in the Nyx Rift shut, and every alliance wants what lies under it. Take the lantern down.</p>') +
       '<h3 class="sub">Choose your class</h3><div class="classes">' + L.CLASS_ORDER.map(c => '<button class="pick cls' + (cls === c ? ' on' : '') + '" data-cls="' + c + '"><span class="ic c-' + c + '">' + icon(CLASS_ICON[c]) + '</span><b>' + L.CLASSES[c].name + '</b><small>' + CLASS_BLURB[c] + '</small></button>').join('') + '</div>' +
-      '<h3 class="sub">Pledge your banner</h3><div class="sides">' + L.SIDE_ORDER.map(k => { const d = L.SIDES[k]; return '<button class="pick side' + (side === k ? ' on' : '') + '" data-side="' + k + '" style="--side:' + d.color + '"><b>' + d.name + '</b><i>\u201c' + d.motto + '\u201d</i><small>' + d.desc + '</small><em>' + d.perk + '</em></button>'; }).join('') + '</div>' +
+      '<h3 class="sub">Pledge your banner</h3><div class="sides">' + L.SIDE_ORDER.map(k => { const d = L.SIDES[k]; return '<button class="pick side' + (side === k ? ' on' : '') + (WAR_ART[k] ? ' art' : '') + '" data-side="' + k + '" style="--side:' + d.color + (WAR_ART[k] ? ';--art:url(' + WAR_ART[k] + ')' : '') + '"><b>' + d.name + '</b><i>\u201c' + d.motto + '\u201d</i><small>' + d.desc + '</small><em>' + d.perk + '</em></button>'; }).join('') + '</div>' +
       '<h3 class="sub">Name your hero</h3><input id="h-name" maxlength="16" placeholder="2 to 16 letters" autocomplete="off"><div class="err" id="h-err"></div>' +
       '<div class="row" style="justify-content:center"><button class="btn big" id="h-go">Begin the descent</button></div>', md => {
         const nm = md.querySelector('#h-name'); nm.value = setup.heroName || '';
@@ -1433,7 +1434,7 @@
       '<div class="row"><button class="btn ghost" id="s-export">Copy backup</button><button class="btn ghost" id="s-import">Load backup</button><button class="btn danger" id="s-reset">Erase progress</button></div>' +
       '<div id="s-extra"></div>' +
       (window.LH_SUPPORT_URL ? '<p style="margin-top:16px">Lanternhold is free with no ads. If you enjoy it, you can <a style="color:var(--gold)" target="_blank" rel="noopener" href="' + window.LH_SUPPORT_URL + '">buy the developer a coffee</a>. Thank you.</p>' : '') +
-      '<p class="credits">Lanternhold v0.2 &middot; An original game by Born2Develop. Made with care, no ads, no tracking.</p>' +
+      '<p class="credits">Lanternhold &middot; A Grand War game by Born 2 Game, LLC. &copy; 2026 Born 2 Game, LLC. Made with care, no ads, no tracking.</p>' +
       '<div class="row"><button class="btn" id="s-close">Done</button></div>', m => {
         m.querySelector('#s-sound').onchange = e => { S.settings.sound = e.target.checked; };
         m.querySelector('#s-sci').onchange = e => { S.settings.notation = e.target.checked ? 'sci' : 'short'; updatePanel(true); };
@@ -1777,6 +1778,53 @@
     } catch (e) { box.innerHTML = '<p class="note">The leaderboard could not load right now. Try again in a minute.</p>'; lbAt = 0; }
   }
   $('codexseg').addEventListener('click', e => { if (e.target.closest('[data-cx="board"]')) loadBoard(); });
+  // ---------- the Grand War: season strip and war room ----------
+  const WAR_URL = 'https://war.born2gamellc.com/';
+  const WAR_ART = { covenant: WAR_URL + 'static/alliance-covenant.jpg', radiant: WAR_URL + 'static/alliance-ascendancy.jpg', tide: WAR_URL + 'static/alliance-tide.jpg' };
+  const SEASON = { n: 1, name: 'The First Incursion', start: Date.UTC(2026, 10, 1, 5), week1: Date.UTC(2026, 10, 8, 5), surge: Date.UTC(2027, 0, 24, 5), weeks: 12 };
+  function paintWarStrip() {
+    const now = Date.now(), wk = Math.max(1, Math.min(SEASON.weeks, Math.floor((now - SEASON.week1) / 6048e5) + 1));
+    const left = SEASON.surge - now, d = Math.floor(left / 864e5);
+    $('ws-season').textContent = 'Season ' + SEASON.n + ' · ' + SEASON.name + ' · week ' + wk + ' of ' + SEASON.weeks;
+    $('ws-surge').textContent = left > 0 ? 'Rift surge in ' + (d > 0 ? d + ' days' : Math.max(1, Math.floor(left / 36e5)) + ' hours') : 'The Rift has surged. Season 2 is coming.';
+  }
+  paintWarStrip(); setInterval(paintWarStrip, 60000);
+
+  function warCard(k, mine) {
+    const d = L.SIDES[k], art = WAR_ART[k];
+    return '<article class="wcard w-' + k + (mine ? ' mine' : '') + '" style="--side:' + d.color + '">' +
+      (art ? '<div class="wart" style="background-image:url(' + art + ')"></div>' : '<div class="wart plain"></div>') +
+      '<div class="wbody"><h4>' + d.name + (mine ? ' <em>Your banner</em>' : '') + '</h4><i>“' + d.motto + '”</i><p>' + WAR_TEXT[k] + '</p><small>On this front: ' + d.perk + '</small></div></article>';
+  }
+  const WAR_TEXT = {
+    covenant: 'Soldiers, builders and defenders who believe civilization survives only behind walls they are willing to die on. They would seal the Nyx Rift and send every reality home. The Hold above the Lantern Deep is a Covenant fortress, and Old Thessaly is the oldest warden they have.',
+    radiant: 'Ancient powers, chosen bloodlines and the fallen who traded everything for power, united by one belief: they were meant to rule. They would master the Rift and rule every reality through it. Their choirs and war-engines dig toward the lantern from every side.',
+    tide: 'Swarms, warbands and hungers without end. Every loss only makes them stronger. They would tear the Rift wider and feed on everything that falls through. Most of what crawls in the Lantern Deep once answered to them.',
+    mercy: 'Medics who cross every line of the war and fly no alliance’s banner. They patch up whoever is bleeding, Covenant, Radiant or Tide. Moss wears their green.',
+    unsworn: 'Delvers who swear to no one. The Rift does not care whose side you are on, and neither do they.',
+  };
+  function paintWarRoom() {
+    const box = $('warroom'); if (!box) return;
+    const mine = L.sideOf(S);
+    const left = SEASON.surge - Date.now(), d = Math.max(0, Math.floor(left / 864e5));
+    box.innerHTML =
+      '<section class="wroom-hero"><small>Born 2 Game · The Shattered Reach</small><h3>The Grand War</h3><p>Three alliances fight across thirteen sectors for the Nexus. Lanternhold is the war’s hidden front: the Lantern Deep, a tear of the Nyx Rift sealed under a Covenant hold.</p>' +
+      '<div class="wstats"><div><b>Season ' + SEASON.n + '</b><small>' + SEASON.name + '</small></div><div><b>' + (left > 0 ? d + ' days' : 'Now') + '</b><small>until the Rift surges</small></div><div><b>Act One</b><small>ends with the season</small></div></div>' +
+      '<a class="btn small" href="' + WAR_URL + '" target="_blank" rel="noopener">Open the war room ↗</a></section>' +
+      '<h3 class="sub">The alliances</h3><div class="wcards">' + ['covenant', 'radiant', 'tide'].map(k => warCard(k, k === mine)).join('') + '</div>' +
+      (mine === 'mercy' || mine === 'unsworn' ? '<div class="wcards one">' + warCard(mine, true) + '</div>' : '') +
+      '<h3 class="sub">How the war began</h3><div class="wlore">' +
+      '<p><b>The Rift.</b> It began as a wound in a dead-star sector: the Nyx Rift, a tear in the sky bleeding light that should not exist. Then it kept tearing. It cut sideways through the walls between realities and dragged whole worlds into one broken space, the Shattered Reach. Thirteen sectors that were never meant to share a sky now share one.</p>' +
+      '<p><b>The Nexus.</b> At the centre of the Reach, where every swallowed reality is knotted to every other, burns the Nexus. When the Rift surges at the end of each season, the alliance holding the most sectors seizes it and decides the Rift’s fate: sealed, ruled, or torn wider.</p>' +
+      '<p><b>The Lantern Deep.</b> One thin tear of the Rift runs under the Hold, and a lantern that has never gone out sits on top of it like a cork. Every alliance believes the Deep is a back door to the Nexus. Nobody up top believes in this front. The warbands down here know better.</p>' +
+      '<p><b>The Mercy Corps.</b> In the middle of it all, medics who answer to no banner carry the wounded out of every battle. In the real world the Corps raises food, toys and funds for local charities, and every supply run reinforces an alliance.</p></div>' +
+      '<h3 class="sub">Seasons and acts</h3><ol class="wtime">' +
+      '<li class="now"><b>Season 1 · The First Incursion</b><small>Nov 1, 2026 to Jan 24, 2027. Lanternhold Act One: fifteen regions down to the Lampmother.</small></li>' +
+      '<li><b>Season 2 · The Expansion</b><small>2027. Act Two opens below the Rift Threshold.</small></li>' +
+      '<li><b>The Long War</b><small>Every season after. Each new season of the war opens a new act of the Deep.</small></li></ol>';
+  }
+  $('codexseg').addEventListener('click', e => { if (e.target.closest('[data-cx="war"]')) paintWarRoom(); });
+  paintWarRoom();
 
   // ---------- chat: Global, Trade and Party ----------
   const CHAT_POLL_OPEN = 5000;
@@ -2089,6 +2137,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 16, date: 'November 22, 2026', title: 'The Grand War comes to the Deep', items: [
+      'A Grand War strip across the top shows the current season, the week, and how long until the Rift surges. Tap it to open the war room.',
+      'A new War page in the Codex: the three alliances with their banners, how the war began, the Nexus, the Mercy Corps, and how Lanternhold’s acts follow the war’s seasons.',
+      'Alliance banner art when you pledge your hero.',
+      'Lanternhold is a Grand War game by Born 2 Game, LLC.'] },
     { v: 15, date: 'November 22, 2026', title: 'Kindling upgrades and class changes', items: [
       'Four new ways to spend Kindling in the Skills tab: Lantern Edge (party damage), Ember Purse (gold), Deep Reservoir (lantern time) and Slow-burning Draught (longer Campfire Draughts). They are permanent.',
       'Change your hero’s class at camp for 15 Kindling. Every Kindling you spent on the skill tree comes back first. Pack space, gear slots and upgrades stay as they are.',

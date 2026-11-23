@@ -887,3 +887,45 @@ body.resting .arena{cursor:default}
 .respecs .btn svg{width:18px;height:18px}
 .respecs .btn.confirm{border-color:var(--accent);color:var(--accent)}
 .kitem .kp{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}
+/* ---------- Grand War chrome ---------- */
+.warstrip{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:7px 20px;background:linear-gradient(90deg,#04070d,#0c1322 45%,#04070d);border-bottom:1px solid #1f2a3d;color:#8b98ad;font:600 12px/1.3 'Chakra Petch',system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;text-decoration:none}
+.warstrip:hover{color:#e8eef8}
+.warstrip .ws-brand i{font-style:normal;color:#f5c242}
+.warstrip .ws-front{color:#e8eef8}
+.warstrip .ws-season{color:#e879f9}
+.warstrip .ws-surge{color:#f5c242}
+.warstrip .ws-go{margin-left:auto;color:#f5c242}
+@media (max-width:720px){.warstrip{gap:4px 12px;padding:6px 12px;font-size:10.5px;letter-spacing:.08em}.warstrip .ws-brand,.warstrip .ws-go,.warstrip .ws-front{display:none}}
+.top .brand small{font-family:'Chakra Petch',system-ui,sans-serif;letter-spacing:.14em}
+/* war room */
+.wroom-hero{position:relative;padding:18px 18px 16px;border-radius:14px;border:1px solid #1f2a3d;background:radial-gradient(120% 140% at 0% 0%,#16213a 0%,#04070d 60%);margin-bottom:6px;overflow:hidden}
+.wroom-hero::after{content:'';position:absolute;inset:0;background:radial-gradient(1px 1px at 20% 30%,#fff8,transparent),radial-gradient(1px 1px at 70% 20%,#fff6,transparent),radial-gradient(1px 1px at 85% 70%,#fff5,transparent),radial-gradient(1px 1px at 40% 80%,#fff4,transparent);pointer-events:none}
+.wroom-hero small{font:600 11px 'Chakra Petch',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8b98ad}
+.wroom-hero h3{font:700 30px/1.05 'Chakra Petch',sans-serif;letter-spacing:.04em;text-transform:uppercase;margin:4px 0 8px;color:#e8eef8}
+.wroom-hero p{color:#b9c3d4;margin:0 0 12px;max-width:62ch}
+.wstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.wstats div{border:1px solid #2a3650;border-radius:10px;padding:8px 10px;background:#0b1220cc}
+.wstats b{display:block;font:700 16px 'Chakra Petch',sans-serif;color:#f5c242}
+.wstats small{letter-spacing:.02em;text-transform:none;font:500 12px Inter,system-ui,sans-serif}
+.wcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.wcards.one{grid-template-columns:1fr;margin-top:10px}
+.wcard{border:1px solid #2a3650;border-top:3px solid var(--side);border-radius:12px;overflow:hidden;background:#0b1220}
+.wcard.mine{box-shadow:0 0 0 2px var(--side),0 8px 30px -12px var(--side)}
+.wcard .wart{aspect-ratio:1600/694;background:#0e1626 center/cover no-repeat}
+.wcard .wart.plain{aspect-ratio:auto;height:8px}
+.wcard .wbody{padding:10px 12px 12px}
+.wcard h4{margin:0;font:700 16px 'Chakra Petch',sans-serif;color:#e8eef8}
+.wcard h4 em{font:700 10px 'Chakra Petch',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#04070d;background:var(--side);border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:middle;font-style:normal}
+.wcard i{display:block;color:var(--side);margin:2px 0 6px}
+.wcard p{margin:0 0 8px;font-size:13.5px;color:#b9c3d4}
+.wcard small{color:#8b98ad;font-size:12px}
+.wlore p{color:var(--text);margin:0 0 10px}
+.wtime{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid #2a3650}
+.wtime li{position:relative;padding:0 0 12px 10px}
+.wtime li::before{content:'';position:absolute;left:-21px;top:4px;width:10px;height:10px;border-radius:50%;background:#2a3650}
+.wtime li.now::before{background:#f5c242;box-shadow:0 0 10px #f5c242}
+.wtime b{display:block;font:700 14px 'Chakra Petch',sans-serif}
+.wtime small{color:var(--muted)}
+@media (max-width:900px){.wcards{grid-template-columns:1fr}.wstats{grid-template-columns:1fr 1fr 1fr}}
+/* banner pick with alliance art */
+.pick.side.art{background-image:linear-gradient(180deg,#0b1220cc,#0b1220f2 55%),var(--art);background-size:cover;background-position:center top}

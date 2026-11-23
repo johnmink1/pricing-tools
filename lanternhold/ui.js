@@ -1,4 +1,4 @@
-/* lh-build 202611231445 */
+/* lh-build 202611231501 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1199,12 +1199,14 @@
       (maxed ? '<button class="btn ghost" disabled>Fully upgraded</button>' : '<button class="btn ghost iup" id="i-up"' + (cost > S.gold ? ' disabled' : '') + '><span>Upgrade to +' + (it.up + 1) + '</span><small>' + icon('coin') + fmt(cost) + ' &middot; ' + Object.entries(nextStats).map(([k, v]) => k.toLowerCase() + ' ' + pc(v)).join(', ') + '</small></button>') +
       '</div><div class="itools">' +
       tool('i-lk', 'lock', it.lk ? 'Unlock' : 'Lock', it.lk ? 'on' : '') +
+      (S.bag.some(x => L.mergeable(it, x)) ? tool('i-merge', 'relic', 'Merge', it.lk ? 'off' : '') : '') +
       (CL ? tool('i-mkt', 'coin', 'Sell', it.lk ? 'off' : '') + tool('i-send', 'users', 'Send', it.lk ? 'off' : '') + tool('i-link', 'chat', 'Link') : '') +
       tool('i-sell', 'flame', 'Salvage ' + fmt(L.salvageValue(it)), 'danger' + (it.lk ? ' off' : '')) + '</div>' +
       (it.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked. Mass scrap, a full pack and the Loot Goblin all leave it alone. Unlock it to sell, send or salvage.</p>' : '') + '</div>', md => {
         const locked = () => { toast('lock', 'This item is locked', 'Unlock it first to sell, send or salvage it.', 'warn'); };
         md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin.' : L.gearName(it) + ' can be scrapped and sold again.', ''); };
         const gate = f => () => { if (it.lk) return locked(); if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
+        const mg = md.querySelector('#i-merge'); if (mg) mg.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to merge it.', 'warn'); mergePicker(uid); };
         const mk = md.querySelector('#i-mkt'); if (mk) mk.onclick = gate(sellItem);
         const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
         const lk = md.querySelector('#i-link'); if (lk) lk.onclick = () => { closeModal(); linkItem(it); };
@@ -1224,6 +1226,41 @@
 
 
 
+
+  // ---------- merge: two copies of the same item become one at +1, or both are lost ----------
+  function mergePicker(uid) {
+    const it = L.itemOf(S, uid); if (!it) return;
+    const all = S.bag.filter(x => L.mergeable(it, x)).sort((a, b) => b.up - a.up);
+    if (!all.length) return itemModal(uid);
+    let pick = (all.find(x => !x.lk) || all[0]).uid;
+    const pct = v => Math.round(v * 1000) / 10 + '%';
+    const draw = () => {
+      const b = L.itemOf(S, pick), r = L.mergeRisk(S, it, b), wa = L.wearer(S, it.uid), wb = L.wearer(S, b.uid);
+      const blocked = it.lk || b.lk;
+      const row = x => { const wn = L.wearer(S, x.uid);
+        return '<div class="pkrow r-' + x.rar + (x.uid === pick ? ' sel' : '') + '" data-mp="' + x.uid + '" role="button" tabindex="0"><div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>' +
+          '<span class="pkt"><b>' + esc(L.gearName(x)) + (x.up ? ' +' + x.up : '') + '</b><small>Floor ' + x.ilvl + (x.aff ? ' &middot; ' + affText(x) : '') + (wn ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(wn).name) + '</i>' : '') + '</small></span>' +
+          (x.lk ? '<span class="cmp down">' + icon('lock') + 'Locked</span>' : '<span class="cmp eq">' + pct(L.mergeRisk(S, it, x).risk) + ' risk</span>') + '</div>'; };
+      modal('<div class="mergebox picker"><h2>' + icon('relic') + 'Merge ' + esc(L.gearName(it)) + '</h2>' +
+        '<p class="note">Pick the copy to merge in. The better job bonus is kept. ' + tipI('The higher the result, the bigger the risk. Every point of Luck and Intelligence lowers it, up to half. Nothing can buy the risk away.') + '</p>' +
+        '<div class="mglist">' + all.map(row).join('') + '</div>' +
+        '<div class="mgodds"><div><small>Result</small><b>+' + r.to + '</b></div><div class="ok"><small>Success</small><b>' + pct(1 - r.risk) + '</b></div><div class="bad"><small>Both destroyed</small><b>' + pct(r.risk) + '</b></div></div>' +
+        '<p class="mgcut">Base risk ' + pct(r.base) + ', cut by ' + Math.round(r.cut * 100) + '% from Luck ' + ((S.attr || {}).lck || 0) + ' and Intelligence ' + ((S.attr || {}).int || 0) + '.</p>' +
+        (wa || wb ? '<p class="note warn">A worn piece is part of this merge. If it fails, that slot ends up empty.</p>' : '') +
+        '<div class="row"><button class="btn ghost" id="mg-back">Back</button><button class="btn danger" id="mg-go"' + (blocked ? ' disabled' : '') + '>' + (blocked ? 'Unlock first' : 'Merge to +' + r.to) + '</button></div></div>', md => {
+          md.querySelectorAll('[data-mp]').forEach(e => e.onclick = () => { pick = e.dataset.mp; draw(); });
+          md.querySelector('#mg-back').onclick = () => itemModal(uid);
+          md.querySelector('#mg-go').onclick = () => {
+            if (!campGate()) return;
+            const res = L.mergeItems(S, uid, pick); if (!res) return;
+            save(); updateGear(true); updateSeats(true);
+            if (res.ok) { sfx.relic(); toast('relic', 'Merge succeeded', L.gearName(res.item) + ' is now +' + res.item.up + '.', ''); itemModal(res.item.uid); }
+            else { sfx.coin(); closeModal(); toast('skull', 'The merge failed', 'Both ' + L.gearName(res.a) + ' pieces were destroyed.', 'warn'); }
+          };
+        });
+    };
+    draw();
+  }
 
   // ---------- slot picker: tap a gear slot to choose what goes there ----------
   function slotPicker(id, pos) {
@@ -3192,6 +3229,10 @@
       ['Locking items', 'i:lock', 'Tap an item in your pack and choose Lock to protect it.', [
         'Locked items show a small padlock and are skipped by <b>Mass scrap</b>, auto-selling when your pack is full, and the <b>Loot Goblin</b>.',
         'You can still equip and upgrade a locked item. Unlock it to sell, send or salvage it.']],
+      ['Merging items', 'i:relic', 'Merge two copies of the same item into one at +1.', [
+        'Open an item and choose <b>Merge</b> when you own another copy. The result is one upgrade above the higher of the two, up to +' + L.UP_MAX + '.',
+        'If the merge fails, <b>both pieces are destroyed</b>. Risk starts at 8% for +1 and climbs about 6% per level.',
+        'Each point of <b>Luck</b> and <b>Intelligence</b> cuts that risk, up to half. Locked items cannot be merged.']],
       ['Mass scrap and Mass sell', 'i:coin', 'Clear out your pack in one go from the Gear tab.', [
         '<b>Mass scrap</b> turns the rarities you tick into gold right away.',
         '<b>Mass sell</b> lists them on the market at their current value, up to 25 listings at a time. You get mail with the gold as each one sells.',
@@ -3305,6 +3346,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 46, date: 'November 23, 2026', title: 'Merge your gear', items: [
+      'Have two of the same item? Open one and choose Merge. They become a single piece one upgrade higher, keeping the better job bonus.',
+      'Every merge carries a risk: if it fails, both pieces are destroyed for good. The higher the result, the bigger the risk.',
+      'Luck and Intelligence lower the risk, up to half. The exact odds show before you confirm, and locked items can never be merged.'] },
     { v: 45, date: 'November 23, 2026', title: 'A cleaner screen', items: [
       'The top bar is tidier. Gold, damage, Embers and Sigils now sit together in one strip.',
       'Hover over almost anything to see what it does. On a phone, tap the small i badges.',

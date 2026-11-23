@@ -667,19 +667,61 @@
   });
   setInterval(paintCamp, 500);
 
-  // ---------- store ----------
+  // ---------- store: supplies and tonics, for gold or Sigils ----------
+  let qmBusy = false;
   function openStore() {
+    const now = Date.now();
     const row = it => {
-      const p = L.shopPrice(S, it.id), have = (S.items && S.items[it.id]) || 0;
-      return '<div class="trow"><div class="tile r-' + (it.id === 'draught' ? 'epic' : 'rare') + '">' + icon(it.icon) + '</div><div class="tinfo"><b>' + it.name + '</b><small>' + it.desc + '</small><small>You have ' + have + '.</small></div><div class="tact"><span class="price">' + icon('coin') + fmt(p) + '</span><button class="btn small" data-buy="' + it.id + '"' + (p > S.gold ? ' disabled' : '') + '>Buy</button></div></div>';
+      const p = L.shopPrice(S, it.id), have = (S.items && S.items[it.id]) || 0, sg = L.ITEM_SIGILS[it.id], t = L.tonicById(it.id), left = t ? L.tonicLeft(S, it.id, now) : 0;
+      const full = t && left + t.min * 60 > L.TONIC_CAP + 1;
+      return '<div class="trow"><div class="tile r-' + (t ? 'fine' : it.id === 'draught' ? 'epic' : 'rare') + '">' + icon(it.icon) + '</div><div class="tinfo"><b>' + it.name + '</b><small>' + it.desc + '</small><small>You have ' + have + '.' + (left ? ' <span class="tleft">Active, ' + fmtTime(left) + ' left</span>' : '') + '</small></div>' +
+        '<div class="tact">' + (t && have ? '<button class="btn small" data-drink="' + it.id + '"' + (full ? ' disabled title="Already at the 60 minute limit"' : '') + '>Drink</button>' : '') +
+        '<button class="btn small ghost" data-buy="' + it.id + '"' + (p > S.gold ? ' disabled' : '') + '>' + icon('coin') + fmt(p) + '</button>' +
+        (sg && CL && signedIn() ? '<button class="btn small ghost sigbuy" data-sbuy="' + it.id + '"' + (typeof prof !== 'undefined' && prof && prof.bal < sg ? ' disabled' : '') + '>' + sigil + sg + '</button>' : '') + '</div></div>';
     };
-    modal('<div class="maphead"><div><h2>The Quartermaster</h2><small>Old Thessaly keeps a stall by the campfire. Prices follow how much gold you earn.</small></div><button class="iconbtn" id="st-x" aria-label="Close">&times;</button></div><div class="tlist store">' + L.SHOP.map(row).join('') + '</div>' +
-      '<p class="note small">Use a Campfire Draught from the camp bar in the Party or Gear tab. Lantern Oil appears under the lantern during guardian fights.</p>', md => {
+    const sup = L.SHOP.filter(x => !L.tonicById(x.id)), ton = L.TONICS;
+    const bal = typeof prof !== 'undefined' && prof ? '<span class="stbal">' + sigil + fmt(prof.bal) + ' ' + TOKEN + '</span>' : '';
+    modal('<div class="maphead"><div><h2>The Quartermaster</h2><small>Old Thessaly keeps a stall by the campfire. Pay in gold, or in ' + TOKEN + ' to skip the saving up.</small></div>' + bal + '<button class="iconbtn" id="st-x" aria-label="Close">&times;</button></div>' +
+      '<h3 class="sub">Tonics</h3><div class="tlist store">' + ton.map(row).join('') + '</div>' +
+      '<p class="note small">Each tonic is a small boost for a short time. Different tonics stack, and drinking the same one again adds time, up to 60 minutes.</p>' +
+      '<h3 class="sub">Supplies</h3><div class="tlist store">' + sup.map(row).join('') + '</div>' +
+      '<p class="note small">Gold prices follow how much gold you earn. Use a Campfire Draught from the camp bar in the Party or Gear tab. Lantern Oil appears under the lantern during guardian fights.</p>', md => {
         md.className = 'sheet wide';
         md.querySelector('#st-x').onclick = closeModal;
-        md.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (L.buyShop(S, b.dataset.buy, 1)) { sfx.coin(); save(); openStore(); paintCamp(); } });
+        md.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (L.buyShop(S, b.dataset.buy, 1)) { sfx.coin(); save(); openStore(); paintCamp(); paintTonics(); } });
+        md.querySelectorAll('[data-drink]').forEach(b => b.onclick = () => drink(b.dataset.drink, true));
+        md.querySelectorAll('[data-sbuy]').forEach(b => b.onclick = async () => {
+          if (qmBusy) return; qmBusy = true; b.disabled = true;
+          const id = b.dataset.sbuy;
+          try { const r = await papi('POST', '/store/pass', { what: 'item', id, n: 1 }); prof.bal = r.bal; S.items[id] = (S.items[id] || 0) + 1; save(); try { pushCloud(true); } catch (e) {} sfx.buy(); openStore(); paintCamp(); paintTonics(); }
+          catch (e) { b.disabled = false; toast('lock', 'That did not go through', e.code === 'funds' ? 'Not enough ' + TOKEN + '.' : 'Try again in a moment.', 'warn'); }
+          qmBusy = false;
+        });
       });
+    if (CL && signedIn() && typeof prof !== 'undefined' && !prof) loadProfile().then(() => { if (!$('modal').hidden && $('modalbody').querySelector('#st-x')) openStore(); });
   }
+  function drink(id, fromStore) {
+    const t = L.tonicById(id);
+    if (!L.drinkTonic(S, id, Date.now())) return;
+    sfx.relic(); save(); toast(t.icon, t.name, t.desc.replace(/ for .*$/, '') + ' for ' + fmtTime(L.tonicLeft(S, id)) + '.', 'feat');
+    if (fromStore) openStore(); paintTonics();
+  }
+  // Active tonics show as small timers above the ability bar; tap one you carry to drink it again.
+  let tonicKey = '';
+  function paintTonics() {
+    const now = Date.now(), box = $('tonicbar');
+    const act = L.TONICS.filter(t => L.tonicLeft(S, t.id, now) > 0), carry = L.TONICS.filter(t => !L.tonicLeft(S, t.id, now) && (S.items[t.id] || 0) > 0);
+    const key = act.map(t => t.id).join() + '|' + carry.map(t => t.id + S.items[t.id]).join();
+    box.hidden = !act.length && !carry.length;
+    if (key !== tonicKey) {
+      tonicKey = key;
+      box.innerHTML = act.map(t => '<button class="tonic on" data-tonic="' + t.id + '" title="' + esc(t.name + ': ' + t.desc) + '">' + icon(t.icon) + '<span></span></button>').join('') +
+        carry.map(t => '<button class="tonic" data-tonic="' + t.id + '" title="Drink ' + esc(t.name) + ': ' + esc(t.desc) + '">' + icon(t.icon) + '<span>&times;' + S.items[t.id] + '</span></button>').join('');
+    }
+    box.querySelectorAll('.tonic.on').forEach(b => { b.querySelector('span').textContent = fmtTime(L.tonicLeft(S, b.dataset.tonic, now)); });
+  }
+  $('tonicbar').addEventListener('click', e => { const b = e.target.closest('[data-tonic]'); if (b) drink(b.dataset.tonic); });
+  setInterval(paintTonics, 1000);
 
   const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const buyN = () => S.settings.buy === 'max' ? 'max' : +S.settings.buy;
@@ -2916,7 +2958,7 @@
     ['Lantern Pass', '<p>The Lantern Pass costs 500 Sigils for 30 days, and buying it again adds another 30. It only makes the game more convenient and never makes you stronger:</p><ul><li><b>Auto</b> training buttons for every character</li><li><b>+10 bag slots</b></li><li><b>+4 hours</b> of earning while you are away</li></ul><p>Every save gets a free 3-day trial. Tap any locked Auto button to start it, or find the pass under <b>Customize profile</b> on your hero’s portrait.</p><p><b>Bag of Holding</b>: a one-time buy for 6,500 Sigils that gives you an endless pack. Nothing is ever auto-sold for lack of room. Find it next to your pack on the Gear tab.</p>'],
     ['Your banner', '<p>Your hero flies one of five banners, and each gives a perk: Iron Covenant +15% party health, Radiant Ascendancy +12% party damage, Devouring Tide +15% gold, Mercy Corps +15% healing, Unsworn +5% health, damage and gold.</p><p><b>Banner kin</b>: every companion or recruited hero in your party who flies your banner makes your perk 40% stronger. The line above your party shows how many kin you have. Banner chat is a good place to find them.</p>'],
     ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in. Want more Sigils? Press <b>Get Sigils</b>, sign in once with your Born 2 Game store account, and buy a pack. It lands in your wallet within a minute.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset. You can also trade Sigils with other players for gold on the <b>Sigils</b> page of the Trading Post.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
-    ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
+    ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p><b>Tonics</b> from the Store give a small boost for 10 or 15 minutes: damage, health, healing, crit, gold, gear drops or hero XP. Different tonics stack, and the same tonic adds time up to an hour. Tap a tonic above your abilities to drink it. Everything in the Store can be bought with gold, or with Sigils to skip the saving up.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
     ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Invite</b>. The player sees your invite and chooses to accept or decline. Once they accept, their hero joins your party the next time you are at camp. Heroes marked <b>Online now</b> belong to players who are playing right now, so they can answer quickly. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too. When someone invites it, the invite shows at the top of the Players Guild with <b>Accept</b> and <b>Decline</b>. Accepting lends a copy of your hero to their party, earns you gold, and does not change your own game.</p>'],
     ['Trading Post: market and mail', '<p>Open the <b>Trading Post</b> (the bag button at the top) to trade gear with other players. It needs a free account.</p><p><b>Market</b>: browse gear by class and buy it for gold. To sell, tap an item in your Gear tab and choose <b>Sell on market</b>. Listings last a week, and you can take yours down any time. When something sells, the gold arrives in your mailbox.</p><p><b>Mail</b>: tap an item and choose <b>Send to a player</b> to send it to someone you have recruited or chatted with. Leave the price at 0 for a gift, or set a price they pay if they accept. They can decline, and you can take an offer back until they answer.</p><p>Gold and gear are in-game only and have no real-money value.</p>'],
@@ -2937,6 +2979,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 34, date: 'November 23, 2026', title: 'Tonics at the Quartermaster', items: [
+      'Seven new tonics: Draught of Fury (+15% damage), Ironbark Tonic (+15% health), Mender’s Brew (+20% healing), Keen-Eye Elixir (+5% crit), Prospector’s Luck (+15% gold), Seeker’s Charm (+15% gear drops) and Scholar’s Ink (+25% hero XP).',
+      'Each lasts 10 or 15 minutes. Different tonics stack, and drinking the same one again adds time, up to an hour.',
+      'Buy them, the Campfire Draught and Lantern Oil with gold, or with Sigils to skip the saving up. Open the Store on the camp bar.',
+      'Tonics you carry show above your abilities. Tap one to drink it.'] },
     { v: 33, date: 'November 23, 2026', title: 'A new home', items: [
       'Lanternhold now lives at lanternhold.born2gamellc.com. The old address brings you here, along with the progress saved on your device.',
       'If you play with an account, sign in once more here. Your saved progress is waiting.'] },

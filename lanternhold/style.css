@@ -1203,3 +1203,16 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 .bohart svg{width:64px;height:64px;color:#f5c242;filter:drop-shadow(0 0 14px rgba(245,194,66,.45))}
 .sigbal.boh{margin-top:8px}
 .sigbal.boh svg{width:22px;height:22px;color:#f5c242;flex-shrink:0}
+/* tonics */
+.tonicbar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.tonic{display:inline-flex;align-items:center;gap:5px;padding:4px 9px 4px 6px;border-radius:999px;border:1px solid var(--line2,#2a3650);background:#0b1220;color:#e8eef8;font:600 12px Inter,sans-serif;cursor:pointer}
+.tonic svg{width:16px;height:16px;color:#9fb0c8}
+.tonic.on{border-color:rgba(245,194,66,.7);background:rgba(245,194,66,.09)}
+.tonic.on svg{color:#f5c242}
+.tonic:hover{border-color:#f5c242}
+.tleft{color:#f5c242;font-weight:700}
+.store .tact{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.store .tact .btn svg{width:14px;height:14px;vertical-align:-2px;margin-right:3px}
+.sigbuy .sigil{fill:#c99bff}
+.stbal{display:inline-flex;align-items:center;gap:4px;font:600 13px Inter,sans-serif;color:#e8eef8;margin-left:auto;margin-right:10px;white-space:nowrap}
+.stbal .sigil{width:15px;height:15px;fill:#c99bff}

@@ -1,4 +1,4 @@
-/* lh-build 202611231542 */
+/* lh-build 202611231544 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -536,9 +536,57 @@
   // ---------- events ----------
   let pendingGold = 0, lastGoldFloat = 0, sealedToast = false;
   const RARITY_COLOR = { common: '#d8cfb8', fine: '#8fcf6a', rare: '#6cc4e8', epic: '#c78bff', set: '#f2c14e' };
+  // ---------- fight log (John, 2026-11-23): a short record of what happened in recent fights ----------
+  const FLOG = [], FLOG_MAX = 120, flogThrottle = {};
+  let flogTaken = 0, flogDirty = false;
+  const nm = id => { const m = id && L.memberById(id); return m ? esc(m.name) : 'Someone'; };
+  function flog(kind, text, key, gap) {
+    const now = Date.now();
+    if (key) { if (flogThrottle[key] && now - flogThrottle[key] < gap) return; flogThrottle[key] = now; }
+    FLOG.unshift({ t: now, kind, text }); if (FLOG.length > FLOG_MAX) FLOG.length = FLOG_MAX; flogDirty = true;
+  }
+  function logEv(e) {
+    switch (e.type) {
+      case 'hit': if (e.crit && !e.auto) flog('fight', '<b>Critical strike</b> for ' + fmt(e.dmg), 'crit', 1500); break;
+      case 'foehit': flogTaken += e.dmg || 0; if (S.foe && S.foe.boss && e.target !== 'minion') flog('party', nm(e.target) + ' takes ' + fmt(e.dmg) + ' from ' + esc(S.foe.name), 'bh' + e.target, 4000); break;
+      case 'kill': { const f = e.foe || {}; flog('fight', (f.boss ? '<b>Guardian down:</b> ' : f.chest ? 'Opened ' : 'Defeated ') + esc(f.name || 'a foe') + ' <em>+' + fmt(e.gold || 0) + ' gold' + (flogTaken ? ', party took ' + fmt(flogTaken) : '') + '</em>'); flogTaken = 0; break; }
+      case 'ability': flog('party', nm(e.id) + ' uses <b>' + esc(e.name || (L.CLASSES[e.cls] && L.CLASSES[e.cls].ability.name) || 'an ability') + '</b>' + (e.dmg ? ' for ' + fmt(e.dmg) : ''), 'ab' + e.id, 2000); break;
+      case 'fall': flog('party', '<b class="bad">' + nm(e.id) + ' falls</b>'); break;
+      case 'revive': flog('party', '<b class="good">' + nm(e.id) + ' is back up</b>'); break;
+      case 'dodge': flog('party', nm(e.target) + ' dodges', 'dg' + e.target, 5000); break;
+      case 'poison': flog('party', nm(e.id) + ' is poisoned', 'ps' + e.id, 6000); break;
+      case 'ambush': if (e.first) flog('fight', e.guarded ? nm(e.target) + ' guards the rear from an ambush' : '<b class="bad">Ambush!</b> ' + nm(e.target) + ' is hit from behind'); break;
+      case 'pack': flog('fight', '<b class="bad">Ambush pack:</b> ' + e.n + ' monsters attack together'); break;
+      case 'ward': flog('fight', 'The foe raises a ward', 'ward', 4000); break;
+      case 'wipe': flog('party', '<b class="bad">The party is beaten</b>' + (e.name ? ' by ' + esc(e.name) : '')); break;
+      case 'bossfail': flog('fight', '<b class="bad">The lantern ran out</b> before the guardian fell'); break;
+      case 'newfloor': flog('fight', 'Reached a new depth: <b>floor ' + e.floor + '</b>'); break;
+      case 'loot': flog('loot', 'Found <b class="r-' + e.item.rar + '" style="color:var(--rc)">' + esc(L.gearName(e.item)) + '</b>'); break;
+      case 'autosell': flog('loot', 'Pack full: sold ' + esc(L.gearName(e.item))); break;
+      case 'sigil': flog('loot', 'Found <b>' + e.n + ' Sigils</b>'); break;
+      case 'relic': flog('loot', 'Relic: <b>' + esc(e.relic.name) + '</b>' + (e.level > 1 ? ' (level ' + e.level + ')' : '')); break;
+      case 'goblinflee': flog('loot', '<b class="bad">The Loot Goblin escaped</b>' + (e.item ? ' with ' + esc(L.gearName(e.item)) : '')); break;
+      case 'goblinkill': flog('loot', '<b class="good">Loot Goblin slain</b>' + (e.item ? ', ' + esc(L.gearName(e.item)) + ' recovered' : '')); break;
+      case 'herolevel': flog('party', nm('you') + ' reaches <b>level ' + e.lv + '</b>'); break;
+    }
+  }
+  let flogFilter = 'all';
+  try { flogFilter = localStorage.getItem('lh_flogf') || 'all'; } catch (e) {}
+  function paintFlog(force) {
+    const box = $('flog'); if (!box || !box.parentElement.open || (!flogDirty && !force)) return; flogDirty = false;
+    const now = Date.now(), ago = t => { const s = Math.round((now - t) / 1000); return s < 60 ? s + 's' : Math.round(s / 60) + 'm'; };
+    const rows = FLOG.filter(x => flogFilter === 'all' || x.kind === flogFilter).slice(0, 60);
+    box.querySelector('.flist').innerHTML = rows.length ? rows.map(x => '<li class="fk-' + x.kind + '"><span>' + x.text + '</span><time>' + ago(x.t) + '</time></li>').join('') : '<li class="none">Nothing yet. Fights show up here as they happen.</li>';
+    box.querySelectorAll('[data-ff]').forEach(b => b.classList.toggle('on', b.dataset.ff === flogFilter));
+  }
+  setInterval(paintFlog, 700);
+  document.addEventListener('click', e => { const b = e.target.closest('[data-ff]'); if (!b) return; flogFilter = b.dataset.ff; try { localStorage.setItem('lh_flogf', flogFilter); } catch (x) {} paintFlog(true); });
+  document.addEventListener('toggle', e => { if (e.target.id === 'flogbox') { try { localStorage.setItem('lh_flog', e.target.open ? '1' : ''); } catch (x) {} paintFlog(true); } }, true);
+  try { if (localStorage.getItem('lh_flog') && $('flogbox')) $('flogbox').open = true; } catch (e) {}
   function handleEvents() {
     let kills = 0, gold = 0;
     for (const e of events) {
+      logEv(e);
       if (e.type === 'hit') {
         if (!e.auto || Math.random() < 0.4) floatText(fmt(e.dmg), e.crit ? 'crit' : e.auto ? 'auto' : '', FOE_X + (Math.random() - 0.5) * 0.2, 0.42 + (Math.random() - 0.5) * 0.2);
         foeAnim.flash = tAnim + 0.06; foeAnim.shake = tAnim + 0.08;
@@ -692,6 +740,15 @@
       '<button class="btn small" data-camp="go" data-tip="Change everything at the main camp. You restart at floor ' + top + '.">Return to camp</button>' +
       '<button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + ' data-tip="' + (n ? 'Change gear here for 60 seconds and keep your floor.' : 'No Draughts left. Buy more in the Store.') + '">Draught · ' + n + '</button>' + store + '</div>';
   }
+  // Sub-views keep the Gear and Skills tabs short: one thing at a time.
+  const subView = (tabId, key, def) => {
+    let v = def; try { v = localStorage.getItem(key) || def; } catch (e) {}
+    const box = $(tabId), seg = box && box.querySelector('.subseg'); if (!seg) return;
+    const set = x => { v = x; box.dataset.view = x; seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === x)); try { localStorage.setItem(key, x); } catch (e) {} };
+    seg.addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) set(b.dataset.v); });
+    set(v);
+  };
+  subView('tab-gear', 'lh_gearv', 'kit'); subView('tab-rekindle', 'lh_skillv', 'stats');
   let campWas = null;
   function paintCamp() {
     const h = campBarHtml();
@@ -790,10 +847,10 @@
     document.querySelectorAll('#seats [data-hp]').forEach(i => { const id = i.dataset.hp; i.style.width = Math.max(0, (S.hp[id] || 0) / L.maxHpOf(S, id) * 100) + '%'; });
   }
   // Companion traits: position, kinship and camp. Working ones glow.
-  function traitChips(id) {
+  function traitChips(id, compact) {
     const st = L.traitState(S, id); if (!st) return '';
     const t = st.t, chip = (kind, on) => { const x = L.traitText(kind, t[kind]), w = kind === 'pos' ? L.POS_NAME[t.pos.at].toLowerCase() + ' seat' : kind === 'kin' ? 'with a ' + L.CLASSES[t.kin.cls].name.toLowerCase() : 'at camp';
-      return '<span class="trait g' + t[kind].g + (on ? ' on' : '') + '" title="' + esc(x.name + ' (' + x.grade + '). ' + x.when + ': ' + x.fx + '.') + '"><b>' + esc(x.name) + '</b> ' + esc(x.fx) + ' <i>' + esc(w) + '</i></span>'; };
+      return '<span class="trait g' + t[kind].g + (on ? ' on' : '') + '" title="' + esc(x.name + ' (' + x.grade + '). ' + x.when + ': ' + x.fx + '.') + '">' + (compact ? '<b>' + esc(x.name) + '</b>' : '<b>' + esc(x.name) + '</b> ' + esc(x.fx) + ' <i>' + esc(w) + '</i>') + '</span>'; };
     return '<div class="traits">' + chip('pos', st.pos) + chip('kin', st.kin) + chip('camp', st.camp) + '</div>';
   }
   function updateSeats(force) {
@@ -843,9 +900,9 @@
       const m = L.memberById(id), job = L.jobOf(S, id);
       const n = buyN() === 'max' ? Math.max(1, L.maxAffordable(S, id)) : buyN(), cost = L.trainCost(S, id, n);
       return '<div class="seat bench">' + portrait(id) + '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + '</div><div class="lv">Level ' + L.lvl(S, id) + ' &middot; ' + esc(m.title) + '</div>' +
-        '<div class="jobline' + (job ? ' on' : '') + '">' + (job ? icon(job.icon) + '<b>' + job.name + '</b> ' + L.jobText(job, L.jobValue(S, job, id)) : 'No camp job. Give them one to help the party.') + '</div>' + traitChips(id) + '</div>' +
-        '<div class="acts"><button class="buy" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button>' + '<button class="autot' + ((S.autoTrain || {})[id] && L.passOn(S) ? ' on' : '') + (L.passOn(S) ? '' : ' locked') + '" data-autot="' + id + '" title="Auto-train: spend gold on this character automatically" aria-pressed="' + !!(S.autoTrain || {})[id] + '">' + icon('refresh') + 'Auto</button>' +
-        '<button class="rest" data-jobfor="' + id + '">' + (job ? 'Change job' : 'Give a job') + '</button><button class="rest" data-seat="' + id + '">Bring along</button></div></div>';
+        '<div class="jobline' + (job ? ' on' : '') + '">' + (job ? icon(job.icon) + '<b>' + job.name + '</b> ' + L.jobText(job, L.jobValue(S, job, id)) : 'No camp job yet') + '</div>' + traitChips(id, true) + '</div>' +
+        '<div class="acts"><button class="buy" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button><div class="minis">' + '<button class="autot' + ((S.autoTrain || {})[id] && L.passOn(S) ? ' on' : '') + (L.passOn(S) ? '' : ' locked') + '" data-autot="' + id + '" title="Auto-train: spend gold on this character automatically" aria-pressed="' + !!(S.autoTrain || {})[id] + '">' + icon('refresh') + 'Auto</button>' +
+        '<button class="rest" data-jobfor="' + id + '" data-tip="' + (job ? 'Change their camp job' : 'Give them a camp job that helps the party') + '">Job</button><button class="rest" data-seat="' + id + '" data-tip="Bring them into your party">Bring</button></div></div></div>';
     }).join('');
     if (!bench.length) benchHtml = jobsHtml + '<p class="note">No one is at the fire. Companions who rest here can take a job that helps the whole party.</p>';
     if ($('bench').dataset.h !== benchHtml) { $('bench').innerHTML = benchHtml; $('bench').dataset.h = benchHtml; }
@@ -1129,6 +1186,7 @@
       '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>' +
       '<div class="dollbar"><small>' + cname + ' gear only. Tap a slot to change it. Worn gear stays on the character, not in the pack.</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
+    { const pn = $('packn'); if (pn) pn.textContent = L.packCount(S); }
     $('bagcount').textContent = S.boh ? L.packCount(S) + ' · Bag of Holding' : L.packCount(S) + '/' + L.bagCap(S); $('g-boh').hidden = !!S.boh || !CL;
     const tile = (it, dim) => {
       const w = L.wearer(S, it.uid), fit = it.cls === m.cls;
@@ -1557,7 +1615,7 @@
       return '<div class="knode t' + sk.tier + (r ? ' got' : '') + (st === 'locked' ? ' lock' : '') + '"><div class="kic">' + icon(SK_ICON[sk.k] || 'star') + '</div><div class="ktx"><b>' + sk.n + '</b>' + pips + '<small>' + L.skillText(sk, r || 1) + (sk.r > 1 && r ? ' now' : '') + '</small>' + btn + '</div></div>';
     };
     const capNext = L.BAG_UPS_MAX - (S.bagUps || 0), bc = L.bagUpCost(S);
-    box.innerHTML = '<div class="khead"><div><h3>' + esc(L.memberById('you').name) + '’s ' + c.name + ' skills</h3><small>Your hero’s skills work while they are in the party. Kindling comes from rekindling.</small></div>' +
+    box.innerHTML = '<div class="khead"><div><h3>' + esc(L.memberById('you').name) + '’s ' + c.name + ' skills</h3><small>Spend Kindling to learn skills ' + tipI('Your hero’s skills work while they are in the party. Kindling comes from rekindling.') + '</small></div>' +
       '<div class="kbal">' + icon('flame') + '<b>' + k + '</b><small>Kindling</small></div></div>' +
       '<div class="ktree">' + tree.map(br => '<div class="kbranch"><h4>' + br.b + '</h4>' + br.s.map(node).join('<i class="klink"></i>') + '</div>').join('') + '</div>' +
       '<div class="kfoot"><span>Spent ' + L.skillSpent(S) + ' of 48</span>' + (L.skillSpent(S) ? '<button class="btn ghost small" id="k-reset">Reset tree</button>' : '') + '</div>' +
@@ -2526,15 +2584,15 @@
       const n = (S.attr || {})[st.id] || 0, sc = L.statScore(S, st.id), fav = pri.includes(st.id), mult = fav ? L.STAT_AFFINITY : 1;
       const fx = Object.keys(st.fx).map(k => pctTxt(st.fx[k] * Math.max(n, 0) * mult) + ' ' + STAT_LBL[k]).join(', ');
       return '<div class="cstat' + (fav ? ' fav' : '') + '"><div class="cscore"><b>' + sc + '</b><small>' + statMod(sc) + '</small></div>' +
-        '<div class="ctx"><b>' + st.name + (fav ? ' <span class="cfav">' + c.name + ' favoured</span>' : '') + '</b><small>' + (n ? fx : 'Raises ' + st.desc + '.') + '</small></div>' +
+        '<div class="ctx" data-tip="' + esc(st.name + ': raises ' + st.desc + '.' + (fav ? ' Favoured by your class, so it counts half again.' : '')) + '"><b>' + st.name + (fav ? ' <span class="cfav">Favoured</span>' : '') + '</b><small>' + (n ? fx : 'Raises ' + st.desc) + '</small></div>' +
         '<div class="cbtns"><button class="btn small" data-stat="' + st.id + '"' + (pts > 0 && sc < L.STAT_MAX ? '' : ' disabled') + ' aria-label="Add a point to ' + st.name + '">+1</button>' +
         (pts >= 5 ? '<button class="btn small ghost" data-stat5="' + st.id + '"' + (sc + 5 <= L.STAT_MAX ? '' : ' disabled') + '>+5</button>' : '') + '</div></div>';
     };
-    box.innerHTML = '<div class="chead"><div><h3>' + esc(L.memberById('you').name) + ', level ' + h.lv + ' ' + c.name + '</h3><small>Your hero earns XP from every fight, even when they sit out. Bigger foes give more.</small></div>' +
+    box.innerHTML = '<div class="chead"><div><h3>' + esc(L.memberById('you').name) + ', level ' + h.lv + ' ' + c.name + '</h3><small>Earns XP from every fight ' + tipI('Your hero earns XP even when they sit out. Bigger foes give more. Each level gives a stat point.') + '</small></div>' +
       '<div class="kbal cpts' + (pts ? ' on' : '') + '">' + icon('star') + '<b>' + pts + '</b><small>' + (pts === 1 ? 'Point' : 'Points') + '</small></div></div>' +
       '<div class="cxp"><i style="width:' + Math.min(100, h.xp / h.need * 100).toFixed(1) + '%"></i><span>' + fmt(Math.floor(h.xp)) + ' / ' + fmt(h.need) + ' XP to level ' + (h.lv + 1) + '</span></div>' +
       '<div class="cgrid">' + L.STATS.map(row).join('') + '</div>' +
-      '<div class="kfoot"><span>Favoured stats count half again. Stats work while your hero is in the party. A reset costs ' + L.RESPEC_COST + ' ' + TOKEN + '.</span>' + ((S.attr && Object.keys(S.attr).length) ? '<button class="btn ghost small" id="c-reset">Reset stats</button>' : '') + '</div>';
+      '<div class="kfoot"><span>About stats ' + tipI('Favoured stats count half again. Stats work while your hero is in the party. A reset costs ' + L.RESPEC_COST + ' ' + TOKEN + '.') + '</span>' + ((S.attr && Object.keys(S.attr).length) ? '<button class="btn ghost small" id="c-reset">Reset stats</button>' : '') + '</div>';
   }
   $('charsheet') && $('charsheet').addEventListener('click', e => {
     const b = e.target.closest('[data-stat],[data-stat5]');
@@ -3475,6 +3533,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 51, date: 'November 23, 2026', title: 'Tidier tabs and a fight log', items: [
+      'Gear now has two views, Equipped and Pack, so you are not scrolling past one to reach the other.',
+      'Skills is split into Stats, Skill tree and Rekindle.',
+      'Camp companions take up far less room. Traits show as names; hover one for details.',
+      'New Fight log at the bottom of the Party tab: kills, critical strikes, abilities, falls, ambushes and loot, with filters.'] },
     { v: 50, date: 'November 23, 2026', title: 'Lantern Surge', items: [
       'New: Lantern Surge. Whenever any player buys a Sigil pack, every hero in the game gets +25% gold and +25% XP.',
       'Each pack adds time for everyone: 30 minutes for 500 Sigils, up to six and a half hours for 6,500, stacking up to a day ahead.',

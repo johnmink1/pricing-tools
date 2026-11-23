@@ -1134,3 +1134,10 @@ body.resting .arena{cursor:default}
 .storelink span{flex:1 1 220px;color:var(--muted);font-size:14px}.storelink span b{color:var(--text)}
 @media (max-width:560px){.packs{grid-template-columns:repeat(2,1fr);row-gap:16px}}
 .storelink+.note{margin-top:10px}
+/* Mercy's Blessing pill */
+.stat.mercy{color:#8fcf6a;cursor:pointer;font:inherit;font-weight:800;font-size:15px;animation:mercyglow 3s ease-in-out infinite}
+.stat.mercy:hover{border-color:#8fcf6a}
+@keyframes mercyglow{50%{box-shadow:0 0 12px rgba(143,207,106,.45)}}
+.mercyfx{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px}.mercyfx li{padding:8px 12px;border-radius:10px;background:rgba(143,207,106,.1);border:1px solid rgba(143,207,106,.35);color:var(--text)}
+@media (max-width:560px){.stat.mercy{font-size:13px}}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}

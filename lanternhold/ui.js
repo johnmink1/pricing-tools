@@ -1962,6 +1962,28 @@
     catch (e) { toast('lock', 'Could not save', e.code === 'bio' ? 'Keep the bio friendly, without links, under 140 characters.' : e.code === 'state' ? 'Play a little first so your hero is registered, then try again.' : 'Try again in a moment.', 'warn'); }
   }
   $('sigils').addEventListener('click', () => openProfileEditor());
+  // ---------- Mercy's Blessing: real donations to the Grand War's Mercy Corps buff every player ----------
+  const mercyLeft = () => { const ms = (S.mercy || 0) - Date.now(); if (ms <= 0) return ''; const h = Math.floor(ms / 36e5); return h >= 48 ? Math.floor(h / 24) + 'd' : h >= 1 ? h + 'h' : Math.max(1, Math.ceil(ms / 6e4)) + 'm'; };
+  function paintMercy() { const b = $('mercy'), t = mercyLeft(); if (b.hidden === !!t) b.hidden = !t; if (t) $('mercyct').textContent = t; }
+  async function loadMercy() {
+    if (!CL) return;
+    try {
+      const r = await fetch(CL.api.replace(/\/$/, '') + '/mercy'); if (!r.ok) return;
+      const m = await r.json(), fresh = m.at && m.at !== S.mercyAt && m.until > Date.now();
+      S.mercy = m.until; S.mercyAt = m.at;
+      if (fresh) toast('cross', 'Mercy’s Blessing is lit', 'A donation to the Mercy Corps blesses every hero: +10% gold, +10% health and +20% healing for ' + mercyLeft() + '.', 'feat');
+      paintMercy(); updatePanel(true);
+    } catch (e) {}
+  }
+  $('mercy').addEventListener('click', () => {
+    const fx = L.MERCY_FX;
+    modal('<div class="maphead"><div><h2>Mercy’s Blessing</h2><small>Lit by real donations. Shared by every hero.</small></div><button class="iconbtn" id="mb-x" aria-label="Close">&times;</button></div>' +
+      '<p>Every time someone gives to the Grand War’s Mercy Corps, the medics bless the whole Hold. The blessing has <b>' + (mercyLeft() || 'no time') + '</b> left.</p>' +
+      '<ul class="mercyfx"><li>+' + fx.gold * 100 + '% gold</li><li>+' + fx.hp * 100 + '% party health</li><li>+' + fx.heal * 100 + '% healing</li></ul>' +
+      '<p class="note">Each $10 given, 5 food items or toy donated to the Mercy Corps adds 2 hours for everyone, up to 7 days ahead. The Corps raises money for Extra Life, food for a local pantry and toys for a children’s hospital.</p>' +
+      '<div class="row"><a class="btn" href="https://war.born2gamellc.com/" target="_blank" rel="noopener">Give to the Mercy Corps</a><button class="btn ghost" id="mb-ok">Close</button></div>', md => { md.querySelector('#mb-x').onclick = closeModal; md.querySelector('#mb-ok').onclick = closeModal; });
+  });
+  setTimeout(loadMercy, 2500); setInterval(loadMercy, 3e5); setInterval(paintMercy, 3e4);
   // ---------- server resets and the admin tab ----------
   // A server wipe bumps a public "epoch". Saves started before it reset to a new game.
   const EPOCH_KEY = 'lanternhold.epoch';
@@ -2632,6 +2654,7 @@
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten, where you are and where other delvers have reached. Tap a region to zoom in on its ten floors and read its dossier (its history, who holds it, its monsters and its guardian), then tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 4% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
+    ['Mercy’s Blessing', '<p>Real donations to the Grand War’s Mercy Corps bless every hero in Lanternhold: +10% gold, +10% party health and +20% healing. Each $10 given, 5 food items or toy donated adds 2 hours, up to 7 days ahead. While it burns, a green heart at the top shows the time left. Tap it to see how to give.</p>'],
     ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in. Want more Sigils? Press <b>Get Sigils</b>, sign in once with your Born 2 Game store account, and buy a pack. It lands in your wallet within a minute.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset. You can also trade Sigils with other players for gold on the <b>Sigils</b> page of the Trading Post.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
     ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
@@ -2654,7 +2677,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 25, date: 'November 23, 2026', title: 'Sigil packs', items: [
+    { v: 25, date: 'November 23, 2026', title: 'Sigil packs and Mercy’s Blessing', items: [
+      'New: Mercy’s Blessing. Whenever someone gives to the Grand War’s Mercy Corps, every hero gets +10% gold, +10% party health and +20% healing. Each $10, 5 food items or toy adds 2 hours, up to 7 days. Watch for the green heart at the top of the screen.',
       'Sigil packs are here: 500 for $4.99, 1,100 for $9.99, 2,400 for $19.99 and 6,500 for $49.99. Press Get Sigils on your profile or in the Sigil exchange.',
       'Sign in once with your Born 2 Game store account. Packs you buy in the store land in your hero’s wallet automatically, usually within a minute.',
       'Sigils still only buy looks, or gold from other players on the exchange. They never buy power.'] },

@@ -739,6 +739,13 @@
   function paintHp() {
     document.querySelectorAll('#seats [data-hp]').forEach(i => { const id = i.dataset.hp; i.style.width = Math.max(0, (S.hp[id] || 0) / L.maxHpOf(S, id) * 100) + '%'; });
   }
+  // Companion traits: position, kinship and camp. Working ones glow.
+  function traitChips(id) {
+    const st = L.traitState(S, id); if (!st) return '';
+    const t = st.t, chip = (kind, on) => { const x = L.traitText(kind, t[kind]), w = kind === 'pos' ? L.POS_NAME[t.pos.at].toLowerCase() + ' seat' : kind === 'kin' ? 'with a ' + L.CLASSES[t.kin.cls].name.toLowerCase() : 'at camp';
+      return '<span class="trait g' + t[kind].g + (on ? ' on' : '') + '" title="' + esc(x.name + ' (' + x.grade + '). ' + x.when + ': ' + x.fx + '.') + '"><b>' + esc(x.name) + '</b> ' + esc(x.fx) + ' <i>' + esc(w) + '</i></span>'; };
+    return '<div class="traits">' + chip('pos', st.pos) + chip('kin', st.kin) + chip('camp', st.camp) + '</div>';
+  }
   function updateSeats(force) {
     const now = Date.now();
     if (!force && now - seatsAt < 1000) { paintHp(); return; }
@@ -765,6 +772,7 @@
       html += '<div class="seat' + (down ? ' down' : '') + (m.player ? ' mine' : '') + '"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span>' + mv + portrait(id) +
         '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
         '<div class="lv">' + (down ? 'Fallen. Back up in ' + Math.ceil((down - now) / 1000) + 's' : memberStatsLine(id, now)) + '</div>' +
+        traitChips(id) +
         '<div class="hpbar"><i data-hp="' + id + '"></i></div></div><div class="acts">' + btn +
         (id !== 'you' && !guest ? '<button class="rest" data-unseat="' + i + '" title="Send ' + esc(m.name) + ' to the campfire to free this seat">To campfire</button>' : '') + '</div></div>';
     }
@@ -785,7 +793,7 @@
       const m = L.memberById(id), job = L.jobOf(S, id);
       const n = buyN() === 'max' ? Math.max(1, L.maxAffordable(S, id)) : buyN(), cost = L.trainCost(S, id, n);
       return '<div class="seat bench">' + portrait(id) + '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + '</div><div class="lv">Level ' + L.lvl(S, id) + ' &middot; ' + esc(m.title) + '</div>' +
-        '<div class="jobline' + (job ? ' on' : '') + '">' + (job ? icon(job.icon) + '<b>' + job.name + '</b> ' + L.jobText(job, L.jobValue(S, job, id)) : 'No camp job. Give them one to help the party.') + '</div></div>' +
+        '<div class="jobline' + (job ? ' on' : '') + '">' + (job ? icon(job.icon) + '<b>' + job.name + '</b> ' + L.jobText(job, L.jobValue(S, job, id)) : 'No camp job. Give them one to help the party.') + '</div>' + traitChips(id) + '</div>' +
         '<div class="acts"><button class="buy" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button>' + '<button class="autot' + ((S.autoTrain || {})[id] && L.passOn(S) ? ' on' : '') + (L.passOn(S) ? '' : ' locked') + '" data-autot="' + id + '" title="Auto-train: spend gold on this character automatically" aria-pressed="' + !!(S.autoTrain || {})[id] + '">' + icon('refresh') + 'Auto</button>' +
         '<button class="rest" data-jobfor="' + id + '">' + (job ? 'Change job' : 'Give a job') + '</button><button class="rest" data-seat="' + id + '">Bring along</button></div></div>';
     }).join('');
@@ -2888,6 +2896,7 @@
     { id: 'boss', title: 'Guardians', text: 'Every fifth floor has a guardian. Beat it before the lantern oil runs out, or your party falls back to train and try again.', target: '#lanternwrap', ready: () => S.foe && S.foe.boss },
     { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor, trinkets and rings. Open Gear to see them. You put gear on at camp, at the top of the stair, or anywhere with a Campfire Draught. A green arrow marks an upgrade.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
     { id: 'camp', title: 'Camp', text: 'Swapping companions, training them and changing gear happen at camp. This bar takes you back up and down again, and its Store sells Campfire Draughts that make camp anywhere.', target: '#campbar', tab: 'party', ready: () => S.floor > 1 && S.maxFloorEver >= 4 },
+    { id: 'traits', title: 'Companion traits', text: 'Each companion has three traits: one for a party seat, one for a class they like fighting beside, and one for resting at camp. Working traits glow gold, so try moving people around.', target: '#seats .traits', tab: 'party', ready: () => S.unlocked.length >= 3 && !!document.querySelector('#seats .traits') },
     { id: 'map', title: 'Map of the Deep', text: 'See how far you have come, which guardians you have beaten, and travel back to any floor you have reached.', target: '#btn-map', ready: () => S.maxFloorEver >= 8 },
     { id: 'stats', title: 'Your character', text: 'Your hero earns XP from every fight. Each level brings a stat point. Open Skills and spend it on Strength, Wisdom, Luck and the rest. Your class favours two of them.', target: '.tabs [data-tab="rekindle"]', ready: () => !!S.hero && L.heroPoints(S) > 0 },
     { id: 'end', title: 'You are ready', text: 'That is the basics. The story will introduce new companions as you descend. Open the Guide (the ? at the top) any time for the details.', target: '#btn-guide', ready: () => true },
@@ -2932,47 +2941,191 @@
   setInterval(coachTick, 600);
   window.addEventListener('resize', () => { if (!$('coach').hidden) coachTick(); });
 
+  // ---------- the Guide: categories on the left, short topic cards with a picture on the right ----------
+  // Topic: [title, picture, one-line summary, [points...]]. Picture: 's:<sprite>' (one or more, comma separated) or 'i:<icon>'.
   const GUIDE = [
-    ['The basics', '<p>Your party fights the monster in the arena on its own. Tap the arena (or press Space) to strike as well. Each floor has 8 monsters; clear them to go deeper.</p><p>Monsters drop <b>gold</b>. Spend it in the Party tab to <b>train</b> your companions. Every 25 levels a companion gets a big power boost.</p><p>The game keeps going while you are away, at a quarter of its usual gold, for up to 8 hours. <b>Night Watch</b> in the Skills tab stretches that to as much as 3 days, and the Lantern Pass adds 4 more hours. After that the party waits at the stair until you come back.</p><p>With the <b>Lantern Pass</b>, tap <b>Auto</b> under any character’s Train button and they train themselves whenever you have the gold, cheapest level first. Every save gets a free 3-day trial.</p>'],
-    ['Your party and classes', '<p>You lead a party of five. You meet companions in the story; tap any portrait to read about them.</p><ul><li><b>Tank</b>: takes the hits. Shield Wall cuts damage by 70%.</li><li><b>Healer</b>: keeps everyone standing. Lantern Hymn heals the party and lifts a fallen ally.</li><li><b>Rogue</b>: the most damage, and dodges a quarter of attacks. Backstab hits for 12 seconds of damage at once.</li><li><b>Mage</b>: Ember Storm quadruples damage for a few seconds. Save it for guardians.</li><li><b>Necromancer</b>: raises skeletons that fight and soak up blows, and heals the party as it hits.</li></ul><p>Abilities fire by themselves. Turn that off under the arena and press 1 to 5 to time them yourself.</p>'],
-    ['Marching order', '<p>The Party list is your marching order. The top member stands at the front, nearest the monster. Use the arrows to move people, or Auto-arrange.</p><ul><li>A <b>tank</b> in the front two draws the attacks. Without one, whoever is in front gets hit most.</li><li>Heals get <b>15% weaker per step</b> between healer and patient, so healers belong in the middle.</li><li>Some monsters <b>ambush</b> from behind and hit the rear member hard. A tank at the back guards against it.</li></ul><p>The notes under the list tell you how your current order is doing.</p>'],
-    ['Monsters and guardians', '<p>Monsters hit back. If your whole party falls, it retreats a floor, rests, and tries again in a little over a minute. Use that time to train and check gear.</p><p>Every 5th floor has a <b>guardian</b>. You must beat it before the lantern oil runs out. Guardians drop better gear and, from floor 10, sometimes a relic.</p><p>Soldiers from the Grand War alliances (marked with their banner) are tougher than normal monsters and drop more.</p>'],
-    ['Monster tricks and Act One', '<p>Deeper monsters have tricks, shown as coloured tags under their name. Tap or hover a tag to read it.</p><ul><li><b>Enraged</b>: hits much harder once it is badly hurt.</li><li><b>Warded</b>: raises a shield (the striped part of its health bar) that soaks damage first.</li><li><b>Regenerating</b>: heals itself over time.</li><li><b>Venomous</b>: its hits poison the target for a few seconds.</li><li><b>Cleaving</b>: each hit also strikes whoever stands behind its target.</li><li><b>Swift</b>: attacks faster.</li></ul><p>Guardians get more tricks the deeper you go, and each region below the Vault has its own. Act One runs through fifteen regions to the Lampmother on floor 150. Act Two opens with Season 2 of the Grand War, and a countdown appears once you get there.</p>'],
-    ['The side panel', '<p><b>Party</b> is your marching order for the fight. <b>Camp</b> is the campfire: resting companions, camp jobs and training. <b>Gear</b> dresses your characters. <b>Skills</b> holds your hero’s skill tree and rekindling. <b>Market</b> has the Trading Post and the Players Guild. <b>Codex</b> keeps your journal, relics and records.</p>'],
-    ['Your character and stats', '<p>Your hero earns <b>XP</b> from every fight, even while sitting out. Bigger foes give more. Each level brings a <b>stat point</b>, and every fifth level brings two. Spend them on the character sheet at the top of the Skills tab.</p><ul><li><b>Strength</b>: party damage</li><li><b>Dexterity</b>: critical hits and dodging</li><li><b>Constitution</b>: party health</li><li><b>Intelligence</b>: ability power and some damage</li><li><b>Wisdom</b>: healing and faster abilities</li><li><b>Charisma</b>: gold</li><li><b>Luck</b>: a little of everything, from loot and chests to crits, gold, Sigil finds and ambush spoils</li></ul><p>Every class <b>favours</b> two stats, and points there count half again: tanks Strength and Constitution, healers Wisdom and Charisma, rogues Dexterity and Luck, mages Intelligence and Wisdom, necromancers Intelligence and Constitution. Stats work while your hero is in the party. A reset costs 50 Sigils. Your level and stats stay when you rekindle.</p>'],
-    ['Ambushes', '<p>Now and then a few monsters team up and jump your party. The foe shows <b>Ambush ×2</b> to <b>×4</b>. They have more health, hit harder and strike the back of the line first, so a tank at the rear helps. Beat them for gold several times over, a good chance at gear, extra XP and kills that count toward your quests. Luck makes the spoils bigger.</p>'],
-    ['Skills and Kindling', '<p>Every rekindle gives you <b>Kindling</b>: 2 at floor 50, plus 1 for every 10 floors deeper. Spend it in the Skills tab on your hero’s class tree. Each class has three branches of four skills, and a skill needs the one above it first. The last skill of each branch is a <b>specialization</b>: it teaches your hero a brand new ability, which appears on the ability bar (keys 6 to 8).</p><p>Kindling also buys a bigger pack (+10 slots) and opens extra gear slots for any character: rings 2 to 5 and a second trinket. Tap a locked slot on the Gear tab. You can reset the skill tree for free at camp.</p><p>Kindling upgrades (Lantern Edge, Ember Purse, Deep Reservoir, Night Watch, Slow-burning Draught and Sigil Sense) are permanent bonuses. At camp you can also <b>change your hero’s class</b> for 15 Kindling. Your skill-tree Kindling is refunded first, but Kindling spent on the pack, gear slots and upgrades stays spent.</p>'],
-    ['Job gear', '<p>A few pieces of gear carry a camp-job bonus, shown by an orange dot. It counts while the wearer works that job at the campfire. Fine gear has about a 2% chance, rare 6% and epic 15%.</p><p>Each job also has its own three-piece job set (helmet, feet and ring). These drop very rarely from guardians and chests from floor 20. Two pieces add +40% to that job and all three add +100%.</p>'],
-    ['Resting at camp', '<p>When you return to camp, or drink a Campfire Draught, the party sits down around the fire. Nobody fights while you rest, and everyone heals up. Press Descend to head back down.</p>'],
-    ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
-    ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten, where you are and where other delvers have reached. Tap a region to zoom in on its ten floors and read its dossier (its history, who holds it, its monsters and its guardian), then tap a floor you have reached to travel there.</p>'],
-    ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 4% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
-    ['Earning Sigils', '<p>You can earn Sigils without spending money. <b>Daily quests</b> (the counter at the top) pay 1 Sigil each and 2 more for finishing all three. Treasure chests and guardians sometimes hold 1 to 3 Sigils. Going deeper and the Kindling upgrade <b>Sigil Sense</b> raise those odds. You can also sell gear for gold and buy Sigils from other players on the exchange.</p>'],
-    ['Mercy’s Blessing', '<p>Real donations to the Grand War’s Mercy Corps bless every hero in Lanternhold: +10% gold, +10% party health and +20% healing. Each $10 given, 5 food items or toy donated adds 2 hours, up to 7 days ahead. While it burns, a green heart at the top shows the time left. Tap it to see how to give.</p>'],
-    ['Lantern Pass', '<p>The Lantern Pass costs 500 Sigils for 30 days, and buying it again adds another 30. It only makes the game more convenient and never makes you stronger:</p><ul><li><b>Auto</b> training buttons for every character</li><li><b>+10 bag slots</b></li><li><b>+4 hours</b> of earning while you are away</li></ul><p>Every save gets a free 3-day trial. Tap any locked Auto button to start it, or find the pass under <b>Customize profile</b> on your hero’s portrait.</p><p><b>Bag of Holding</b>: a one-time buy for 6,500 Sigils that gives you an endless pack. Nothing is ever auto-sold for lack of room. Find it next to your pack on the Gear tab.</p>'],
-    ['Your banner', '<p>Your hero flies one of five banners, and each gives a perk: Iron Covenant +15% party health, Radiant Ascendancy +12% party damage, Devouring Tide +15% gold, Mercy Corps +15% healing, Unsworn +5% health, damage and gold.</p><p><b>Banner kin</b>: every companion or recruited hero in your party who flies your banner makes your perk 40% stronger. The line above your party shows how many kin you have. Banner chat is a good place to find them.</p>'],
-    ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in. Want more Sigils? Press <b>Get Sigils</b>, sign in once with your Born 2 Game store account, and buy a pack. It lands in your wallet within a minute.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset. You can also trade Sigils with other players for gold on the <b>Sigils</b> page of the Trading Post.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
-    ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p><b>Tonics</b> from the Store give a small boost for 10 or 15 minutes: damage, health, healing, crit, gold, gear drops or hero XP. Different tonics stack, and the same tonic adds time up to an hour. Tap a tonic above your abilities to drink it. Everything in the Store costs gold. Speed-ups (the gold, gear-drop and XP tonics and the Campfire Draught) can also be bought with Sigils; combat tonics are gold only.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
-    ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
-    ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Invite</b>. The player sees your invite and chooses to accept or decline. Once they accept, their hero joins your party the next time you are at camp. Heroes marked <b>Online now</b> belong to players who are playing right now, so they can answer quickly. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too. When someone invites it, the invite shows at the top of the Players Guild with <b>Accept</b> and <b>Decline</b>. Accepting lends a copy of your hero to their party, earns you gold, and does not change your own game.</p>'],
-    ['Trading Post: market and mail', '<p>Open the <b>Trading Post</b> (the bag button at the top) to trade gear with other players. It needs a free account.</p><p><b>Market</b>: browse gear by class and buy it for gold. To sell, tap an item in your Gear tab and choose <b>Sell on market</b>. Listings last a week, and you can take yours down any time. When something sells, the gold arrives in your mailbox.</p><p><b>Mail</b>: tap an item and choose <b>Send to a player</b> to send it to someone you have recruited or chatted with. Leave the price at 0 for a gift, or set a price they pay if they accept. They can decline, and you can take an offer back until they answer.</p><p>Gold and gear are in-game only and have no real-money value.</p>'],
-    ['Multiplayer and chat', '<p>With a free account your progress is saved online and works on any device.</p><p>Once you sign in, your hero appears on a board where other players can recruit it, and you earn gold each time. You can recruit their heroes too. Player heroes are stronger than story companions.</p><p>Have a Born 2 Game store account? Press <b>Continue with Born 2 Game</b> on the sign-in screen and you are in, no new password needed.</p><p><b>Chat</b> (the speech bubble) has Global, Trade, Party and <b>Banner</b> channels. Banner chat only reaches players who fly the same banner as your hero. Ctrl+click an item to link it. Tap a name to mute or report. No web links, and be kind.</p>'],
-    ['Controls', '<ul><li><b>Tap the arena, Space or Enter</b>: strike</li><li><b>1 to 5</b>: use an ability</li><li><b>Ctrl+click an item</b>: link it in chat</li><li><b>Arrows on the floor header</b>: move between floors you have reached</li></ul>'],
+    { id: 'start', name: 'Getting started', icon: 'lantern', topics: [
+      ['The basics', 's:tank,healer,slime', 'Your party fights on its own. You tap to help, and spend gold to get stronger.', [
+        'Tap the arena (or press <b>Space</b>) to strike.',
+        'Each floor has <b>8 monsters</b>. Clear them to go deeper.',
+        'Monsters drop <b>gold</b>. Spend it to <b>train</b> your party in the Party tab.',
+        'Every <b>25 levels</b> a companion gets a big power jump.']],
+      ['While you are away', 'i:refresh', 'The game keeps earning when you close it.', [
+        'You earn <b>a quarter</b> of your usual gold for up to <b>8 hours</b>.',
+        '<b>Night Watch</b> (Skills tab) stretches that up to 3 days.',
+        'The <b>Lantern Pass</b> adds 4 more hours.']],
+      ['The side panel', 'i:map', 'Six tabs, each with one job.', [
+        '<b>Party</b>: who fights, and in what order.',
+        '<b>Camp</b>: resting companions, camp jobs and training.',
+        '<b>Gear</b>: dress your characters.',
+        '<b>Skills</b>: your character sheet, skill tree and rekindling.',
+        '<b>Market</b>: trading, Sigils and the Players Guild.',
+        '<b>Codex</b>: journal, relics and records.']],
+      ['Controls', 'i:help', 'Everything works with taps; keys are shortcuts.', [
+        '<b>Tap, Space or Enter</b>: strike',
+        '<b>1 to 5</b>: party abilities. <b>6 to 8</b>: your hero’s specializations.',
+        '<b>Ctrl+click an item</b>: link it in chat',
+        '<b>Arrows by the floor number</b>: move between floors you have reached']],
+    ] },
+    { id: 'party', name: 'Your party', icon: 'users', topics: [
+      ['The five classes', 's:tank,healer,rogue,mage,necro', 'Five seats, five roles. Every class has its own ability.', [
+        '<b>Tank</b>: takes the hits. Shield Wall cuts damage by 70%.',
+        '<b>Healer</b>: keeps everyone up. Lantern Hymn heals and lifts a fallen ally.',
+        '<b>Rogue</b>: most damage, dodges a quarter of attacks. Backstab hits hard.',
+        '<b>Mage</b>: Ember Storm quadruples damage for a few seconds.',
+        '<b>Necromancer</b>: raises skeletons that fight and soak blows.']],
+      ['Marching order', 's:tank,rogue,healer,mage,necro', 'The top of the Party list stands in front, nearest the monster.', [
+        'A <b>tank</b> in the front two draws attacks.',
+        'Heals get <b>15% weaker per step</b> of distance, so healers go in the middle.',
+        'Ambushers hit the <b>rear</b> first. A tank at the back guards it.',
+        'Use the arrows, or <b>Auto-arrange</b>. Notes under the list rate your order.']],
+      ['Companion traits', 's:healer,necro', 'Every story companion has three traits, rolled when they join. Working ones glow gold.', [
+        '<b>Position trait</b>: works while they stand in one seat (for example <i>Vanguard: front seat, +8% party damage</i>).',
+        '<b>Kinship trait</b>: works while a given class is in the party (for example <i>Bone-kin: with a necromancer, +6% party health</i>).',
+        '<b>Camp trait</b>: works while they rest at the campfire: a better camp job, cheaper training, more gold or faster healing.',
+        'Traits come in <b>Common</b>, <b>Fine</b> (blue) and <b>Rare</b> (purple). Arrange your party to switch on as many as you can.']],
+      ['Campfire companions', 'i:flame', 'Story companions join as you go deeper and rest by the fire.', [
+        '<b>Bring along</b> seats one. <b>To campfire</b> sends one back.',
+        'Seat changes happen at <b>camp</b>.',
+        'Companions are a little weaker than other players’ heroes.']],
+      ['Players Guild', 'i:users', 'Fill seats with other players’ heroes. They are stronger than companions.', [
+        'Sign in, open <b>Players Guild</b>, press <b>Invite</b>.',
+        'They <b>accept or decline</b>. Accepted heroes join at camp.',
+        'Invites to <i>you</i> show at the top with <b>Accept</b> and <b>Decline</b>. Accepting lends a copy of your hero and earns you gold.',
+        '<b>Dismiss</b> on a seat lets a hero go.']],
+      ['Your banner', 'i:flare', 'Your hero flies one of five banners, each with a perk.', [
+        'Iron Covenant <b>+15% health</b>. Radiant Ascendancy <b>+12% damage</b>. Devouring Tide <b>+15% gold</b>. Mercy Corps <b>+15% healing</b>. Unsworn <b>+5%</b> to all three.',
+        '<b>Banner kin</b>: each party member under your banner makes the perk 40% stronger.']],
+    ] },
+    { id: 'fight', name: 'Combat', icon: 'sword', topics: [
+      ['Monsters', 's:slime,rat,skeleton', 'Monsters hit back. If the whole party falls, it retreats a floor and tries again.', [
+        'Retreats last about a minute. Use it to train and check gear.',
+        '<b>Grand War soldiers</b> (with a banner) are tougher and drop more.']],
+      ['Guardians', 's:golem,wyrm,lich', 'Every 5th floor has a guardian. Beat it before the lantern oil runs out.', [
+        'Guardians drop better gear and, from floor 10, sometimes a relic.',
+        '<b>Lantern Oil</b> from the Store buys 15 more seconds.',
+        'Act One ends with the Lampmother on floor <b>150</b>. Act Two opens with Grand War Season 2.']],
+      ['Monster tricks', 's:eye,thorn', 'Deeper foes have tricks, shown as tags under their name.', [
+        '<b>Enraged</b>: hits harder when hurt. <b>Warded</b>: a shield soaks damage first.',
+        '<b>Regenerating</b>: heals over time. <b>Venomous</b>: poisons its target.',
+        '<b>Cleaving</b>: also hits whoever stands behind. <b>Swift</b>: attacks faster.']],
+      ['Ambushes', 's:hound,bat,riftling', 'Sometimes 2 to 4 monsters team up and jump the party.', [
+        'Shown as <b>Ambush ×2</b> to <b>×4</b>. More health, harder hits, rear first.',
+        'Pays several times the gold, better gear odds and extra XP. Luck makes it bigger.']],
+      ['Abilities', 'i:star', 'Each party member has one ability; your hero can learn more.', [
+        'They fire by themselves. Turn that off under the arena to time them.',
+        'Keys <b>1 to 5</b> use them; <b>6 to 8</b> are specializations from the skill tree.']],
+    ] },
+    { id: 'gear', name: 'Gear and loot', icon: 'gear-armor', topics: [
+      ['Gear basics', 's:chest', 'Gear drops from monsters, chests and guardians. Each piece fits one class and slot.', [
+        'Slots: main hand, offhand, helmet, trinket, chest, legs, feet, ring. Robes cover chest and legs.',
+        'Change gear at <b>camp</b>. <b>Equip best</b> does it in one tap.',
+        'A <b>green arrow</b> marks an upgrade. The corner number is the level needed.',
+        'Upgrade with gold, or salvage what you do not need.']],
+      ['Rarity and sets', 'i:crown', 'Rare and epic gear is a real find, and gets likelier deeper down.', [
+        'From floor 15, guardians can drop <b>set pieces</b>. Two or three of a set add bonuses.',
+        'A <b>Forager</b> at camp improves all drops.']],
+      ['Job gear', 'i:hammer', 'Some pieces boost a camp job (orange dot).', [
+        'Fine 2%, rare 6%, epic 15% chance to roll one.',
+        'Each job has a 3-piece job set from floor 20: <b>2 pieces +40%</b>, <b>3 pieces +100%</b>.']],
+      ['Your pack', 'i:bag', 'The pack holds 40 items to start.', [
+        'Kindling adds <b>+10 slots</b> up to six times. The Lantern Pass adds 10.',
+        'When full, the weakest common item is sold automatically.',
+        'The <b>Bag of Holding</b> (6,500 Sigils, once) makes it endless.']],
+      ['Relics', 'i:relic', 'Permanent bonuses that guardians sometimes drop.', [
+        'Duplicates level a relic up. They stay through rekindling.']],
+    ] },
+    { id: 'camp', name: 'Camp', icon: 'flame', topics: [
+      ['Camp', 'i:flame', 'The top of the stair, floor 1. Party and gear changes happen here.', [
+        '<b>Return to camp</b> on the camp bar. Free in the first 10 floors, then costs gold.',
+        '<b>Descend</b> takes you straight back to the floor you left.',
+        'The party rests and heals while at camp.',
+        'Training works anywhere.']],
+      ['Camp jobs', 'i:hammer', 'Resting companions can take a job that helps the whole party.', [
+        '<b>Forager</b>: gear drops. <b>Runesmith</b>: damage. <b>Herbalist</b>: healing.',
+        '<b>Armorer</b>: health. <b>Prospector</b>: gold. <b>Lamplighter</b>: lantern oil.',
+        'Grows with level; <b>+50%</b> when the job suits their class. A <i>Hard worker</i> trait adds more.']],
+      ['The Store and tonics', 'i:cup', 'Tonics are small boosts for 10 or 15 minutes. Open <b>Store</b> on the camp bar.', [
+        'Combat: <b>+15% damage</b>, <b>+15% health</b>, <b>+20% healing</b>, <b>+5% crit</b> (gold only).',
+        'Speed-ups: <b>+15% gold</b>, <b>+15% gear drops</b>, <b>+25% hero XP</b> (gold or Sigils).',
+        'Different tonics stack. The same one adds time, up to an hour. Tap one above your abilities to drink.',
+        '<b>Campfire Draught</b>: camp anywhere for 60 seconds. <b>Lantern Oil</b>: +15 seconds against a guardian.']],
+    ] },
+    { id: 'grow', name: 'Getting stronger', icon: 'star', topics: [
+      ['Your character', 'i:user', 'Your hero earns XP from every fight and gets a stat point each level.', [
+        '<b>STR</b> damage. <b>DEX</b> crits and dodge. <b>CON</b> health. <b>INT</b> ability power.',
+        '<b>WIS</b> healing and faster abilities. <b>CHA</b> gold. <b>LCK</b> a little of everything.',
+        'Your class <b>favours two stats</b>; points there count 50% more.',
+        'Spend points at the top of the Skills tab. A reset costs 50 Sigils.']],
+      ['Skill tree and Kindling', 'i:flare', 'Rekindling earns Kindling, spent on your hero’s class tree.', [
+        'Three branches of four skills. The fourth teaches a new ability (keys 6 to 8).',
+        'Kindling also buys pack space, extra rings and a second trinket slot.',
+        'Reset the tree free at camp. Change class at camp for 15 Kindling.']],
+      ['Rekindling', 'i:lantern', 'From floor 50, start again from floor 1 for permanent Embers.', [
+        'Each <b>Ember</b> adds 4% damage and gold forever.',
+        'Companions, gear, relics and your character stay; levels reset.',
+        'Rekindle when progress slows down.']],
+      ['Story, journal and map', 'i:book', 'The story unfolds as you descend.', [
+        'Replay scenes in the <b>Journal</b>.',
+        'The <b>Map of the Deep</b> shows every region and lets you travel to floors you have reached.']],
+    ] },
+    { id: 'sigils', name: 'Sigils and perks', icon: 'star', topics: [
+      ['Earning Sigils', 'i:star', 'You can earn Sigils without spending money.', [
+        '<b>Daily quests</b> (top bar): 1 Sigil each, 2 more for all three.',
+        'Chests and guardians sometimes hold 1 to 3.',
+        'Trade gold for Sigils with other players on the exchange.']],
+      ['What Sigils buy', 'i:crown', 'Looks, convenience and speed-ups. Never combat power.', [
+        '<b>Lantern Pass</b> (500, 30 days): Auto-train, +10 bag slots, +4 h away. Free 3-day trial.',
+        '<b>Bag of Holding</b> (6,500, once): an endless pack.',
+        '<b>Speed-up tonics</b> and Campfire Draughts. Profile frames, titles and colors.',
+        'Buy packs with <b>Get Sigils</b> after signing in with your Born 2 Game store account.']],
+      ['Mercy’s Blessing', 'i:cross', 'Real donations to the Grand War’s Mercy Corps bless every player.', [
+        '<b>+10% gold</b>, <b>+10% health</b>, <b>+20% healing</b> while it burns.',
+        'Each $10, 5 food items or toy adds 2 hours, up to 7 days.']],
+      ['Grand War aura', 'i:shield', 'Verified Grand War commanders carry a class aura.', [
+        '2% to 10% by war rank. Honors add more.',
+        'Set your commander name on your profile’s Grand War tab. Auras are earned, never bought.']],
+    ] },
+    { id: 'social', name: 'Playing together', icon: 'chat', topics: [
+      ['Accounts', 'i:user', 'A free account saves your progress online, on any device.', [
+        '<b>Continue with Born 2 Game</b> signs you in with your store account.']],
+      ['Chat', 'i:chat', 'Global, Trade, Party and Banner channels.', [
+        'Banner chat reaches only players under your banner.',
+        'Ctrl+click an item to link it. Tap a name to mute or report. No links, and be kind.']],
+      ['Trading Post', 'i:bag', 'Buy and sell gear for gold, or mail it to a player.', [
+        '<b>Sell</b>: tap an item in Gear, choose <b>Sell on market</b>. Listings last a week.',
+        '<b>Mail</b>: send to someone you recruited or chatted with, as a gift or for a price.',
+        'Gold and gear have no real-money value.']],
+      ['Your profile', 'i:user', 'The card other players see.', [
+        'Tap your portrait, then <b>Customize profile</b>: frame, title, color, banner, emblems and a bio.']],
+    ] },
   ];
-  function openGuide() {
-    modal('<div class="maphead"><div><h2>Delver’s Guide</h2><small>Everything you need to know about the descent.</small></div><button class="iconbtn" id="g-x" aria-label="Close guide">&times;</button></div>' +
-      '<div class="guide">' + GUIDE.map(([t, h], i) => '<details' + (i === 0 ? ' open' : '') + '><summary>' + t + '</summary><div>' + h + '</div></details>').join('') + '</div>' +
-      '<div class="row"><button class="btn ghost" id="g-notes">What\u2019s new</button><button class="btn ghost" id="g-tut">Replay the tutorial</button><button class="btn" id="g-ok">Close</button></div>', md => {
+  const guidePic = p => p.startsWith('s:') ? '<div class="gpic sprites">' + p.slice(2).split(',').map(n => '<img src="' + SP.spriteURL(n, 2, 0) + '" alt="">').join('') + '</div>' : '<div class="gpic">' + icon(p.slice(2)) + '</div>';
+  let guideCat = 'start';
+  function openGuide(cat) {
+    if (typeof cat === 'string') guideCat = cat;
+    const c = GUIDE.find(x => x.id === guideCat) || GUIDE[0];
+    modal('<div class="maphead"><div><h2>Delver’s Guide</h2><small>Pick a topic.</small></div><button class="iconbtn" id="g-x" aria-label="Close guide">&times;</button></div>' +
+      '<div class="gwrap"><nav class="gnav">' + GUIDE.map(x => '<button class="' + (x.id === c.id ? 'on' : '') + '" data-gcat="' + x.id + '">' + icon(x.icon) + '<span>' + x.name + '</span></button>').join('') + '</nav>' +
+      '<div class="gbody">' + c.topics.map(([t, pic, sum, pts]) => '<section class="gcard">' + guidePic(pic) + '<div class="gtext"><h3>' + t + '</h3><p class="gsum">' + sum + '</p><ul>' + pts.map(x => '<li>' + x + '</li>').join('') + '</ul></div></section>').join('') + '</div></div>' +
+      '<div class="row"><button class="btn ghost" id="g-notes">What’s new</button><button class="btn ghost" id="g-tut">Replay the tutorial</button><button class="btn" id="g-ok">Close</button></div>', md => {
+        md.className = 'sheet wide guidesheet';
+        md.querySelectorAll('[data-gcat]').forEach(b => b.onclick = () => { openGuide(b.dataset.gcat); const gb = $('modalbody').querySelector('.gbody'); if (gb) gb.scrollTop = 0; });
         md.querySelector('#g-notes').onclick = openNotes;
         md.querySelector('#g-x').onclick = closeModal; md.querySelector('#g-ok').onclick = closeModal;
         md.querySelector('#g-tut').onclick = () => { S.tut = { i: 0, done: false }; coachCtx = null; closeModal(); switchTab('party'); save(); };
       });
   }
-  $('btn-guide').addEventListener('click', openGuide);
+  $('btn-guide').addEventListener('click', () => openGuide());
 
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 36, date: 'November 23, 2026', title: 'Companion traits and a new Guide', items: [
+      'Every story companion now has three traits, rolled when they join: a position trait for one party seat, a kinship trait that works beside a certain class, and a camp trait for resting at the fire.',
+      'Working traits glow gold on the Party and Camp tabs. Rearrange your party to switch on as many as you can.',
+      'Camp traits can boost a companion’s camp job, cut training costs, add gold or heal the party faster at camp.',
+      'The Guide is rebuilt: topics sorted into categories, short points, and pictures.'] },
     { v: 35, date: 'November 23, 2026', title: 'Easier big numbers', items: [
       'Big numbers now read 2.40M, 13.1B and 250T (million, billion, trillion) instead of scientific notation.'] },
     { v: 34, date: 'November 23, 2026', title: 'Tonics at the Quartermaster', items: [

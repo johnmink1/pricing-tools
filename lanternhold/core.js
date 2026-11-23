@@ -239,6 +239,7 @@
       mode: null, hero: null, guests: [],
       unlocked: [], levels: {}, party: [null, null, null, null, null],
       hp: {}, down: {}, abil: {}, minions: [], items: { draught: 1, oil: 0 }, campUntil: 0, jobs: {},
+      skills: {}, kindling: 0, bagUps: 0, unlocks: {},
       relics: {}, embers: 0, feats: {},
       bag: [], gear: {}, lore: { hold: 1 },
       story: { seen: {}, queue: [] },
@@ -293,14 +294,15 @@
 
   function maxHpOf(s, id) {
     const m = memberById(id);
-    return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + 0.04 * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp') * (1 + campBonus(s, 'hp')));
+    return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + 0.04 * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp') * (1 + campBonus(s, 'hp')) * (1 + sk(s, 'php') + (id === 'you' ? sk(s, 'hp') : 0)));
   }
-  function partyMult(s) { return emberMult(s) * (1 + 0.02 * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')); }
+  function partyMult(s) { return emberMult(s) * (1 + 0.02 * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')) * (1 + sk(s, 'pdps')); }
   function memberDps(s, id, now) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id), c = CLASSES[m.cls];
     let d = c.dps * scale(s, id) * partyMult(s) * gearMult(s, id, 'dps');
-    if (m.cls === 'mage' && abilityActive(s, id, now)) d *= setBonus(s, id) >= 3 ? 6 : 4;
+    if (id === 'you') d *= 1 + sk(s, 'dps');
+    if (m.cls === 'mage' && abilityActive(s, id, now)) d *= (setBonus(s, id) >= 3 ? 6 : 4) * (id === 'you' ? 1 + sk(s, 'power') : 1);
     return d;
   }
   function minionDps(s, now) {
@@ -314,14 +316,80 @@
   function healPerSec(s, id) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id); if (m.cls !== 'healer') return 0;
-    return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + 0.04 * s.embers) * (1 + 0.02 * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal'));
+    return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + 0.04 * s.embers) * (1 + 0.02 * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0));
   }
   function clickDamage(s, now) { return (1 + totalDps(s, now) * 0.05) * (1 + relicVal(s, 'whet')); }
-  function goldMult(s) { return emberMult(s) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')); }
-  function critChance(s) { return 0.04 + relicVal(s, 'dice'); }
-  function lanternTime(s) { return BASE_LANTERN + relicVal(s, 'lamp') + campBonus(s, 'lamp'); }
-  function chestChance(s) { return 0.03 + relicVal(s, 'moth'); }
+  function goldMult(s) { return emberMult(s) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
+  function critChance(s) { return 0.04 + relicVal(s, 'dice') + sk(s, 'crit'); }
+  function lanternTime(s) { return BASE_LANTERN + relicVal(s, 'lamp') + campBonus(s, 'lamp') + sk(s, 'lantern'); }
+  function chestChance(s) { return 0.03 + relicVal(s, 'moth') + sk(s, 'chest'); }
   function abilityDuration(s, ab) { return ab.dur * (1 + relicVal(s, 'hourglass')); }
+
+  // ---------- Skill trees ----------
+  // Each class has three branches of three skills. Your own hero uses the tree for their class.
+  // Kindling comes only from rekindling. Ranks cost 1, 2 and 3 points by tier, and a skill
+  // needs the one above it in its branch first. A full tree costs 36 points.
+  // n: name, k: effect, v: per rank, r: max ranks, d: description ({v} is the rank total).
+  const SK = (n, k, v, r, d) => ({ n, k, v, r, d });
+  const SKILL_TREES = {
+    tank: [
+      { b: 'Bastion', s: [SK('Iron Hide', 'hp', 0.10, 3, '+{v} health for your hero'), SK('Hold the Line', 'guard', 0.04, 3, 'Party takes {v} less damage'), SK('Unbreakable', 'power', 0.5, 1, 'Shield Wall blocks 85% of damage instead of 70%')] },
+      { b: 'Vanguard', s: [SK('Shield Bash', 'dps', 0.15, 3, '+{v} damage for your hero'), SK('Rallying Cry', 'pdps', 0.05, 3, '+{v} party damage'), SK('Bulwark Charge', 'cd', 0.3, 1, 'Shield Wall comes back 30% sooner')] },
+      { b: 'Warden', s: [SK('Stalwart Company', 'php', 0.05, 3, '+{v} party health'), SK('Lantern Bearer', 'lantern', 2, 3, '+{v}s lantern time on guardians'), SK('Long Watch', 'dur', 0.5, 1, 'Shield Wall lasts 50% longer')] },
+    ],
+    healer: [
+      { b: 'Grace', s: [SK('Gentle Hands', 'heal', 0.10, 3, '+{v} healing from your hero'), SK('Mending Light', 'pheal', 0.05, 3, '+{v} party healing'), SK('Second Dawn', 'revive', 2, 1, 'Lantern Hymn lifts two more fallen allies')] },
+      { b: 'Vigil', s: [SK('Blessed Ward', 'php', 0.05, 3, '+{v} party health'), SK('Sanctuary', 'guard', 0.03, 3, 'Party takes {v} less damage'), SK('Swelling Hymn', 'power', 0.5, 1, 'Lantern Hymn heals 50% more')] },
+      { b: 'Pilgrim', s: [SK('Alms', 'gold', 0.08, 3, '+{v} gold'), SK('Lamplight Psalm', 'lantern', 2, 3, '+{v}s lantern time on guardians'), SK('Quick Prayer', 'cd', 0.3, 1, 'Lantern Hymn comes back 30% sooner')] },
+    ],
+    rogue: [
+      { b: 'Shadow', s: [SK('Light Feet', 'dodge', 0.03, 3, '+{v} dodge chance for your hero'), SK('Quick Hands', 'dps', 0.15, 3, '+{v} damage for your hero'), SK('Vanish', 'cd', 0.35, 1, 'Backstab comes back 35% sooner')] },
+      { b: 'Fortune', s: [SK('Sticky Fingers', 'gold', 0.08, 3, '+{v} gold'), SK('Keen Eye', 'loot', 0.06, 3, '+{v} gear drop chance'), SK('Lockpick', 'chest', 0.02, 1, '+2% treasure chest chance')] },
+      { b: 'Edge', s: [SK('Find the Gap', 'crit', 0.02, 3, '+{v} critical strike chance'), SK('Coordinated Strike', 'pdps', 0.04, 3, '+{v} party damage'), SK('Killing Blow', 'power', 1, 1, 'Backstab hits twice as hard')] },
+    ],
+    mage: [
+      { b: 'Fire', s: [SK('Kindle', 'dps', 0.15, 3, '+{v} damage for your hero'), SK('Fan the Flames', 'pdps', 0.05, 3, '+{v} party damage'), SK('Inferno', 'power', 0.5, 1, 'Ember Storm burns 50% hotter')] },
+      { b: 'Arcane', s: [SK('Flowing Mana', 'cd', 0.08, 3, 'Ember Storm comes back {v} sooner'), SK('Lingering Fire', 'dur', 0.15, 3, 'Ember Storm lasts {v} longer'), SK('Overcharge', 'crit', 0.05, 1, '+5% critical strike chance')] },
+      { b: 'Ward', s: [SK('Glyph of Warding', 'php', 0.05, 3, '+{v} party health'), SK('Runic Shield', 'guard', 0.03, 3, 'Party takes {v} less damage'), SK('Lantern Sigil', 'lantern', 4, 1, '+4s lantern time on guardians')] },
+    ],
+    necro: [
+      { b: 'Grave', s: [SK('Bone Craft', 'power', 0.15, 3, 'Skeletons hit {v} harder'), SK('Restless Dead', 'dur', 0.15, 3, 'Skeletons last {v} longer'), SK('Ossuary', 'minion', 2, 1, 'Raise Dead calls two more skeletons')] },
+      { b: 'Blight', s: [SK('Rot', 'dps', 0.15, 3, '+{v} damage for your hero'), SK('Withering Curse', 'pdps', 0.05, 3, '+{v} party damage'), SK('Soul Harvest', 'cd', 0.3, 1, 'Raise Dead comes back 30% sooner')] },
+      { b: 'Pact', s: [SK('Grave Gold', 'gold', 0.08, 3, '+{v} gold'), SK('Death’s Ledger', 'loot', 0.06, 3, '+{v} gear drop chance'), SK('Deathless', 'php', 0.10, 1, '+10% party health')] },
+    ],
+  };
+  // Give every skill a stable id like 'tank.1.2' (branch 1, tier 2).
+  for (const c in SKILL_TREES) SKILL_TREES[c].forEach((br, bi) => br.s.forEach((k, ti) => { k.id = c + '.' + bi + '.' + ti; k.tier = ti; k.cls = c; k.branch = bi; }));
+  const skillById = id => { const [c, b, t] = (id || '').split('.'); const br = SKILL_TREES[c] && SKILL_TREES[c][+b]; return br && br.s[+t]; };
+  const heroCls = s => { const h = s.hero && memberById('you'); return h ? h.cls : null; };
+  const skillCost = k => k.tier + 1;
+  function skillText(k, rank) {
+    const v = k.v * Math.max(1, rank);
+    return k.d.replace('{v}', k.k === 'lantern' ? v : Math.round(v * 100) + '%');
+  }
+  // Total of one effect from your hero's tree. It only counts while your hero is in the party.
+  function sk(s, key) {
+    if (!s.skills || !s.party.includes('you')) return 0;
+    let t = 0;
+    for (const id in s.skills) { const k = skillById(id); if (k && k.k === key && k.cls === heroCls(s)) t += k.v * s.skills[id]; }
+    return t;
+  }
+  function skillSpent(s) { let t = 0; for (const id in (s.skills || {})) { const k = skillById(id); if (k) t += skillCost(k) * s.skills[id]; } return t; }
+  function canLearn(s, id) {
+    const k = skillById(id); if (!k || k.cls !== heroCls(s)) return 'not';
+    const r = (s.skills || {})[id] || 0;
+    if (r >= k.r) return 'max';
+    if (k.tier > 0 && !((s.skills || {})[k.cls + '.' + k.branch + '.' + (k.tier - 1)])) return 'locked';
+    if ((s.kindling || 0) < skillCost(k)) return 'points';
+    return 'ok';
+  }
+  function learnSkill(s, id) {
+    if (canLearn(s, id) !== 'ok') return false;
+    const k = skillById(id); s.kindling -= skillCost(k); s.skills[id] = (s.skills[id] || 0) + 1; return true;
+  }
+  function resetSkills(s) { s.kindling = (s.kindling || 0) + skillSpent(s); s.skills = {}; }
+  // Kindling earned by rekindling now: 2 at floor 50, plus 1 for every 10 floors deeper.
+  function skillPointsFor(s) { return s.maxFloor < REKINDLE_FLOOR ? 0 : 2 + Math.floor((s.maxFloor - REKINDLE_FLOOR) / 10); }
 
   function embersFor(s) {
     const f = s.maxFloor;
@@ -331,15 +399,32 @@
 
 
   // ---------- gear ----------
-  const SLOTS = ['weapon', 'armor', 'trinket'];
-  const SLOT_NAME = { weapon: 'Weapon', armor: 'Armor', trinket: 'Trinket' };
+  // Item types. A robe is a chest piece that also covers the legs.
+  const SLOTS = ['main', 'off', 'head', 'neck', 'chest', 'robe', 'legs', 'feet', 'ring'];
+  // Where gear is worn. The second trinket and rings 2 to 5 are unlocked per character with Kindling.
+  const POS = ['main', 'off', 'head', 'neck', 'neck2', 'chest', 'legs', 'feet', 'ring1', 'ring2', 'ring3', 'ring4', 'ring5'];
+  const SLOT_NAME = { main: 'Main hand', off: 'Offhand', head: 'Helmet', neck: 'Trinket', neck2: 'Trinket', chest: 'Chest', robe: 'Robe', legs: 'Legs', feet: 'Feet', ring: 'Ring', ring1: 'Ring', ring2: 'Ring', ring3: 'Ring', ring4: 'Ring', ring5: 'Ring' };
+  const CLOTH = { healer: 1, mage: 1, necro: 1 };
+  const posType = p => p === 'neck2' ? 'neck' : p.slice(0, 4) === 'ring' ? 'ring' : p;
+  const fitsPos = (type, pos) => type === posType(pos) || (type === 'robe' && pos === 'chest');
   const BASES = {
-    tank:   { weapon: "Warden's Mace",  armor: 'Bulwark Plate',     trinket: 'Tower Sigil' },
-    healer: { weapon: 'Willow Staff',   armor: 'Mossweave Robe',    trinket: 'Censer Charm' },
-    rogue:  { weapon: 'Twin Fangs',     armor: 'Shadowhide Jerkin', trinket: 'Loaded Dice' },
-    mage:   { weapon: 'Emberwood Wand', armor: 'Cinderweave Robe',  trinket: 'Focus Prism' },
-    necro:  { weapon: 'Bone Scepter',   armor: 'Gravecloth Shroud', trinket: 'Cracked Phylactery' },
+    tank:   { main: "Warden's Mace",  off: 'Tower Shield',  head: 'Iron Helm',          neck: 'Tower Sigil',        chest: 'Bulwark Plate',     legs: 'Plated Greaves',     feet: 'Ironshod Boots',    ring: 'Signet of the Hold' },
+    healer: { main: 'Willow Staff',   off: 'Psalter of Light', head: 'Pilgrim Circlet', neck: 'Censer Charm',       chest: 'Linen Vestment',    robe: 'Mossweave Robe',     legs: 'Linen Leggings',    feet: 'Pilgrim Sandals',   ring: 'Mossstone Ring' },
+    rogue:  { main: 'Twin Fangs',     off: 'Parrying Dagger', head: 'Shadow Hood',      neck: 'Lucky Coin Chain',   chest: 'Shadowhide Jerkin', legs: 'Quiet Breeches',     feet: 'Soft Boots',        ring: 'Cutpurse Ring' },
+    mage:   { main: 'Emberwood Wand', off: 'Focus Orb',     head: 'Scholar Circlet',    neck: 'Focus Prism',        chest: 'Cinder Vest',       robe: 'Cinderweave Robe',   legs: 'Ashen Leggings',    feet: 'Ember-step Slippers', ring: 'Spark Ring' },
+    necro:  { main: 'Bone Scepter',   off: 'Grim Tome',     head: 'Skull Cowl',         neck: 'Cracked Phylactery', chest: 'Grave Harness',     robe: 'Gravecloth Shroud',  legs: 'Bone-laced Leggings', feet: 'Grave Walkers',   ring: 'Bone Ring' },
   };
+  // How much of an item's power goes to damage and to health. Healers turn their damage share into healing too.
+  const WEIGHT = { main: { dps: 1, hp: 0 }, off: { dps: 0.4, hp: 0 }, head: { dps: 0, hp: 0.4 }, neck: { dps: 0.5, hp: 0.5 }, chest: { dps: 0, hp: 1 }, robe: { dps: 0.2, hp: 1.5 }, legs: { dps: 0, hp: 0.5 }, feet: { dps: 0.2, hp: 0.2 }, ring: { dps: 0.25, hp: 0 } };
+  const weightOf = it => it.slot === 'off' && it.cls === 'tank' ? { dps: 0, hp: 0.5 } : WEIGHT[it.slot];
+  // Old saves used weapon, armor and trinket.
+  function normItem(it) {
+    if (!it) return it;
+    if (it.slot === 'weapon') it.slot = 'main';
+    else if (it.slot === 'armor') it.slot = CLOTH[it.cls] && !it.set ? 'robe' : 'chest';
+    else if (it.slot === 'trinket') it.slot = 'neck';
+    return it;
+  }
   const RARITY = [
     { id: 'common', name: 'Common', pct: 0.10, w: 60, prefix: '' },
     { id: 'fine',   name: 'Fine',   pct: 0.20, w: 28, prefix: 'Keen ' },
@@ -348,42 +433,57 @@
     { id: 'set',    name: 'Set',    pct: 0.45, w: 0,  prefix: '' },
   ];
   const SETS = [
-    { id: 'vigil',  cls: 'tank',   name: "Gravewarden's Vigil", pieces: { weapon: 'Vigil Hammer', armor: 'Vigil Mail', trinket: 'Vigil Lantern' },
+    { id: 'vigil',  cls: 'tank',   name: "Gravewarden's Vigil", pieces: { main: 'Vigil Hammer', chest: 'Vigil Mail', neck: 'Vigil Lantern' },
       two: '+20% health', three: 'Shield Wall lasts twice as long', lore: 'Forged for the first Gravewarden, who swore no one would be left behind in the dark.' },
-    { id: 'grace',  cls: 'healer', name: "Rootmother's Grace", pieces: { weapon: 'Grace Bough', armor: 'Grace Bark Robe', trinket: 'Grace Seed' },
+    { id: 'grace',  cls: 'healer', name: "Rootmother's Grace", pieces: { main: 'Grace Bough', chest: 'Grace Bark Robe', neck: 'Grace Seed' },
       two: '+25% healing', three: 'Lantern Hymn lifts every fallen ally', lore: 'Before the roots went sour, the Root Mother mended anything that bled. Some of her kindness stayed in the wood.' },
-    { id: 'night',  cls: 'rogue',  name: "Kestrel's Night", pieces: { weapon: 'Nightfang', armor: 'Night Cowl', trinket: 'Night Coin' },
+    { id: 'night',  cls: 'rogue',  name: "Kestrel's Night", pieces: { main: 'Nightfang', chest: 'Night Cowl', neck: 'Night Coin' },
       two: '+10% dodge', three: 'Backstab recovers 40% faster', lore: 'Kestrel swears she did not steal these. Varga swears she did.' },
-    { id: 'regalia',cls: 'mage',   name: 'Ashcombe Regalia', pieces: { weapon: 'Ashcombe Rod', armor: 'Ashcombe Mantle', trinket: 'Ashcombe Ember' },
+    { id: 'regalia',cls: 'mage',   name: 'Ashcombe Regalia', pieces: { main: 'Ashcombe Rod', chest: 'Ashcombe Mantle', neck: 'Ashcombe Ember' },
       two: '+25% damage', three: 'Ember Storm burns at 6x instead of 4x', lore: 'The robes of the Ashcombe line of fire-scholars. Wren’s master wore them last.' },
-    { id: 'crown',  cls: 'necro',  name: 'The Hollow Crown', pieces: { weapon: 'Hollow Scepter', armor: 'Hollow Regalia', trinket: 'Hollow Crown' },
+    { id: 'crown',  cls: 'necro',  name: 'The Hollow Crown', pieces: { main: 'Hollow Scepter', chest: 'Hollow Regalia', neck: 'Hollow Crown' },
       two: '+30% skeleton damage', three: 'Raise Dead calls 5 skeletons', lore: 'A king’s regalia, left in the Vault when its owner was fed to the lantern.' },
   ];
-  const GEAR_CAP = 40;
+  const GEAR_CAP = 40, BAG_STEP = 10, BAG_UPS_MAX = 6;
   let uidSeq = 0;
   const gearPct = it => RARITY.find(r => r.id === it.rar).pct * (1 + 0.03 * it.ilvl) * (1 + 0.2 * it.up);
+  // What an item adds, as [label, fraction] pairs.
+  function itemStats(it) {
+    const p = gearPct(it), w = weightOf(it), out = [];
+    if (w.dps) { out.push(['Damage', p * w.dps]); if (it.cls === 'healer') out.push(['Healing', p * w.dps]); }
+    if (w.hp) out.push(['Health', p * w.hp]);
+    return out;
+  }
+  const itemScore = it => { const w = weightOf(it); return gearPct(it) * (w.dps + w.hp); };
   function gearName(it) {
     if (it.set) return SETS.find(x => x.id === it.set).pieces[it.slot];
     return RARITY.find(r => r.id === it.rar).prefix + BASES[it.cls][it.slot];
+  }
+  const DROP_W = [['main', 2], ['off', 1.5], ['head', 1.5], ['neck', 1], ['chest', 1.5], ['legs', 1.5], ['feet', 1.5], ['ring', 1.5]];
+  function rollSlot(cls, r) {
+    let x = r() * 12;
+    for (const [t, w] of DROP_W) { x -= w; if (x < 0) return t === 'chest' && CLOTH[cls] && r() < 0.5 ? 'robe' : t; }
+    return 'ring';
   }
   function rollGear(s, f, opts, rng) {
     const r = rng || Math.random;
     const classes = Array.from(new Set(s.party.filter(Boolean).map(id => memberById(id).cls)));
     const cls = classes.length ? classes[Math.floor(r() * classes.length)] : CLASS_ORDER[Math.floor(r() * 5)];
-    const slot = SLOTS[Math.floor(r() * 3)];
     let rar;
     if (opts && opts.set) {
       const set = SETS.find(x => x.cls === cls);
-      return { uid: Date.now().toString(36) + (uidSeq++), cls, slot, rar: 'set', set: set.id, ilvl: f, up: 0 };
+      return { uid: Date.now().toString(36) + (uidSeq++), cls, slot: ['main', 'chest', 'neck'][Math.floor(r() * 3)], rar: 'set', set: set.id, ilvl: f, up: 0 };
     }
+    const slot = rollSlot(cls, r);
     // Rarity odds start stingy and open up with depth (d reaches 1 at floor 80).
     const boost = (opts && opts.boost) || 0, d = Math.min(1, f / 80);
     const p = r() + boost * 0.15 * d;
     rar = p > 0.995 - 0.03 * d ? 'epic' : p > 0.94 - 0.08 * d ? 'rare' : p > 0.7 - 0.12 * d ? 'fine' : 'common';
     return { uid: Date.now().toString(36) + (uidSeq++), cls, slot, rar, ilvl: f, up: 0 };
   }
+  const bagCap = s => GEAR_CAP + BAG_STEP * (s.bagUps || 0);
   function dropGear(s, foe, rng, events) {
-    const r = rng || Math.random, f = s.floor, loot = 1 + campBonus(s, 'loot');
+    const r = rng || Math.random, f = s.floor, loot = 1 + campBonus(s, 'loot') + sk(s, 'loot');
     let it = null;
     if (foe.boss) {
       if (f >= 15 && r() < 0.06 * loot) it = rollGear(s, f, { set: true }, r);
@@ -392,9 +492,9 @@
     else if (foe.elite) { if (r() < 0.15 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
     else if (r() < 0.012 * loot) it = rollGear(s, f, null, r);
     if (!it) return;
-    if (s.bag.length >= GEAR_CAP) {
+    if (s.bag.length >= bagCap(s)) {
       // full bag: the lowest value common item gets sold automatically
-      const worst = s.bag.filter(x => x.rar === 'common').sort((a, b) => gearPct(a) - gearPct(b))[0];
+      const worst = s.bag.filter(x => x.rar === 'common' && !wearer(s, x.uid)).sort((a, b) => gearPct(a) - gearPct(b))[0];
       if (worst && gearPct(worst) < gearPct(it)) { s.bag = s.bag.filter(x => x !== worst); s.gold += salvageValue(worst); }
       else { s.gold += salvageValue(it); events && events.push({ type: 'autosell', item: it }); return; }
     }
@@ -404,20 +504,47 @@
   }
   function equipped(s, id) { return (s.gear[id] || {}); }
   function itemOf(s, uid) { return s.bag.find(x => x.uid === uid); }
-  function wearer(s, uid) { for (const id in s.gear) for (const sl of SLOTS) if (s.gear[id][sl] === uid) return id; return null; }
+  function wornAt(s, uid) { for (const id in s.gear) for (const p in s.gear[id]) if (s.gear[id][p] === uid) return [id, p]; return null; }
+  function wearer(s, uid) { const w = wornAt(s, uid); return w ? w[0] : null; }
+  const wornPos = (s, uid) => { const w = wornAt(s, uid); return w ? w[1] : null; };
   const reqLevel = it => Math.max(1, Math.floor(it.ilvl * 1.5));
   const canWear = (s, id, it) => lvl(s, id) >= reqLevel(it);
-  function equip(s, id, uid) {
+  // Kindling unlocks, per character.
+  const unlocksOf = (s, id) => (s.unlocks && s.unlocks[id]) || { rings: 0, neck2: 0 };
+  function openPos(s, id) {
+    const u = unlocksOf(s, id);
+    return POS.filter(p => p === 'neck2' ? u.neck2 : p.slice(0, 4) === 'ring' ? +p[4] <= 1 + u.rings : true);
+  }
+  const robeOn = (s, id) => { const c = equipped(s, id).chest, it = c && itemOf(s, c); return !!(it && it.slot === 'robe'); };
+  function equip(s, id, uid, pos) {
     const it = itemOf(s, uid); if (!it) return false;
     const m = memberById(id); if (!m || m.guest || m.cls !== it.cls || !canWear(s, id, it)) return false;
-    const prev = wearer(s, uid); if (prev) delete s.gear[prev][it.slot];
-    s.gear[id] = s.gear[id] || {};
+    const open = openPos(s, id).filter(p => fitsPos(it.slot, p));
+    if (pos && !open.includes(pos)) return false;
+    const g = s.gear[id] = s.gear[id] || {};
+    if (!pos) {
+      const cur = wornAt(s, uid); if (cur && cur[0] === id) return true;
+      pos = open.find(p => !g[p]) || open.slice().sort((a, b) => gearPct(itemOf(s, g[a])) - gearPct(itemOf(s, g[b])))[0];
+    }
+    if (!pos) return false;
     const before = maxHpOf(s, id);
-    s.gear[id][it.slot] = uid;
+    const prev = wornAt(s, uid); if (prev) delete s.gear[prev[0]][prev[1]];
+    g[pos] = uid;
+    if (it.slot === 'robe') delete g.legs;
+    if (it.slot === 'legs' && robeOn(s, id)) delete g.chest;
     if (s.hp[id] != null && !s.down[id]) s.hp[id] = Math.max(1, s.hp[id] + maxHpOf(s, id) - before);
     return true;
   }
-  function unequip(s, id, slot) { if (s.gear[id]) delete s.gear[id][slot]; }
+  // What equipping this item would take off (for comparisons).
+  function replaces(s, id, it) {
+    const g = equipped(s, id), open = openPos(s, id).filter(p => fitsPos(it.slot, p));
+    if (it.slot === 'robe') return ['chest', 'legs'].map(p => g[p] && itemOf(s, g[p])).filter(Boolean);
+    if (it.slot === 'legs' && robeOn(s, id)) return [itemOf(s, g.chest)];
+    if (open.some(p => !g[p])) return [];
+    const worst = open.map(p => itemOf(s, g[p])).filter(Boolean).sort((a, b) => gearPct(a) - gearPct(b))[0];
+    return worst ? [worst] : [];
+  }
+  function unequip(s, id, pos) { if (s.gear[id]) delete s.gear[id][pos]; }
   const upgradeCost = it => foeGold(Math.max(1, it.ilvl), false) * 25 * Math.pow(1.7, it.up) * (it.rar === 'set' ? 2 : 1);
   const UP_MAX = 10;
   function upgrade(s, uid) {
@@ -428,36 +555,55 @@
   const salvageValue = it => foeGold(Math.max(1, it.ilvl), false) * 3 * (1 + RARITY.findIndex(r => r.id === it.rar)) * (1 + it.up);
   function salvage(s, uid) {
     const it = itemOf(s, uid); if (!it) return 0;
-    const w = wearer(s, uid); if (w) delete s.gear[w][it.slot];
+    const w = wornAt(s, uid); if (w) delete s.gear[w[0]][w[1]];
     s.bag = s.bag.filter(x => x !== it);
     const v = salvageValue(it); s.gold += v; return v;
   }
-  // Best unworn-or-own item per slot for a member, if it beats what they wear.
-  function betterFor(s, id) {
+  // The best kit a member could wear from their own gear and unworn pack items: { pos: item }.
+  function bestKit(s, id) {
     const m = memberById(id); if (!m || m.guest) return {};
-    const g = equipped(s, id), out = {};
-    for (const sl of SLOTS) {
-      const cur = g[sl] && itemOf(s, g[sl]); let best = null, bp = cur ? gearPct(cur) : 0;
-      for (const it of s.bag) if (it.cls === m.cls && it.slot === sl && !wearer(s, it.uid) && canWear(s, id, it) && gearPct(it) > bp) { best = it; bp = gearPct(it); }
-      if (best) out[sl] = best;
+    const pool = s.bag.filter(it => it.cls === m.cls && canWear(s, id, it) && (!wearer(s, it.uid) || wearer(s, it.uid) === id));
+    const open = openPos(s, id), kit = {};
+    const top = (type, n) => pool.filter(it => it.slot === type).sort((a, b) => itemScore(b) - itemScore(a)).slice(0, n);
+    for (const t of ['main', 'off', 'head', 'feet', 'neck', 'ring']) {
+      const ps = open.filter(p => posType(p) === t), best = top(t, ps.length), g = equipped(s, id);
+      // keep items already in place where they stay in the top picks, fill the rest
+      const keep = ps.filter(p => g[p] && best.some(b => b.uid === g[p]));
+      const rest = best.filter(b => !keep.some(p => g[p] === b.uid));
+      for (const p of keep) kit[p] = itemOf(s, g[p]);
+      for (const p of ps) if (!kit[p] && rest.length) kit[p] = rest.shift();
     }
+    const robe = top('robe', 1)[0], chest = top('chest', 1)[0], legs = top('legs', 1)[0];
+    const split = (chest ? itemScore(chest) : 0) + (legs ? itemScore(legs) : 0);
+    if (robe && itemScore(robe) > split) kit.chest = robe; else { if (chest) kit.chest = chest; if (legs) kit.legs = legs; }
+    return kit;
+  }
+  // Positions where the best kit differs from what is worn now.
+  function betterFor(s, id) {
+    const g = equipped(s, id), kit = bestKit(s, id), out = {};
+    for (const p in kit) if (g[p] !== kit[p].uid) out[p] = kit[p];
     return out;
   }
-  function equipBest(s, id) { const b = betterFor(s, id); let n = 0; for (const sl in b) if (equip(s, id, b[sl].uid)) n++; return n; }
-  function setCount(s, id, setId) { const g = equipped(s, id); let n = 0; for (const sl of SLOTS) { const it = g[sl] && itemOf(s, g[sl]); if (it && it.set === setId) n++; } return n; }
+  function equipBest(s, id) { const b = betterFor(s, id); let n = 0; for (const p in b) if (equip(s, id, b[p].uid, p)) n++; return n; }
+  function setCount(s, id, setId) { const g = equipped(s, id); let n = 0; for (const p in g) { const it = itemOf(s, g[p]); if (it && it.set === setId) n++; } return n; }
   function setBonus(s, id) {
     const m = memberById(id); if (!m) return 0;
     const set = SETS.find(x => x.cls === m.cls); if (!set) return 0;
     return setCount(s, id, set.id);
   }
-  function gearMult(s, id, kind) {
-    const g = equipped(s, id); let pct = 0;
-    for (const sl of SLOTS) {
-      const it = g[sl] && itemOf(s, g[sl]); if (!it) continue;
-      if (kind === 'dps' && (sl === 'weapon' || sl === 'trinket')) pct += gearPct(it) * (sl === 'trinket' ? 0.5 : 1);
-      if (kind === 'hp' && (sl === 'armor' || sl === 'trinket')) pct += gearPct(it) * (sl === 'trinket' ? 0.5 : 1);
-      if (kind === 'heal' && sl !== 'armor') pct += gearPct(it);
+  // Total gear bonus for one stat, as a fraction (0.5 = +50%).
+  function gearPctOf(s, id, kind) {
+    const g = equipped(s, id), robe = robeOn(s, id); let pct = 0;
+    for (const p in g) {
+      if (p === 'legs' && robe) continue;
+      const it = itemOf(s, g[p]); if (!it) continue;
+      const w = weightOf(it);
+      pct += gearPct(it) * (kind === 'hp' ? w.hp : w.dps);
     }
+    return pct;
+  }
+  function gearMult(s, id, kind) {
+    let pct = gearPctOf(s, id, kind);
     const n = setBonus(s, id), cls = memberById(id).cls;
     if (n >= 2) {
       if (kind === 'hp' && cls === 'tank') pct += 0.2;
@@ -465,6 +611,22 @@
       if (kind === 'dps' && cls === 'mage') pct += 0.25;
     }
     return 1 + pct;
+  }
+  // ---------- Kindling ----------
+  // Earned only by rekindling. Spent on the skill tree, bag space and extra gear slots.
+  const bagUpCost = s => 1 + (s.bagUps || 0);
+  function buyBag(s) {
+    if ((s.bagUps || 0) >= BAG_UPS_MAX || s.kindling < bagUpCost(s)) return false;
+    s.kindling -= bagUpCost(s); s.bagUps = (s.bagUps || 0) + 1; return true;
+  }
+  // kind 'ring' opens the next ring (2 to 5), 'neck2' opens the second trinket.
+  function unlockCost(s, id, kind) { const u = unlocksOf(s, id); return kind === 'neck2' ? (u.neck2 ? 0 : 3) : u.rings >= 4 ? 0 : u.rings + 1; }
+  function unlockSlot(s, id, kind) {
+    const m = memberById(id); if (!m || m.guest) return false;
+    const c = unlockCost(s, id, kind); if (!c || s.kindling < c) return false;
+    s.unlocks = s.unlocks || {}; const u = s.unlocks[id] = Object.assign({ rings: 0, neck2: 0 }, s.unlocks[id] || {});
+    s.kindling -= c; if (kind === 'neck2') u.neck2 = 1; else u.rings++;
+    return true;
   }
 
   // ---------- lore ----------
@@ -795,9 +957,10 @@
       return;
     }
     const m = memberById(t), c = CLASSES[m.cls];
-    if (c.dodge && (rng || Math.random)() < c.dodge + (setBonus(s, t) >= 2 ? 0.1 : 0)) { events && events.push({ type: 'dodge', target: t }); return; }
+    if (c.dodge && (rng || Math.random)() < c.dodge + (setBonus(s, t) >= 2 ? 0.1 : 0) + (t === 'you' ? sk(s, 'dodge') : 0)) { events && events.push({ type: 'dodge', target: t }); return; }
     if (c.armor) dmg *= 1 - c.armor;
-    if (m.cls === 'tank' && abilityActive(s, t, now)) dmg *= 0.3;
+    if (m.cls === 'tank' && abilityActive(s, t, now)) dmg *= 0.3 * (t === 'you' ? 1 - sk(s, 'power') : 1);
+    dmg *= 1 - Math.min(0.5, sk(s, 'guard'));
     s.hp[t] = (s.hp[t] == null ? maxHpOf(s, t) : s.hp[t]) - dmg;
     events && events.push({ type: 'foehit', target: t, dmg, behind: !!pick.behind });
     if (s.hp[t] <= 0) {
@@ -821,23 +984,23 @@
     const m = memberById(id), c = CLASSES[m.cls], ab = c.ability;
     const st = s.abil[id] || { readyAt: 0, until: 0 };
     if (st.readyAt > now) return false;
-    const sb = setBonus(s, id);
-    st.readyAt = now + ab.cd * 1000 * (m.cls === 'rogue' && sb >= 3 ? 0.6 : 1);
-    st.until = now + abilityDuration(s, ab) * 1000 * (m.cls === 'tank' && sb >= 3 ? 2 : 1);
+    const sb = setBonus(s, id), me = id === 'you', pw = me ? 1 + sk(s, 'power') : 1;
+    st.readyAt = now + ab.cd * 1000 * (m.cls === 'rogue' && sb >= 3 ? 0.6 : 1) * (me ? 1 - Math.min(0.5, sk(s, 'cd')) : 1);
+    st.until = now + abilityDuration(s, ab) * 1000 * (m.cls === 'tank' && sb >= 3 ? 2 : 1) * (me ? 1 + sk(s, 'dur') : 1);
     s.abil[id] = st;
     if (m.cls === 'healer') {
-      healParty(s, 0.45, true);
-      const fallen = s.party.filter(x => x && s.down[x]).slice(0, sb >= 3 ? 5 : 1);
+      healParty(s, 0.45 * pw, true);
+      const fallen = s.party.filter(x => x && s.down[x]).slice(0, (sb >= 3 ? 5 : 1) + (me ? sk(s, 'revive') : 0));
       for (const f of fallen) { delete s.down[f]; s.hp[f] = maxHpOf(s, f) * 0.5; s.stats.revives++; events && events.push({ type: 'revive', id: f }); }
     } else if (m.cls === 'rogue') {
-      const d = c.dps * scale(s, id) * partyMult(s) * gearMult(s, id, 'dps') * 12;
+      const d = c.dps * scale(s, id) * partyMult(s) * gearMult(s, id, 'dps') * 12 * pw;
       events && events.push({ type: 'ability', id, cls: m.cls, dmg: d });
       damageFoe(s, d, now, null, events);
       return true;
     } else if (m.cls === 'necro') {
-      const each = c.dps * scale(s, id) * partyMult(s) * gearMult(s, id, 'dps') * 0.6 * (sb >= 2 ? 1.3 : 1);
+      const each = c.dps * scale(s, id) * partyMult(s) * gearMult(s, id, 'dps') * 0.6 * (sb >= 2 ? 1.3 : 1) * pw;
       const hp = maxHpOf(s, id) * 0.5;
-      s.minions = Array.from({ length: sb >= 3 ? 5 : 3 }, () => ({ dps: each, hp, max: hp, until: st.until }));
+      s.minions = Array.from({ length: (sb >= 3 ? 5 : 3) + (me ? sk(s, 'minion') : 0) }, () => ({ dps: each, hp, max: hp, until: st.until }));
     }
     events && events.push({ type: 'ability', id, cls: m.cls });
     return true;
@@ -857,8 +1020,15 @@
     return false;
   }
 
+  // Resting at camp: after Return to camp (floor 1) or under a Campfire Draught. Nobody fights; everyone heals up.
+  const resting = (s, now) => !!((s.campReturn && s.floor <= CAMP_FLOOR) || s.campUntil > now);
   function tick(s, dt, now, rng, events) {
     s.stats.playTime += dt;
+    if (resting(s, now)) {
+      for (const id of s.party) if (id) { delete s.down[id]; const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + mx * 0.25 * dt); }
+      s.minions = []; s.lantern = 0;
+      return;
+    }
     // story recruits and revivals
     for (const id of s.party) if (id && s.down[id] && s.down[id] <= now) { delete s.down[id]; s.hp[id] = maxHpOf(s, id) * 0.4; }
     s.minions = s.minions.filter(m => m.until > now && m.hp > 0);
@@ -893,6 +1063,7 @@
   }
 
   function strike(s, now, rng, events, auto) {
+    if (resting(s, now)) return 0;
     if (!s.foe) s.foe = makeFoe(s, rng);
     let dmg = clickDamage(s, now);
     const crit = (rng || Math.random)() < critChance(s);
@@ -906,6 +1077,7 @@
   function rekindle(s) {
     const e = embersFor(s);
     if (e <= 0) return 0;
+    s.kindling = (s.kindling || 0) + skillPointsFor(s);
     s.embers += e; s.stats.rekindles++;
     s.gold = 0; s.floor = 1; s.foeIdx = 0; s.maxFloor = 1; s.foe = null; s.lantern = 0;
     for (const id of s.unlocked) s.levels[id] = 1;
@@ -971,8 +1143,13 @@
     s.foe = null; s.lantern = 0; s.minions = []; s.abil = {}; s.down = {};
     s.guests = o.guests || [];
     s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
+    // Skill trees arrived after some players had already rekindled: 2 points for each past rekindle.
+    s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
+    s.bagUps = o.bagUps || 0; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0;
     if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
-    s.bag = o.bag || []; s.gear = o.gear || {}; s.lore = Object.assign({ hold: 1 }, o.lore || {});
+    s.bag = (o.bag || []).map(normItem); s.gear = o.gear || {};
+    const OLD = { weapon: 'main', armor: 'chest', trinket: 'neck' };
+    for (const id in s.gear) for (const k in OLD) if (s.gear[id][k]) { s.gear[id][OLD[k]] = s.gear[id][k]; delete s.gear[id][k]; } s.lore = Object.assign({ hold: 1 }, o.lore || {});
     registerHero(s);
     for (const id of s.party) if (id && (s.hp[id] == null || s.hp[id] <= 0)) s.hp[id] = maxHpOf(s, id);
     return s;
@@ -983,8 +1160,8 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, SLOTS, SLOT_NAME, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    clickDamage, lanternTime, embersFor, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    offlineGoldPerSec, resting, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

@@ -724,3 +724,66 @@ body:not(.incamp) [data-train]:not([data-train="you"])::after,body:not(.incamp) 
 .tile .lvb{bottom:3px;left:3px;background:#000b;color:var(--muted);font-size:10px}
 .tile .lvb.no{background:#5a1a14;color:#ffb0a0}
 .ititle small b.bad{color:#ff8a7a}
+/* gear doll v2: full slot layout */
+.doll{grid-template-columns:auto 1fr auto;grid-template-areas:none;align-items:start;gap:8px 10px}
+.doll .dcol{display:flex;flex-direction:column;gap:6px}
+.doll .dmid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;align-self:center}
+.doll .dstats{grid-area:auto;grid-template-columns:1fr 1fr;width:auto;gap:6px}
+.doll .drings{grid-column:1/-1;display:flex;justify-content:center;gap:6px;padding-top:8px;border-top:1px dashed var(--line);width:100%}
+.doll .dslot .tile{width:54px;height:54px}.doll .dslot .iimg{width:38px;height:38px}
+.doll .dslot span{font-size:9.5px;letter-spacing:.08em}
+.doll .dslot.covered .tile{opacity:.35}
+.doll .dslot.locked .tile{display:grid;place-items:center;color:var(--dim);border-style:dashed}
+.doll .dslot.locked .tile svg{width:18px;height:18px}
+.doll .dslot.locked .tile.unl{cursor:pointer;color:var(--ember);border-color:rgba(255,138,61,.5)}
+.doll .dslot.locked .tile.unl:hover{background:rgba(255,138,61,.08)}
+.doll .kc{position:absolute;right:3px;bottom:2px;font-style:normal;font-size:11px;font-weight:800;color:var(--ember)}
+.kbig{width:64px;height:64px;margin:0 auto 6px;color:var(--ember);filter:drop-shadow(0 0 18px rgba(255,138,61,.5))}.kbig svg{width:64px;height:64px}
+b.kind{color:var(--ember)}
+@media (max-width:520px){.doll .dslot .tile{width:46px;height:46px}.doll .dslot .iimg{width:32px;height:32px}.doll .dfig img{height:84px}}
+/* skill tree and Kindling */
+.khead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 12px}
+.khead h3{font-family:var(--title);font-size:20px;margin:0 0 2px}
+.khead small{color:var(--muted);font-size:13px}
+.kbal{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(255,138,61,.1);border:1px solid rgba(255,138,61,.35);flex:none}
+.kbal svg{width:18px;height:18px;color:var(--ember)}.kbal b{font-size:20px;color:var(--ember)}.kbal small{color:var(--muted);font-size:12px}
+.ktree{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kbranch{display:flex;flex-direction:column;align-items:stretch;padding:10px;border-radius:12px;background:linear-gradient(180deg,#1d1712,#16110d);border:1px solid var(--line)}
+.kbranch h4{margin:0 0 8px;text-align:center;font-family:var(--title);font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+.klink{display:block;width:2px;height:12px;margin:0 auto;background:var(--line2)}
+.knode{display:flex;gap:8px;padding:8px;border-radius:10px;border:1px solid var(--line);background:#120e0b}
+.knode.got{border-color:rgba(242,193,78,.45);box-shadow:inset 0 0 18px rgba(242,193,78,.06)}
+.knode.lock{opacity:.55}
+.knode.t2{border-width:2px}
+.kic{flex:none;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:#0b0907;border:1px solid var(--line);color:var(--gold)}
+.kic svg{width:17px;height:17px}
+.knode:not(.got) .kic{color:var(--dim)}
+.ktx{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.ktx b{font-size:14px}.ktx small{color:var(--muted);font-size:12px;line-height:1.35}
+.kp{display:flex;gap:3px}.kp i{width:14px;height:4px;border-radius:2px;background:#3a2e22}.kp i.on{background:var(--gold)}
+.ktx .btn{align-self:flex-start;margin-top:3px}
+.kmax{font-style:normal;font-size:12px;color:var(--good);font-weight:700}
+.klock{font-style:normal;font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:4px}.klock svg{width:12px;height:12px}
+.kfoot{display:flex;align-items:center;justify-content:space-between;margin:8px 2px 4px;color:var(--dim);font-size:13px}
+.kshop{display:grid;gap:8px;margin-bottom:10px}
+.kitem{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;border:1px solid var(--line);background:#120e0b}
+.kitem>div:nth-child(2){flex:1}.kitem b{display:block;font-size:14px}.kitem small{color:var(--muted);font-size:12.5px}
+.kitem .kic{color:var(--ember)}
+#skills+.rekindle{border-top:1px solid var(--line);margin-top:14px}
+@media (max-width:720px){.ktree{grid-template-columns:1fr}}
+/* market and codex tabs */
+.tradecard{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid var(--line);background:linear-gradient(180deg,#1d1712,#15110d);margin-bottom:6px}
+.tradecard>div:nth-child(2){flex:1}.tradecard b{display:block;font-size:16px}.tradecard small{color:var(--muted);font-size:13px}
+.tradecard .kic{width:40px;height:40px;color:var(--gold)}.tradecard .kic svg{width:22px;height:22px}
+.tcbtns{display:flex;gap:6px;flex-wrap:wrap}
+.codexseg{display:flex;margin-bottom:12px}.codexseg button{flex:1}.codexseg em{font-style:normal;color:var(--dim);font-size:12px;margin-left:4px}
+@media (max-width:520px){.tradecard{flex-wrap:wrap}.tcbtns{width:100%}.tcbtns .btn{flex:1}}
+/* resting at camp */
+.restcard{display:none;align-items:center;gap:12px;justify-content:space-between}
+.restcard b{display:block;font-family:var(--title);font-size:18px;color:#ffd9a0}.restcard small{color:var(--muted);font-size:13px}
+body.resting .foe>:not(.restcard){display:none}
+body.resting .restcard{display:flex}
+body.resting #hint{display:none}
+body.resting #abilities{opacity:.45;pointer-events:none}
+body.resting .arena{cursor:default}
+.kcost{display:inline-flex;align-items:center;gap:2px;margin-left:4px}.kcost svg{width:12px;height:12px}

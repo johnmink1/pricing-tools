@@ -3,7 +3,7 @@
 // 'return' letter). Senders can recall an unanswered offer. Letters (sale, payment, return) are claimed.
 const D = require('@aws-sdk/client-dynamodb'), crypto = require('crypto');
 const db = new D.DynamoDBClient({}), T = process.env.TABLE, H = process.env.HEROES;
-const CLS = ['tank', 'healer', 'rogue', 'mage', 'necro'], SLOT = ['weapon', 'armor', 'trinket'], RAR = ['common', 'fine', 'rare', 'epic', 'set'];
+const CLS = ['tank', 'healer', 'rogue', 'mage', 'necro'], SLOT = ['main', 'off', 'head', 'neck', 'chest', 'robe', 'legs', 'feet', 'ring'], RAR = ['common', 'fine', 'rare', 'epic', 'set'];
 const SET = { vigil: 'tank', grace: 'healer', night: 'rogue', regalia: 'mage', crown: 'necro' };
 const BAD = /(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn|retard)/gi;
 const res = (c, b) => ({ statusCode: c, body: JSON.stringify(b) });

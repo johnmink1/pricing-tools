@@ -676,7 +676,10 @@
     const cls = classes.length ? classes[Math.floor(r() * classes.length)] : CLASS_ORDER[Math.floor(r() * 5)];
     return { uid: Date.now().toString(36) + (uidSeq++), cls, slot: ['head', 'feet', 'ring'][Math.floor(r() * 3)], rar: 'set', jset: JOB_KEYS[Math.floor(r() * JOB_KEYS.length)], ilvl: f, up: 0 };
   }
-  const bagCap = s => GEAR_CAP + BAG_STEP * (s.bagUps || 0);
+  // Lantern Pass: a 30-day convenience pass bought with Sigils. Auto-train, +10 bag slots, +4 hours of offline time. No power.
+  const PASS_COST = 500, PASS_DAYS = 30, PASS_BAG = 10, PASS_OFFLINE = 4 * 3600;
+  const passOn = s => !!(s && ((s.pass && s.pass > Date.now()) || (s.passTrial && s.passTrial > Date.now())));
+  const bagCap = s => GEAR_CAP + BAG_STEP * (s.bagUps || 0) + (passOn(s) ? PASS_BAG : 0);
   function dropGear(s, foe, rng, events) {
     const r = rng || Math.random, f = s.floor, loot = 1 + campBonus(s, 'loot') + sk(s, 'loot');
     let it = null;
@@ -1408,10 +1411,11 @@
   // Away from the game the party earns a quarter of its active gold, for a limited time.
   // The base window is 8 hours; Night Watch (Kindling) extends it, up to 3 days at most.
   const OFFLINE_BASE = 8 * 3600, OFFLINE_MAX = 72 * 3600;
-  const offlineWindow = s => Math.min(OFFLINE_MAX, OFFLINE_BASE + kup(s, 'watch'));
+  const offlineWindow = s => Math.min(OFFLINE_MAX, OFFLINE_BASE + kup(s, 'watch') + (passOn(s) ? PASS_OFFLINE : 0));
   const offlineEarnPerSec = s => offlineGoldPerSec(s) * 0.5;
   // Auto-train: spend gold on the members who have it switched on, cheapest level first.
   function autoTrain(s, inCamp) {
+    if (!passOn(s)) return 0;
     const on = Object.keys(s.autoTrain || {}).filter(id => s.autoTrain[id] && s.unlocked.includes(id) && !isGuest(s, id) && (inCamp || s.party.includes(id)));
     let n = 0;
     while (on.length && n < 200) {
@@ -1470,7 +1474,7 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, PASS_COST, PASS_DAYS, PASS_BAG, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

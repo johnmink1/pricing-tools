@@ -1141,3 +1141,9 @@ body.resting .arena{cursor:default}
 .mercyfx{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px}.mercyfx li{padding:8px 12px;border-radius:10px;background:rgba(143,207,106,.1);border:1px solid rgba(143,207,106,.35);color:var(--text)}
 @media (max-width:560px){.stat.mercy{font-size:13px}}
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
+/* Lantern Pass */
+.passfx{list-style:none;padding:0;margin:8px 0 12px;display:grid;gap:8px}
+.passfx li{display:grid;gap:2px;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--panel)}
+.passfx b{color:var(--gold)}.passfx span{color:var(--muted);font-size:14px}
+.passstate{margin:0 0 10px}.passstate b{color:var(--gold)}
+.autot.locked{opacity:.55}.autot.locked::after{content:'';display:inline-block;width:6px;height:6px;margin-left:4px;border-radius:50%;background:var(--violet)}

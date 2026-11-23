@@ -836,7 +836,7 @@ Resources:
       Code:
         ZipFile: |
           // built from infra/lambda/profile.js by infra/build.py
-          const l=require("@aws-sdk/client-dynamodb"),N=require("crypto"),u=new l.DynamoDBClient({}),{HEROES:b,WALLETS:g}=process.env,E=Object.fromEntries("f.plain0 f.iron150 f.radiant150 f.tide150 f.mercy150 f.ember250 f.rift400 f.nexus600 t.delver0 t.lampbearer80 t.ashborn120 t.nightwatch120 t.riftwalker200 t.warden200 t.stormcaller200 t.oathkeeper250 t.heir400 c.none0 c.gold100 c.violet100 c.ember100 c.frost100 c.verdant100 c.rift300 g.night0 g.forge150 g.crypt150 g.glass150 g.storm200 g.rift350 g.nexus500 e.lantern0 e.shield0 e.sword0 e.skull40 e.flame40 e.wave40 e.sun40 e.moon40 e.star40 e.key40 e.anvil40 e.crown60 e.eye60 e.rose60 e.raven80 e.rift100".split(" ").map(r=>{const i=r.match(/^(.+?)(\d+)$/);return[i[1],+i[2]]})),T=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn|http|www\.|\.com)/i,s=(r,i,p)=>({statusCode:r,headers:Object.assign({"content-type":"application/json"},p),body:JSON.stringify(i)}),f=r=>({S:String(r)}),A=r=>N.createHash("sha256").update("lh:"+r).digest("hex").slice(0,16);exports.handler=async r=>{const i=r.routeKey,p=r.requestContext.authorizer&&r.requestContext.authorizer.jwt&&r.requestContext.authorizer.jwt.claims;if(!p||!p.sub)return s(401,{error:"auth"});let a={};if(r.body)try{a=JSON.parse(r.isBase64Encoded?Buffer.from(r.body,"base64").toString():r.body)}catch{return s(400,{error:"json"})}const S=A(p.sub),d={userId:f(p.sub)},h={pid:f(S)},w=async()=>(await u.send(new l.UpdateItemCommand({TableName:g,Key:d,ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = if_not_exists(bal, :g), own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":{N:"100"},":o":{SS:["f.plain"]}}}))).Attributes,x=async e=>(await u.send(new l.GetItemCommand({TableName:b,Key:{pid:f(e)}}))).Item,m=async(e,t)=>{await u.send(new l.UpdateItemCommand({TableName:b,Key:h,UpdateExpression:e,ConditionExpression:"attribute_exists(pid) AND attribute_not_exists(ban)",...t&&{ExpressionAttributeValues:t}})),await u.send(new l.UpdateItemCommand({TableName:g,Key:d,UpdateExpression:e,...t&&{ExpressionAttributeValues:t}}))},y=e=>({bal:+e.bal.N,own:e.own.SS,pf:e.pf?JSON.parse(e.pf.S):null,wl:e.wl?e.wl.S:"",wv:!!(e.wv&&e.wv.N==="1")});try{if(i==="GET /profile"){const e=await w(),t=await x(S);if(t&&!t.ban&&(e.pf&&!t.pf||e.wl&&!t.wl)){const n={},o=[];for(const c of["pf","wl","wv"])e[c]&&(n[":"+c]=e[c],o.push(c+" = :"+c));await u.send(new l.UpdateItemCommand({TableName:b,Key:h,UpdateExpression:"SET "+o.join(", "),ExpressionAttributeValues:n}))}return s(200,y(e))}if(i==="PUT /profile"){const e=new Set((await w()).own.SS),t=(o,c)=>c===""||E[o+"."+c]===0||e.has(o+"."+c),n={b:String(a.b||"").replace(/\s+/g," ").trim(),t:String(a.t||""),f:String(a.f||""),c:String(a.c||""),g:String(a.g||""),e:[...new Set(Array.isArray(a.e)?a.e.map(String):[])]};return n.b.length>140||T.test(n.b.replace(/[^a-z.\/]/gi,""))?s(400,{error:"bio"}):!t("t",n.t)||!t("f",n.f)||!t("c",n.c)||!t("g",n.g)||n.e.length>6||!n.e.every(o=>o&&t("e",o))?s(400,{error:"item"}):(await m("SET pf = :p",{":p":f(JSON.stringify(n))}),s(200,{ok:!0,pf:n}))}if(i==="POST /shop"){const e=String(a.id||""),t=E[e];if(!t)return s(400,{error:"item"});const n=await w();if(n.own.SS.includes(e))return s(409,{error:"owned"});if(+n.bal.N<t)return s(409,{error:"funds"});const o=await u.send(new l.UpdateItemCommand({TableName:g,Key:d,ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = bal - :p ADD own :s",ConditionExpression:"bal >= :p AND NOT contains(own, :i)",ExpressionAttributeValues:{":p":{N:String(t)},":s":{SS:[e]},":i":f(e)}}));return s(200,y(o.Attributes))}if(i==="POST /warlink"){const e=String(a.name||"").trim();return e.length>40?s(400,{error:"commander"}):(await(e?m("SET wl = :n, wv = :z",{":n":f(e),":z":{N:"0"}}):m("REMOVE wl, wv")),s(200,{ok:!0,wl:e}))}}catch(e){if(e.name==="ConditionalCheckFailedException")return s(409,{error:"state"});throw e}return s(404,{error:"not found"})};
+          const l=require("@aws-sdk/client-dynamodb"),N=require("crypto"),u=new l.DynamoDBClient({}),{HEROES:b,WALLETS:g}=process.env,E=Object.fromEntries("f.plain0 f.iron150 f.radiant150 f.tide150 f.mercy150 f.ember250 f.rift400 f.nexus600 t.delver0 t.lampbearer80 t.ashborn120 t.nightwatch120 t.riftwalker200 t.warden200 t.stormcaller200 t.oathkeeper250 t.heir400 c.none0 c.gold100 c.violet100 c.ember100 c.frost100 c.verdant100 c.rift300 g.night0 g.forge150 g.crypt150 g.glass150 g.storm200 g.rift350 g.nexus500 e.lantern0 e.shield0 e.sword0 e.skull40 e.flame40 e.wave40 e.sun40 e.moon40 e.star40 e.key40 e.anvil40 e.crown60 e.eye60 e.rose60 e.raven80 e.rift100".split(" ").map(r=>{const i=r.match(/^(.+?)(\d+)$/);return[i[1],+i[2]]})),T=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn|http|www\.|\.com)/i,s=(r,i,p)=>({statusCode:r,headers:Object.assign({"content-type":"application/json"},p),body:JSON.stringify(i)}),f=r=>({S:String(r)}),A=r=>N.createHash("sha256").update("lh:"+r).digest("hex").slice(0,16);exports.handler=async r=>{const i=r.routeKey,p=r.requestContext.authorizer&&r.requestContext.authorizer.jwt&&r.requestContext.authorizer.jwt.claims;if(!p||!p.sub)return s(401,{error:"auth"});let a={};if(r.body)try{a=JSON.parse(r.isBase64Encoded?Buffer.from(r.body,"base64").toString():r.body)}catch{return s(400,{error:"json"})}const S=A(p.sub),d={userId:f(p.sub)},h={pid:f(S)},w=async()=>(await u.send(new l.UpdateItemCommand({TableName:g,Key:d,ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = if_not_exists(bal, :g), own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":{N:"100"},":o":{SS:["f.plain"]}}}))).Attributes,x=async e=>(await u.send(new l.GetItemCommand({TableName:b,Key:{pid:f(e)}}))).Item,m=async(e,t)=>{await u.send(new l.UpdateItemCommand({TableName:b,Key:h,UpdateExpression:e,ConditionExpression:"attribute_exists(pid) AND attribute_not_exists(ban)",...t&&{ExpressionAttributeValues:t}})),await u.send(new l.UpdateItemCommand({TableName:g,Key:d,UpdateExpression:e,...t&&{ExpressionAttributeValues:t}}))},y=e=>({bal:+e.bal.N,own:e.own.SS,pf:e.pf?JSON.parse(e.pf.S):null,wl:e.wl?e.wl.S:"",wv:!!(e.wv&&e.wv.N==="1"),pass:e.pass?+e.pass.N:0});try{if(i==="GET /profile"){const e=await w(),t=await x(S);if(t&&!t.ban&&(e.pf&&!t.pf||e.wl&&!t.wl)){const n={},o=[];for(const c of["pf","wl","wv"])e[c]&&(n[":"+c]=e[c],o.push(c+" = :"+c));await u.send(new l.UpdateItemCommand({TableName:b,Key:h,UpdateExpression:"SET "+o.join(", "),ExpressionAttributeValues:n}))}return s(200,y(e))}if(i==="PUT /profile"){const e=new Set((await w()).own.SS),t=(o,c)=>c===""||E[o+"."+c]===0||e.has(o+"."+c),n={b:String(a.b||"").replace(/\s+/g," ").trim(),t:String(a.t||""),f:String(a.f||""),c:String(a.c||""),g:String(a.g||""),e:[...new Set(Array.isArray(a.e)?a.e.map(String):[])]};return n.b.length>140||T.test(n.b.replace(/[^a-z.\/]/gi,""))?s(400,{error:"bio"}):!t("t",n.t)||!t("f",n.f)||!t("c",n.c)||!t("g",n.g)||n.e.length>6||!n.e.every(o=>o&&t("e",o))?s(400,{error:"item"}):(await m("SET pf = :p",{":p":f(JSON.stringify(n))}),s(200,{ok:!0,pf:n}))}if(i==="POST /shop"){const e=String(a.id||""),t=E[e];if(!t)return s(400,{error:"item"});const n=await w();if(n.own.SS.includes(e))return s(409,{error:"owned"});if(+n.bal.N<t)return s(409,{error:"funds"});const o=await u.send(new l.UpdateItemCommand({TableName:g,Key:d,ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = bal - :p ADD own :s",ConditionExpression:"bal >= :p AND NOT contains(own, :i)",ExpressionAttributeValues:{":p":{N:String(t)},":s":{SS:[e]},":i":f(e)}}));return s(200,y(o.Attributes))}if(i==="POST /warlink"){const e=String(a.name||"").trim();return e.length>40?s(400,{error:"commander"}):(await(e?m("SET wl = :n, wv = :z",{":n":f(e),":z":{N:"0"}}):m("REMOVE wl, wv")),s(200,{ok:!0,wl:e}))}}catch(e){if(e.name==="ConditionalCheckFailedException")return s(409,{error:"state"});throw e}return s(404,{error:"not found"})};
 
   ProfileIntegration:
     Type: AWS::ApiGatewayV2::Integration
@@ -1018,7 +1018,7 @@ Resources:
       Code:
         ZipFile: |
           // built from infra/lambda/store.js by infra/build.py
-          const w=require("@aws-sdk/client-dynamodb"),x=new w.DynamoDBClient({}),{TABLE:E,WALLETS:f,PACKS:g}=process.env,S=Object.fromEntries(g.split(",").map(t=>t.split(":")).map(([t,r])=>[t,+r])),s=(t,r)=>({statusCode:t,body:JSON.stringify(r)}),o=t=>({S:String(t)}),l=t=>({N:String(t)}),C=async(t,r)=>{const i=await fetch("https://www.wixapis.com"+t,{headers:{Authorization:r}});if(!i.ok)throw Object.assign(new Error("wix "+i.status),{st:i.status});return i.json()};let h=null,I=0;async function T(){if(h&&Date.now()-I<3e5)return h;const t=await fetch("https://war.born2gamellc.com/api/mercy.json").then(m=>m.json()),r=t.food||{},i=t.toys||{},c=Math.floor((t.total||0)/10)+Math.floor((r.items||0)/5)+Math.floor((r.dollars||0)/10)+(i.items||0)+Math.floor((i.dollars||0)/10),n=Date.now(),d={userId:o("#mercy")},a=(await x.send(new w.GetItemCommand({TableName:f,Key:d}))).Item,p=a?+a.pts.N:-1,b=a?+a.until.N:0;let u=b,e=a?+a.at.N:0;if(a?c>p&&(u=Math.min(Math.max(n,b)+(c-p)*72e5,n+6048e5),e=n):(u=n+864e5,e=n),c!==p)try{await x.send(new w.UpdateItemCommand({TableName:f,Key:d,UpdateExpression:"SET pts = :p, #u = :u, #a = :a",ConditionExpression:a?"pts = :o":"attribute_not_exists(userId)",ExpressionAttributeNames:{"#u":"until","#a":"at"},ExpressionAttributeValues:Object.assign({":p":l(c),":u":l(u),":a":l(e)},a?{":o":a.pts}:{})}))}catch(m){if(m.name!=="ConditionalCheckFailedException")throw m;return{until:b,at:e}}return h={until:u,at:e,pts:c},I=n,h}exports.handler=async t=>{if(t.routeKey==="GET /mercy")try{return Object.assign(s(200,await T()),{headers:{"cache-control":"public, max-age=120"}})}catch{return s(502,{error:"mercy"})}const r=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!r||!r.sub)return s(401,{error:1});if(t.routeKey!=="POST /store/sync")return s(404,{error:1});let i={};try{i=JSON.parse(t.isBase64Encoded?Buffer.from(t.body||"","base64").toString():t.body||"{}")}catch{return s(400,{error:1})}const c=String(i.token||"");if(c.length<20||c.length>4e3)return s(400,{error:1});let n;try{n=(await C("/members/v1/members/my",c)).member}catch{return s(401,{error:"wix"})}if(!n||!n.id)return s(401,{error:"wix"});const d=n.id,a=String(n.profile&&n.profile.nickname||(n.loginEmail||"").replace(/@.*/,"")||"Store account").slice(0,40);try{await x.send(new w.PutItemCommand({TableName:E,Item:{pk:o("wix#"+d),sk:o("link"),u:o(r.sub),name:o(a),at:l(Date.now())},ConditionExpression:"attribute_not_exists(pk) OR u = :u",ExpressionAttributeValues:{":u":o(r.sub)}}))}catch(e){if(e.name==="ConditionalCheckFailedException")return s(409,{error:"taken"});throw e}let p=[];try{p=(await C("/pricing-plans/v2/member/orders?limit=100",c)).orders||[]}catch{return s(502,{error:"orders"})}let b=0;for(const e of p){const m=S[e.planId];if(!(!m||e.lastPaymentStatus!=="PAID"||e.buyer&&e.buyer.memberId!==d))try{await x.send(new w.TransactWriteItemsCommand({TransactItems:[{Put:{TableName:E,Item:{pk:o("wixord#"+e.id),sk:o("-"),u:o(r.sub),m:o(d),n:l(m),at:l(Date.now())},ConditionExpression:"attribute_not_exists(pk)"}},{Update:{TableName:f,Key:{userId:o(r.sub)},UpdateExpression:"SET bal = if_not_exists(bal, :g) + :n, own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":l(100),":n":l(m),":o":{SS:["f.plain"]}}}}]})),b+=m}catch(y){if(y.name!=="TransactionCanceledException")throw y}}const u=await x.send(new w.GetItemCommand({TableName:f,Key:{userId:o(r.sub)}}));return s(200,{ok:!0,name:a,added:b,bal:u.Item&&u.Item.bal?+u.Item.bal.N:100})};
+          const m=require("@aws-sdk/client-dynamodb"),b=new m.DynamoDBClient({}),{TABLE:y,WALLETS:h,PACKS:C}=process.env,k=Object.fromEntries(C.split(",").map(t=>t.split(":")).map(([t,e])=>[t,+e])),s=(t,e)=>({statusCode:t,body:JSON.stringify(e)}),n=t=>({S:String(t)}),i=t=>({N:String(t)}),S=async(t,e)=>{const o=await fetch("https://www.wixapis.com"+t,{headers:{Authorization:e}});if(!o.ok)throw Object.assign(new Error("wix "+o.status),{st:o.status});return o.json()};exports.handler=async t=>{const e=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!e||!e.sub)return s(401,{error:1});if(t.routeKey!=="POST /store/sync")return s(404,{error:1});let o={};try{o=JSON.parse(t.isBase64Encoded?Buffer.from(t.body||"","base64").toString():t.body||"{}")}catch{return s(400,{error:1})}const u=String(o.token||"");if(u.length<20||u.length>4e3)return s(400,{error:1});let a;try{a=(await S("/members/v1/members/my",u)).member}catch{return s(401,{error:"wix"})}if(!a||!a.id)return s(401,{error:"wix"});const d=a.id,w=String(a.profile&&a.profile.nickname||(a.loginEmail||"").replace(/@.*/,"")||"Store account").slice(0,40);try{await b.send(new m.PutItemCommand({TableName:y,Item:{pk:n("wix#"+d),sk:n("link"),u:n(e.sub),name:n(w),at:i(Date.now())},ConditionExpression:"attribute_not_exists(pk) OR u = :u",ExpressionAttributeValues:{":u":n(e.sub)}}))}catch(r){if(r.name==="ConditionalCheckFailedException")return s(409,{error:"taken"});throw r}let p=[];try{p=(await S("/pricing-plans/v2/member/orders?limit=100",u)).orders||[]}catch{return s(502,{error:"orders"})}let x=0;for(const r of p){const c=k[r.planId];if(!(!c||r.lastPaymentStatus!=="PAID"||r.buyer&&r.buyer.memberId!==d))try{await b.send(new m.TransactWriteItemsCommand({TransactItems:[{Put:{TableName:y,Item:{pk:n("wixord#"+r.id),sk:n("-"),u:n(e.sub),m:n(d),n:i(c),at:i(Date.now())},ConditionExpression:"attribute_not_exists(pk)"}},{Update:{TableName:h,Key:{userId:n(e.sub)},UpdateExpression:"SET bal = if_not_exists(bal, :g) + :n, own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":i(100),":n":i(c),":o":{SS:["f.plain"]}}}}]})),x+=c}catch(f){if(f.name!=="TransactionCanceledException")throw f}}const l=await b.send(new m.GetItemCommand({TableName:h,Key:{userId:n(e.sub)}}));return s(200,{ok:!0,name:w,added:x,bal:l.Item&&l.Item.bal?+l.Item.bal.N:100})};
 
   StoreIntegration:
     Type: AWS::ApiGatewayV2::Integration
@@ -1036,6 +1036,74 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
 
+  PerksFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: perks-tables
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:Query, dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:UpdateItem, dynamodb:ConditionCheckItem]
+                Resource: [!GetAtt WalletsTable.Arn]
+
+  PerksFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-perks
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 25
+      Role: !GetAtt PerksFunctionRole.Arn
+      Environment:
+        Variables:
+          WALLETS: !Ref WalletsTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/perks.js by infra/build.py
+          const m=require("@aws-sdk/client-dynamodb"),b=new m.DynamoDBClient({}),{WALLETS:w}=process.env,o=(t,n)=>({statusCode:t,body:JSON.stringify(n)}),x=t=>({S:String(t)}),i=t=>({N:String(t)});let f=null,y=0;async function C(){if(f&&Date.now()-y<3e5)return f;const t=await fetch("https://war.born2gamellc.com/api/mercy.json").then(d=>d.json()),n=t.food||{},c=t.toys||{},a=Math.floor((t.total||0)/10)+Math.floor((n.items||0)/5)+Math.floor((n.dollars||0)/10)+(c.items||0)+Math.floor((c.dollars||0)/10),s=Date.now(),r={userId:x("#mercy")},e=(await b.send(new m.GetItemCommand({TableName:w,Key:r}))).Item,l=e?+e.pts.N:-1,h=e?+e.until.N:0;let p=h,u=e?+e.at.N:0;if(e?a>l&&(p=Math.min(Math.max(s,h)+(a-l)*72e5,s+6048e5),u=s):(p=s+864e5,u=s),a!==l)try{await b.send(new m.UpdateItemCommand({TableName:w,Key:r,UpdateExpression:"SET pts = :p, #u = :u, #a = :a",ConditionExpression:e?"pts = :o":"attribute_not_exists(userId)",ExpressionAttributeNames:{"#u":"until","#a":"at"},ExpressionAttributeValues:Object.assign({":p":i(a),":u":i(p),":a":i(u)},e?{":o":e.pts}:{})}))}catch(d){if(d.name!=="ConditionalCheckFailedException")throw d;return{until:h,at:u}}return f={until:p,at:u,pts:a},y=s,f}exports.handler=async t=>{if(t.routeKey==="GET /mercy")try{return Object.assign(o(200,await C()),{headers:{"cache-control":"public, max-age=120"}})}catch{return o(502,{error:"mercy"})}const n=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!n||!n.sub)return o(401,{error:1});if(t.routeKey==="POST /store/pass"){const c={userId:x(n.sub)},a=(await b.send(new m.GetItemCommand({TableName:w,Key:c}))).Item,s=a&&a.bal?+a.bal.N:100,r=a&&a.pass?+a.pass.N:0,e=Math.max(Date.now(),r)+2592e6;if(s<500)return o(400,{error:"funds"});try{await b.send(new m.UpdateItemCommand({TableName:w,Key:c,UpdateExpression:"SET bal = if_not_exists(bal, :g) - :c, pass = :p, own = if_not_exists(own, :o)",ConditionExpression:(r?"pass = :w":"attribute_not_exists(pass)")+" AND (attribute_not_exists(bal) OR bal >= :c)",ExpressionAttributeValues:Object.assign({":g":i(100),":c":i(500),":p":i(e),":o":{SS:["f.plain"]}},r?{":w":i(r)}:{})}))}catch(l){if(l.name==="ConditionalCheckFailedException")return o(409,{error:"state"});throw l}return o(200,{ok:!0,pass:e,bal:s-500})}return o(404,{error:1})};
+
+  PerksIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt PerksFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  PerksInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PerksFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  PerksPassRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /store/pass
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${PerksIntegration}'
+
+  StoreMercyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /mercy
+      Target: !Sub 'integrations/${PerksIntegration}'
   StoreSyncRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
@@ -1045,12 +1113,7 @@ Resources:
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub 'integrations/${StoreIntegration}'
 
-  StoreMercyRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref HttpApi
-      RouteKey: GET /mercy
-      Target: !Sub 'integrations/${StoreIntegration}'
+
 
   WardenFunctionRole:
     Type: AWS::IAM::Role

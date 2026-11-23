@@ -524,6 +524,13 @@
         claimFound();
       } else if (e.type === 'lore') {
         const lo = L.LORE.find(x => x.id === e.id); toast('book', 'New journal entry', lo.title, 'feat');
+      } else if (e.type === 'pack') {
+        floatText('Ambush!', 'crit', 0.5, 0.3);
+        if (!(S.stats.packs > 0)) toast('sword', 'Ambush!', e.n + ' monsters have teamed up to jump your party. They hit harder and strike the back first, but they pay ' + (e.n * L.PACK_GOLD) + ' times the gold and often drop gear.', 'feat');
+      } else if (e.type === 'herolevel') {
+        sfx.relic(); floatText('Level ' + e.lv + '!', 'crit', 0.5, 0.25);
+        toast('star', L.memberById('you').name + ' reached level ' + e.lv, (e.pts === 1 ? 'A new stat point' : e.pts + ' new stat points') + ' to spend on the character sheet in the Skills tab.', 'feat');
+        if (tab === 'rekindle') updateSkills(); else { const hp = L.heroPoints(S); if (!S.kindling && hp) $('kindcount').textContent = '+' + hp; }
       } else if (e.type === 'relic') {
         sfx.relic();
         toast('relic', e.level > 1 ? e.relic.name + ' grows stronger' : 'Relic found: ' + e.relic.name, e.relic.desc + (e.level > 1 ? ' (level ' + e.level + ')' : ''), 'relic');
@@ -1223,7 +1230,9 @@
   function updateSkills() {
     const box = $('skills'); if (!box) return;
     const cls = L.heroCls(S), k = S.kindling || 0;
-    $('kindcount').textContent = k ? k : '';
+    const hp = cls ? L.heroPoints(S) : 0;
+    $('kindcount').textContent = k ? k : hp ? '+' + hp : '';
+    paintSheet();
     if (!cls) { box.innerHTML = ''; return; }
     const tree = L.SKILL_TREES[cls], c = L.CLASSES[cls];
     const node = sk => {
@@ -1298,6 +1307,40 @@
     if (phone()) { const p = document.querySelector('.panel'); p && window.scrollTo({ top: p.getBoundingClientRect().top + window.scrollY - 8, behavior: 'smooth' }); }
   }));
 
+  // ---------- Character sheet: hero level, XP and stats ----------
+  const STAT_LBL = { pdps: 'party damage', crit: 'crit chance', dodge: 'dodge', php: 'party health', power: 'ability power', pheal: 'party healing', cd: 'faster abilities', gold: 'gold', loot: 'loot', chest: 'chest chance', sig: 'Sigil odds', spoils: 'ambush spoils' };
+  const pctTxt = v => { const p = v * 100; return '+' + (p >= 1 ? Math.round(p * 10) / 10 : p >= 0.01 ? Math.round(p * 100) / 100 : Math.round(p * 10000) / 10000) + '%'; };
+  const statMod = sc => { const m = Math.floor((sc - 10) / 2); return (m >= 0 ? '+' : '') + m; };
+  function paintSheet() {
+    const box = $('charsheet'); if (!box) return;
+    const cls = L.heroCls(S);
+    if (!cls) { box.innerHTML = ''; return; }
+    const h = L.heroLevel(S), pts = L.heroPoints(S), pri = L.STAT_CLASS[cls] || [], c = L.CLASSES[cls];
+    const row = st => {
+      const n = (S.attr || {})[st.id] || 0, sc = L.statScore(S, st.id), fav = pri.includes(st.id), mult = fav ? L.STAT_AFFINITY : 1;
+      const fx = Object.keys(st.fx).map(k => pctTxt(st.fx[k] * Math.max(n, 0) * mult) + ' ' + STAT_LBL[k]).join(', ');
+      return '<div class="cstat' + (fav ? ' fav' : '') + '"><div class="cscore"><b>' + sc + '</b><small>' + statMod(sc) + '</small></div>' +
+        '<div class="ctx"><b>' + st.name + (fav ? ' <span class="cfav">' + c.name + ' favoured</span>' : '') + '</b><small>' + (n ? fx : 'Raises ' + st.desc + '.') + '</small></div>' +
+        '<div class="cbtns"><button class="btn small" data-stat="' + st.id + '"' + (pts > 0 && sc < L.STAT_MAX ? '' : ' disabled') + ' aria-label="Add a point to ' + st.name + '">+1</button>' +
+        (pts >= 5 ? '<button class="btn small ghost" data-stat5="' + st.id + '"' + (sc + 5 <= L.STAT_MAX ? '' : ' disabled') + '>+5</button>' : '') + '</div></div>';
+    };
+    box.innerHTML = '<div class="chead"><div><h3>' + esc(L.memberById('you').name) + ', level ' + h.lv + ' ' + c.name + '</h3><small>Your hero earns XP from every fight, even when they sit out. Bigger foes give more.</small></div>' +
+      '<div class="kbal cpts' + (pts ? ' on' : '') + '">' + icon('star') + '<b>' + pts + '</b><small>' + (pts === 1 ? 'Point' : 'Points') + '</small></div></div>' +
+      '<div class="cxp"><i style="width:' + Math.min(100, h.xp / h.need * 100).toFixed(1) + '%"></i><span>' + fmt(Math.floor(h.xp)) + ' / ' + fmt(h.need) + ' XP to level ' + (h.lv + 1) + '</span></div>' +
+      '<div class="cgrid">' + L.STATS.map(row).join('') + '</div>' +
+      '<div class="kfoot"><span>Favoured stats count half again. Stats work while your hero is in the party.</span>' + ((S.attr && Object.keys(S.attr).length) ? '<button class="btn ghost small" id="c-reset">Reset stats</button>' : '') + '</div>';
+  }
+  $('charsheet') && $('charsheet').addEventListener('click', e => {
+    const b = e.target.closest('[data-stat],[data-stat5]');
+    if (b) { if (L.addStat(S, b.dataset.stat || b.dataset.stat5, b.dataset.stat5 ? 5 : 1)) { sfx.buy(); save(); updateSkills(); } return; }
+    if (e.target.closest('#c-reset')) {
+      if (!campGate()) return;
+      modal('<div class="center"><h2>Reset your stats?</h2><p>Every point comes back so you can place them again. It is free, and only works at camp.</p><div class="row"><button class="btn ghost" id="r-no">Keep them</button><button class="btn" id="r-yes">Reset</button></div></div>', md => {
+        md.querySelector('#r-no').onclick = closeModal;
+        md.querySelector('#r-yes').onclick = () => { L.resetStats(S); save(); closeModal(); updateSkills(); };
+      });
+    }
+  });
   // ---------- header & stage ----------
   let lastRelicCount = -1, lastFeatCount = -1, slowTick = 0;
   function updatePanel(force) {
@@ -1305,7 +1348,7 @@
     $('gold').textContent = fmt(S.gold);
     { const sg = $('sigils'); if (sg) { const on = !!(typeof prof !== 'undefined' && prof && signedIn()); if (sg.hidden === on) sg.hidden = !on; if (on) $('sigilct').textContent = prof.bal.toLocaleString(); } }
     $('dps').textContent = fmt(L.totalDps(S, now));
-    $('embers').textContent = fmt(S.embers); $('kindcount').textContent = S.kindling ? S.kindling : '';
+    $('embers').textContent = fmt(S.embers); { const hp = S.hero ? L.heroPoints(S) : 0; $('kindcount').textContent = S.kindling ? S.kindling : hp > 0 ? '+' + hp : ''; }
     if (tab === 'party' || tab === 'camp') updateSeats(force);
     if (tab === 'market' && force) showMarketView();
     if (tab === 'gear') updateGear(force);
@@ -1342,8 +1385,8 @@
     { let g = L.currentGoal(S); if (S.maxFloorEver > L.ACT_ONE_END && !L.actTwoOpen()) { const d = Math.max(0, L.ACT_TWO_AT - Date.now()), dd = Math.floor(d / 864e5), hh = Math.floor(d / 36e5) % 24; g = 'Act Two opens with Season 2, in ' + (dd ? dd + 'd ' : '') + hh + 'h'; } if ($('goaltext').textContent !== g) $('goaltext').textContent = g; }
     const f = S.foe;
     if (f) {
-      $('foename').textContent = f.name;
-      const tag = $('foetag'); tag.textContent = f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; tag.className = 'tag' + (f.chest ? ' chest' : '') + (f.elite ? ' war w-' + f.side : '');
+      $('foename').textContent = f.pack ? f.name + ' and ' + (f.pack - 1) + ' more' : f.name;
+      const tag = $('foetag'); tag.textContent = f.pack ? 'Ambush ×' + f.pack : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; tag.className = 'tag' + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
       { const mk = (f.mods || []).join(','); if (mk !== lastModKey) { lastModKey = mk; $('foemods').innerHTML = (f.mods || []).map(m => '<span class="mod m-' + m + '" title="' + esc(L.MODS[m].desc) + '">' + esc(L.MODS[m].name) + '</span>').join(''); } }
       $('hpbar').style.width = Math.max(0, f.hp / f.max * 100) + '%';
       $('wardbar').style.width = Math.min(100, (f.ward || 0) / f.max * 100) + '%';
@@ -2037,7 +2080,10 @@
   const questsReady = () => { const q = L.questState(S); const got = S.daily.got; return q.filter(x => x.done && !x.got).length + (q.every(x => x.got) && !(got & 8) ? 1 : 0); };
   function paintQuests() {
     const q = L.questState(S), b = $('quests'); if (!b) return;
-    $('questct').textContent = q.filter(x => x.got).length + '/3'; b.classList.toggle('ready', questsReady() > 0);
+    const n = q.filter(x => x.got).length, rd = questsReady(), all = n === 3 && (S.daily.got & 8);
+    $('questct').textContent = rd ? 'Claim ' + rd : all ? 'Quests done' : 'Quests ' + n + '/3';
+    b.classList.toggle('ready', rd > 0); b.classList.toggle('done', !rd && !!all);
+    b.title = rd ? 'Daily quests: ' + rd + (rd === 1 ? ' reward' : ' rewards') + ' ready to claim' : all ? 'Daily quests: all done for today' : 'Daily quests: ' + n + ' of 3 done';
   }
   function openQuests() {
     const q = L.questState(S), got = S.daily.got, allGot = q.every(x => x.got), msLeft = Date.parse(L.questDay() + 'T00:00:00Z') + 864e5 - Date.now();
@@ -2687,6 +2733,7 @@
     { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor, trinkets and rings. Open Gear to see them. You put gear on at camp, at the top of the stair, or anywhere with a Campfire Draught. A green arrow marks an upgrade.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
     { id: 'camp', title: 'Camp', text: 'Swapping companions, training them and changing gear happen at camp. This bar takes you back up and down again, and its Store sells Campfire Draughts that make camp anywhere.', target: '#campbar', tab: 'party', ready: () => S.floor > 1 && S.maxFloorEver >= 4 },
     { id: 'map', title: 'Map of the Deep', text: 'See how far you have come, which guardians you have beaten, and travel back to any floor you have reached.', target: '#btn-map', ready: () => S.maxFloorEver >= 8 },
+    { id: 'stats', title: 'Your character', text: 'Your hero earns XP from every fight. Each level brings a stat point. Open Skills and spend it on Strength, Wisdom, Luck and the rest. Your class favours two of them.', target: '.tabs [data-tab="rekindle"]', ready: () => !!S.hero && L.heroPoints(S) > 0 },
     { id: 'end', title: 'You are ready', text: 'That is the basics. The story will introduce new companions as you descend. Open the Guide (the ? at the top) any time for the details.', target: '#btn-guide', ready: () => true },
   ];
   let coachCtx = null, coachEl = null;
@@ -2736,6 +2783,8 @@
     ['Monsters and guardians', '<p>Monsters hit back. If your whole party falls, it retreats a floor, rests, and tries again in a little over a minute. Use that time to train and check gear.</p><p>Every 5th floor has a <b>guardian</b>. You must beat it before the lantern oil runs out. Guardians drop better gear and, from floor 10, sometimes a relic.</p><p>Soldiers from the Grand War alliances (marked with their banner) are tougher than normal monsters and drop more.</p>'],
     ['Monster tricks and Act One', '<p>Deeper monsters have tricks, shown as coloured tags under their name. Tap or hover a tag to read it.</p><ul><li><b>Enraged</b>: hits much harder once it is badly hurt.</li><li><b>Warded</b>: raises a shield (the striped part of its health bar) that soaks damage first.</li><li><b>Regenerating</b>: heals itself over time.</li><li><b>Venomous</b>: its hits poison the target for a few seconds.</li><li><b>Cleaving</b>: each hit also strikes whoever stands behind its target.</li><li><b>Swift</b>: attacks faster.</li></ul><p>Guardians get more tricks the deeper you go, and each region below the Vault has its own. Act One runs through fifteen regions to the Lampmother on floor 150. Act Two opens with Season 2 of the Grand War, and a countdown appears once you get there.</p>'],
     ['The side panel', '<p><b>Party</b> is your marching order for the fight. <b>Camp</b> is the campfire: resting companions, camp jobs and training. <b>Gear</b> dresses your characters. <b>Skills</b> holds your hero’s skill tree and rekindling. <b>Market</b> has the Trading Post and the Players Guild. <b>Codex</b> keeps your journal, relics and records.</p>'],
+    ['Your character and stats', '<p>Your hero earns <b>XP</b> from every fight, even while sitting out. Bigger foes give more. Each level brings a <b>stat point</b>, and every fifth level brings two. Spend them on the character sheet at the top of the Skills tab.</p><ul><li><b>Strength</b>: party damage</li><li><b>Dexterity</b>: critical hits and dodging</li><li><b>Constitution</b>: party health</li><li><b>Intelligence</b>: ability power and some damage</li><li><b>Wisdom</b>: healing and faster abilities</li><li><b>Charisma</b>: gold</li><li><b>Luck</b>: a little of everything, from loot and chests to crits, gold, Sigil finds and ambush spoils</li></ul><p>Every class <b>favours</b> two stats, and points there count half again: tanks Strength and Constitution, healers Wisdom and Charisma, rogues Dexterity and Luck, mages Intelligence and Wisdom, necromancers Intelligence and Constitution. Stats work while your hero is in the party. Reset them for free at camp. Your level and stats stay when you rekindle.</p>'],
+    ['Ambushes', '<p>Now and then a few monsters team up and jump your party. The foe shows <b>Ambush ×2</b> to <b>×4</b>. They have more health, hit harder and strike the back of the line first, so a tank at the rear helps. Beat them for gold several times over, a good chance at gear, extra XP and kills that count toward your quests. Luck makes the spoils bigger.</p>'],
     ['Skills and Kindling', '<p>Every rekindle gives you <b>Kindling</b>: 2 at floor 50, plus 1 for every 10 floors deeper. Spend it in the Skills tab on your hero’s class tree. Each class has three branches of four skills, and a skill needs the one above it first. The last skill of each branch is a <b>specialization</b>: it teaches your hero a brand new ability, which appears on the ability bar (keys 6 to 8).</p><p>Kindling also buys a bigger pack (+10 slots) and opens extra gear slots for any character: rings 2 to 5 and a second trinket. Tap a locked slot on the Gear tab. You can reset the skill tree for free at camp.</p><p>Kindling upgrades (Lantern Edge, Ember Purse, Deep Reservoir, Night Watch, Slow-burning Draught and Sigil Sense) are permanent bonuses. At camp you can also <b>change your hero’s class</b> for 15 Kindling. Your skill-tree Kindling is refunded first, but Kindling spent on the pack, gear slots and upgrades stays spent.</p>'],
     ['Job gear', '<p>A few pieces of gear carry a camp-job bonus, shown by an orange dot. It counts while the wearer works that job at the campfire. Fine gear has about a 2% chance, rare 6% and epic 15%.</p><p>Each job also has its own three-piece job set (helmet, feet and ring). These drop very rarely from guardians and chests from floor 20. Two pieces add +40% to that job and all three add +100%.</p>'],
     ['Resting at camp', '<p>When you return to camp, or drink a Campfire Draught, the party sits down around the fire. Nobody fights while you rest, and everyone heals up. Press Descend to head back down.</p>'],
@@ -2768,6 +2817,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 29, date: 'November 23, 2026', title: 'Your character, and ambushes', items: [
+      'Your hero now earns XP and levels up. Each level brings a stat point to spend on Strength, Dexterity, Constitution, Intelligence, Wisdom, Charisma or Luck. Find the character sheet at the top of the Skills tab.',
+      'Each class favours two stats, and points there count half again. Luck touches everything: loot, chests, crits, gold, Sigil finds and ambush spoils.',
+      'Ambushes: now and then two to four monsters team up and jump your party. They are tougher and strike the back of the line, but pay several times the gold and often drop gear.',
+      'Veteran heroes start with XP for their past fights, so you may have points waiting already.'] },
     { v: 28, date: 'November 23, 2026', title: 'Fly your banner', items: [
       'New Banner chat: talk only with heroes who fly the same banner as you. Find it next to Global in the chat.',
       'Banner kin: every party member who marches under your banner makes your banner perk 40% stronger. A full party of kin more than doubles it. Players you recruited before today need to be recruited again to count.'] },

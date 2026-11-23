@@ -1,4 +1,4 @@
-/* lh-build 202611231734 */
+/* lh-build 202611231735 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -811,10 +811,10 @@
       '<h3 class="sub">Tonics</h3><div class="tlist store">' + ton.map(row).join('') + '</div>' +
       '<p class="note small">Each tonic is a small boost for a short time. Different tonics stack, and drinking the same one again adds time, up to 60 minutes.</p>' +
       '<h3 class="sub">Supplies</h3><div class="tlist store">' + sup.map(row).join('') + '</div>' +
-      '<button class="wardad" id="st-ward"><span class="wafigs">' + ['ember', 'rift', 'sworn'].map((o, i) => '<img src="' + SP.spriteURL(['tank', 'mage', 'rogue'][i], 2, '0~' + o) + '" alt="">').join('') + '<img class="lamp" src="' + SP.spriteURL('lantern', 2, '0~soul') + '" alt=""></span><span class="watext"><b>The Wardrobe</b><small>Outfits for every hero and new lanterns for the party. Looks only, bought with ' + TOKEN + '.</small></span></button>' +
+      (wardOn() ? '<button class="wardad" id="st-ward"><span class="wafigs">' + ['ember', 'rift', 'sworn'].map((o, i) => '<img src="' + SP.spriteURL(['tank', 'mage', 'rogue'][i], 2, '0~' + o) + '" alt="">').join('') + '<img class="lamp" src="' + SP.spriteURL('lantern', 2, '0~soul') + '" alt=""></span><span class="watext"><b>The Wardrobe</b><small>Outfits for every hero and new lanterns for the party. Looks only, bought with ' + TOKEN + '.</small></span></button>' : '') +
       '<p class="note small">Gold prices follow how much gold you earn. Use a Campfire Draught from the camp bar in the Party or Gear tab. Lantern Oil appears under the lantern during guardian fights.</p>', md => {
         md.className = 'sheet wide';
-        md.querySelector('#st-x').onclick = closeModal; md.querySelector('#st-ward').onclick = () => openWardrobe('k');
+        md.querySelector('#st-x').onclick = closeModal; const sw = md.querySelector('#st-ward'); if (sw) sw.onclick = () => openWardrobe('k');
         md.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (L.buyShop(S, b.dataset.buy, 1)) { sfx.coin(); save(); openStore(); paintCamp(); paintTonics(); } });
         md.querySelectorAll('[data-drink]').forEach(b => b.onclick = () => drink(b.dataset.drink, true));
         md.querySelectorAll('[data-sbuy]').forEach(b => b.onclick = async () => {
@@ -1210,7 +1210,7 @@
     const totals = [m.cls === 'healer' ? ['Healing', dmg] : ['Damage', dmg], ['Health', hp]].map(([k, v]) => '<div><small>' + k + '</small><b>' + pc(v) + '</b></div>').join('');
     let h = '<div class="doll">' +
       '<div class="dcol">' + ['head', 'neck', 'chest', 'legs'].map(slotTile).join('') + '</div>' +
-      '<div class="dmid"><div class="dfig" data-prof="' + gearWho + '" role="button" tabindex="0" title="About ' + esc(m.name) + '"><img src="' + SP.spriteURL(m.cls, 5, lookHue(m)) + '" alt=""><b>' + esc(m.name) + '</b>' + classTag(m.cls) + '</div>' + (CL && !String(gearWho).startsWith('p_') ? '<button class="wdbtn" id="g-ward" title="Outfits and lanterns">' + icon('star') + 'Wardrobe</button>' : '') +
+      '<div class="dmid"><div class="dfig" data-prof="' + gearWho + '" role="button" tabindex="0" title="About ' + esc(m.name) + '"><img src="' + SP.spriteURL(m.cls, 5, lookHue(m)) + '" alt=""><b>' + esc(m.name) + '</b>' + classTag(m.cls) + '</div>' + (wardOn() && !String(gearWho).startsWith('p_') ? '<button class="wdbtn" id="g-ward" title="Outfits and lanterns">' + icon('star') + 'Wardrobe</button>' : '') +
       '<div class="dstats">' + totals + '</div></div>' +
       '<div class="dcol">' + ['main', 'off', 'neck2', 'feet'].map(slotTile).join('') + '</div>' +
       '<div class="drings">' + ['ring1', 'ring2', 'ring3', 'ring4', 'ring5'].map(slotTile).join('') + '</div></div>' +
@@ -1482,7 +1482,7 @@
     modal('<div class="prof"><div class="profhead"><div class="profspr c-' + m.cls + '"></div><div><h2>' + esc(m.name) + '</h2><small>' + esc(m.title) + '</small><div class="tags">' + classTag(m.cls) + (sd ? '<span class="sidetag" style="--side:' + sd.color + '">' + sd.name + '</span>' : '') + (guest ? '<span class="you guest">Player</span>' : '') + '</div></div></div>' +
       '<p class="bio">' + esc(bio) + '</p>' + (m.line && !guest && id !== 'you' ? '<p class="quote">“' + esc(m.line) + '”</p>' : '') +
       (id === 'you' && L.warAura(S) ? '<h3 class="sub">Grand War aura</h3><div id="p-aura">' + auraBox() + '</div>' : id === 'you' && CL ? '<div id="p-aura"></div>' : '') +
-      (id === 'you' && CL ? '<h3 class="sub">Profile card</h3><p class="note">What other players see in the Players Guild.</p><div class="pfwrap" id="p-card">' + looksCard({ name: m.name, cls: m.cls, level: lv, floor: S.maxFloorEver, wd: S.wd, pf: prof && prof.pf, w: prof && prof.wv ? prof.wl : '' }) + '</div><div class="row left"><button class="btn small" id="p-looks">Customize profile</button><button class="btn small ghost" id="p-ward">Wardrobe</button></div>' : '') +
+      (id === 'you' && CL ? '<h3 class="sub">Profile card</h3><p class="note">What other players see in the Players Guild.</p><div class="pfwrap" id="p-card">' + looksCard({ name: m.name, cls: m.cls, level: lv, floor: S.maxFloorEver, wd: S.wd, pf: prof && prof.pf, w: prof && prof.wv ? prof.wl : '' }) + '</div><div class="row left"><button class="btn small" id="p-looks">Customize profile</button>' + (wardOn() ? '<button class="btn small ghost" id="p-ward">Wardrobe</button>' : '') + '</div>' : '') +
       (guest && g0 && (g0.pf || g0.w) ? '<div class="pfwrap">' + looksCard(Object.assign({}, g0, { name: m.name, cls: m.cls })) + '</div>' : '') +
       '<h3 class="sub">' + c.name + '</h3><p class="note">' + esc(CLASS_BLURB[m.cls]) + '</p>' +
       '<div class="ability"><b>' + c.ability.name + '</b> <span>every ' + c.ability.cd + 's</span><small>' + esc(c.ability.desc) + '</small></div>' +
@@ -2352,12 +2352,12 @@
       '<div class="pfbal"><span>' + sigil + '<b>' + prof.bal + '</b> ' + TOKEN + '</span><button class="btn small ghost" id="pe-get">Get Sigils</button></div>' +
       (subOn() ? '<div class="pfbal pass"><span>Lanternholder: <b>active</b>, renews ' + subDate() + '</span><button class="btn small ghost" id="pe-pass">Perks</button></div>' :
         '<div class="pfbal pass"><span>Lantern Pass: <b>' + (passLeft() || 'none') + '</b></span><button class="btn small ghost" id="pe-pass">' + (passLeft() ? 'Extend' : 'Get the pass') + '</button></div>') +
-      '<div class="pfbal pass"><span>Wardrobe: <b>outfits and lanterns</b></span><button class="btn small ghost" id="pe-ward">Open</button></div>' +
+      (wardOn() ? '<div class="pfbal pass"><span>Wardrobe: <b>outfits and lanterns</b></span><button class="btn small ghost" id="pe-ward">Open</button></div>' : '') +
       '<div class="pfbal pass"><span>Bag of Holding: <b>' + (S.boh ? 'owned' : 'none') + '</b></span>' + (S.boh ? '' : '<button class="btn small ghost" id="pe-boh">See it</button>') + '</div>' +
       '<div class="seg pfseg">' + tabs + '</div><div class="pfbody">' + body + '</div>' +
       '<div class="row"><button class="btn ghost" id="pe-cancel">Cancel</button><button class="btn" id="pe-save">Save profile</button></div>', md => {
         md.querySelector('#pe-x').onclick = closeModal; md.querySelector('#pe-cancel').onclick = closeModal;
-        md.querySelector('#pe-get').onclick = () => getSigils(paintEditor); md.querySelector('#pe-pass').onclick = openPass; md.querySelector('#pe-ward').onclick = () => openWardrobe('k'); const bo = md.querySelector('#pe-boh'); if (bo) bo.onclick = () => openBoh();
+        md.querySelector('#pe-get').onclick = () => getSigils(paintEditor); md.querySelector('#pe-pass').onclick = openPass; const pw = md.querySelector('#pe-ward'); if (pw) pw.onclick = () => openWardrobe('k'); const bo = md.querySelector('#pe-boh'); if (bo) bo.onclick = () => openBoh();
         md.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { if (edTab === 'b') draft.b = (md.querySelector('#pe-bio') || {}).value || draft.b; edTab = b.dataset.et; paintEditor(); });
         const bio = md.querySelector('#pe-bio'); if (bio) bio.oninput = () => { draft.b = bio.value; md.querySelector('#pe-bc').textContent = bio.value.length + ' / 140'; };
         md.querySelectorAll('[data-cos]').forEach(b => b.onclick = () => pickCos(edTab, b.dataset.cos));
@@ -4570,6 +4570,9 @@
   const wardItem = (k, id) => WARDROBE[k].items.find(x => x[0] === id) || WARDROBE[k].items[0];
   // Other players' looks (name color, title, outfit, lantern), cached by player id for chat and the Ring.
   const looksCache = {}, looksAt = {};
+  // The Wardrobe shows once its server answers (signed-out players see it and are asked to sign in).
+  var wardOK = false;
+  const wardOn = () => !!CL && (!signedIn() || wardOK);
   async function fetchLooks(ids) {
     if (!CL || !signedIn()) return false;
     const now = Date.now(), want = [...new Set(ids)].filter(x => /^[0-9a-f]{16}$/.test(x) && !(now - (looksAt[x] || 0) < 3e5)).slice(0, 40);
@@ -4594,6 +4597,7 @@
     if (!CL || !signedIn()) return null;
     try {
       const r = await papi('GET', '/wardrobe');
+      if (!wardOK) { wardOK = true; try { updateGear(true); } catch (e) {} }
       if (prof) { prof.bal = r.bal; prof.own = r.own; }
       const was = JSON.stringify(S.wd || {}); S.wd = r.wd || {};
       if (JSON.stringify(S.wd) !== was) { save(); wardRefresh(); }

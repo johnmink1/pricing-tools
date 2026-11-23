@@ -1,4 +1,4 @@
-/* lh-build 202611231734 */
+/* lh-build 202611231735 */
 /* Lanternhold illustrated sprites. Each sprite is drawn as layered SVG (outline, shading, rim light, detail),
    tinted per companion or biome, rendered once to an image and then drawn on the arena canvas. */
 (function (root) {

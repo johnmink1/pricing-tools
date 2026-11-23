@@ -1,4 +1,4 @@
-/* lh-build 202611231614 */
+/* lh-build 202611231643 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -690,7 +690,12 @@
     $('modalbody').className = 'sheet'; $('modalbody').innerHTML = html; $('modal').hidden = false;
     onMount && onMount($('modalbody'));
   }
-  function closeModal() { $('modal').hidden = true; }
+  function closeModal() {
+    $('modal').hidden = true;
+    // No hero yet (first visit): closing any other window returns to hero creation, unless a sign-in is
+    // fetching the account's save, which then loads that hero or reopens creation itself.
+    if (!S.hero) setTimeout(() => { if (!S.hero && $('modal').hidden && !(typeof signedIn === 'function' && signedIn())) setup(); }, 60);
+  }
   $('modal').addEventListener('click', e => { if (e.target.id === 'modal' && !$('modal').dataset.lock) closeModal(); });
 
   // ---------- panel: party ----------
@@ -1866,12 +1871,13 @@
   function setup(note) {
     let cls = 'rogue', side = 'covenant';
     $('modal').dataset.lock = '1';
-    const draw = () => modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Lanternhold</h2></div>' +
+    const draw = () => modal((CL && !signedIn() ? '<div class="haveacct"><span>Already have a hero?</span><button type="button" class="btn ghost small" id="h-signin">Sign in</button></div>' : '') + '<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Lanternhold</h2></div>' +
       (note ? '<p class="center">' + note + '</p>' : '<p class="center">The Grand War burns across the Shattered Reach. Beneath a forgotten Hold, a single lantern keeps a tear in the Nyx Rift shut, and every alliance wants what lies under it. Take the lantern down.</p>') +
       '<h3 class="sub">Choose your class</h3><div class="classes">' + L.CLASS_ORDER.map(c => '<button class="pick cls' + (cls === c ? ' on' : '') + '" data-cls="' + c + '"><span class="ic c-' + c + '">' + icon(CLASS_ICON[c]) + '</span><b>' + L.CLASSES[c].name + '</b><small>' + CLASS_BLURB[c] + '</small></button>').join('') + '</div>' +
       '<h3 class="sub">Pledge your banner</h3><div class="sides">' + L.SIDE_ORDER.map(k => { const d = L.SIDES[k]; return '<button class="pick side' + (side === k ? ' on' : '') + (WAR_ART[k] ? ' art' : '') + '" data-side="' + k + '" style="--side:' + d.color + (WAR_ART[k] ? ';--art:url(' + WAR_ART[k] + ')' : '') + '"><b>' + d.name + '</b><i>\u201c' + d.motto + '\u201d</i><small>' + d.desc + '</small><em>' + d.perk + '</em></button>'; }).join('') + '</div>' +
       '<h3 class="sub">Name your hero</h3><input id="h-name" maxlength="16" placeholder="2 to 16 letters" autocomplete="off"><div class="err" id="h-err"></div>' +
       '<div class="row" style="justify-content:center"><button class="btn big" id="h-go">Begin the descent</button></div>', md => {
+        const si = md.querySelector('#h-signin'); if (si) si.onclick = () => { delete $('modal').dataset.lock; authForm('in'); };
         const nm = md.querySelector('#h-name'); nm.value = setup.heroName || '';
         nm.oninput = () => { setup.heroName = nm.value; };
         md.querySelectorAll('[data-cls]').forEach(b => b.onclick = () => { cls = b.dataset.cls; draw(); });
@@ -2021,7 +2027,7 @@
     return r.json();
   }
   async function pushCloud(quiet) {
-    if (!CL || !signedIn()) return;
+    if (!CL || !signedIn() || !S.hero) return;
     try {
       const o = saveObj();
       await api('PUT', { data: JSON.stringify(o), floor: o.maxFloorEver });
@@ -2045,10 +2051,12 @@
     } catch (e) {}
   }
   async function reconcile() {
-    let rec; try { rec = await api('GET'); } catch (e) { return; }
+    let rec; try { rec = await api('GET'); } catch (e) { if (!S.hero && $('modal').hidden) setup(); return; }
     const local = saveObj();
+    if (!rec && !S.hero) { setup('You are signed in, but this account has no hero yet. Create one below and it will be saved to your account.'); return; }
     if (!rec) { await pushCloud(false); return; }
-    let cloud; try { cloud = JSON.parse(rec.data); } catch (e) { await pushCloud(true); return; }
+    let cloud; try { cloud = JSON.parse(rec.data); } catch (e) { if (S.hero) await pushCloud(true); else setup(); return; }
+    if (!S.hero) { useSave(cloud); return; }
     const ct = (cloud.stats && cloud.stats.playTime) || 0;
     if (Math.abs(ct - local.stats.playTime) < 5) { lastCloud = Date.now(); return; }
     if (!local.stats.kills && !local.embers) { useSave(cloud); return; }
@@ -2105,9 +2113,9 @@
     }[mode];
     modal('<form class="auth" novalidate><h2>' + titles[mode] + '</h2><p>' + lead + '</p>' + (mode === 'in' || mode === 'up' ? '<button type="button" class="btn b2g" id="f-b2g">Continue with Born 2 Game</button><div class="or"><span>or use your email</span></div>' : '') + f +
       '<div class="err" id="f-err"></div><button class="btn" type="submit" id="f-go">' + btn + '</button><div class="links">' + links + '</div>' +
-      '<button type="button" class="btn ghost skipacct" id="f-skip">Play without an account</button>' +
+      '<button type="button" class="btn ghost skipacct" id="f-skip">' + (S.hero ? 'Play without an account' : 'Back to making a new hero') + '</button>' +
       '<p class="credits">An account is optional. It only keeps your save safe across devices. We only keep your email and game save. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a></p></form>', m => {
-        m.querySelector('#f-skip').onclick = () => { closeModal(); toast('user', 'Playing without an account', 'Your progress saves on this device. You can sign in any time from the top bar.', 'feat'); };
+        m.querySelector('#f-skip').onclick = () => { const had = !!S.hero; closeModal(); if (had) toast('user', 'Playing without an account', 'Your progress saves on this device. You can sign in any time from the top bar.', 'feat'); };
         const ca = m.querySelector('.codeage'); if (ca) { const t = codeSent(email); ca.textContent = t ? 'The newest code was sent at ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '. Older codes stop working. It can take a few minutes, so check Spam or Junk too.' : 'It can take a few minutes, so check Spam or Junk too.'; }
         m.querySelectorAll('.em').forEach(x => x.textContent = email || '');
         const em = m.querySelector('#f-email'); if (em && email) em.value = email;
@@ -3600,7 +3608,8 @@
   const PATCH_NOTES = [
     { v: 53, date: 'November 23, 2026', title: 'Easier sign-up', items: [
       'Fixed: confirming a new account could reject a correct-looking code after asking for several. The game no longer sends extra codes on its own, tells you when the newest one was sent, and ignores spaces in the code.',
-      'Every sign-in screen now has <b>Play without an account</b>. Accounts are optional and only keep your save safe across devices.'] },
+      'Every sign-in screen now has <b>Play without an account</b>. Accounts are optional and only keep your save safe across devices.',
+      'Returning players can tap <b>Sign in</b> on the very first screen to load their hero, with no need to make a new one first.'] },
     { v: 52, date: 'November 23, 2026', title: 'Auto-scrap and a cleaner pack', items: [
       'New: <b>Auto-scrap</b>. Tick the rarities you never want, and new drops of those turn straight into gold and Dust without taking pack space. Set pieces and upgrades for your party are always kept.',
       'The pack view has a tidy header: a space meter that turns red when the pack is full, and one <b>Bulk actions</b> menu for mass sell, merge and scrap.'] },

@@ -1,4 +1,4 @@
-/* lh-build 202611231614 */
+/* lh-build 202611231643 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1657,3 +1657,6 @@ body.resting .taptip{display:none}
 .auth .skipacct{width:100%;margin-top:10px}
 .auth .codeage{display:block;margin-top:6px;color:var(--muted);font-size:13px}
 .auth .links .link:disabled{opacity:.55;cursor:default}
+/* first run: returning players sign in before making a hero */
+.haveacct{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px 0 14px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:var(--bg2);color:var(--muted);font-size:14px}
+.haveacct span{font-weight:600;color:var(--text)}

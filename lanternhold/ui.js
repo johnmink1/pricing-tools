@@ -720,7 +720,7 @@
     else if (t.dataset.recruit) recruitPlayer(t.dataset.recruit);
     else if (t.id === 'b-find') findHeroes();
     else if (t.id === 'b-signin') openAccount();
-    else if (t.id === 'f-recruit') switchTab('market');
+    else if (t.id === 'f-recruit') { trade.view = 'guild'; switchTab('market'); }
     else if (t.id === 'm-market') openTrade('market');
     else if (t.id === 'm-mail') openTrade('mail');
   };
@@ -1213,7 +1213,7 @@
     $('dps').textContent = fmt(L.totalDps(S, now));
     $('embers').textContent = fmt(S.embers); $('kindcount').textContent = S.kindling ? S.kindling : '';
     if (tab === 'party' || tab === 'camp') updateSeats(force);
-    if (tab === 'market' && force) paintBoard();
+    if (tab === 'market' && force) showMarketView();
     if (tab === 'gear') updateGear(force);
     if (tab === 'codex') {
       if (cx === 'journal' && force) updateJournal();
@@ -1920,7 +1920,8 @@
       'At camp the party sits around a campfire. Nobody fights while you rest, and everyone heals up.',
       'The side panel is split into Party, Camp, Gear, Skills, Market and Codex, so there is far less scrolling.',
       'Rare gear can carry a camp-job bonus, marked with an orange dot. It boosts that job while the wearer works it at the campfire.',
-      'Six new job sets, one for each camp job, drop very rarely from guardians and chests from floor 20. Two pieces give +40% to that job, three give +100%.'] },
+      'Six new job sets, one for each camp job, drop very rarely from guardians and chests from floor 20. Two pieces give +40% to that job, three give +100%.',
+      'A new Market tab: browse gear as a grid of cards, filter by slot and rarity, sort by price or power, and tap a card to compare it with what you wear before you buy. Mailbox and Players Guild sit right beside it.'] },
     { v: 11, date: 'November 22, 2026', title: 'Camp jobs and rarer loot', items: [
       'Companions at the campfire can take camp jobs: Forager, Runesmith, Herbalist, Armorer, Prospector and Lamplighter.',
       'Each job helps the whole party all the time. It grows with the companion’s level and is stronger when it suits their class, so it pays to train your whole roster.',
@@ -1995,7 +1996,7 @@
   // ---------- trading post: market and player mail ----------
   // Items and gold live in each player's save, so the client moves them; the server keeps
   // listings, offers and letters so both sides see the same thing.
-  const trade = { view: 'market', cls: null, mine: false, list: null, mail: null, msg: '', busy: false };
+  const trade = { view: 'market', cls: null, mine: false, list: null, mail: null, msg: '', busy: false, slot: 'all', rar: 'all', sort: 'cheap' };
   const tradeItem = it => L.normItem({ cls: it.cls, slot: it.slot, rar: it.rar, set: it.set || undefined, jset: it.jset || undefined, aff: it.aff || undefined, ilvl: it.ilvl, up: it.up || 0 });
   const fromServer = it => Object.assign(tradeItem(it), { uid: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) });
   const bagFull = () => S.bag.length >= L.bagCap(S);
@@ -2013,7 +2014,7 @@
   };
   function takeFromBag(uid) {
     const it = L.itemOf(S, uid); if (!it) return null;
-    const w = L.wearer(S, uid); if (w) L.unequip(S, w, it.slot);
+    const w = L.wearer(S, uid); if (w) L.unequip(S, w, L.wornPos(S, uid));
     S.bag = S.bag.filter(x => x.uid !== uid);
     return it;
   }
@@ -2029,40 +2030,70 @@
     if (!quiet) { trade.msg = 'Checking your mail…'; paintTrade(); }
     try { trade.mail = await chatCall('GET', '/mail'); trade.msg = ''; } catch (e) { if (!quiet) trade.msg = tradeErr(e); }
     const n = trade.mail ? trade.mail.inbox.length : 0;
-    $('tradedot').hidden = !n; $('tradedot').textContent = n > 9 ? '9+' : n;
+    $('tradedot').hidden = !n; $('tradedot').textContent = n > 9 ? '9+' : n; if ($('mailn')) $('mailn').textContent = n ? n : '';
     if (!quiet) paintTrade();
   }
 
+  // The trading post lives in the Market tab: Market, Mailbox and Players Guild.
   function openTrade(view) {
-    if (!CL) return;
-    if (!signedIn()) { toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; }
     if (view) trade.view = view;
-    if (!trade.cls) { const m = L.memberById(gearWho || 'you'); trade.cls = m ? m.cls : 'tank'; }
+    if (typeof tab === 'undefined' || tab !== 'market') { switchTab('market'); return; }
+    showMarketView();
+  }
+  function showMarketView() {
+    document.querySelectorAll('#mktseg button').forEach(b => b.classList.toggle('on', b.dataset.mv === trade.view));
+    $('tradebox').hidden = trade.view === 'guild'; $('boardwrap').hidden = trade.view !== 'guild';
+    if (trade.view === 'guild') { paintBoard(); return; }
+    if (!trade.cls) { const m = L.memberById('you'); trade.cls = m ? m.cls : 'tank'; }
     paintTrade();
+    if (!CL || !signedIn()) return;
     if (trade.view === 'market') loadMarket(); else loadMail();
   }
+  const SLOT_FILTER = [['all', 'All slots'], ['main', 'Main hand'], ['off', 'Offhand'], ['head', 'Helmet'], ['neck', 'Trinket'], ['chest', 'Chest'], ['robe', 'Robe'], ['legs', 'Legs'], ['feet', 'Feet'], ['ring', 'Ring']];
+  const RAR_FILTER = [['all', 'Any rarity'], ['fine', 'Fine and up'], ['rare', 'Rare and up'], ['epic', 'Epic and set']];
+  const rarRank = r => ['common', 'fine', 'rare', 'epic', 'set'].indexOf(r);
+  function shownListings() {
+    let list = (trade.list || []).filter(l => { L.normItem(l.item); return true; });
+    if (trade.slot !== 'all') list = list.filter(l => l.item.slot === trade.slot);
+    if (trade.rar !== 'all') list = list.filter(l => rarRank(l.item.rar) >= rarRank(trade.rar));
+    const by = { cheap: (a, b) => a.price - b.price, new: (a, b) => b.at - a.at, power: (a, b) => L.itemScore(b.item) - L.itemScore(a.item), level: (a, b) => a.item.ilvl - b.item.ilvl };
+    return list.slice().sort(by[trade.sort] || by.cheap);
+  }
+  // How a listed item compares with what your best-fitting character of that class wears now.
+  function marketOwner(it) { const ids = S.unlocked.filter(id => { const m = L.memberById(id); return m && !m.guest && m.cls === it.cls; }); return ids.includes('you') ? 'you' : ids[0] || null; }
+  function marketCmp(it) {
+    const id = marketOwner(it); if (!id) return '';
+    const d = Math.round((L.itemScore(it) - L.replaces(S, id, it).reduce((a, x) => a + L.itemScore(x), 0)) * 100);
+    return d > 0 ? '<span class="cmp up">&#9650; ' + d + '%</span>' : d < 0 ? '<span class="cmp down">&#9660; ' + (-d) + '%</span>' : '<span class="cmp eq">Same</span>';
+  }
   function paintTrade() {
-    const seg = '<div class="seg tradeseg"><button data-tv="market"' + (trade.view === 'market' ? ' class="on"' : '') + '>Market</button><button data-tv="mail"' + (trade.view === 'mail' ? ' class="on"' : '') + '>Mailbox' + (trade.mail && trade.mail.inbox.length ? ' <em>' + trade.mail.inbox.length + '</em>' : '') + '</button></div>';
-    let h = '<div class="maphead"><div><h2>Trading Post</h2><small>Trade gear with other players for gold. To sell or send something, tap it in your Gear tab.</small></div><button class="iconbtn" id="t-x" aria-label="Close">&times;</button></div>' + seg;
-    if (trade.view === 'market') {
+    const box = $('tradebox'); if (!box) return;
+    const n = trade.mail ? trade.mail.inbox.length : 0; $('mailn').textContent = n ? n : '';
+    let h = '';
+    if (!CL) h = '<p class="note">The Trading Post is not available right now. Try again later.</p>';
+    else if (!signedIn()) h = '<div class="mkempty">' + icon('lock') + '<b>Sign in to trade</b><small>The market and mailbox need a free account so other players can see your listings.</small><button class="btn small" id="t-signin">Sign in</button></div>';
+    else if (trade.view === 'market') {
       h += '<div class="whoseg tradecls">' + L.CLASS_ORDER.map(c => '<button class="whochip c-' + c + (!trade.mine && trade.cls === c ? ' on' : '') + '" data-tc="' + c + '"><img src="' + SP.spriteURL(c, 2) + '" alt=""><span>' + L.CLASSES[c].name + '</span></button>').join('') +
         '<button class="whochip' + (trade.mine ? ' on' : '') + '" data-tc="mine"><span>My listings</span></button></div>';
+      const sel = (id, opts, v) => '<select id="' + id + '">' + opts.map(([k, t]) => '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>';
+      h += '<div class="mkfilters">' + sel('tf-slot', SLOT_FILTER, trade.slot) + sel('tf-rar', RAR_FILTER, trade.rar) + sel('tf-sort', [['cheap', 'Cheapest first'], ['new', 'Newest first'], ['power', 'Strongest first'], ['level', 'Lowest level first']], trade.sort) + '</div>';
       if (trade.msg) h += '<p class="note">' + esc(trade.msg) + '</p>';
       if (trade.list) {
-        h += trade.list.length ? '<div class="tlist">' + trade.list.map(l => {
-          const mine = trade.mine || l.seller === trade.me;
-          return '<div class="trow">' + tradeTile(l.item) + '<div class="tinfo"><b class="r-' + l.item.rar + '">' + tradeName(l.item) + '</b><small>' + tradeSub(l.item) + '</small><small>' + (mine ? 'Your listing' : 'Sold by ' + esc(l.name)) + '</small></div>' +
-            '<div class="tact"><span class="price">' + icon('coin') + fmt(l.price) + '</span>' +
-            (mine ? '<button class="btn ghost small" data-tcancel="' + l.id + '" data-tcls="' + l.cls + '">Take down</button>' : '<button class="btn small" data-tbuy="' + l.id + '" data-tcls="' + l.cls + '"' + (l.price > S.gold ? ' disabled title="Not enough gold"' : '') + '>Buy</button>') + '</div></div>';
-        }).join('') + '</div>' : '<p class="note">' + (trade.mine ? 'You have nothing for sale. Tap an item in your Gear tab and choose Sell on market.' : 'No ' + L.CLASSES[trade.cls].name.toLowerCase() + ' gear for sale right now.') + '</p>';
+        const list = shownListings();
+        h += list.length ? '<div class="mkgrid">' + list.map(l => {
+          const it = l.item, mine = trade.mine || l.seller === trade.me, rar = L.RARITY.find(r => r.id === it.rar);
+          return '<button class="mkcard r-' + it.rar + '" data-tview="' + l.id + '">' + tradeTile(it) +
+            '<span class="mkname r-' + it.rar + '">' + tradeName(it) + '</span>' +
+            '<span class="mkmeta">' + rar.name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; lvl ' + L.reqLevel(it) + '</span>' +
+            '<span class="mkfoot"><span class="price">' + icon('coin') + fmt(l.price) + '</span>' + (mine ? '<span class="mkmine">Yours</span>' : marketCmp(it)) + '</span></button>';
+        }).join('') + '</div>' : '<div class="mkempty">' + icon('bag') + '<b>' + (trade.mine ? 'Nothing for sale yet' : 'No matching ' + L.CLASSES[trade.cls].name.toLowerCase() + ' gear') + '</b><small>' + (trade.mine ? 'Tap an item in your Gear tab and choose Sell to list it here.' : (trade.list.length ? 'Try a wider filter.' : 'Check back later, or list something of your own.')) + '</small></div>';
       }
     } else {
       if (trade.msg) h += '<p class="note">' + esc(trade.msg) + '</p>';
       const mb = trade.mail;
       if (mb) {
         const letters = mb.inbox.filter(l => l.type !== 'offer'), offers = mb.inbox.filter(l => l.type === 'offer');
-        h += '<h3 class="sub">Inbox</h3>';
-        if (!mb.inbox.length) h += '<p class="note">Nothing new. Players can send you gear as a gift or with a price you can accept.</p>';
+        if (!mb.inbox.length) h += '<div class="mkempty">' + icon('chat') + '<b>No new mail</b><small>Players can send you gear as a gift, or with a price you can accept or decline.</small></div>';
         if (letters.length > 1) h += '<div class="row"><button class="btn small" id="t-claimall">Collect all (' + letters.length + ')</button></div>';
         h += '<div class="tlist">' + letters.map(l => {
           const what = l.type === 'sale' ? esc(l.fromName) + ' bought your ' + tradeName(l.item) + '.'
@@ -2075,35 +2106,63 @@
         if (mb.outbox.length) h += '<h3 class="sub">Waiting for an answer</h3><div class="tlist">' + mb.outbox.map(l => '<div class="trow">' + tradeTile(l.item) + '<div class="tinfo"><b class="r-' + l.item.rar + '">' + tradeName(l.item) + '</b><small>To ' + esc(l.toName) + (l.price ? ' for ' + fmt(l.price) + ' gold' : ' as a gift') + '</small></div><div class="tact"><button class="btn ghost small" data-trecall="' + l.id + '">Take back</button></div></div>').join('') + '</div>';
       }
     }
-    h += '<p class="note small">Trades are between players. Gold and gear are in-game only and have no real-money value.</p>';
-    if ($('modal').hidden || !$('modalbody').querySelector('.tradepost')) modal('<div class="tradepost"></div>', md => md.className = 'sheet wide');
-    const box = $('modalbody').querySelector('.tradepost'); if (box) box.innerHTML = h;
+    h += '<p class="note small mknote">To sell or send gear, tap it in your Gear tab. Gold and gear are in-game only and have no real-money value.</p>';
+    box.innerHTML = h;
   }
+  // A listing up close: stats, how it compares, and Buy.
+  function listingModal(id) {
+    const l = (trade.list || []).find(x => x.id === id); if (!l) return;
+    const it = L.normItem(l.item), rar = L.RARITY.find(r => r.id === it.rar), mine = trade.mine || l.seller === trade.me;
+    const owner = marketOwner(it), reps = owner ? L.replaces(S, owner, it) : [], cur = {};
+    for (const r of reps) for (const [k, v] of L.itemStats(r)) cur[k] = (cur[k] || 0) + v;
+    const pc = v => '+' + Math.round(v * 100) + '%';
+    const stats = L.itemStats(it).map(([k, v]) => { const d = owner ? Math.round((v - (cur[k] || 0)) * 100) : 0;
+      return '<div class="ist"><span>' + k + '</span><b>' + pc(v) + '</b>' + (owner ? '<em class="' + (d > 0 ? 'up' : d < 0 ? 'down' : 'eq') + '">' + (d > 0 ? '&#9650; ' + d + '%' : d < 0 ? '&#9660; ' + (-d) + '%' : 'same') + '</em>' : '') + '</div>'; }).join('');
+    const om = owner && L.memberById(owner);
+    const set = it.set && L.SETS.find(x => x.id === it.set), js = it.jset && L.JOB_SETS[it.jset];
+    modal('<div class="icard r-' + it.rar + '"><button class="iconbtn icx" id="l-x" aria-label="Close">&times;</button>' +
+      '<div class="ihero">' + tradeTile(it).replace('class="tile', 'class="tile big') + '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + tradeName(it) + '</h2><small>Requires level <b class="' + (om && !L.canWear(S, owner, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
+      '<div class="istats">' + stats + '</div>' +
+      (om ? '<p class="icmp">' + (reps.length ? 'Compared with ' + esc(om.name) + '’s ' + reps.map(r => esc(L.gearName(r))).join(' and ') + '.' : esc(om.name) + ' has an open ' + L.SLOT_NAME[it.slot].toLowerCase() + ' slot.') + '</p>' : '<p class="icmp">You have no ' + L.CLASSES[it.cls].name.toLowerCase() + ' yet to wear this.</p>') +
+      (it.aff ? '<div class="iaff">' + icon('flame') + '<span><b>+' + Math.round(it.aff.v * (1 + 0.1 * it.up) * 100) + '% ' + (L.JOBS.find(j => j.id === it.aff.j) || {}).name + ' job</b><small>Counts while the wearer works that job at the campfire.</small></span></div>' : '') +
+      (js ? '<div class="iset"><b>' + js.name + '</b><small><em>2 pieces</em> +' + Math.round(L.JOB_SET_TWO * 100) + '% job output</small><small><em>3 pieces</em> +' + Math.round(L.JOB_SET_THREE * 100) + '% job output</small></div>' : '') +
+      (set ? '<div class="iset"><b>' + set.name + '</b><small><em>2 pieces</em> ' + set.two + '</small><small><em>3 pieces</em> ' + set.three + '</small></div>' : '') +
+      '<div class="mkseller"><span>' + (mine ? 'Your listing' : 'Sold by <b>' + esc(l.name) + '</b>') + '</span><span class="price big">' + icon('coin') + fmt(l.price) + '</span></div>' +
+      '<div class="iacts">' + (mine ? '<button class="btn ghost" id="l-down">Take it down</button>' : '<button class="btn" id="l-buy"' + (l.price > S.gold ? ' disabled' : '') + '>' + (l.price > S.gold ? 'Not enough gold' : 'Buy for ' + fmt(l.price) + ' gold') + '</button>') + '<button class="btn ghost" id="l-close">Back to market</button></div></div>', md => {
+        md.querySelector('#l-x').onclick = closeModal; md.querySelector('#l-close').onclick = closeModal;
+        const b = md.querySelector('#l-buy'); if (b) b.onclick = () => { closeModal(); doBuy(l.id); };
+        const d = md.querySelector('#l-down'); if (d) d.onclick = () => { closeModal(); doCancel(l.id, l.cls); };
+      });
+  }
+  const doBuy = id => tradeAct(async () => {
+    const l = trade.list.find(x => x.id === id); if (!l) return;
+    if (bagFull()) { toast('bag', 'Your pack is full', 'Salvage something first.', 'warn'); return; }
+    if (l.price > S.gold) return;
+    const r = await chatCall('POST', '/market/buy', { id: l.id, cls: l.cls, name: S.hero.name });
+    S.gold -= r.price; S.bag.push(fromServer(r.item)); afterTrade(); sfx.coin();
+    toast('bag', 'Bought ' + L.gearName(L.normItem(r.item)), 'It is in your pack now.', 'feat'); loadMarket();
+  });
+  const doCancel = (id, cls) => tradeAct(async () => {
+    if (bagFull()) { toast('bag', 'Your pack is full', 'Salvage something first, then take your listing down.', 'warn'); return; }
+    const r = await chatCall('POST', '/market/cancel', { id, cls });
+    S.bag.push(fromServer(r.item)); afterTrade(); toast('bag', 'Listing taken down', 'The item is back in your pack.', ''); loadMarket();
+  });
   async function tradeAct(fn, what) {
     if (trade.busy) return; trade.busy = true;
     try { await fn(); } catch (e) { toast('lock', 'Trade did not go through', tradeErr(e, what), 'warn'); }
     trade.busy = false;
   }
-  $('modalbody').addEventListener('click', e => {
-    if (!$('modalbody').querySelector('.tradepost')) return;
+  $('mktseg').addEventListener('click', e => { const b = e.target.closest('[data-mv]'); if (!b) return; trade.view = b.dataset.mv; trade.msg = ''; showMarketView(); });
+  $('tradebox').addEventListener('change', e => {
+    const id = e.target.id; if (!id || id.slice(0, 3) !== 'tf-') return;
+    trade[id.slice(3)] = e.target.value; paintTrade();
+  });
+  $('tradebox').addEventListener('click', e => {
     const t = e.target.closest('button'); if (!t) return;
     const d = t.dataset;
-    if (t.id === 't-x') { closeModal(); return; }
-    if (d.tv) { trade.view = d.tv; trade.msg = ''; paintTrade(); d.tv === 'market' ? loadMarket() : loadMail(); return; }
+    if (t.id === 't-signin') { authForm('in'); return; }
+    if (d.tview) { listingModal(d.tview); return; }
     if (d.tc) { if (d.tc === 'mine') trade.mine = true; else { trade.mine = false; trade.cls = d.tc; } loadMarket(); return; }
-    if (d.tbuy) tradeAct(async () => {
-      const l = trade.list.find(x => x.id === d.tbuy); if (!l) return;
-      if (bagFull()) { toast('bag', 'Your pack is full', 'Salvage something first.', 'warn'); return; }
-      if (l.price > S.gold) return;
-      const r = await chatCall('POST', '/market/buy', { id: l.id, cls: l.cls, name: S.hero.name });
-      S.gold -= r.price; S.bag.push(fromServer(r.item)); afterTrade(); sfx.coin();
-      toast('bag', 'Bought ' + L.gearName(r.item), 'It is in your pack now.', 'feat'); loadMarket();
-    });
-    if (d.tcancel) tradeAct(async () => {
-      if (bagFull()) { toast('bag', 'Your pack is full', 'Salvage something first, then take your listing down.', 'warn'); return; }
-      const r = await chatCall('POST', '/market/cancel', { id: d.tcancel, cls: d.tcls });
-      S.bag.push(fromServer(r.item)); afterTrade(); toast('bag', 'Listing taken down', 'The item is back in your pack.', ''); loadMarket();
-    });
     if (d.tclaim || t.id === 't-claimall') tradeAct(async () => {
       const ids = d.tclaim ? [d.tclaim] : trade.mail.inbox.filter(l => l.type !== 'offer').map(l => l.id);
       let gold = 0, items = 0;
@@ -2177,7 +2236,7 @@
   }
   if (CL) {
     $('btn-trade').hidden = false;
-    $('btn-trade').addEventListener('click', () => openTrade());
+    $('btn-trade').addEventListener('click', () => { trade.view = 'market'; openTrade(); if (phone()) { const p = document.querySelector('.panel'); p && window.scrollTo({ top: p.getBoundingClientRect().top + window.scrollY - 8, behavior: 'smooth' }); } });
     setInterval(() => { if (signedIn() && !document.hidden) loadMail(true); }, 90000);
     setTimeout(() => { if (signedIn()) loadMail(true); }, 4000);
   }

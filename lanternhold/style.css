@@ -791,3 +791,24 @@ body.resting .arena{cursor:default}
 .iaff{display:flex;gap:10px;align-items:flex-start;margin:10px 0;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,138,61,.35);background:rgba(255,138,61,.07)}
 .iaff svg{width:18px;height:18px;color:var(--ember);flex:none;margin-top:2px}.iaff b{display:block;color:#ffc58f}.iaff small{color:var(--muted);font-size:12.5px}
 .iset b em{font-style:normal;color:var(--muted);font-weight:600;font-size:12px;margin-left:6px}
+/* market tab */
+.mktseg{display:flex;margin-bottom:12px}.mktseg button{flex:1}.mktseg em{font-style:normal;background:var(--ember);color:#1a0f08;border-radius:999px;padding:0 6px;font-size:11px;margin-left:4px}.mktseg em:empty{display:none}
+.mkfilters{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 12px}
+.mkfilters select{width:100%;background:#120e0b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;font-size:13px}
+.mkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.mkcard{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px 10px;border-radius:12px;border:1px solid var(--line);background:linear-gradient(180deg,#1d1712,#14100c);color:var(--text);font:inherit;cursor:pointer;text-align:center;transition:border-color .15s,transform .15s}
+.mkcard:hover{border-color:var(--line2);transform:translateY(-1px)}
+.mkcard.r-epic{border-color:rgba(199,139,255,.35)}.mkcard.r-set{border-color:rgba(242,193,78,.4)}.mkcard.r-rare{border-color:rgba(108,196,232,.3)}
+.mkcard .tile{width:64px;height:64px;pointer-events:none}.mkcard .iimg{width:46px;height:46px}
+.mkname{font-weight:700;font-size:13.5px;line-height:1.25;min-height:34px;display:flex;align-items:center}
+.mkmeta{font-size:11.5px;color:var(--muted)}
+.mkfoot{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;margin-top:4px;padding-top:6px;border-top:1px solid var(--line)}
+.mkfoot .price{font-size:14px}.mkfoot .cmp{font-size:11px;padding:1px 6px}
+.mkmine{font-size:11px;color:var(--gold);font-weight:700}
+.mkempty{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:26px 12px;border:1px dashed var(--line);border-radius:12px;color:var(--muted)}
+.mkempty svg{width:26px;height:26px;color:var(--dim)}.mkempty b{color:var(--text);font-size:15px}.mkempty small{font-size:13px;max-width:320px}
+.mkseller{display:flex;align-items:center;justify-content:space-between;margin:10px 0 2px;color:var(--muted);font-size:13.5px}
+.price.big{font-size:20px}
+.mknote{margin-top:14px}
+.r-common{color:var(--text)}.mkname.r-fine{color:#a8e08a}.mkname.r-rare{color:#86d0f0}.mkname.r-epic{color:#d4a6ff}.mkname.r-set{color:var(--gold)}
+@media (max-width:520px){.mkgrid{grid-template-columns:repeat(2,1fr)}.mkfilters{grid-template-columns:1fr 1fr}.mkfilters select:last-child{grid-column:1/-1}}

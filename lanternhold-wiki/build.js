@@ -240,6 +240,7 @@ ref({
         ['Soldiers', b.war.units.map(esc).join(', ')],
         b.foe ? ['Native monster', '<a href="/wiki/bestiary/#' + b.foe.id + '">' + esc(b.foe.name) + '</a>'] : null,
         b.mod ? ['Signature trick', esc(L.MODS[b.mod].name) + ' <small>' + esc(L.MODS[b.mod].desc) + '</small>'] : null,
+        (L.REGION_SETS || [])[i] ? ['Region set', '<a href="/wiki/sets/#rset-' + i + '">' + esc(L.REGION_SETS[i].name) + '</a>'] : null,
       ]) + '</div></div></div></li>';
   }).join('') + '</ol>' + related(['bestiary', 'world-boss']),
   index: () => L.BIOMES.forEach((b, i) => { const [a, z] = regionFloors(i), pl = loreBy('biome' + i); addSearch('regions', b.name, slug(b.name), 'Floors ' + a + '-' + z + '. Guardian: ' + b.boss + '. ' + (pl ? pl.text : ''), 'Region'); addSearch('regions', b.boss, slug(b.name), 'Guardian of ' + b.name + ', floor ' + z + '. ' + ((loreBy('g' + i) || {}).text || ''), 'Guardian'); }),
@@ -279,7 +280,7 @@ ref({
     return '<h2 id="slots">Slots</h2><p>Main hand, offhand, helmet, trinket (a second one unlocks with Kindling), chest, legs, feet and up to five rings. Robes are for Healers, Mages and Necromancers and cover the chest and legs.</p>' +
       table(['Class'].concat(slots.map(s => esc(L.SLOT_NAME[s]))), CO.map(c => ['<b>' + clsName(c) + '</b>'].concat(slots.map(s => esc((L.BASES || {})[c] && L.BASES[c][s] || '–')))), 'small') +
       '<h2 id="rarity">Rarity</h2>' + table(['Rarity', 'Drop share', 'Power', 'Enchant sockets', 'Dust when scrapped'], L.RARITY.map(r => [
-        '<span class="rar r-' + r.id + '">' + r.name + '</span>', r.w ? pct(r.w / totW) : 'Guardians and chests', pct(r.pct, 1) + ' per item level step', String(({ common: 0, fine: 1, rare: 2, epic: 3, set: 2 })[r.id]), String(({ common: 1, fine: 3, rare: 8, epic: 20, set: 15 })[r.id]) + '+'])) +
+        '<span class="rar r-' + r.id + '">' + r.name + '</span>', r.w ? pct(r.w / totW) : r.id === 'goblin' ? 'Loot Goblin only' : 'Guardians and chests', pct(r.pct, 1) + ' per item level step', String(((L.SOCK_BASE) || { common: 0, fine: 1, rare: 2, epic: 3, set: 2 })[r.id] || 0), String(((L.DUST) || { common: 1, fine: 3, rare: 8, epic: 20, set: 15 })[r.id] || '–') + '+'])) +
       '<p class="note">Power grows 3% per item level and 20% per upgrade. Items from floor 30 and floor 80 get one more socket each, up to ' + 4 + '.</p>' +
       '<h2 id="upgrades">Upgrades and merging</h2><p>Upgrade a piece with gold up to +' + L.UP_MAX + ', or merge two copies of the same item into one at one level higher. A failed merge destroys both pieces. Luck and Intelligence cut the risk, up to half.</p>' +
       table(['Merge to', 'Base risk', 'With 40 Luck and 25 Intelligence'], ups.map(u => { const r = L.mergeRisk({ attr: { lck: 40, int: 25 } }, { up: u - 1 }, { up: 0 }); return ['+' + u, pct(r.base), pct(r.risk)]; }), 'small') +
@@ -293,8 +294,8 @@ ref({
 // ---- Sets ----
 ref({
   slug: 'sets', title: 'Item sets', nav: 'Sets', icon: 'crown',
-  desc: 'Every Lanternhold item set: class sets with their two- and three-piece bonuses and lore, and the six camp job sets.',
-  lede: 'Set pieces drop from guardians from floor 15. Wear two or three pieces of one set for its bonuses.',
+  desc: 'Every Lanternhold item set: the fifteen region sets, the Loot Goblin’s Sack, class sets with their bonuses and lore, and the six camp job sets.',
+  lede: 'Every region of the Deep has its own four-piece set, each class has a three-piece set from guardians, and each camp job has a set too.',
   body: () => {
     const sets = L.SETS.map(s => {
       const lo = loreBy('set_' + s.id), extra = [];
@@ -307,11 +308,25 @@ ref({
     const jobs = Object.entries(L.JOB_SETS).map(([id, s]) => { const j = L.JOBS.find(x => x.id === id) || {};
       return card('job-' + id, esc(s.name), { sub: 'For the ' + esc(j.name || id) + ' camp job', body: '<div class="chips">' + Object.entries(s.pieces).map(([sl, n]) => chip('<small>' + esc(L.SLOT_NAME[sl] || sl) + '</small> ' + esc(n), 'job')).join('') + '</div>' +
         kv([['2 pieces', pct(L.JOB_SET_TWO, 1) + ' to the job'], ['3 pieces', pct(L.JOB_SET_THREE, 1) + ' to the job']]) }); }).join('');
-    return '<h2>Class sets</h2><div class="grid2">' + sets + '</div><h2 id="job-sets">Job sets</h2><p>From floor 20, guardians (3%) and chests (0.8%) can drop job set pieces. Any class can wear them, and they boost the camp job of whoever wears them.</p><div class="grid3">' + jobs + '</div>' +
+    const RS = L.REGION_SETS || [];
+    const KN = { dps: 'damage', hp: 'health', heal: 'healing (health for non-healers)', gold: 'gold for the whole party' };
+    const regionSets = RS.length ? '<h2 id="region-sets">Region sets</h2><p>Every region of the Deep drops its own four-piece armor set (head, chest, legs and feet) for any class. Pieces drop only on that region’s floors, and guardians are the best bet' +
+      (L.RSET_DROP ? ' (' + pct(L.RSET_DROP.boss) + ' a guardian, ' + pct(L.RSET_DROP.chest) + ' a chest)' : '') + '. Two pieces boost one stat. Four pieces add damage and health that multiply all of that hero’s gear, and the bonuses never fall behind item level, so a finished set lasts through rekindles. Region pieces are bound to the Hold: they cannot be sold or sent.</p>' +
+      '<div class="toc">' + RS.map((r, i) => '<a href="#rset-' + i + '">' + esc(r.name) + '</a>').join('') + '</div><div class="grid3">' + RS.map((r, i) => {
+        const b = L.BIOMES[i] || {}, two = L.rsetTwo ? L.rsetTwo(i) : 0, four = L.rsetFour ? L.rsetFour(i) : 0, fl = regionFloors(i);
+        return card('rset-' + i, esc(r.name), { style: '--acc:' + (b.accent || 'var(--gold)'), pic: pic('chest', b.hue || 0, ''), sub: '<a href="/wiki/regions/#' + slug(b.name || '') + '">' + esc(b.name || '') + '</a> · floors ' + fl[0] + '–' + fl[1],
+          body: '<div class="chips">' + ['Head', 'Chest', 'Legs', 'Feet'].map(n => chip(n, 'set')).join('') + '</div>' +
+            kv([['2 pieces', pct(two, 1) + ' ' + esc(KN[r.k] || r.k)], ['4 pieces', pct(four, 1) + ' damage and health']]) + (r.lore ? '<p class="quote">' + esc(r.lore) + '</p>' : '') });
+      }).join('') + '</div><p class="note">Piece names follow the wearer: plate for Tanks (Helm, Hauberk, Greaves, Sabatons), leather for Rogues (Hood, Jerkin, Breeches, Boots) and cloth for everyone else (Cowl, Vestment, Leggings, Slippers).</p>' : '';
+    const sack = L.GOBLIN_SACK_GOLD ? '<h2 id="goblin-sack">The Loot Goblin’s Sack</h2><div class="grid2">' + card('goblin-sack-card', 'Loot Goblin’s Sack', { pic: pic('goblin', 0, 'Loot Goblin'), sub: 'Trinket · one of the rarest finds in the Deep',
+      body: kv([['While worn', pct(L.GOBLIN_SACK_GOLD, 1) + ' gold for the whole party'], ['Drop chance', 'About one <a href="/wiki/bestiary/#loot-goblin">Loot Goblin</a> kill in ' + num(Math.round(1 / L.GOBLIN_SACK_CHANCE))], ['Sockets', '3 enchant sockets']]) }) + '</div>' : '';
+    return regionSets + sack + '<h2>Class sets</h2><div class="grid2">' + sets + '</div><h2 id="job-sets">Job sets</h2><p>From floor 20, guardians (3%) and chests (0.8%) can drop job set pieces. Any class can wear them, and they boost the camp job of whoever wears them.</p><div class="grid3">' + jobs + '</div>' +
       '<h2 id="job-affixes">Job affixes</h2><p>Some ordinary pieces roll a job affix instead (an orange dot in game): ' + Object.entries(L.AFFIX_CHANCE || {}).map(([r, v]) => r + ' ' + pct(v)).join(', ') + '.</p>' + related(['gear', 'camp-and-jobs']);
   },
   index: () => { for (const s of L.SETS) addSearch('sets', s.name, 'set-' + s.id, clsName(s.cls) + ' set. ' + Object.values(s.pieces).join(', ') + '. 2 pieces: ' + s.two + '. 3 pieces: ' + s.three, 'Set');
-    for (const [id, s] of Object.entries(L.JOB_SETS)) addSearch('sets', s.name, 'job-' + id, 'Job set: ' + Object.values(s.pieces).join(', '), 'Set'); },
+    for (const [id, s] of Object.entries(L.JOB_SETS)) addSearch('sets', s.name, 'job-' + id, 'Job set: ' + Object.values(s.pieces).join(', '), 'Set');
+    (L.REGION_SETS || []).forEach((r, i) => addSearch('sets', r.name, 'rset-' + i, 'Region set from ' + ((L.BIOMES[i] || {}).name || '') + '. ' + r.word + ' pieces. 2 pieces: ' + pct(L.rsetTwo(i), 1) + ' ' + r.k + '. 4 pieces: ' + pct(L.rsetFour(i), 1) + ' damage and health. ' + (r.lore || ''), 'Region set'));
+    if (L.GOBLIN_SACK_GOLD) addSearch('sets', 'Loot Goblin’s Sack', 'goblin-sack', 'Rare trinket from the Loot Goblin: ' + pct(L.GOBLIN_SACK_GOLD, 1) + ' party gold while worn', 'Item'); },
 });
 
 // ---- Enchantments ----

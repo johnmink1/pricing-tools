@@ -1088,6 +1088,7 @@
       : (m.bio || m.line);
     modal('<div class="prof"><div class="profhead"><div class="profspr c-' + m.cls + '"></div><div><h2>' + esc(m.name) + '</h2><small>' + esc(m.title) + '</small><div class="tags">' + classTag(m.cls) + (sd ? '<span class="sidetag" style="--side:' + sd.color + '">' + sd.name + '</span>' : '') + (guest ? '<span class="you guest">Player</span>' : '') + '</div></div></div>' +
       '<p class="bio">' + esc(bio) + '</p>' + (m.line && !guest && id !== 'you' ? '<p class="quote">“' + esc(m.line) + '”</p>' : '') +
+      (id === 'you' && L.warAura(S) ? '<h3 class="sub">Grand War aura</h3><div id="p-aura">' + auraBox() + '</div>' : id === 'you' && CL ? '<div id="p-aura"></div>' : '') +
       (id === 'you' && CL ? '<h3 class="sub">Profile card</h3><p class="note">What other players see in the Players Guild.</p><div class="pfwrap" id="p-card">' + looksCard({ name: m.name, cls: m.cls, level: lv, floor: S.maxFloorEver, pf: prof && prof.pf, w: prof && prof.wv ? prof.wl : '' }) + '</div><button class="btn small" id="p-looks">Customize profile</button>' : '') +
       (guest && g0 && (g0.pf || g0.w) ? '<div class="pfwrap">' + looksCard(Object.assign({}, g0, { name: m.name, cls: m.cls })) + '</div>' : '') +
       '<h3 class="sub">' + c.name + '</h3><p class="note">' + esc(CLASS_BLURB[m.cls]) + '</p>' +
@@ -1101,7 +1102,7 @@
         const st = md.querySelector('#p-seat'); if (st) st.onclick = () => { closeModal(); if (campGate()) pickSeat(id); };
         md.querySelector('#p-close').onclick = closeModal;
         const lk = md.querySelector('#p-looks'); if (lk) lk.onclick = openProfileEditor;
-        if (id === 'you' && CL && signedIn() && !prof) Promise.all([loadProfile(), loadWar()]).then(() => { const c = md.querySelector('#p-card'); if (c && prof) c.innerHTML = looksCard({ name: m.name, cls: m.cls, level: lv, floor: S.maxFloorEver, pf: prof.pf, w: prof.wv ? prof.wl : '' }); });
+        if (id === 'you' && CL && signedIn() && !prof) Promise.all([loadProfile(), loadWar()]).then(() => { const c = md.querySelector('#p-card'); if (c && prof) c.innerHTML = looksCard({ name: m.name, cls: m.cls, level: lv, floor: S.maxFloorEver, pf: prof.pf, w: prof.wv ? prof.wl : '' }); const au = md.querySelector('#p-aura'); if (au && !au.innerHTML && L.warAura(S)) au.innerHTML = '<h3 class="sub">Grand War aura</h3>' + auraBox(); });
       });
   }
 
@@ -1726,7 +1727,22 @@
     if (!r.ok) throw Object.assign(new Error(j.error || ('server ' + r.status)), { code: j.error || r.status });
     return j;
   }
-  async function loadProfile() { if (!CL || !signedIn()) return null; try { prof = await papi('GET', '/profile'); } catch (e) {} return prof; }
+  async function loadProfile() {
+    if (!CL || !signedIn()) return null;
+    try { prof = await papi('GET', '/profile'); } catch (e) { return prof; }
+    // A verified commander link turns on the hero's Grand War aura.
+    const had = JSON.stringify(S.war || null);
+    if (prof.wv && prof.wl) { await loadWar(); const c = commander(prof.wl); if (c) S.war = { n: c.n, lv: c.lv | 0, h: c.h.slice(0, 12) }; }
+    else delete S.war;
+    if (JSON.stringify(S.war || null) !== had) { save(); updatePanel(true); }
+    return prof;
+  }
+  // The aura block shown on your hero and in the profile editor.
+  function auraBox() {
+    const a = L.warAura(S);
+    if (!a) return '';
+    return '<div class="aura c-' + a.cls + '"><div class="aurah"><b>' + esc(a.name) + '</b><small>Grand War ' + esc(S.war.n) + ', rank ' + (a.lv + 1) + ' of 7</small></div><ul>' + a.lines.map(l => '<li>' + esc(l) + '</li>').join('') + '</ul></div>';
+  }
   async function loadWar() {
     if (!CL) return [];
     if (warList && Date.now() - warAt < 3e5) return warList;
@@ -1788,9 +1804,9 @@
     } else {
       const c = commander(prof.wl);
       body = '<p class="note">Play in the Grand War? Link your commander and your war rank and honors appear on your card and in the Players Guild. The Born 2 Game team checks each link before it shows, so nobody can borrow your name.</p>' +
-        (prof.wl ? '<div class="wlink"><div>' + (c ? warBadge(prof.wl, true) : '<b>' + esc(prof.wl) + '</b>') + '</div><small>' + (prof.wv ? 'Verified. Your badges are showing.' : 'Waiting for the team to confirm it is you. Mention it in the Grand War Discord to speed it up.') + '</small><button class="btn small ghost" id="pe-unlink">Remove link</button></div>' :
+        (prof.wl ? '<div class="wlink"><div>' + (c ? warBadge(prof.wl, true) : '<b>' + esc(prof.wl) + '</b>') + '</div><small>' + (prof.wv ? 'Verified. Your badges are showing and your hero carries a Grand War aura.' : 'Waiting for the team to confirm it is you. Mention it in the Grand War Discord to speed it up.') + '</small><button class="btn small ghost" id="pe-unlink">Remove link</button></div>' :
           '<div class="wform"><input id="pe-cmd" list="pe-cmds" placeholder="Your commander name in the Grand War" autocomplete="off"><datalist id="pe-cmds">' + (warList || []).map(c => '<option value="' + esc(c.n) + '">').join('') + '</datalist><button class="btn small" id="pe-link">Request link</button></div>' +
-          '<p class="note">Commanders on the Grand War ladder right now: ' + (warList || []).length + '. Not listed yet? Play a game in the war first.</p>');
+          '<p class="note">Once the link is verified, your hero carries a Grand War aura for their class. It grows with your war rank, and honors such as Grand Marshal add to it.</p><p class="note">Commanders on the Grand War ladder right now: ' + (warList || []).length + '. Not listed yet? Play a game in the war first.</p>');
     }
     modal('<div class="maphead"><div><h2>Your profile</h2><small>Looks only. Nothing here changes your party’s power.</small></div><button class="iconbtn" id="pe-x" aria-label="Close">&times;</button></div>' +
       '<div class="pfwrap">' + looksCard(me) + '</div>' +
@@ -2500,7 +2516,7 @@
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten, where you are and where other delvers have reached. Tap a region to zoom in on its ten floors and read its dossier (its history, who holds it, its monsters and its guardian), then tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
-    ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p>'],
+    ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
     ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
     ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
@@ -2522,6 +2538,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 22, date: 'November 23, 2026', title: 'Grand War auras', items: [
+      'Verified Grand War commanders now carry an aura for their hero’s class. Tanks get the Bulwark Aura (party health, less damage taken), healers the Mending Aura (healing), rogues the Shadow Aura (gold, critical hits), mages the Ember Aura (party damage, critical hits) and necromancers the Grave Aura (party damage, gear drops).',
+      'The aura grows with your rank on the Grand War ladder, from 2% at Recruit to 10% at the top rank. Past seasons as Grand Marshal or champion make it a quarter stronger each.',
+      'War honors add their own bonus: Grand Marshal gives the Marshal’s Banner (+5% party damage), Alliance Champion the Champion’s Mantle (+5% party health) and Nexus Holder the Nexus Tithe (+10% gold).',
+      'Your aura shows on your hero’s portrait. Auras are earned in the war and can never be bought.'] },
     { v: 21, date: 'November 22, 2026', title: 'Profiles, Sigils and Grand War badges', items: [
       'Your hero now has a profile card that other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. Open it from your hero’s portrait and press Customize profile.',
       'Sigils buy looks for your card. Every account starts with 100. Looks never change your party’s power, and they stay with your account even through a server reset.',

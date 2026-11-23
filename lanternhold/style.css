@@ -489,3 +489,43 @@ button.scene:hover{border-color:var(--accent)}
 .ilink{background:none;border:0;padding:0;font:inherit;font-weight:800;cursor:pointer;color:var(--rc,#e9c98a)}
 .ilink:hover{text-decoration:underline}
 .ilink.r-common{--rc:#d9cdb8}.ilink.r-fine{--rc:#8fcf6a}.ilink.r-rare{--rc:#6cb6ff}.ilink.r-epic{--rc:#c78bff}.ilink.r-set{--rc:#f2c45a}
+
+/* mass scrap */
+.packbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.packbar .sub{margin-bottom:0}
+.scrapgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin-bottom:10px}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);margin-bottom:6px;cursor:pointer}
+.chk input{margin-top:3px;width:16px;height:16px;accent-color:var(--accent);flex:none}
+.chk b{display:block;font-size:14px}
+.chk small{display:block;color:var(--muted);font-size:12.5px}
+.scrapsum{margin-top:10px}
+.scrapsum b{color:var(--text)}
+
+/* tutorial coach and guide */
+.coach{position:fixed;z-index:45;width:300px;background:#2a1f14;border:1px solid var(--accent);border-radius:12px;padding:12px 14px;box-shadow:0 14px 40px rgba(0,0,0,.6)}
+.coach::before{content:"";position:absolute;left:var(--ax,40px);top:-7px;width:12px;height:12px;background:#2a1f14;border-left:1px solid var(--accent);border-top:1px solid var(--accent);transform:translateX(-50%) rotate(45deg)}
+.coach.up::before{top:auto;bottom:-7px;transform:translateX(-50%) rotate(225deg)}
+.coach-step{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:800}
+.coach b{display:block;font-size:16px;margin:2px 0 4px}
+.coach p{margin:0;color:var(--muted);font-size:14px;line-height:1.45}
+.coach-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.coach-row .btn[hidden]{display:none}
+.linkbtn{background:none;border:0;padding:0;color:var(--dim);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer}
+.tut-hi{outline:2px solid var(--accent);outline-offset:3px;border-radius:10px;animation:tutpulse 1.4s ease-in-out infinite}
+@keyframes tutpulse{50%{outline-color:transparent;outline-offset:6px}}
+@media (prefers-reduced-motion:reduce){.tut-hi{animation:none}}
+@media (max-width:720px){.coach{width:auto}.coach::before{display:none}}
+.guide details{border:1px solid var(--line);border-radius:10px;background:var(--bg2);margin-bottom:6px}
+.guide summary{cursor:pointer;padding:10px 12px;font-weight:800}
+.guide details>div{padding:0 12px 6px}
+.guide p,.guide li{color:var(--muted);font-size:14px;line-height:1.5}
+.guide ul{padding-left:18px;margin:0 0 10px}
+.guide b{color:var(--text)}
+@media (max-width:560px){
+  .top{gap:6px}
+  .top .iconbtn,.top .account,.top .updatebtn{width:36px;height:36px;padding:0}
+  .top .account{width:auto;min-width:36px;padding:0 4px}
+  .brand b{font-size:17px}
+  .brand .logo{width:24px;height:24px}
+}
+@media (max-width:380px){.brand b{display:none}}

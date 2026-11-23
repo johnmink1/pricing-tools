@@ -741,6 +741,40 @@
   }));
   function syncBuySeg() { document.querySelectorAll('#buyseg button').forEach(x => x.classList.toggle('on', String(S.settings.buy) === x.dataset.n)); }
 
+
+  // ---------- mass scrap ----------
+  const scrapOpts = { common: true, fine: true, rare: false, epic: false, set: false, keepBest: true, keepUp: true };
+  function scrapList() {
+    const best = new Set();
+    if (scrapOpts.keepBest) {
+      const top = {};
+      for (const it of S.bag) { const k = it.cls + it.slot; if (!top[k] || L.gearPct(it) > L.gearPct(top[k])) top[k] = it; }
+      Object.values(top).forEach(it => best.add(it.uid));
+    }
+    return S.bag.filter(it => scrapOpts[it.rar] && !L.wearer(S, it.uid) && !best.has(it.uid) && !(scrapOpts.keepUp && it.up > 0));
+  }
+  function openScrap() {
+    const draw = () => {
+      const list = scrapList(), gold = list.reduce((a, it) => a + L.salvageValue(it), 0);
+      const chk = (k, label, sub) => '<label class="chk"><input type="checkbox" data-opt="' + k + '"' + (scrapOpts[k] ? ' checked' : '') + '><span><b>' + label + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></label>';
+      modal('<h2>Mass scrap</h2><p>Salvage many pieces at once for gold. Gear someone is wearing is never scrapped.</p>' +
+        '<div class="scrapgrid">' + L.RARITY.map(r => chk(r.id, '<span class="r-' + r.id + '" style="color:var(--rc)">' + r.name + '</span>', S.bag.filter(x => x.rar === r.id && !L.wearer(S, x.uid)).length + ' unworn')).join('') + '</div>' +
+        chk('keepBest', 'Keep the best of each kind', 'Saves your strongest spare piece for every class and slot.') +
+        chk('keepUp', 'Keep upgraded pieces', 'Anything you have spent gold upgrading stays.') +
+        '<p class="scrapsum">' + (list.length ? 'Scraps <b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' for <b>' + fmt(gold) + ' gold</b>.' : 'Nothing matches. Tick more rarities above.') + '</p>' +
+        '<div class="row"><button class="btn danger" id="s-go"' + (list.length ? '' : ' disabled') + '>Scrap ' + list.length + '</button><button class="btn ghost" id="s-x">Cancel</button></div>', md => {
+          md.querySelectorAll('[data-opt]').forEach(c => c.onchange = () => { scrapOpts[c.dataset.opt] = c.checked; draw(); });
+          md.querySelector('#s-x').onclick = closeModal;
+          md.querySelector('#s-go').onclick = () => {
+            const l = scrapList(); let g = 0; for (const it of l) g += L.salvage(S, it.uid);
+            closeModal(); sfx.coin(); updateGear(true); save();
+            toast('coin', 'Scrapped ' + l.length + (l.length === 1 ? ' piece' : ' pieces'), '+' + fmt(g) + ' gold', 'feat');
+          };
+        });
+    };
+    draw();
+  }
+  $('g-scrap').addEventListener('click', openScrap);
   // ---------- panel: relics, feats, ledger, rekindle ----------
   function updateRelics() {
     const box = $('relics');
@@ -1414,6 +1448,81 @@
   setInterval(checkUpdate, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
   setTimeout(checkUpdate, 20000);
+
+  // ---------- tutorial (coach marks) and the Guide ----------
+  // Steps show one at a time, point at the real control, and wait for the player to do the thing.
+  const sumLevels = () => Object.keys(S.levels).reduce((a, k) => a + (S.levels[k] || 0), 0);
+  const TUT = [
+    { id: 'strike', title: 'Strike!', text: 'Tap the monster to hit it yourself. Your party fights on its own too, but every tap helps. Try a few.', target: '#arena', tab: null, ready: () => true, done: c => S.stats.clicks >= c.clicks + 5, noNext: true },
+    { id: 'gold', title: 'Gold', text: 'Every monster drops gold, even while you are away. Gold is how your party grows stronger.', target: '.stat.gold', ready: () => true },
+    { id: 'train', title: 'Train your party', text: 'Spend gold to train a companion. Higher levels mean more damage, health and healing. Train whoever is cheapest to start.', target: '#seats .buy:not([disabled])', tab: 'party', ready: () => S.gold >= 10, done: c => sumLevels() > c.levels, noNext: true },
+    { id: 'abil', title: 'Abilities', text: 'Each class has a special move. They fire by themselves, or press keys 1 to 5 (or tap them) to use one right when you need it.', target: '#abilities', ready: () => true },
+    { id: 'order', title: 'Marching order', text: 'The top of this list stands at the front. Keep your tank up front, healers in the middle so they reach everyone, and watch the back for ambushes.', target: '.formhead', tab: 'party', ready: () => S.party.filter(Boolean).length >= 2 },
+    { id: 'boss', title: 'Guardians', text: 'Every fifth floor has a guardian. Beat it before the lantern oil runs out, or your party falls back to train and try again.', target: '#lanternwrap', ready: () => S.foe && S.foe.boss },
+    { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor and trinkets. Open Gear to put them on. Each piece fits one class, and green tags show upgrades.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
+    { id: 'map', title: 'Map of the Deep', text: 'See how far you have come, which guardians you have beaten, and travel back to any floor you have reached.', target: '#btn-map', ready: () => S.maxFloorEver >= 8 },
+    { id: 'end', title: 'You are ready', text: 'That is the basics. The story will introduce new companions as you descend. Open the Guide (the ? at the top) any time for the details.', target: '#btn-guide', ready: () => true },
+  ];
+  let coachCtx = null, coachEl = null;
+  function tutState() { S.tut = S.tut || { i: 0, done: false }; return S.tut; }
+  function coachHide() { $('coach').hidden = true; if (coachEl) coachEl.classList.remove('tut-hi'); coachEl = null; }
+  function coachShow(step, i) {
+    if (step.tab && tab !== step.tab) switchTab(step.tab);
+    const el = document.querySelector(step.target);
+    if (!el || !el.offsetParent) { coachHide(); return; }
+    if (coachEl !== el) {
+      if (coachEl) coachEl.classList.remove('tut-hi'); coachEl = el; el.classList.add('tut-hi');
+      const r0 = el.getBoundingClientRect(), roomBottom = innerWidth <= 720 ? innerHeight - 190 : innerHeight - 20;
+      if (r0.top < 60 || r0.bottom > roomBottom) el.scrollIntoView({ block: innerWidth <= 720 ? 'start' : 'center', behavior: 'smooth' });
+    }
+    $('coachstep').textContent = 'Tutorial ' + (i + 1) + ' of ' + TUT.length;
+    $('coachtitle').textContent = step.title; $('coachtext').textContent = step.text;
+    $('coachnext').hidden = !!step.noNext; $('coachnext').textContent = i === TUT.length - 1 ? 'Got it' : 'Next';
+    const c = $('coach'); c.hidden = false;
+    if (innerWidth <= 720) { c.style.left = '12px'; c.style.right = '12px'; c.style.top = 'auto'; c.style.bottom = '12px'; c.classList.remove('up'); return; }
+    const r = el.getBoundingClientRect(), cw = c.offsetWidth, ch = c.offsetHeight;
+    let top = r.bottom + 14, up = false;
+    if (top + ch > innerHeight - 10) { top = r.top - ch - 14; up = true; }
+    const left = Math.max(10, Math.min(innerWidth - cw - 10, r.left + r.width / 2 - cw / 2));
+    c.style.left = left + 'px'; c.style.top = Math.max(10, top) + 'px'; c.style.right = 'auto'; c.style.bottom = 'auto';
+    c.style.setProperty('--ax', Math.max(16, Math.min(cw - 16, r.left + r.width / 2 - left)) + 'px'); c.classList.toggle('up', up);
+  }
+  function coachTick() {
+    const st = tutState();
+    if (st.done || !S.hero || !$('modal').hidden || sceneOpen) { coachHide(); return; }
+    const step = TUT[st.i]; if (!step) { st.done = true; coachHide(); return; }
+    if (!coachCtx || coachCtx.i !== st.i) { if (!step.ready()) { coachHide(); return; } coachCtx = { i: st.i, clicks: S.stats.clicks, levels: sumLevels() }; }
+    if (step.done && step.done(coachCtx)) { coachAdvance(); return; }
+    coachShow(step, st.i);
+  }
+  function coachAdvance() { const st = tutState(); st.i++; coachCtx = null; coachHide(); if (st.i >= TUT.length) { st.done = true; save(); } setTimeout(coachTick, 400); }
+  $('coachnext').addEventListener('click', coachAdvance);
+  $('coachskip').addEventListener('click', () => { const st = tutState(); st.done = true; coachHide(); save(); toast('book', 'Tutorial skipped', 'Open the Guide (the ? at the top) whenever you want a refresher.', ''); });
+  // Veterans who loaded an existing save skip straight past the tutorial.
+  if (S.hero && !S.tut && S.maxFloorEver > 10) S.tut = { i: TUT.length, done: true };
+  setInterval(coachTick, 600);
+  window.addEventListener('resize', () => { if (!$('coach').hidden) coachTick(); });
+
+  const GUIDE = [
+    ['The basics', '<p>Your party fights the monster in the arena on its own. Tap the arena (or press Space) to strike as well. Each floor has 8 monsters; clear them to go deeper.</p><p>Monsters drop <b>gold</b>. Spend it in the Party tab to <b>train</b> your companions. Every 25 levels a companion gets a big power boost.</p><p>The game keeps going while you are away. When you come back, your party brings home the gold it earned.</p>'],
+    ['Your party and classes', '<p>You lead a party of five. You meet companions in the story; tap any portrait to read about them.</p><ul><li><b>Tank</b>: takes the hits. Shield Wall cuts damage by 70%.</li><li><b>Healer</b>: keeps everyone standing. Lantern Hymn heals the party and lifts a fallen ally.</li><li><b>Rogue</b>: the most damage, and dodges a quarter of attacks. Backstab hits for 12 seconds of damage at once.</li><li><b>Mage</b>: Ember Storm quadruples damage for a few seconds. Save it for guardians.</li><li><b>Necromancer</b>: raises skeletons that fight and soak up blows, and heals the party as it hits.</li></ul><p>Abilities fire by themselves. Turn that off under the arena and press 1 to 5 to time them yourself.</p>'],
+    ['Marching order', '<p>The Party list is your marching order. The top member stands at the front, nearest the monster. Use the arrows to move people, or Auto-arrange.</p><ul><li>A <b>tank</b> in the front two draws the attacks. Without one, whoever is in front gets hit most.</li><li>Heals get <b>15% weaker per step</b> between healer and patient, so healers belong in the middle.</li><li>Some monsters <b>ambush</b> from behind and hit the rear member hard. A tank at the back guards against it.</li></ul><p>The notes under the list tell you how your current order is doing.</p>'],
+    ['Monsters and guardians', '<p>Monsters hit back. If your whole party falls, it retreats a floor, rests, and tries again in a little over a minute. Use that time to train and check gear.</p><p>Every 5th floor has a <b>guardian</b>. You must beat it before the lantern oil runs out. Guardians drop better gear and, from floor 10, sometimes a relic.</p><p>Soldiers from the Grand War alliances (marked with their banner) are tougher than normal monsters and drop more.</p>'],
+    ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and goes in a weapon, armor or trinket slot.</p><p>In the Gear tab, pick a companion to see what fits them. Green tags mean an upgrade, and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
+    ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten and where you are. Tap a floor you have reached to travel there.</p>'],
+    ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 25 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
+    ['Multiplayer and chat', '<p>With a free account your progress is saved online and works on any device.</p><p>In <b>Multiplayer</b>, your hero appears on a board where other players can recruit it, and you earn gold each time. You can recruit their heroes too. Player heroes are stronger than story companions.</p><p><b>Chat</b> (the speech bubble) has Global, Trade and Party channels. Ctrl+click an item to link it. Tap a name to mute or report. No web links, and be kind.</p>'],
+    ['Controls', '<ul><li><b>Tap the arena, Space or Enter</b>: strike</li><li><b>1 to 5</b>: use an ability</li><li><b>Ctrl+click an item</b>: link it in chat</li><li><b>Arrows on the floor header</b>: move between floors you have reached</li></ul>'],
+  ];
+  function openGuide() {
+    modal('<div class="maphead"><div><h2>Delver’s Guide</h2><small>Everything you need to know about the descent.</small></div><button class="iconbtn" id="g-x" aria-label="Close guide">&times;</button></div>' +
+      '<div class="guide">' + GUIDE.map(([t, h], i) => '<details' + (i === 0 ? ' open' : '') + '><summary>' + t + '</summary><div>' + h + '</div></details>').join('') + '</div>' +
+      '<div class="row"><button class="btn ghost" id="g-tut">Replay the tutorial</button><button class="btn" id="g-ok">Close</button></div>', md => {
+        md.querySelector('#g-x').onclick = closeModal; md.querySelector('#g-ok').onclick = closeModal;
+        md.querySelector('#g-tut').onclick = () => { S.tut = { i: 0, done: false }; coachCtx = null; closeModal(); switchTab('party'); save(); };
+      });
+  }
+  $('btn-guide').addEventListener('click', openGuide);
   // ---------- boot ----------
   resize();
   window.addEventListener('resize', resize);

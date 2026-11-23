@@ -441,7 +441,7 @@
   function classTag(cls) { return '<span class="ctag c-' + cls + '">' + L.CLASSES[cls].name + '</span>'; }
   function portrait(id) {
     const m = L.memberById(id);
-    return '<div class="ic c-' + m.cls + (m.player ? ' player' : '') + '">' + icon(CLASS_ICON[m.cls]) + '</div>';
+    return '<div class="ic c-' + m.cls + (m.player ? ' player' : '') + '" data-prof="' + id + '" role="button" tabindex="0" title="About ' + esc(m.name) + '">' + icon(CLASS_ICON[m.cls]) + '</div>';
   }
   function memberStatsLine(id, now) {
     const m = L.memberById(id), L_ = L.lvl(S, id);
@@ -478,7 +478,7 @@
         btn = '<button class="buy" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button>';
       } else btn = '<button class="btn ghost small" data-dismiss="' + id + '">Dismiss</button>';
       html += '<div class="seat' + (down ? ' down' : '') + (m.player ? ' mine' : '') + '">' + portrait(id) +
-        '<div class="info"><div class="nm">' + esc(m.name) + ' ' + classTag(m.cls) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
+        '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
         '<div class="lv">' + (down ? 'Fallen. Back up in ' + Math.ceil((down - now) / 1000) + 's' : memberStatsLine(id, now)) + '</div>' +
         '<div class="hpbar"><i data-hp="' + id + '"></i></div></div>' + btn +
         (i > 0 && !guest ? '<button class="mini" data-unseat="' + i + '" title="Send to camp" aria-label="Send to camp">&times;</button>' : '') + '</div>';
@@ -489,11 +489,12 @@
     $('benchwrap').hidden = !bench.length;
     const benchHtml = bench.map(id => {
       const m = L.memberById(id);
-      return '<div class="seat bench">' + portrait(id) + '<div class="info"><div class="nm">' + esc(m.name) + ' ' + classTag(m.cls) + '</div><div class="lv">' + esc(m.title) + ' &middot; Level ' + L.lvl(S, id) + '</div><div class="line">' + esc(m.line) + '</div></div><button class="btn small" data-seat="' + id + '">Bring along</button></div>';
+      return '<div class="seat bench">' + portrait(id) + '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + '</div><div class="lv">' + esc(m.title) + ' &middot; Level ' + L.lvl(S, id) + '</div><div class="line">' + esc(m.line) + '</div></div><button class="btn small" data-seat="' + id + '">Bring along</button></div>';
     }).join('');
     if ($('bench').dataset.h !== benchHtml) { $('bench').innerHTML = benchHtml; $('bench').dataset.h = benchHtml; }
   }
   $('tab-party').addEventListener('click', e => {
+    const pf = e.target.closest('[data-prof]'); if (pf) { profileModal(pf.dataset.prof); return; }
     const t = e.target.closest('button'); if (!t) return;
     if (t.dataset.train) { if (L.train(S, t.dataset.train, buyN())) { sfx.buy(); updateSeats(true); } }
     else if (t.dataset.unseat) { L.unseat(S, +t.dataset.unseat); updateSeats(true); updateAbilities(true); }
@@ -580,44 +581,83 @@
     if (it.slot === 'armor') return pct(p) + ' health';
     return it.cls === 'healer' ? pct(p) + ' healing, ' + pct(p / 2) + ' health' : pct(p / 2) + ' damage and health';
   }
-  function itemChip(it, extra) {
+  function itemChip(it, extra, cls) {
     const w = L.wearer(S, it.uid);
-    return '<button class="item r-' + it.rar + '" data-item="' + it.uid + '">' + icon(SLOT_ICON[it.slot]) + '<span><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.CLASSES[it.cls].name + ' &middot; ' + itemEffect(it) + (w ? ' &middot; worn by ' + esc(L.memberById(w).name) : '') + '</small></span>' + (extra || '') + '</button>';
+    return '<div class="item r-' + it.rar + (cls ? ' ' + cls : '') + '" data-item="' + it.uid + '" role="button" tabindex="0">' + icon(SLOT_ICON[it.slot]) + '<span><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.SLOT_NAME[it.slot] + ' &middot; ' + itemEffect(it) + (w ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(w).name) + '</i>' : '') + '</small></span>' + (extra || '') + '</div>';
   }
+  // How an item compares to what this member wears in that slot, in gear percent.
+  function compareTag(it, id) {
+    const cur = (S.gear[id] || {})[it.slot], ci = cur && L.itemOf(S, cur);
+    if (ci && ci.uid === it.uid) return '<span class="cmp eq">Equipped</span>';
+    const d = Math.round((L.gearPct(it) - (ci ? L.gearPct(ci) : 0)) * 100);
+    return d > 0 ? '<span class="cmp up">&#9650; ' + d + '% better</span>' : d < 0 ? '<span class="cmp down">&#9660; ' + (-d) + '% worse</span>' : '<span class="cmp eq">Same</span>';
+  }
+  const gearOwners = () => S.unlocked.filter(id => { const m = L.memberById(id); return m && !m.guest; });
   function updateGear(force) {
-    const who = S.unlocked.filter(id => L.memberById(id));
+    const who = gearOwners();
     if (!who.includes(gearWho)) gearWho = who[0];
     $('gearcount').textContent = S.bag.length ? S.bag.length : '';
     if (!gearWho) return;
-    const key = gearWho + '|' + S.bag.length + '|' + JSON.stringify(S.gear) + '|' + S.bag.map(x => x.up).join('') + '|' + Math.floor(S.gold / 1) ;
+    const key = gearWho + '|' + S.bag.length + '|' + JSON.stringify(S.gear) + '|' + S.bag.map(x => x.up).join('') + '|' + S.unlocked.length + '|' + Math.floor(S.gold);
     if (!force && key === gearKey) return; gearKey = key;
-    $('gearwho').innerHTML = who.map(id => '<button class="' + (id === gearWho ? 'on' : '') + '" data-who="' + id + '">' + esc(L.memberById(id).name) + '</button>').join('');
-    const m = L.memberById(gearWho), g = S.gear[gearWho] || {};
+    $('gearwho').innerHTML = who.map(id => {
+      const m = L.memberById(id), n = Object.keys(L.betterFor(S, id)).length;
+      return '<button class="whochip c-' + m.cls + (id === gearWho ? ' on' : '') + '" data-who="' + id + '">' + icon(CLASS_ICON[m.cls]) + '<span>' + esc(m.name) + '</span>' + (n ? '<em title="Better gear in your pack">' + n + '</em>' : '') + '</button>';
+    }).join('');
+    const m = L.memberById(gearWho), g = S.gear[gearWho] || {}, cname = L.CLASSES[m.cls].name;
     const set = L.SETS.find(x => x.cls === m.cls), sc = L.setCount(S, gearWho, set.id);
-    $('gearslots').innerHTML = L.SLOTS.map(sl => {
+    const better = L.betterFor(S, gearWho), nb = Object.keys(better).length;
+    let h = '<div class="gearhead">' + portrait(gearWho) + '<div><b>' + esc(m.name) + '</b> ' + classTag(m.cls) + '<small>Can wear <b>' + cname + '</b> gear only. Tap any piece for details.</small></div>' +
+      '<button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
+    h += L.SLOTS.map(sl => {
       const it = g[sl] && L.itemOf(S, g[sl]);
-      return '<div class="slot"><span class="slab">' + L.SLOT_NAME[sl] + '</span>' + (it ? itemChip(it) : '<div class="item none">' + icon(SLOT_ICON[sl]) + '<span><b>Nothing equipped</b><small>Find ' + L.CLASSES[m.cls].name.toLowerCase() + ' gear in the dungeon.</small></span></div>') + '</div>';
-    }).join('') + '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span>' + sc + '/3</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>';
-    const items = S.bag.slice().sort((a, b) => (b.cls === m.cls) - (a.cls === m.cls) || L.gearPct(b) - L.gearPct(a));
+      const hint = better[sl] ? '<span class="cmp up">Upgrade in pack</span>' : '';
+      return '<div class="slot"><span class="slab">' + L.SLOT_NAME[sl] + '</span>' + (it ? itemChip(it, hint) : '<div class="item none">' + icon(SLOT_ICON[sl]) + '<span><b>Empty</b><small>' + (better[sl] ? 'You have one in your pack.' : 'No ' + cname.toLowerCase() + ' ' + L.SLOT_NAME[sl].toLowerCase() + ' found yet.') + '</small></span>' + hint + '</div>') + '</div>';
+    }).join('') + '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span>' + sc + '/3</span><small>' + cname + ' set. 2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>';
+    $('gearslots').innerHTML = h;
     $('bagcount').textContent = S.bag.length + '/' + L.GEAR_CAP;
-    $('bag').innerHTML = items.length ? items.map(it => itemChip(it)).join('') : '<p class="note">Your pack is empty. Gear drops from foes, chests and guardians.</p>';
+    const fits = S.bag.filter(it => it.cls === m.cls).sort((a, b) => L.gearPct(b) - L.gearPct(a));
+    const others = S.bag.filter(it => it.cls !== m.cls);
+    let bh = '<h4 class="packh">Fits ' + esc(m.name) + ' <em>' + fits.length + '</em></h4>';
+    bh += fits.length ? fits.map(it => {
+      const mine = L.wearer(S, it.uid) === gearWho;
+      return itemChip(it, compareTag(it, gearWho) + (mine ? '' : '<button class="btn small" data-equip="' + it.uid + '">Equip</button>'), mine ? 'mine' : '');
+    }).join('') : '<p class="note">No ' + cname.toLowerCase() + ' gear in your pack yet.</p>';
+    if (others.length) {
+      bh += '<details class="others"><summary>Other classes <em>' + others.length + '</em> <small>Gear for the rest of your roster. Pick that companion above to equip it.</small></summary>';
+      for (const c of L.CLASS_ORDER) {
+        const list = others.filter(it => it.cls === c); if (!list.length) continue;
+        const owners = who.filter(id => L.memberById(id).cls === c).map(id => esc(L.memberById(id).name));
+        bh += '<div class="ogroup"><span class="slab">' + L.CLASSES[c].name + ' gear' + (owners.length ? ' &middot; for ' + owners.join(', ') : ' &middot; nobody can wear this yet') + '</span>' + list.map(it => itemChip(it, '', 'dim')).join('') + '</div>';
+      }
+      bh += '</details>';
+    }
+    if (!S.bag.length) bh = '<p class="note">Your pack is empty. Gear drops from foes, chests and guardians.</p>';
+    const open = $('bag').querySelector('details.others[open]');
+    $('bag').innerHTML = bh;
+    if (open) { const d = $('bag').querySelector('details.others'); if (d) d.open = true; }
   }
   $('tab-gear').addEventListener('click', e => {
     const w = e.target.closest('[data-who]'); if (w) { gearWho = w.dataset.who; updateGear(true); return; }
+    const eq = e.target.closest('[data-equip]'); if (eq) { if (L.equip(S, gearWho, eq.dataset.equip)) { sfx.buy(); updateGear(true); updateSeats(true); } return; }
+    if (e.target.closest('#g-best')) { const n = L.equipBest(S, gearWho); if (n) { sfx.buy(); toast('gear-armor', 'Best gear on', n + (n === 1 ? ' piece' : ' pieces') + ' equipped on ' + L.memberById(gearWho).name + '.', ''); updateGear(true); updateSeats(true); } return; }
+    if (e.target.closest('.gearhead .ic')) { profileModal(gearWho); return; }
     const it = e.target.closest('[data-item]'); if (it) itemModal(it.dataset.item);
   });
+  ['tab-gear', 'tab-party'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof]')) { e.preventDefault(); e.target.click(); } }));
   function itemModal(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
-    const m = L.memberById(gearWho), w = L.wearer(S, uid);
+    let m = L.memberById(gearWho), w = L.wearer(S, uid);
+    if (m.cls !== it.cls) { const o = gearOwners().find(id => L.memberById(id).cls === it.cls); if (o) { gearWho = o; m = L.memberById(o); } }
     const set = it.set && L.SETS.find(x => x.id === it.set);
     const fits = m.cls === it.cls;
     const cost = L.upgradeCost(it), maxed = it.up >= L.UP_MAX;
     modal('<div class="itemhead r-' + it.rar + '">' + icon(SLOT_ICON[it.slot]) + '<div><h2>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</h2><small>' + L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + L.CLASSES[it.cls].name + ' only &middot; found on floor ' + it.ilvl + '</small></div></div>' +
       '<p class="effect">' + itemEffect(it) + '</p>' +
       (set ? '<div class="setinfo on"><b>' + set.name + '</b><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
-      (w ? '<p>Worn by ' + esc(L.memberById(w).name) + '.</p>' : '') +
+      (w ? '<p>Worn by ' + esc(L.memberById(w).name) + '.</p>' : fits ? '<p>' + compareTag(it, gearWho) + ' than what ' + esc(m.name) + ' wears now.</p>' : '') +
       '<div class="row">' +
-      (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>Fits a ' + L.CLASSES[it.cls].name + '</button>') +
+      (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>No ' + L.CLASSES[it.cls].name + ' in your roster yet</button>') +
       '<button class="btn ghost" id="i-up"' + (maxed || cost > S.gold ? ' disabled' : '') + '>' + (maxed ? 'Fully upgraded' : 'Upgrade for ' + fmt(cost) + ' gold') + '</button>' +
       '<button class="btn danger" id="i-sell">Salvage for ' + fmt(L.salvageValue(it)) + '</button></div>' +
       '<div class="row"><button class="btn ghost" id="i-close">Close</button></div>', md => {
@@ -627,6 +667,39 @@
         md.querySelector('#i-up').onclick = () => { if (L.upgrade(S, uid)) { sfx.relic(); re(); } };
         md.querySelector('#i-sell').onclick = () => { const v = L.salvage(S, uid); sfx.coin(); closeModal(); updateGear(true); toast('coin', 'Salvaged', '+' + fmt(v) + ' gold', ''); };
         md.querySelector('#i-close').onclick = closeModal;
+      });
+  }
+
+
+  // ---------- companion profile ----------
+  const SIDE_OF_MEMBER = id => { const m = L.memberById(id); if (id === 'you') return L.sideOf(S); return m.side || null; };
+  function profileModal(id) {
+    const m = L.memberById(id); if (!m) return;
+    const c = L.CLASSES[m.cls], now = Date.now(), side = SIDE_OF_MEMBER(id), sd = side && L.SIDES[side];
+    const guest = L.isGuest(S, id), lv = L.lvl(S, id) || 1, inParty = S.party.includes(id);
+    const stats = [['Level', lv], ['Health', fmt(L.maxHpOf(S, id))], ['Damage', fmt(L.memberDps(S, id, now) || 0) + '/s']];
+    if (m.cls === 'healer') stats.push(['Healing', fmt(L.healPerSec(S, id)) + '/s']);
+    if (c.armor) stats.push(['Blocks', Math.round(c.armor * 100) + '% of hits']);
+    if (c.dodge) stats.push(['Dodges', Math.round(c.dodge * 100) + '% of hits']);
+    if (c.drain) stats.push(['Life drain', 'heals party as it hits']);
+    stats.push(['Power', m.player ? 'Full (player hero)' : Math.round(L.NPC_POWER * 100) + '% (story companion)']);
+    const gear = S.gear[id] || {};
+    const gearList = L.SLOTS.map(sl => { const it = gear[sl] && L.itemOf(S, gear[sl]); return '<li><span>' + L.SLOT_NAME[sl] + '</span>' + (it ? '<b class="r-' + it.rar + '">' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b>' : '<i>Empty</i>') + '</li>'; }).join('');
+    const bio = id === 'you' ? 'That is you. You took the lantern from Old Thessaly and carried it down the stair' + (sd ? ', under the banner of the ' + sd.name : '') + '.'
+      : guest ? 'Another player’s hero, lent to your party. They fight at the level their owner trained them to. You cannot change their gear or train them.'
+      : (m.bio || m.line);
+    modal('<div class="prof"><div class="profhead"><div class="profspr c-' + m.cls + '"></div><div><h2>' + esc(m.name) + '</h2><small>' + esc(m.title) + '</small><div class="tags">' + classTag(m.cls) + (sd ? '<span class="sidetag" style="--side:' + sd.color + '">' + sd.name + '</span>' : '') + (guest ? '<span class="you guest">Player</span>' : '') + '</div></div></div>' +
+      '<p class="bio">' + esc(bio) + '</p>' + (m.line && !guest && id !== 'you' ? '<p class="quote">“' + esc(m.line) + '”</p>' : '') +
+      '<h3 class="sub">' + c.name + '</h3><p class="note">' + esc(CLASS_BLURB[m.cls]) + '</p>' +
+      '<div class="ability"><b>' + c.ability.name + '</b> <span>every ' + c.ability.cd + 's</span><small>' + esc(c.ability.desc) + '</small></div>' +
+      '<div class="pstats">' + stats.map(([k, v]) => '<div><span>' + k + '</span><b>' + v + '</b></div>').join('') + '</div>' +
+      (sd ? '<p class="note">' + sd.name + ': “' + sd.motto + '” ' + esc(sd.desc) + '</p>' : '') +
+      (guest ? '' : '<h3 class="sub">Gear</h3><ul class="pgear">' + gearList + '</ul>') +
+      '<div class="row">' + (guest ? '' : '<button class="btn ghost" id="p-gear">Manage gear</button>') + (!inParty && !guest ? '<button class="btn" id="p-seat">Bring along</button>' : '') + '<button class="btn ghost" id="p-close">Close</button></div></div>', md => {
+        const box = md.querySelector('.profspr'); try { const img = SP.render(m.cls, 5, m.hue || 0); if (img) box.appendChild(img); } catch (e) {}
+        const g = md.querySelector('#p-gear'); if (g) g.onclick = () => { closeModal(); gearWho = id; switchTab('gear'); };
+        const st = md.querySelector('#p-seat'); if (st) st.onclick = () => { closeModal(); pickSeat(id); };
+        md.querySelector('#p-close').onclick = closeModal;
       });
   }
 

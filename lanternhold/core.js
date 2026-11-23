@@ -30,16 +30,16 @@
   // ---------- recruits ----------
   // tier scales stats and cost; later recruits are stronger alternatives.
   const MEMBERS = [
-    { id: 'oduya',   name: 'Oduya',     title: 'Covenant Gravewarden', side: 'covenant', cls: 'tank',   tier: 0, hue: 0,    line: 'Iron Covenant to the bone. Has held worse lines than this. Twice.' },
-    { id: 'moss',    name: 'Moss',      title: 'Mercy Corps Medic',    side: 'mercy',    cls: 'healer', tier: 0, hue: 0,    line: 'Mercy Corps patches up anyone who bleeds. Even you.' },
-    { id: 'kestrel', name: 'Kestrel',   title: 'Unsworn Cutpurse',     side: 'unsworn',  cls: 'rogue',  tier: 0, hue: 0,    line: 'Sworn to no alliance. Loyal to whoever is paying today.' },
-    { id: 'wren',    name: 'Wren',      title: 'Ascendancy Apprentice', side: 'radiant', cls: 'mage',   tier: 0, hue: 0,    line: 'Radiant Ascendancy scholar. Looking for her master. Burning things meanwhile.' },
-    { id: 'vael',    name: 'Vael',      title: 'Tide Deserter',        side: 'tide',     cls: 'necro',  tier: 0, hue: 0,    line: 'Walked out of the Devouring Tide. Nobody walks out of the Tide.' },
-    { id: 'ashe',    name: 'Sir Ashe',  title: 'Covenant Cinder Knight', side: 'covenant', cls: 'tank', tier: 1, hue: -30,  line: 'Held the Forges for the Covenant for forty years. Still burning.' },
-    { id: 'oracle',  name: 'The Pale Oracle', title: 'Ascendancy Seer', side: 'radiant', cls: 'healer', tier: 1, hue: 160, line: 'Has watched the Rift for the Ascendancy since before the war. Knows how this ends.' },
-    { id: 'varga',   name: 'Varga',     title: 'Tide Knife for Hire',  side: 'tide',     cls: 'rogue',  tier: 1, hue: 150,  line: 'Kestrel’s sister. Took Tide coin. Charges double for family.' },
-    { id: 'brann',   name: 'Brann',     title: 'Covenant Runesmith',   side: 'covenant', cls: 'mage',   tier: 1, hue: 180,  line: 'Carved the seal-wards that keep the Rift shut. Regrets some of them.' },
-    { id: 'hollow',  name: 'The Hollow King', title: 'The First Bearer', side: 'unsworn', cls: 'necro', tier: 1, hue: 60, line: 'The first lantern-bearer. Fed to the seal. Came back anyway.' },
+    { id: 'oduya',   name: 'Oduya',     title: 'Covenant Gravewarden', side: 'covenant', cls: 'tank',   tier: 0, hue: 0,    bio: 'Oduya was posted to the Hold by the Iron Covenant twenty years ago and told to hold the stair. Nobody ever came to relieve her, so she never left. She speaks rarely, and only in short orders.', line: 'Iron Covenant to the bone. Has held worse lines than this. Twice.' },
+    { id: 'moss',    name: 'Moss',      title: 'Mercy Corps Medic',    side: 'mercy',    cls: 'healer', tier: 0, hue: 0,    bio: 'A Mercy Corps field medic who followed the war underground because that was where people were bleeding. She is kind, stubborn and a little bit frightening with a needle.', line: 'Mercy Corps patches up anyone who bleeds. Even you.' },
+    { id: 'kestrel', name: 'Kestrel',   title: 'Unsworn Cutpurse',     side: 'unsworn',  cls: 'rogue',  tier: 0, hue: 0,    bio: "An Unsworn thief from the Hold's lower streets. She came down for the lantern's price and stayed because, for once, nobody was paying her to leave.", line: 'Sworn to no alliance. Loyal to whoever is paying today.' },
+    { id: 'wren',    name: 'Wren',      title: 'Ascendancy Apprentice', side: 'radiant', cls: 'mage',   tier: 0, hue: 0,    bio: 'A third-circle scholar of the Radiant Ascendancy, chasing a master who went down a year ago. She is brilliant, impatient, and sets things on fire when she is nervous.', line: 'Radiant Ascendancy scholar. Looking for her master. Burning things meanwhile.' },
+    { id: 'vael',    name: 'Vael',      title: 'Tide Deserter',        side: 'tide',     cls: 'necro',  tier: 0, hue: 0,    bio: "Once Wren's master and an Ascendancy researcher. The Rift changed him, the Devouring Tide recruited him, and he walked away from both. The dead listen to him now.", line: 'Walked out of the Devouring Tide. Nobody walks out of the Tide.' },
+    { id: 'ashe',    name: 'Sir Ashe',  title: 'Covenant Cinder Knight', side: 'covenant', cls: 'tank', tier: 1, hue: -30,  bio: 'A Covenant knight of the Forge Garrison who held the Cinder Forges alone for forty years. His armour never cooled. Neither did his temper.', line: 'Held the Forges for the Covenant for forty years. Still burning.' },
+    { id: 'oracle',  name: 'The Pale Oracle', title: 'Ascendancy Seer', side: 'radiant', cls: 'healer', tier: 1, hue: 160, bio: 'An Ascendancy seer who stayed in the drowned chapel to watch the Rift. She has seen most of the ways this ends and chooses to help anyway.', line: 'Has watched the Rift for the Ascendancy since before the war. Knows how this ends.' },
+    { id: 'varga',   name: 'Varga',     title: 'Tide Knife for Hire',  side: 'tide',     cls: 'rogue',  tier: 1, hue: 150,  bio: "Kestrel's older sister and a knife for hire who took Tide coin and Thessaly's coin at the same time. Family won in the end, narrowly.", line: 'Kestrel’s sister. Took Tide coin. Charges double for family.' },
+    { id: 'brann',   name: 'Brann',     title: 'Covenant Runesmith',   side: 'covenant', cls: 'mage',   tier: 1, hue: 180,  bio: 'The Covenant runesmith who carved the seal-wards around the lantern. He knows exactly what they hold in and is trying to make up for it.', line: 'Carved the seal-wards that keep the Rift shut. Regrets some of them.' },
+    { id: 'hollow',  name: 'The Hollow King', title: 'The First Bearer', side: 'unsworn', cls: 'necro', tier: 1, hue: 60, bio: 'The very first lantern-bearer, fed to the seal before the Grand War had a name. He came back hollow and crowned. He wants his name back.', line: 'The first lantern-bearer. Fed to the seal. Came back anyway.' },
   ];
   // The Grand War alliances, as they appear on the Lantern Deep front.
   const SIDES = {
@@ -404,7 +404,7 @@
   function wearer(s, uid) { for (const id in s.gear) for (const sl of SLOTS) if (s.gear[id][sl] === uid) return id; return null; }
   function equip(s, id, uid) {
     const it = itemOf(s, uid); if (!it) return false;
-    const m = memberById(id); if (!m || m.cls !== it.cls) return false;
+    const m = memberById(id); if (!m || m.guest || m.cls !== it.cls) return false;
     const prev = wearer(s, uid); if (prev) delete s.gear[prev][it.slot];
     s.gear[id] = s.gear[id] || {};
     const before = maxHpOf(s, id);
@@ -427,6 +427,18 @@
     s.bag = s.bag.filter(x => x !== it);
     const v = salvageValue(it); s.gold += v; return v;
   }
+  // Best unworn-or-own item per slot for a member, if it beats what they wear.
+  function betterFor(s, id) {
+    const m = memberById(id); if (!m || m.guest) return {};
+    const g = equipped(s, id), out = {};
+    for (const sl of SLOTS) {
+      const cur = g[sl] && itemOf(s, g[sl]); let best = null, bp = cur ? gearPct(cur) : 0;
+      for (const it of s.bag) if (it.cls === m.cls && it.slot === sl && !wearer(s, it.uid) && gearPct(it) > bp) { best = it; bp = gearPct(it); }
+      if (best) out[sl] = best;
+    }
+    return out;
+  }
+  function equipBest(s, id) { const b = betterFor(s, id); let n = 0; for (const sl in b) if (equip(s, id, b[sl].uid)) n++; return n; }
   function setCount(s, id, setId) { const g = equipped(s, id); let n = 0; for (const sl of SLOTS) { const it = g[sl] && itemOf(s, g[sl]); if (it && it.set === setId) n++; } return n; }
   function setBonus(s, id) {
     const m = memberById(id); if (!m) return 0;
@@ -850,7 +862,7 @@
   }
 
   const api = {
-    VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
+    VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, SLOTS, SLOT_NAME, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,

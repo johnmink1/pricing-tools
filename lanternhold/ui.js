@@ -3954,7 +3954,7 @@
     try {
       // The hero board row must exist first (it holds the name); publishing is quick and harmless.
       if (Date.now() - rg.sent > 5 * 6e4) { try { await api('PUT', { name: S.hero.name, cls: S.hero.cls, side: S.hero.side, level: L.lvl(S, 'you'), floor: S.maxFloorEver }, '/hero'); } catch (e) {} await api('PUT', ringBuild(), '/arena'); rg.sent = Date.now(); }
-      rg.st = await api('GET', null, '/arena'); rg.at = Date.now();
+      const st = await api('GET', null, '/arena'); if (!st) throw 0; rg.st = st; rg.at = Date.now();
       ringDefenseNews();
     } catch (e) { rg.err = 'The Ring could not be reached right now. Try again in a minute.'; }
     rg.busy = false; paintRing();

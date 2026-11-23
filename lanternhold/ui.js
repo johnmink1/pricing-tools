@@ -1,4 +1,4 @@
-/* lh-build 202611232146 */
+/* lh-build 202611232148 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2064,6 +2064,7 @@
         '<p class="setnote">Pick tracks, set the volume or mute from the <button class="linkbtn" id="s-musicpanel">music player</button> (the note button at the top).</p>' : '') +
       '<p style="margin-top:16px">Your progress saves automatically in this browser. Copy a backup to move it to another device.</p>' +
       '<div class="row"><button class="btn ghost" id="s-export">Copy backup</button><button class="btn ghost" id="s-import">Load backup</button><button class="btn danger" id="s-reset">Erase progress</button></div>' +
+      '<div class="row"><button class="btn ghost" id="s-intro">Watch the intro</button></div>' +
       '<div id="s-extra"></div>' +
       (window.LH_SUPPORT_URL ? '<p style="margin-top:16px">Lanternhold is free with no ads. If you enjoy it, you can <a style="color:var(--gold)" target="_blank" rel="noopener" href="' + window.LH_SUPPORT_URL + '">buy the developer a coffee</a>. Thank you.</p>' : '') +
       '<p class="credits">Lanternhold &middot; A Grand War game by Born 2 Game, LLC. &copy; 2026 Born 2 Game, LLC. Made with care, no ads, no tracking.</p>' +
@@ -2074,6 +2075,7 @@
           m.querySelector('#s-musicpanel').onclick = () => { closeModal(); LHMusic.open(); };
         }
         m.querySelector('#s-close').onclick = () => { save(); closeModal(); };
+        m.querySelector('#s-intro').onclick = () => { save(); closeModal(); if (window.LHIntro) LHIntro.play(); };
         m.querySelector('#s-export').onclick = () => {
           save(); const code = btoa(unescape(encodeURIComponent(localStorage.getItem(SAVE_KEY) || '')));
           m.querySelector('#s-extra').innerHTML = '<p>Your backup code:</p><textarea readonly></textarea>';
@@ -3482,7 +3484,7 @@
     return head.indexOf('lh-build ' + b) >= 0;
   }
   async function allFresh(b) {
-    for (const f of ['./', 'ui.js', 'core.js', 'sprites.js', 'vector.js', 'music.js', 'style.css']) if (!(await hasMark(f, b))) return false;
+    for (const f of ['./', 'ui.js', 'core.js', 'sprites.js', 'vector.js', 'music.js', 'intro.js', 'style.css']) if (!(await hasMark(f, b))) return false;
     return true;
   }
   async function loadBuild(b) {
@@ -3843,6 +3845,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 65, date: 'November 23, 2026', title: 'Why we fight', items: [
+      'A new opening for Lanternhold: the Shattered Reach, the Nyx Rift, the five who answer the call, and why we fight.',
+      'It plays once on your first visit. Tap to move through it or skip it any time, and watch it again from Settings.'] },
     { v: 64, date: 'November 23, 2026', title: 'A slower, deeper descent', items: [
       'Lanternhold is now paced to be savored, not rushed. New parts of the game open as your hero levels up: Gear at 3, the Campfire at 5, map travel and market buying at 8, camp jobs at 10, the Players Guild at 12, the Ember Ring at 15, selling and the Sigil exchange at 18, rekindling at 20, and the world boss and job sets at 25.',
       'Each new region needs a hero level to enter. Until then your party keeps working the region it is in. Hero XP needs more per level, and deeper floors and guardians give the most.',

@@ -1,4 +1,4 @@
-/* lh-build 202611232146 */
+/* lh-build 202611232148 */
 /* Lanternhold music player. Original score, streamed one track at a time (nothing downloads until it plays).
    Settings live in localStorage "lh_music": {on, vol, idx, shuffle, muted}. window.LHMusic is the small API ui.js uses. */
 (function () {

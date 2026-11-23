@@ -51,8 +51,17 @@ exports.handler = async (e) => {
     return res(200, { ok: true, add, bal: bal + add, mask: nm });
   }
   // Lantern Pass: 500 Sigils for 30 days of convenience perks, stacking onto any time left.
+  // The same route sells a stat reset ({ what: 'respec' }) for 50 Sigils.
   if (e.routeKey === 'POST /store/pass') {
     const K = { userId: S(cl.sub) }, w = (await db.send(new D.GetItemCommand({ TableName: W, Key: K }))).Item;
+    if (b.what === 'respec') {
+      const bal = w && w.bal ? +w.bal.N : 100;
+      if (bal < 50) return res(400, { error: 'funds' });
+      try { await db.send(new D.UpdateItemCommand({ TableName: W, Key: K, UpdateExpression: 'SET bal = if_not_exists(bal, :g) - :c, own = if_not_exists(own, :o)', ConditionExpression: 'attribute_not_exists(bal) OR bal >= :c',
+        ExpressionAttributeValues: { ':g': N(100), ':c': N(50), ':o': { SS: ['f.plain'] } } })); }
+      catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'state' }); throw x; }
+      return res(200, { ok: true, bal: bal - 50 });
+    }
     const bal = w && w.bal ? +w.bal.N : 100, was = w && w.pass ? +w.pass.N : 0, until = Math.max(Date.now(), was) + 2592e6;
     if (bal < 500) return res(400, { error: 'funds' });
     try {

@@ -194,7 +194,7 @@ Resources:
       Code:
         ZipFile: |
           // built from infra/lambda/heroes.js by infra/build.py
-          const{DynamoDBClient:f,UpdateItemCommand:m,ScanCommand:S}=require("@aws-sdk/client-dynamodb"),N=require("crypto"),d=new f({}),l=process.env.TABLE,x=["tank","healer","rogue","mage","necro"],w=["covenant","radiant","tide","mercy","unsworn"],E=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn)/i,n=(t,u)=>({statusCode:t,headers:{"content-type":"application/json"},body:JSON.stringify(u)}),y=t=>N.createHash("sha256").update("lh:"+t).digest("hex").slice(0,16);exports.handler=async t=>{const u=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!u||!u.sub)return n(401,{error:"not signed in"});const c=y(u.sub),p=t.routeKey;let s={};if(t.body)try{s=JSON.parse(t.isBase64Encoded?Buffer.from(t.body,"base64").toString():t.body)}catch{return n(400,{error:"bad json"})}if(p==="PUT /hero"){const r=String(s.name||"").trim();if(!/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(r)||E.test(r.replace(/[^a-z]/gi,"")))return n(400,{error:"name"});if(!x.includes(s.cls))return n(400,{error:"class"});const a=Math.max(1,Math.min(1e5,Math.floor(Number(s.floor)||1))),o=Math.max(1,Math.min(50+a*8,Math.floor(Number(s.level)||1))),e=w.includes(s.side)?s.side:"unsworn";let i;try{i=await d.send(new m({TableName:l,Key:{pid:{S:c}},UpdateExpression:"SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z, u = :u",ConditionExpression:"attribute_not_exists(ban)",ExpressionAttributeNames:{"#n":"name"},ExpressionAttributeValues:{":n":{S:r},":c":{S:s.cls},":l":{N:String(o)},":f":{N:String(a)},":s":{S:e},":t":{N:String(Date.now())},":z":{N:"0"},":u":{S:u.sub}},ReturnValues:"UPDATED_OLD"}))}catch(b){if(b.name==="ConditionalCheckFailedException")return n(403,{error:"banned"});throw b}const h=i.Attributes&&i.Attributes.recruits;return n(200,{ok:!0,id:c,recruits:h?Number(h.N):0})}if(p==="GET /heroes"){const r=await d.send(new S({TableName:l,Limit:300})),a=Date.now()-30*864e5;let o=(r.Items||[]).filter(e=>e.pid.S!==c&&e.name&&e.seen&&Number(e.seen.N)>a).map(e=>({id:e.pid.S,name:e.name.S,cls:e.cls.S,level:Number(e.lv.N),floor:Number(e.fl.N),side:e.sd?e.sd.S:"unsworn",on:Date.now()-Number(e.seen.N)<18e4}));for(let e=o.length-1;e>0;e--){const i=Math.floor(Math.random()*(e+1));[o[e],o[i]]=[o[i],o[e]]}return o.sort((e,i)=>i.on-e.on),n(200,{heroes:o.slice(0,10)})}if(p==="POST /recruit"){const r=String(s.heroId||"");if(!/^[0-9a-f]{16}$/.test(r)||r===c)return n(400,{error:"hero"});try{await d.send(new m({TableName:l,Key:{pid:{S:r}},UpdateExpression:"ADD recruits :one",ConditionExpression:"attribute_exists(pid)",ExpressionAttributeValues:{":one":{N:"1"}}}))}catch(a){if(a.name==="ConditionalCheckFailedException")return n(404,{error:"no hero"});throw a}return await d.send(new m({TableName:l,Key:{pid:{S:r}},UpdateExpression:"ADD pin :me",ExpressionAttributeValues:{":me":{SS:[c]}}})),await d.send(new m({TableName:l,Key:{pid:{S:c}},UpdateExpression:"ADD inv :id",ExpressionAttributeValues:{":id":{SS:[r]}}})),n(200,{ok:!0})}return n(404,{error:"not found"})};
+          const{DynamoDBClient:f,UpdateItemCommand:m,ScanCommand:S}=require("@aws-sdk/client-dynamodb"),N=require("crypto"),l=new f({}),d=process.env.TABLE,w=["tank","healer","rogue","mage","necro"],x=["covenant","radiant","tide","mercy","unsworn"],E=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn)/i,n=(t,u)=>({statusCode:t,headers:{"content-type":"application/json"},body:JSON.stringify(u)}),y=t=>N.createHash("sha256").update("lh:"+t).digest("hex").slice(0,16);exports.handler=async t=>{const u=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!u||!u.sub)return n(401,{error:"not signed in"});const c=y(u.sub),p=t.routeKey;let s={};if(t.body)try{s=JSON.parse(t.isBase64Encoded?Buffer.from(t.body,"base64").toString():t.body)}catch{return n(400,{error:"bad json"})}if(p==="PUT /hero"){const r=String(s.name||"").trim();if(!/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(r)||E.test(r.replace(/[^a-z]/gi,"")))return n(400,{error:"name"});if(!w.includes(s.cls))return n(400,{error:"class"});const i=Math.max(1,Math.min(1e5,Math.floor(Number(s.floor)||1))),o=Math.max(1,Math.min(50+i*8,Math.floor(Number(s.level)||1))),e=x.includes(s.side)?s.side:"unsworn";let a;try{a=await l.send(new m({TableName:d,Key:{pid:{S:c}},UpdateExpression:"SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z, u = :u",ConditionExpression:"attribute_not_exists(ban)",ExpressionAttributeNames:{"#n":"name"},ExpressionAttributeValues:{":n":{S:r},":c":{S:s.cls},":l":{N:String(o)},":f":{N:String(i)},":s":{S:e},":t":{N:String(Date.now())},":z":{N:"0"},":u":{S:u.sub}},ReturnValues:"UPDATED_OLD"}))}catch(b){if(b.name==="ConditionalCheckFailedException")return n(403,{error:"banned"});throw b}const h=a.Attributes&&a.Attributes.recruits;return n(200,{ok:!0,id:c,recruits:h?Number(h.N):0})}if(p==="GET /heroes"){const r=await l.send(new S({TableName:d,Limit:300})),i=Date.now()-30*864e5;let o=(r.Items||[]).filter(e=>e.pid.S!==c&&e.name&&e.seen&&Number(e.seen.N)>i).map(e=>({id:e.pid.S,name:e.name.S,cls:e.cls.S,level:Number(e.lv.N),floor:Number(e.fl.N),side:e.sd?e.sd.S:"unsworn",on:Date.now()-Number(e.seen.N)<18e4,pf:e.pf?JSON.parse(e.pf.S):null,w:e.wv&&e.wv.N==="1"?e.wl.S:""}));for(let e=o.length-1;e>0;e--){const a=Math.floor(Math.random()*(e+1));[o[e],o[a]]=[o[a],o[e]]}return o.sort((e,a)=>a.on-e.on),n(200,{heroes:o.slice(0,10)})}if(p==="POST /recruit"){const r=String(s.heroId||"");if(!/^[0-9a-f]{16}$/.test(r)||r===c)return n(400,{error:"hero"});try{await l.send(new m({TableName:d,Key:{pid:{S:r}},UpdateExpression:"ADD recruits :one",ConditionExpression:"attribute_exists(pid)",ExpressionAttributeValues:{":one":{N:"1"}}}))}catch(i){if(i.name==="ConditionalCheckFailedException")return n(404,{error:"no hero"});throw i}return await l.send(new m({TableName:d,Key:{pid:{S:r}},UpdateExpression:"ADD pin :me",ExpressionAttributeValues:{":me":{SS:[c]}}})),await l.send(new m({TableName:d,Key:{pid:{S:c}},UpdateExpression:"ADD inv :id",ExpressionAttributeValues:{":id":{SS:[r]}}})),n(200,{ok:!0})}return n(404,{error:"not found"})};
 
   ChatTable:
     Type: AWS::DynamoDB::Table
@@ -775,6 +775,207 @@ Resources:
       FunctionName: !Ref AdminFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  # Sigil wallets, owned cosmetics, profile looks and Grand War links. Kept out of the server wipe on purpose.
+  WalletsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: lanternhold-wallets
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      Tags:
+        - Key: app
+          Value: lanternhold
+
+  ProfileFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: tables
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:UpdateItem]
+                Resource: [!GetAtt HeroesTable.Arn, !GetAtt WalletsTable.Arn]
+
+  ProfileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-profile
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt ProfileFunctionRole.Arn
+      Environment:
+        Variables:
+          HEROES: !Ref HeroesTable
+          WALLETS: !Ref WalletsTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/profile.js by infra/build.py
+          const l=require("@aws-sdk/client-dynamodb"),N=require("crypto"),u=new l.DynamoDBClient({}),{HEROES:b,WALLETS:g}=process.env,E=Object.fromEntries("f.plain0 f.iron150 f.radiant150 f.tide150 f.mercy150 f.ember250 f.rift400 f.nexus600 t.delver0 t.lampbearer80 t.ashborn120 t.nightwatch120 t.riftwalker200 t.warden200 t.stormcaller200 t.oathkeeper250 t.heir400 c.none0 c.gold100 c.violet100 c.ember100 c.frost100 c.verdant100 c.rift300 g.night0 g.forge150 g.crypt150 g.glass150 g.storm200 g.rift350 g.nexus500 e.lantern0 e.shield0 e.sword0 e.skull40 e.flame40 e.wave40 e.sun40 e.moon40 e.star40 e.key40 e.anvil40 e.crown60 e.eye60 e.rose60 e.raven80 e.rift100".split(" ").map(r=>{const i=r.match(/^(.+?)(\d+)$/);return[i[1],+i[2]]})),T=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn|http|www\.|\.com)/i,s=(r,i,p)=>({statusCode:r,headers:Object.assign({"content-type":"application/json"},p),body:JSON.stringify(i)}),f=r=>({S:String(r)}),A=r=>N.createHash("sha256").update("lh:"+r).digest("hex").slice(0,16);exports.handler=async r=>{const i=r.routeKey,p=r.requestContext.authorizer&&r.requestContext.authorizer.jwt&&r.requestContext.authorizer.jwt.claims;if(!p||!p.sub)return s(401,{error:"auth"});let a={};if(r.body)try{a=JSON.parse(r.isBase64Encoded?Buffer.from(r.body,"base64").toString():r.body)}catch{return s(400,{error:"json"})}const S=A(p.sub),d={userId:f(p.sub)},h={pid:f(S)},w=async()=>(await u.send(new l.UpdateItemCommand({TableName:g,Key:d,ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = if_not_exists(bal, :g), own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":{N:"100"},":o":{SS:["f.plain"]}}}))).Attributes,x=async e=>(await u.send(new l.GetItemCommand({TableName:b,Key:{pid:f(e)}}))).Item,m=async(e,t)=>{await u.send(new l.UpdateItemCommand({TableName:b,Key:h,UpdateExpression:e,ConditionExpression:"attribute_exists(pid) AND attribute_not_exists(ban)",...t&&{ExpressionAttributeValues:t}})),await u.send(new l.UpdateItemCommand({TableName:g,Key:d,UpdateExpression:e,...t&&{ExpressionAttributeValues:t}}))},y=e=>({bal:+e.bal.N,own:e.own.SS,pf:e.pf?JSON.parse(e.pf.S):null,wl:e.wl?e.wl.S:"",wv:!!(e.wv&&e.wv.N==="1")});try{if(i==="GET /profile"){const e=await w(),t=await x(S);if(t&&!t.ban&&(e.pf&&!t.pf||e.wl&&!t.wl)){const n={},o=[];for(const c of["pf","wl","wv"])e[c]&&(n[":"+c]=e[c],o.push(c+" = :"+c));await u.send(new l.UpdateItemCommand({TableName:b,Key:h,UpdateExpression:"SET "+o.join(", "),ExpressionAttributeValues:n}))}return s(200,y(e))}if(i==="PUT /profile"){const e=new Set((await w()).own.SS),t=(o,c)=>c===""||E[o+"."+c]===0||e.has(o+"."+c),n={b:String(a.b||"").replace(/\s+/g," ").trim(),t:String(a.t||""),f:String(a.f||""),c:String(a.c||""),g:String(a.g||""),e:[...new Set(Array.isArray(a.e)?a.e.map(String):[])]};return n.b.length>140||T.test(n.b.replace(/[^a-z.\/]/gi,""))?s(400,{error:"bio"}):!t("t",n.t)||!t("f",n.f)||!t("c",n.c)||!t("g",n.g)||n.e.length>6||!n.e.every(o=>o&&t("e",o))?s(400,{error:"item"}):(await m("SET pf = :p",{":p":f(JSON.stringify(n))}),s(200,{ok:!0,pf:n}))}if(i==="POST /shop"){const e=String(a.id||""),t=E[e];if(!t)return s(400,{error:"item"});const n=await w();if(n.own.SS.includes(e))return s(409,{error:"owned"});if(+n.bal.N<t)return s(409,{error:"funds"});const o=await u.send(new l.UpdateItemCommand({TableName:g,Key:d,ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = bal - :p ADD own :s",ConditionExpression:"bal >= :p AND NOT contains(own, :i)",ExpressionAttributeValues:{":p":{N:String(t)},":s":{SS:[e]},":i":f(e)}}));return s(200,y(o.Attributes))}if(i==="POST /warlink"){const e=String(a.name||"").trim();return e.length>40?s(400,{error:"commander"}):(await(e?m("SET wl = :n, wv = :z",{":n":f(e),":z":{N:"0"}}):m("REMOVE wl, wv")),s(200,{ok:!0,wl:e}))}}catch(e){if(e.name==="ConditionalCheckFailedException")return s(409,{error:"state"});throw e}return s(404,{error:"not found"})};
+
+  ProfileIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ProfileFunction.Arn
+      PayloadFormatVersion: '2.0'
+      TimeoutInMillis: 15000
+
+  ProfileInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ProfileFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  ProfileGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /profile
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ProfileIntegration}'
+
+  ProfilePutRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PUT /profile
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ProfileIntegration}'
+
+  ProfileShopRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /shop
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ProfileIntegration}'
+
+  ProfileWarlinkRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /warlink
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ProfileIntegration}'
+
+  WardenFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: tables
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:UpdateItem, dynamodb:Scan]
+                Resource: [!GetAtt HeroesTable.Arn, !GetAtt WalletsTable.Arn]
+
+  WardenFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-warden
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt WardenFunctionRole.Arn
+      Environment:
+        Variables:
+          HEROES: !Ref HeroesTable
+          WALLETS: !Ref WalletsTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/warden.js by infra/build.py
+          const u=require("@aws-sdk/client-dynamodb"),d=new u.DynamoDBClient({}),{HEROES:f,WALLETS:h}=process.env,r=(n,o,s)=>({statusCode:n,headers:Object.assign({"content-type":"application/json"},s),body:JSON.stringify(o)}),p=n=>({S:String(n)}),y={covenant:"covenant",ascendancy:"radiant",tide:"tide"};let m=null,b=0;async function S(){if(m&&Date.now()-b<6e5)return m;const[n,o]=await Promise.all(["ranks","heroes"].map(e=>fetch("https://war.born2gamellc.com/api/"+e+".json").then(t=>t.json()))),s={},i=(e,t,l,w)=>s[e.toLowerCase()]||(s[e.toLowerCase()]={n:e,a:y[t]||t,r:l,lv:w,h:[]});for(const[e,t]of Object.entries(n.alliances||{}))for(const l of t.by_rank||[])for(const w of l.names||[])i(w,e,l.title,l.level);const c=(e,t)=>{e&&e.name&&i(e.name,e.alliance,"Veteran",0).h.push(t)},a=o.live||{};c(a.marshal,"Grand Marshal");for(const e of Object.values(a.champions||{}))c(e,"Alliance Champion");for(const e of o.hall||[]){c(e.marshal,"Grand Marshal, Season "+e.season);for(const t of Object.values(e.champions||{}))c(t,"Champion, Season "+e.season)}return m=Object.values(s),b=Date.now(),m}exports.handler=async n=>{const o=n.routeKey;if(o==="GET /war")try{return r(200,{c:await S()},{"cache-control":"public, max-age=300"})}catch{return r(502,{error:"war"})}const s=n.requestContext.authorizer&&n.requestContext.authorizer.jwt&&n.requestContext.authorizer.jwt.claims;if(!s||!String(s["cognito:groups"]||"").includes("admins"))return r(403,{error:"admin only"});let i={};if(n.body)try{i=JSON.parse(n.isBase64Encoded?Buffer.from(n.body,"base64").toString():n.body)}catch{return r(400,{error:"json"})}const c=async a=>(await d.send(new u.GetItemCommand({TableName:f,Key:{pid:p(a)}}))).Item;try{if(o==="GET /admin/links"){const e=await d.send(new u.ScanCommand({TableName:f,FilterExpression:"attribute_exists(wl)"}));return r(200,{links:(e.Items||[]).map(t=>({id:t.pid.S,name:t.name?t.name.S:"",wl:t.wl.S,wv:!!(t.wv&&t.wv.N==="1")}))})}const a=String(i.id||"");if(!/^[0-9a-f]{16}$/.test(a))return r(400,{error:"id"});if(o==="POST /admin/verify"){const e=await c(a);if(!e||!e.u||!e.wl)return r(404,{error:"link"});const t=i.ok?{UpdateExpression:"SET wv = :one",ExpressionAttributeValues:{":one":{N:"1"}}}:{UpdateExpression:"REMOVE wl, wv"};return await d.send(new u.UpdateItemCommand({TableName:f,Key:{pid:p(a)},...t})),await d.send(new u.UpdateItemCommand({TableName:h,Key:{userId:e.u},...t})),r(200,{ok:!0})}if(o==="POST /admin/grant"){const e=Math.trunc(Number(i.n)||0),t=await c(a);if(!e||Math.abs(e)>1e5)return r(400,{error:"amount"});if(!t||!t.u)return r(404,{error:"player"});const l=await d.send(new u.UpdateItemCommand({TableName:h,Key:{userId:t.u},ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = if_not_exists(bal, :g) + :n, own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":{N:"100"},":n":{N:String(e)},":o":{SS:["f.plain"]}}}));return r(200,{ok:!0,bal:+l.Attributes.bal.N})}}catch(a){if(a.name==="ConditionalCheckFailedException")return r(409,{error:"state"});throw a}return r(404,{error:"not found"})};
+
+  WardenIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt WardenFunction.Arn
+      PayloadFormatVersion: '2.0'
+      TimeoutInMillis: 15000
+
+  WardenInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WardenFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  WardenWarRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /war
+      AuthorizationType: NONE
+      Target: !Sub 'integrations/${WardenIntegration}'
+
+  WardenLinksRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /admin/links
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${WardenIntegration}'
+
+  WardenVerifyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /admin/verify
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${WardenIntegration}'
+
+  WardenGrantRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /admin/grant
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${WardenIntegration}'
 
 Outputs:
   GameConfig:

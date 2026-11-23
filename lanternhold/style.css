@@ -1013,3 +1013,85 @@ body.resting .arena{cursor:default}
 .autot.on{background:#101928;border-color:var(--accent);color:var(--accent)}
 .autot.on svg{animation:autospin 2.4s linear infinite}
 @keyframes autospin{to{transform:rotate(360deg)}}
+/* ---------- player profiles: looks and Grand War badges ---------- */
+.pfwrap{margin:4px 0 12px}
+.pfcard{position:relative;display:flex;gap:14px;align-items:center;padding:16px;border-radius:14px;border:1px solid var(--line2);overflow:hidden;background:var(--panel)}
+.pfava{flex:none;width:64px;height:64px;border-radius:16px;display:grid;place-items:center;border:3px solid #5f6b80;background:var(--bg2);position:relative}
+.pfava .ic{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;border:0}
+.pfava .ic svg{width:28px;height:28px}
+.pfava.sm{width:44px;height:44px;border-radius:12px;border-width:2px}
+.pfava.sm .ic{width:34px;height:34px}.pfava.sm .ic svg{width:20px;height:20px}
+.pfmain{min-width:0;position:relative}
+.pfname{display:block;font-family:var(--title);font-size:22px;letter-spacing:.03em;line-height:1.1}
+.pftitle{display:block;color:var(--muted);font-size:13px;font-style:italic}
+.nm .pftitle{display:inline;font-size:12px}
+.pftags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.pflv{font-size:12px;color:var(--muted)}
+.pfemb{display:flex;gap:6px;margin-top:8px}
+.emb{width:22px;height:22px;fill:none;stroke:var(--gold);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.pfemb .emb{width:24px;height:24px;padding:3px;border-radius:7px;background:rgba(4,7,13,.55);border:1px solid var(--line2)}
+.pfbio{margin:10px 2px 0;color:var(--text);font-size:14px;line-height:1.5;border-left:2px solid var(--gold);padding-left:10px}
+.pfwar{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.warbadge{--side:#f5c242;display:inline-flex;align-items:center;gap:6px;padding:2px 9px 2px 3px;border-radius:999px;border:1px solid color-mix(in srgb,var(--side) 60%,transparent);background:color-mix(in srgb,var(--side) 12%,var(--bg2));font:600 11px var(--title);letter-spacing:.04em;color:var(--text);vertical-align:middle;white-space:nowrap}
+.warbadge b{background:var(--side);color:#04070d;border-radius:999px;padding:1px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.warbadge.big{font-size:13px;padding:3px 11px 3px 4px}.warbadge.big b{font-size:11px}
+.warbadge.honor{--side:#f5c242}
+/* frames */
+.fr-plain{border-color:#5f6b80}
+.fr-iron{border-color:#9fb4c8;box-shadow:0 0 0 2px #1f2a3d,0 0 14px -4px #9fb4c8}
+.fr-radiant{border-color:#ffd36b;box-shadow:0 0 18px -4px #ffd36b}
+.fr-tide{border-color:#d06bff;box-shadow:0 0 18px -4px #d06bff}
+.fr-mercy{border-color:#8fcf6a;box-shadow:0 0 16px -4px #8fcf6a}
+.fr-ember{border-color:#ff8a3d;animation:frember 2.4s ease-in-out infinite}
+.fr-rift{border-color:#c9a6ff;animation:frrift 3s ease-in-out infinite}
+.fr-nexus{border-color:transparent;background:linear-gradient(var(--bg2),var(--bg2)) padding-box,conic-gradient(from var(--fa,0deg),#f5c242,#fff3c4,#c8952a,#f5c242) border-box;animation:frnexus 4s linear infinite}
+@property --fa{syntax:'<angle>';inherits:false;initial-value:0deg}
+@keyframes frember{50%{box-shadow:0 0 22px -2px #ff8a3d}}
+@keyframes frrift{0%,100%{box-shadow:0 0 14px -4px #c9a6ff}50%{box-shadow:0 0 26px 0 #e879f9;border-color:#e879f9}}
+@keyframes frnexus{to{--fa:360deg}}
+/* name colors */
+.nc-none{color:var(--text)}.nc-gold{color:#f5c242}.nc-violet{color:#e879f9}.nc-ember{color:#ff8a3d}.nc-frost{color:#9fd6ec}.nc-verdant{color:#8fcf6a}
+.nc-rift{background:linear-gradient(90deg,#c9a6ff,#e879f9,#9fd6ec,#c9a6ff);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ncrift 4s linear infinite}
+@keyframes ncrift{to{background-position:200% 0}}
+/* banners */
+.bn-night{background:radial-gradient(120% 140% at 0% 0%,#16213a,#04070d 65%)}
+.bn-forge{background:radial-gradient(120% 120% at 100% 100%,#5a1d0a,#140a08 60%)}
+.bn-crypt{background:radial-gradient(120% 120% at 0% 100%,#1f3d24,#060d09 65%)}
+.bn-glass{background:linear-gradient(135deg,#0c2a33 0%,#07141a 50%,#12323c 100%)}
+.bn-storm{background:radial-gradient(90% 120% at 80% 0%,#243a7a,#060813 70%)}
+.bn-rift{background:radial-gradient(80% 120% at 85% 50%,#4b1f7a,#0e0718 70%)}
+.bn-nexus{background:radial-gradient(90% 140% at 100% 0%,#5a4513,#0b0c12 65%)}
+.pfcard.bn-rift::after,.pfcard.bn-nexus::after,.pfcard.bn-storm::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(1px 1px at 20% 30%,#fff8,transparent),radial-gradient(1px 1px at 70% 20%,#fff6,transparent),radial-gradient(1.5px 1.5px at 85% 70%,#fff5,transparent),radial-gradient(1px 1px at 45% 80%,#fff4,transparent)}
+/* editor */
+.pfbal{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;padding:8px 12px;border-radius:10px;border:1px solid var(--line2);background:var(--panel)}
+.pfbal span{display:flex;align-items:center;gap:6px;color:var(--muted)}.pfbal b{color:var(--gold);font-size:18px}
+.sigil{display:inline-block;position:static;flex:none;width:16px;height:16px;fill:#e879f9;vertical-align:-3px;margin:0 2px 0 0;filter:drop-shadow(0 0 4px #e879f988)}
+.pfbal .sigil{width:20px;height:20px}
+.pfseg{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+.pfseg button{flex:1 1 auto;padding:7px 10px;border-radius:8px;border:1px solid var(--line2);background:var(--bg2);font-size:13px;font-weight:600;color:var(--muted)}
+.pfseg button.on{color:var(--text);border-color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,var(--bg2))}
+.pfbody{max-height:40vh;overflow-y:auto;margin-bottom:12px}
+.pfbody textarea{width:100%;resize:vertical;background:var(--bg2);color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:10px;font:inherit}
+.cosgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.cos{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 8px;border-radius:12px;border:1px solid var(--line2);background:var(--bg2);text-align:center}
+.cos:hover{border-color:var(--muted)}
+.cos.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.cos b{font-size:12.5px;font-weight:600}
+.cos small{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:2px}
+.cos.locked small{color:#e879f9;font-weight:700}
+.cos .emb{width:30px;height:30px}
+.cs-f{width:40px;height:40px;border-radius:11px;border:3px solid;display:grid;place-items:center}
+.cs-f i{width:20px;height:20px;border-radius:6px;background:var(--panel2)}
+.cs-c{font:700 22px var(--title)}
+.cs-g{width:100%;height:36px;border-radius:8px;border:1px solid var(--line2)}
+.cs-t{font:600 13px var(--title);color:var(--text);padding:8px 0;font-style:italic}
+.cosbuy{display:flex;justify-content:center;margin-bottom:8px}
+.cosbuy .emb,.cosbuy .sigil{width:48px;height:48px}.cosbuy .cs-f{width:64px;height:64px}.cosbuy .cs-g{width:200px;height:60px}.cosbuy .cs-c{font-size:36px}
+.wlink{display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:12px;border-radius:12px;border:1px solid var(--line2);background:var(--bg2)}
+.wlink small{color:var(--muted)}
+.wform{display:flex;gap:8px}
+.wform input{flex:1;min-width:0;background:var(--bg2);color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;font:inherit}
+.linkname{background-color:transparent;border:0;padding:0;font:inherit;font-weight:700;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+.linkname:hover{text-decoration-color:currentColor}
+.seat.gboard{align-items:center}
+@media (prefers-reduced-motion:reduce){.fr-ember,.fr-rift,.fr-nexus,.nc-rift{animation:none}}

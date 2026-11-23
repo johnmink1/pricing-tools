@@ -1,4 +1,4 @@
-/* lh-build 202611232124 */
+/* lh-build 202611232138 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1802,3 +1802,12 @@ body.resting .taptip{display:none}
 .setnote .linkbtn{color:var(--gold);font-size:13px}
 @media (max-width:560px){.mus-panel{top:auto;bottom:12px;right:12px;left:12px;width:auto;max-width:none;max-height:calc(100vh - 90px)}}
 @media (max-width:380px){.top .iconbtn,.top .account,.top .updatebtn{width:32px;height:32px}.top .account{width:auto;min-width:32px}.top .iconbtn svg{width:19px;height:19px}.top{gap:4px}}
+/* chat: unread bubble and whispers */
+.chatfab #chatdot{top:-5px;right:-5px;width:auto;height:auto;min-width:19px;padding:2px 5px;border-radius:999px;background:#e5484d;color:#fff;font:800 11px/1.2 var(--body);text-align:center;font-style:normal;border:2px solid var(--bg);box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.chatfab #chatdot:empty{display:none}
+#chatch{flex-wrap:nowrap}#chatch button{position:relative;padding-left:8px;padding-right:8px}
+#chatch button.unread::after{content:'';position:absolute;top:4px;right:3px;width:7px;height:7px;border-radius:50%;background:#e5484d}
+.dmto{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 10px 6px;padding:5px 6px 5px 10px;border:1px solid #a78bfa55;border-radius:8px;background:rgba(167,139,250,.08);font-size:12.5px;color:var(--muted)}
+.dmto[hidden]{display:none}.dmto b{color:#c4b5fd}.dmto .iconbtn{width:24px;height:24px;font-size:16px}
+.msg.dm .who{color:#c4b5fd}.msg.dm span{color:#ddd6fe}
+.dmdir{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}

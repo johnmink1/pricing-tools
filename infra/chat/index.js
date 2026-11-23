@@ -14,6 +14,8 @@ async function room(me, q) {
   const ch = q.ch;
   if (ch === 'global' || ch === 'trade') return ch;
   if (ch === 'banner') { const r = await db.send(new D.GetItemCommand({ TableName: H, Key: { pid: S(me) }, ProjectionExpression: 'sd' })); return r.Item && r.Item.sd ? 'banner#' + r.Item.sd.S : null; }
+  // Whispers: each player reads only their own inbox, which holds what they sent and what they got.
+  if (ch === 'dm') return 'dm#' + me;
   if (ch === 'party') { const L = /^[0-9a-f]{16}$/.test(q.leader || '') ? q.leader : me; return (await canParty(me, L)) ? 'party#' + L : null; }
   return null;
 }
@@ -25,10 +27,17 @@ exports.handler = async (e) => {
   if (rk === 'GET /chat') {
     const pk = await room(me, q); if (!pk) return res(403, { error: 'room' });
     const r = await db.send(new D.QueryCommand({ TableName: T, KeyConditionExpression: 'pk = :p AND sk > :s', ExpressionAttributeValues: { ':p': S(pk), ':s': S(q.since || '0') }, ScanIndexForward: false, Limit: 60 }));
-    return res(200, { me, msgs: (r.Items || []).filter(i => !i.hid).reverse().map(i => ({ id: i.sk.S, from: i.from.S, name: i.name.S, cls: i.cls.S, text: i.text.S })) });
+    return res(200, { me, msgs: (r.Items || []).filter(i => !i.hid).reverse().map(i => Object.assign({ id: i.sk.S, from: i.from.S, name: i.name.S, cls: i.cls.S, text: i.text.S }, i.to ? { to: i.to.S, toName: i.toName ? i.toName.S : '' } : {})) });
   }
   if (rk === 'POST /chat') {
     const pk = await room(me, b); if (!pk) return res(403, { error: 'room' });
+    let to = null;
+    if (b.ch === 'dm') {
+      if (!/^[0-9a-f]{16}$/.test(b.to || '') || b.to === me) return res(400, { error: 'to' });
+      const h = await db.send(new D.GetItemCommand({ TableName: H, Key: { pid: S(b.to) }, ProjectionExpression: '#n', ExpressionAttributeNames: { '#n': 'name' } }));
+      if (!h.Item || !h.Item.name) return res(404, { error: 'to' });
+      to = { pid: b.to, name: h.Item.name.S };
+    }
     let text = String(b.text || '').replace(/[\u0000-\u001f\u007f​-‏‪-‮]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
     const name = String(b.name || '').trim();
     if (!text) return res(400, { error: 'empty' });
@@ -40,7 +49,13 @@ exports.handler = async (e) => {
     try { await db.send(new D.PutItemCommand({ TableName: T, Item: { pk: S('rate#' + me), sk: S('0'), t: N(now), ttl: N(Math.floor(now / 1000) + 3600) }, ConditionExpression: 'attribute_not_exists(t) OR t < :c', ExpressionAttributeValues: { ':c': N(now - 3000) } })); }
     catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(429, { error: 'slow' }); throw x; }
     const sk = now.toString(36).padStart(9, '0') + crypto.randomBytes(3).toString('hex');
-    await db.send(new D.PutItemCommand({ TableName: T, Item: { pk: S(pk), sk: S(sk), from: S(me), name: S(name), cls: S(/^(tank|healer|rogue|mage|necro)$/.test(b.cls) ? b.cls : 'rogue'), text: S(text), ttl: N(Math.floor(now / 1000) + 7 * 86400) } }));
+    const item = { sk: S(sk), from: S(me), name: S(name), cls: S(/^(tank|healer|rogue|mage|necro)$/.test(b.cls) ? b.cls : 'rogue'), text: S(text), ttl: N(Math.floor(now / 1000) + 7 * 86400) };
+    if (to) {
+      // one copy in each inbox, so both sides see the conversation
+      Object.assign(item, { to: S(to.pid), toName: S(to.name) });
+      await db.send(new D.PutItemCommand({ TableName: T, Item: Object.assign({ pk: S('dm#' + to.pid) }, item) }));
+      await db.send(new D.PutItemCommand({ TableName: T, Item: Object.assign({ pk: S('dm#' + me) }, item) }));
+    } else await db.send(new D.PutItemCommand({ TableName: T, Item: Object.assign({ pk: S(pk) }, item) }));
     return res(200, { ok: true, id: sk });
   }
   if (rk === 'POST /report') {

@@ -1,4 +1,4 @@
-/* lh-build 202611231643 */
+/* lh-build 202611231727 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1660,3 +1660,29 @@ body.resting .taptip{display:none}
 /* first run: returning players sign in before making a hero */
 .haveacct{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px 0 14px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:var(--bg2);color:var(--muted);font-size:14px}
 .haveacct span{font-weight:600;color:var(--text)}
+/* Ember Ring: matchups, skills, loadout */
+.mu{display:inline-flex;align-items:center;gap:4px;font-weight:700;font-size:12px}
+.mu svg{width:12px;height:12px}
+.mu.good{color:var(--good)}.mu.bad{color:var(--bad)}
+.rfinfo small.brings{color:var(--sky);font-size:12px}
+.rmatch{display:grid;gap:6px;padding:10px 12px;margin:0 0 10px;border:1px solid var(--line2);border-radius:12px;background:var(--panel)}
+.rmatch small{color:var(--muted)}
+.rmrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.rmc{font-size:12px;font-weight:800;color:var(--cc);border:1px solid color-mix(in srgb,var(--cc) 45%,transparent);border-radius:999px;padding:0 8px;line-height:19px}
+.rskills{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin:0 0 12px}
+.rskill{display:grid;gap:4px;align-content:start;padding:9px 11px;border:1px solid var(--line);border-radius:12px;background:var(--bg2)}
+.rskill.on{border-color:var(--gold2);background:linear-gradient(180deg,#22190a,var(--bg2))}
+.rskill.locked b{color:var(--muted)}
+.rskill small{color:var(--muted);font-size:13px;line-height:1.35}.rskill small.dim{color:var(--dim);font-size:12px}
+.rsk-top{display:flex;align-items:center;gap:6px}
+.rsk-top b{font-family:var(--title);font-size:15px}
+.rslot{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#1a1204;background:var(--gold);border-radius:999px;padding:0 7px;line-height:17px}
+.rsk-top .pips{margin-left:auto;display:flex;gap:3px}
+.rsk-top .pips i{width:9px;height:9px;border-radius:50%;border:1px solid var(--gold2);background:transparent}
+.rsk-top .pips i.on{background:var(--gold);border-color:var(--gold)}
+.rsk-act{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.rdkit{color:var(--sky);font-size:11px;min-height:14px}
+.rdedge{text-align:center;font-size:13px;font-weight:700;margin:0 0 8px}.rdedge.good{color:var(--good)}.rdedge.bad{color:var(--bad)}
+.rdpop .abil{color:var(--sky);font-size:17px;top:6%;letter-spacing:.02em}
+.rdpop .dot{color:#b5e86a;font-size:16px}
+.rdlog em.ab{color:var(--sky);font-style:normal;font-weight:700}

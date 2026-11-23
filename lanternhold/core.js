@@ -51,7 +51,11 @@
   };
   const SIDE_ORDER = ['covenant', 'radiant', 'tide', 'mercy', 'unsworn'];
   const sideOf = s => (s.hero && s.hero.side) || null;
-  const sidePerk = (s, k) => { const d = sideOf(s); if (!d) return 1;
+  // Mercy's Blessing: real-world donations to the Grand War's Mercy Corps light it for every player (the server keeps the clock).
+  const MERCY_FX = { gold: 0.10, hp: 0.10, heal: 0.20 };
+  const mercyOn = s => !!(s && s.mercy && s.mercy > Date.now());
+  const sidePerk = (s, k) => sidePerk0(s, k) * (mercyOn(s) ? 1 + (MERCY_FX[k] || 0) : 1);
+  const sidePerk0 = (s, k) => { const d = sideOf(s); if (!d) return 1;
     if (d === 'unsworn') return k === 'heal' ? 1 : 1.05;
     return ({ covenant: { hp: 1.15 }, radiant: { dps: 1.12 }, tide: { gold: 1.15 }, mercy: { heal: 1.15 } }[d][k]) || 1; };
   const TIER = [{ cost: 10, stat: 1 }, { cost: 1320, stat: 2.6e4 }];
@@ -1466,7 +1470,7 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

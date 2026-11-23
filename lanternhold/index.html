@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611230058">
+<link rel="stylesheet" href="style.css?v=202611230106">
 </head>
 <body>
 <div id="app">
@@ -33,6 +33,7 @@
     <button class="updatebtn" id="btn-update" hidden><svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span>Update ready</span></button>
     <button class="iconbtn chatbtn" id="btn-chat" hidden aria-label="Chat"><svg viewBox="0 0 24 24"><use href="#i-chat"/></svg><i id="chatdot" hidden></i></button>
     <button class="account" id="btn-account" hidden aria-label="Sign in"></button>
+    <button class="iconbtn" id="btn-guide" aria-label="Guide" title="Guide"><svg viewBox="0 0 24 24"><use href="#i-help"/></svg></button>
     <button class="iconbtn" id="btn-settings" aria-label="Settings"><svg viewBox="0 0 24 24"><use href="#i-gear"/></svg></button>
   </header>
 
@@ -85,7 +86,7 @@
       <div class="tabbody" id="tab-gear" hidden>
         <div class="whoseg" id="gearwho"></div>
         <div class="slots" id="gearslots"></div>
-        <h3 class="sub">Pack <em id="bagcount"></em></h3>
+        <div class="packbar"><h3 class="sub">Pack <em id="bagcount"></em></h3><button class="btn ghost small" id="g-scrap">Mass scrap</button></div>
         <p class="note">Gear drops from monsters, chests and guardians. Each piece fits one class, so pick a companion above to see what they can wear. Green tags show upgrades.</p>
         <div class="bag" id="bag"></div>
       </div>
@@ -114,6 +115,7 @@
       </div>
     </aside>
   </main>
+  <div class="coach" id="coach" hidden role="dialog" aria-live="polite"><div class="coach-step" id="coachstep"></div><b id="coachtitle"></b><p id="coachtext"></p><div class="coach-row"><button class="linkbtn" id="coachskip">Skip tutorial</button><button class="btn small" id="coachnext">Next</button></div></div>
   <aside class="chat" id="chat" hidden aria-label="Chat">
     <div class="chathead"><div class="seg" id="chatch"><button data-ch="global" class="on">Global</button><button data-ch="trade">Trade</button><button data-ch="party">Party</button></div><button class="iconbtn" id="chatx" aria-label="Close chat">&times;</button></div>
     <select id="chatroom" hidden aria-label="Which party"></select>
@@ -132,6 +134,7 @@
     <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="#f2c14e" stroke="#8a5a14" stroke-width="1.5"/><path d="M12 7.5v9M9.5 10a2.5 2 0 0 1 5 0c0 2.6-5 1.4-5 4a2.5 2 0 0 0 5 0" fill="none" stroke="#8a5a14" stroke-width="1.5" stroke-linecap="round"/></symbol>
     <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2c1 4 6 6 6 12a6 6 0 0 1-12 0c0-3 1.5-4.5 3-6 0 2 1 3 2 3 0-3-1-6 1-9z" fill="#ff8a3d"/><path d="M12 12c1.5 2 3 3 3 5a3 3 0 0 1-6 0c0-1.5 1.5-3 3-5z" fill="#ffd27a"/></symbol>
     <symbol id="i-cup" viewBox="0 0 24 24"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H16.5M4 21.5h13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8.5 3.5c-.8 1 .8 1.8 0 3M12.5 3.5c-.8 1 .8 1.8 0 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.3 9.5a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.3-2.7 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17.6" r="1.1" fill="currentColor"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.05-4.95M19 4.5v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-map" viewBox="0 0 24 24"><path d="M3.5 6.5 9 4l6 2.5L20.5 4v13.5L15 20l-6-2.5L3.5 20z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 4v13.5M15 6.5V20" stroke="currentColor" stroke-width="1.5"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10H9.5L5 19.5v-4H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 9.5h8M8 12.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
@@ -168,10 +171,10 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611230058";</script>
+<script>window.LH_BUILD = "202611230106";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611230058"></script>
-<script src="sprites.js?v=202611230058"></script>
-<script src="ui.js?v=202611230058"></script>
+<script src="core.js?v=202611230106"></script>
+<script src="sprites.js?v=202611230106"></script>
+<script src="ui.js?v=202611230106"></script>
 </body>
 </html>

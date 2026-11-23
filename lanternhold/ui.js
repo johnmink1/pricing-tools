@@ -1,4 +1,4 @@
-/* lh-build 202611232314 */
+/* lh-build 202611232327 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -758,8 +758,8 @@
         floatText('Ambush!', 'crit', 0.5, 0.3);
         if (!(S.stats.packs > 0)) toast('sword', 'Ambush!', e.n + ' monsters have teamed up to jump your party. They hit harder and strike the back first, but they pay ' + (e.n * L.PACK_GOLD) + ' times the gold and often drop gear.', 'feat');
       } else if (e.type === 'herolevel') {
-        sfx.relic(); floatText('Level ' + e.lv + '!', 'crit', 0.5, 0.25);
-        toast('star', L.memberById('you').name + ' reached level ' + e.lv, (e.pts === 1 ? 'A new stat point' : e.pts + ' new stat points') + ' to spend on the character sheet in the Skills tab.', 'feat');
+        sfx.relic(); floatText('Hero level ' + e.lv + '!', 'crit', 0.5, 0.25);
+        toast('star', L.memberById('you').name + ' reached hero level ' + e.lv, (e.pts === 1 ? 'A new stat point' : e.pts + ' new stat points') + ' to spend on the character sheet in the Skills tab.', 'feat');
         if (tab === 'rekindle') updateSkills(); else { const hp = L.heroPoints(S); if (!S.kindling && hp) $('kindcount').textContent = '+' + hp; }
         for (const u of L.newUnlocks(S, e.from || e.lv - 1, e.lv)) toast(u.icon, 'Unlocked: ' + u.name, u.desc, 'feat');
         { const r = L.REGION_LV.findIndex((need, i) => need > (e.from || e.lv - 1) && need <= e.lv && i * 10 + 1 > S.maxFloorEver); if (r > 0) toast('map', 'The way down opens', 'Floors ' + (r * 10 + 1) + ' to ' + (r * 10 + 10) + ' are open to you now.', 'feat'); }
@@ -824,7 +824,7 @@
   // ---------- pacing v2: features open by hero level (John, 2026-11-23) ----------
   const TAB_FEATURE = { camp: 'camp', gear: 'gear', market: 'buy', guild: 'guild', ring: 'ring' };
   const heroName = () => (L.memberById('you') || { name: 'Your hero' }).name;
-  function lockMsg(id) { const u = L.unlockOf(id); return u.name + ' opens at hero level ' + u.lv + '. ' + heroName() + ' is level ' + L.heroLv(S) + '.'; }
+  function lockMsg(id) { const u = L.unlockOf(id); return u.name + ' opens at hero level ' + u.lv + '. ' + heroName() + ' is hero level ' + L.heroLv(S) + '.'; }
   function gateUse(id) { if (L.canUse(S, id)) return true; const u = L.unlockOf(id); toast('lock', u.name + ' is still locked', lockMsg(id) + ' Your hero earns XP from every fight.', 'warn'); return false; }
   function paintTabLocks() { document.querySelectorAll('.tabs [data-tab]').forEach(b => { const f = TAB_FEATURE[b.dataset.tab]; b.classList.toggle('locked', !!(f && S.hero && !L.canUse(S, f))); }); }
   // The road ahead: every level-gated feature, the next region and the campfire, in one card.
@@ -833,9 +833,9 @@
     const nextR = L.REGION_LV.findIndex((need, r) => need > lv && r * 10 + 1 > S.maxFloorEver);
     const fu = focus && L.unlockOf(focus);
     let h = '<div class="road">' + (fu ? '<div class="roadlock">' + icon('lock') + '<div><b>' + esc(fu.name) + ' opens at hero level ' + fu.lv + '</b><small>' + esc(fu.desc) + ' Your hero earns XP from every fight, and more from deeper floors and guardians.</small></div></div>' : '') +
-      '<div class="roadhead"><div><h3>The road ahead</h3><small>' + esc(heroName()) + ' is level <b>' + lv + '</b> &middot; ' + pct + '% to level ' + (lv + 1) + '</small></div></div>' +
+      '<div class="roadhead"><div><h3>The road ahead</h3><small>' + esc(heroName()) + ' is hero level <b>' + lv + '</b> &middot; ' + pct + '% to level ' + (lv + 1) + '</small></div></div>' +
       '<div class="bar roadxp"><i style="width:' + pct + '%"></i></div><ul class="roadlist">' +
-      L.UNLOCKS.map(u => { const on = L.canUse(S, u.id); return '<li class="' + (on ? 'open' : '') + (u.id === focus ? ' focus' : '') + '"><span class="ric">' + icon(on ? u.icon : 'lock') + '</span><div><b>' + esc(u.name) + '</b><small>' + esc(u.desc) + '</small></div><em>' + (on ? 'Open' : 'Level ' + u.lv) + '</em></li>'; }).join('') +
+      L.UNLOCKS.map(u => { const on = L.canUse(S, u.id); return '<li class="' + (on ? 'open' : '') + (u.id === focus ? ' focus' : '') + '"><span class="ric">' + icon(on ? u.icon : 'lock') + '</span><div><b>' + esc(u.name) + '</b><small>' + esc(u.desc) + '</small></div><em>' + (on ? 'Open' : 'Hero level ' + u.lv) + '</em></li>'; }).join('') +
       '</ul><p class="note small">' + (nextR >= 0 ? 'Floors ' + (nextR * 10 + 1) + ' to ' + (nextR * 10 + 10) + ' open at hero level ' + L.REGION_LV[nextR] + '. ' : '') +
       'Your campfire holds ' + L.rosterCap(S) + ' companions now; it grows at hero levels ' + L.ROSTER_LV.join(', ') + '. Camp job slots open at levels ' + L.JOB_SLOT_LV.join(', ') + '.</p></div>';
     return h;
@@ -869,7 +869,7 @@
     }
     modal('<div class="maphead"><div><h2>' + esc(nm.name) + ' wants to join</h2><small>' + esc(nm.title) + ' &middot; ' + L.CLASSES[nm.cls].name + '. Your campfire is full: ' + list.length + ' of ' + L.rosterCap(S) + ' companions.</small></div></div>' +
       '<p>' + esc(nm.line || nm.bio || '') + '</p><p class="note">To keep ' + esc(nm.name) + ', dismiss someone for good, or add a spot at the fire. If you turn ' + esc(nm.name) + ' away, they will not ask again.</p>' +
-      '<div class="choice">' + list.map(c => { const m = L.memberById(c); return '<button class="pick jpick rdis" data-rdis="' + c + '"><img src="' + SP.spriteURL(m.cls, 2, lookHue(m)) + '" alt=""><b>' + esc(m.name) + '</b><small>Level ' + L.lvl(S, c) + ' ' + L.CLASSES[m.cls].name + (S.party.includes(c) ? ' &middot; in your party' : '') + '</small><em>Dismiss</em></button>'; }).join('') + '</div>' +
+      '<div class="choice">' + list.map(c => { const m = L.memberById(c); return '<button class="pick jpick rdis" data-rdis="' + c + '"><img src="' + SP.spriteURL(m.cls, 2, lookHue(m)) + '" alt=""><b>' + esc(m.name) + '</b><small>Power level ' + L.lvl(S, c) + ' ' + L.CLASSES[m.cls].name + (S.party.includes(c) ? ' &middot; in your party' : '') + '</small><em>Dismiss</em></button>'; }).join('') + '</div>' +
       '<div class="row">' + (canBuy ? '<button class="btn" id="rc-buy">' + sigil + ' Add a spot: ' + fmt(L.ROSTER_COST) + ' ' + TOKEN + '</button>' : '') + '<button class="btn ghost" id="rc-no">Turn ' + esc(nm.name) + ' away</button></div>', md => {
         md.className = 'sheet wide';
         md.querySelectorAll('[data-rdis]').forEach(b => b.onclick = () => openRecruit(b.dataset.rdis));
@@ -1024,7 +1024,7 @@
   }
   function memberStatsLine(id, now) {
     const m = L.memberById(id), L_ = L.lvl(S, id);
-    const parts = ['Level <b>' + L_ + '</b>'];
+    const parts = ['Power level <b>' + L_ + '</b>'];
     if (m.cls === 'healer') parts.push(fmt(L.healPerSec(S, id)) + ' heal/s');
     parts.push(fmt(L.memberDps(S, id, now) || 0) + ' dmg/s');
     parts.push(fmt(L.maxHpOf(S, id)) + ' hp');
@@ -1102,7 +1102,7 @@
     let benchHtml = jobsHtml + bench.map(id => {
       const m = L.memberById(id), job = L.jobOf(S, id);
       const n = buyN() === 'max' ? Math.max(1, L.maxAffordable(S, id)) : buyN(), cost = L.trainCost(S, id, n);
-      return '<div class="seat bench">' + portrait(id) + '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + '</div><div class="lv">Level ' + L.lvl(S, id) + ' &middot; ' + esc(m.title) + '</div>' +
+      return '<div class="seat bench">' + portrait(id) + '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + '</div><div class="lv">Power level ' + L.lvl(S, id) + ' &middot; ' + esc(m.title) + '</div>' +
         '<div class="jobline' + (job ? ' on' : '') + '">' + (job ? icon(job.icon) + '<b>' + job.name + '</b> ' + L.jobText(job, L.jobValue(S, job, id)) : 'No camp job yet') + '</div>' + traitChips(id, true) + '</div>' +
         '<div class="acts"><button class="buy" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button><div class="minis">' + '<button class="autot' + ((S.autoTrain || {})[id] && L.passOn(S) ? ' on' : '') + (L.passOn(S) ? '' : ' locked') + '" data-autot="' + id + '" title="Auto-train: spend gold on this character automatically" aria-pressed="' + !!(S.autoTrain || {})[id] + '">' + icon('refresh') + 'Auto</button>' +
         '<button class="rest" data-jobfor="' + id + '" data-tip="' + (job ? 'Change their camp job' : 'Give them a camp job that helps the party') + '">Job</button><button class="rest" data-seat="' + id + '" data-tip="Bring them into your party">Bring</button></div></div></div>';
@@ -1149,7 +1149,7 @@
     const j = L.JOBS.find(x => x.id === jid), cur = S.jobs && S.jobs[jid];
     const free = S.unlocked.filter(id => L.jobFree(S, id)).sort((a, b) => L.jobValue(S, j, b) - L.jobValue(S, j, a));
     modal('<div class="maphead"><div><h2>' + j.name + '</h2><small>' + esc(j.desc) + ' Gives ' + j.fmt + '. Higher level companions do it better' + ', and a ' + L.CLASSES[j.aff].name.toLowerCase() + ' does it half again as well.</small></div><button class="iconbtn" id="j-x" aria-label="Close">&times;</button></div>' +
-      (free.length ? '<div class="choice">' + free.map(id => { const m = L.memberById(id), o = L.jobOf(S, id); return '<button class="pick jpick' + (cur === id ? ' on' : '') + '" data-pick="' + id + '"><img src="' + SP.spriteURL(m.cls, 2, lookHue(m)) + '" alt=""><span><b>' + esc(m.name) + (m.cls === j.aff ? ' <i class="aff">&#9733; ' + L.CLASSES[m.cls].name + '</i>' : '') + '</b><small>Level ' + L.lvl(S, id) + (o && o.id !== jid ? ' &middot; now ' + o.name : '') + '</small></span><em>' + L.jobText(j, L.jobValue(S, j, id)) + '</em></button>'; }).join('') + '</div>'
+      (free.length ? '<div class="choice">' + free.map(id => { const m = L.memberById(id), o = L.jobOf(S, id); return '<button class="pick jpick' + (cur === id ? ' on' : '') + '" data-pick="' + id + '"><img src="' + SP.spriteURL(m.cls, 2, lookHue(m)) + '" alt=""><span><b>' + esc(m.name) + (m.cls === j.aff ? ' <i class="aff">&#9733; ' + L.CLASSES[m.cls].name + '</i>' : '') + '</b><small>Power level ' + L.lvl(S, id) + (o && o.id !== jid ? ' &middot; now ' + o.name : '') + '</small></span><em>' + L.jobText(j, L.jobValue(S, j, id)) + '</em></button>'; }).join('') + '</div>'
         : '<p class="note">Nobody is resting at the campfire. Send a companion back from your party to give them a job.</p>') +
       '<div class="row">' + (cur && L.jobFree(S, cur) ? '<button class="btn ghost" id="j-clear">Leave the job empty</button>' : '') + '<button class="btn ghost" id="j-close">Close</button></div>', md => {
         md.className = 'sheet wide';
@@ -1161,7 +1161,7 @@
   }
   function jobForModal(id) {
     const m = L.memberById(id), cur = L.jobOf(S, id);
-    modal('<div class="maphead"><div><h2>A job for ' + esc(m.name) + '</h2><small>Level ' + L.lvl(S, id) + ' ' + L.CLASSES[m.cls].name.toLowerCase() + '. Train them to make their job count for more.</small></div><button class="iconbtn" id="j-x" aria-label="Close">&times;</button></div>' +
+    modal('<div class="maphead"><div><h2>A job for ' + esc(m.name) + '</h2><small>Power level ' + L.lvl(S, id) + ' ' + L.CLASSES[m.cls].name.toLowerCase() + '. Train them to make their job count for more.</small></div><button class="iconbtn" id="j-x" aria-label="Close">&times;</button></div>' +
       '<div class="choice">' + L.JOBS.map(j => { const h = S.jobs && S.jobs[j.id], taken = h && h !== id && L.jobFree(S, h); return '<button class="pick jpick' + (cur && cur.id === j.id ? ' on' : '') + '" data-pj="' + j.id + '"><span class="jic">' + icon(j.icon) + '</span><span><b>' + j.name + (m.cls === j.aff ? ' <i class="aff">&#9733; suits them</i>' : '') + '</b><small>' + (taken ? 'Replaces ' + esc(L.memberById(h).name) : esc(j.desc)) + '</small></span><em>' + L.jobText(j, L.jobValue(S, j, id)) + '</em></button>'; }).join('') + '</div>' +
       '<div class="row">' + (cur ? '<button class="btn ghost" id="j-clear">No job</button>' : '') + '<button class="btn ghost" id="j-close">Close</button></div>', md => {
         md.className = 'sheet wide';
@@ -1176,7 +1176,7 @@
     if (empty >= 0) { L.seat(S, id, empty); updateSeats(true); updateAbilities(true); return; }
     const m = L.memberById(id);
     modal('<h2>Who goes back to the campfire?</h2><p>' + esc(m.name) + ' takes their seat.</p><div class="choice">' +
-      S.party.map((x, i) => x === 'you' || !x ? '' : '<button class="pick" data-slot="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', level ' + L.lvl(S, x) + '</small></button>').join('') +
+      S.party.map((x, i) => x === 'you' || !x ? '' : '<button class="pick" data-slot="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', power level ' + L.lvl(S, x) + '</small></button>').join('') +
       '</div><div class="row"><button class="btn ghost" id="m-cancel">Cancel</button></div>', md => {
         md.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { L.seat(S, id, +b.dataset.slot); closeModal(); updateSeats(true); updateAbilities(true); paintBoard(); });
         md.querySelector('#m-cancel').onclick = closeModal;
@@ -1206,7 +1206,7 @@
       h += (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note">Your party is full. When a player accepts your invite, you choose who steps out.</p>') +
         '<button class="btn small" id="b-find">' + (boardList ? 'Show other heroes' : 'Browse the guild') + '</button>';
       if (boardMsg) h += '<p class="note">' + esc(boardMsg) + '</p>';
-      if (boardList) h += '<div class="board">' + boardList.map(g => { const pf = g.pf || {}; return '<div class="seat bench gboard' + (g.wd && g.wd.b && BANNERS[g.wd.b] ? ' hasgb">' + bannerSVG(g.wd.b, 'gban') : '">') + '<div class="pfava sm fr-' + cosOf('f', pf.f)[0] + '">' + (g.wd && g.wd.k && g.wd.k.you ? '<div class="ic c-' + g.cls + ' player dressed"><img src="' + SP.spriteURL(g.cls, 2, outfitHue(g.wd.k.you)) + '" alt=""></div>' : '<div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div>') + '</div><div class="info"><div class="nm"><button class="linkname nc-' + cosOf('c', pf.c)[0] + '" data-gprof="' + g.id + '">' + esc(g.name) + '</button> ' + classTag(g.cls) + (pf.t ? ' <small class="pftitle">' + esc(cosOf('t', pf.t)[1]) + '</small>' : '') + (g.w ? ' ' + warBadge(g.w) : '') + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
+      if (boardList) h += '<div class="board">' + boardList.map(g => { const pf = g.pf || {}; return '<div class="seat bench gboard' + (g.wd && g.wd.b && BANNERS[g.wd.b] ? ' hasgb">' + bannerSVG(g.wd.b, 'gban') : '">') + '<div class="pfava sm fr-' + cosOf('f', pf.f)[0] + '">' + (g.wd && g.wd.k && g.wd.k.you ? '<div class="ic c-' + g.cls + ' player dressed"><img src="' + SP.spriteURL(g.cls, 2, outfitHue(g.wd.k.you)) + '" alt=""></div>' : '<div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div>') + '</div><div class="info"><div class="nm"><button class="linkname nc-' + cosOf('c', pf.c)[0] + '" data-gprof="' + g.id + '">' + esc(g.name) + '</button> ' + classTag(g.cls) + (pf.t ? ' <small class="pftitle">' + esc(cosOf('t', pf.t)[1]) + '</small>' : '') + (g.w ? ' ' + warBadge(g.w) : '') + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Power level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
         ((S.guests || []).some(x => x.id === 'p_' + g.id) ? '<span class="muted">In party</span>' : inv.sent[g.id] ? '<span class="invact"><span class="invwait">Invited</span><button class="btn ghost small" data-uninv="' + g.id + '">Cancel</button></span>' : '<button class="btn small" data-recruit="' + g.id + '">Invite</button>') + '</div>'; }).join('') + '</div>';
       if ((S.guests || []).length) h += '<p class="note">To let a player’s hero go, press Dismiss on their seat.</p>';
     }
@@ -1223,7 +1223,7 @@
   function invCard() {
     const a = inv.asks, q = S.joinQ || [];
     let h = '';
-    if (a.length) h += '<div class="invites"><h4>Party invitations</h4>' + a.map(g => '<div class="seat bench gboard"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div><div class="info"><div class="nm">' + esc(g.name) + ' ' + classTag(g.cls) + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; wants your hero in their party</div></div><span class="invact"><button class="btn small" data-invyes="' + g.id + '">Accept</button><button class="btn ghost small" data-invno="' + g.id + '">Decline</button></span></div>').join('') +
+    if (a.length) h += '<div class="invites"><h4>Party invitations</h4>' + a.map(g => '<div class="seat bench gboard"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div><div class="info"><div class="nm">' + esc(g.name) + ' ' + classTag(g.cls) + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Power level ' + g.level + ' &middot; wants your hero in their party</div></div><span class="invact"><button class="btn small" data-invyes="' + g.id + '">Accept</button><button class="btn ghost small" data-invno="' + g.id + '">Decline</button></span></div>').join('') +
       '<p class="note">Accepting lends a copy of your hero to their party, and you earn gold for it. Your own game and party do not change.</p></div>';
     if (q.length) h += '<p class="note">' + q.map(g => '<b>' + esc(g.name) + '</b>').join(', ') + (q.length === 1 ? ' accepted your invite and joins' : ' accepted your invites and join') + ' when you are at camp.</p>';
     return h;
@@ -1255,7 +1255,7 @@
     };
     if (S.party.includes(null)) return join();
     modal('<h2>Make room for ' + esc(g.name) + '</h2><p>' + esc(g.name) + ' accepted your invite, and your party is full. Who should step out? Story companions go back to the campfire, and players’ heroes are dismissed.</p><div class="choice">' +
-      S.party.map((x, i) => x === 'you' || !x ? '' : '<button class="pick" data-out="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', level ' + L.lvl(S, x) + (L.isGuest(S, x) ? ' &middot; player' : '') + '</small></button>').join('') +
+      S.party.map((x, i) => x === 'you' || !x ? '' : '<button class="pick" data-out="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', power level ' + L.lvl(S, x) + (L.isGuest(S, x) ? ' &middot; player' : '') + '</small></button>').join('') +
       '</div><div class="row"><button class="btn ghost" id="m-cancel">Not now</button></div>', md => {
         md.querySelectorAll('[data-out]').forEach(b => b.onclick = () => {
           const i = +b.dataset.out, x = S.party[i];
@@ -1407,7 +1407,7 @@
       const w = L.wearer(S, it.uid), fit = it.cls === m.cls;
       const d = fit && !w ? Math.round((L.itemScore(it) - L.replaces(S, gearWho, it).reduce((a, x) => a + L.itemScore(x), 0)) * 100) : 0;
       return '<div class="tile r-' + it.rar + (dim ? ' dim' : '') + (w ? ' worn' : '') + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + ' (' + itemEffect(it) + ')' + (w ? ', worn by ' + esc(L.memberById(w).name) : '') + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' +
-        '<i class="lvb' + (fit && !L.canWear(S, gearWho, it) ? ' no' : '') + '" title="Needs level ' + L.reqLevel(it) + '">Lv ' + L.reqLevel(it) + '</i>' + (it.aff || it.jset ? '<i class="affb" title="Helps a camp job"></i>' : '') + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (d > 0 && L.canWear(S, gearWho, it) ? '<i class="upb">&#9650;</i>' : '') + (w ? '<i class="wb" title="Worn">' + esc(L.memberById(w).name.charAt(0)) + '</i>' : '') + (it.lk ? '<i class="lkb" title="Locked">' + icon('lock') + '</i>' : '') + '</div>';
+        '<i class="lvb' + (fit && !L.canWear(S, gearWho, it) ? ' no' : '') + '" title="Needs power level ' + L.reqLevel(it) + '">Lv ' + L.reqLevel(it) + '</i>' + (it.aff || it.jset ? '<i class="affb" title="Helps a camp job"></i>' : '') + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (d > 0 && L.canWear(S, gearWho, it) ? '<i class="upb">&#9650;</i>' : '') + (w ? '<i class="wb" title="Worn">' + esc(L.memberById(w).name.charAt(0)) + '</i>' : '') + (it.lk ? '<i class="lkb" title="Locked">' + icon('lock') + '</i>' : '') + '</div>';
     };
     const pack = S.bag.filter(it => !L.wearer(S, it.uid));
     const fits = pack.filter(it => it.cls === m.cls).sort((a, b) => L.gearPct(b) - L.gearPct(a));
@@ -1462,7 +1462,7 @@
     modal('<div class="icard r-' + it.rar + '">' +
       '<button class="iconbtn icx" id="i-close" aria-label="Close">&times;</button>' +
       '<div class="ihero"><div class="tile big r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
-      '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + esc(L.gearName(it)) + '</h2>' + pips + '<small>Requires level <b class="' + (fits && !w && !L.canWear(S, gearWho, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
+      '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + esc(L.gearName(it)) + '</h2>' + pips + '<small>Requires power level <b class="' + (fits && !w && !L.canWear(S, gearWho, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
       '<div class="istats">' + stats + '</div>' +
       (fits && !w ? '<p class="icmp">' + (ci ? 'Compared with ' + esc(m.name) + '’s ' + reps.map(r => esc(L.gearName(r)) + (r.up ? ' +' + r.up : '')).join(' and ') + '.' : esc(m.name) + ' has an open ' + L.SLOT_NAME[it.slot].toLowerCase() + ' slot.') + (it.slot === 'robe' ? ' A robe covers the chest and legs.' : '') + '</p>' : '') +
       enchBlock(it) +
@@ -1473,7 +1473,7 @@
       (it.rar === 'goblin' ? '<div class="iset gobset"><b>The Loot Goblin’s Sack</b><small>+' + pct100(L.GOBLIN_SACK_GOLD) + ' gold for the whole party while worn. Roughly one Loot Goblin in ' + Math.round(1 / L.GOBLIN_SACK_CHANCE).toLocaleString('en-US') + ' drops it.</small><small class="lore">Still lumpy with whatever he stole last. Nobody has been brave enough to empty it.</small></div>' : '') +
       (wearer ? '<div class="iworn"><img src="' + SP.spriteURL(wearer.cls, 2, lookHue(wearer)) + '" alt="">Worn by <b>' + esc(wearer.name) + '</b></div>' : '') +
       '<div class="iacts">' +
-      (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? (L.canWear(S, gearWho, it) ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>' + esc(m.name) + ' needs level ' + L.reqLevel(it) + '</button>') : '<button class="btn" disabled>No ' + L.CLASSES[it.cls].name + ' in your roster yet</button>') +
+      (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? (L.canWear(S, gearWho, it) ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>' + esc(m.name) + ' needs power level ' + L.reqLevel(it) + '</button>') : '<button class="btn" disabled>No ' + L.CLASSES[it.cls].name + ' in your roster yet</button>') +
       (maxed ? '<button class="btn ghost" disabled>Fully upgraded</button>' : '<button class="btn ghost iup" id="i-up"' + (cost > S.gold ? ' disabled' : '') + '><span>Upgrade to +' + (it.up + 1) + '</span><small>' + icon('coin') + fmt(cost) + ' &middot; ' + Object.entries(nextStats).map(([k, v]) => k.toLowerCase() + ' ' + pc(v)).join(', ') + '</small></button>') +
       '</div><div class="itools">' +
       tool('i-lk', 'lock', it.lk ? 'Unlock' : 'Lock', it.lk ? 'on' : '') +
@@ -1614,7 +1614,7 @@
     const row = x => {
       const it = x.it, wn = x.w ? L.memberById(x.w).name : '';
       if (x.ok && (held || (it.lk && x.w && x.w !== id) || (it.slot === 'robe' && L.slotLocked(S, id, 'legs')))) x.ok = false, x.lockd = true;
-      const tag = x.lockd ? '<span class="cmp down">' + icon('lock') + 'Locked</span>' : !x.ok ? '<span class="cmp down">Needs level ' + L.reqLevel(it) + '</span>' : x.d > 0 ? '<span class="cmp up">&#9650; ' + x.d + '%</span>' : x.d < 0 ? '<span class="cmp down">&#9660; ' + (-x.d) + '%</span>' : '<span class="cmp eq">Same</span>';
+      const tag = x.lockd ? '<span class="cmp down">' + icon('lock') + 'Locked</span>' : !x.ok ? '<span class="cmp down">Needs power level ' + L.reqLevel(it) + '</span>' : x.d > 0 ? '<span class="cmp up">&#9650; ' + x.d + '%</span>' : x.d < 0 ? '<span class="cmp down">&#9660; ' + (-x.d) + '%</span>' : '<span class="cmp eq">Same</span>';
       return '<div class="pkrow r-' + it.rar + (x.ok ? '' : ' no') + '"><div class="tile r-' + it.rar + '" data-info="' + it.uid + '" role="button" tabindex="0" title="Details"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
         '<span class="pkt"><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it) + (wn ? ' &middot; <i class="worn">worn by ' + esc(wn) + '</i>' : '') + '</small></span>' + tag +
         '<button class="btn small" data-pick="' + it.uid + '"' + (x.ok ? '' : ' disabled') + '>Equip</button></div>';
@@ -1856,7 +1856,7 @@
     updateSkills();
     const rk = L.canUse(S, 'rekindle');
     $('btn-rekindle').disabled = e <= 0 || !rk;
-    $('rekindlenote').textContent = !rk ? 'Rekindling opens at hero level ' + L.unlockOf('rekindle').lv + ', from floor ' + L.REKINDLE_FLOOR + ' or deeper. ' + heroName() + ' is level ' + L.heroLv(S) + '.'
+    $('rekindlenote').textContent = !rk ? 'Rekindling opens at hero level ' + L.unlockOf('rekindle').lv + ', from floor ' + L.REKINDLE_FLOOR + ' or deeper. ' + heroName() + ' is hero level ' + L.heroLv(S) + '.'
       : S.maxFloor < L.REKINDLE_FLOOR ? 'Reach floor ' + L.REKINDLE_FLOOR + ' on this descent to rekindle. You are on floor ' + S.maxFloor + '.'
       : 'Deeper floors give more Embers. Most delvers rekindle when progress slows down.';
   }
@@ -2542,7 +2542,7 @@
     const wb = o.wd && o.wd.b && BANNERS[o.wd.b] ? o.wd.b : '';
     return '<div class="pfcard bn-' + bn + (wb ? ' hasban' : '') + '">' + (wb ? '<div class="pfban">' + bannerSVG(wb) + '</div>' : '') + '<div class="pfava fr-' + fr + '"><div class="ic c-' + o.cls + ' player' + (ok ? ' dressed' : '') + '">' + (ok ? '<img src="' + SP.spriteURL(o.cls, 2, outfitHue(ok)) + '" alt="">' : icon(CLASS_ICON[o.cls])) + '</div></div>' +
       '<div class="pfmain"><b class="pfname nc-' + nc + '">' + esc(o.name) + '</b>' + (tt ? '<small class="pftitle">' + esc(tt) + '</small>' : '') +
-      '<div class="pftags">' + classTag(o.cls) + (o.level ? '<span class="pflv">Level ' + o.level + (o.floor ? ' · floor ' + o.floor : '') + '</span>' : '') + '</div>' +
+      '<div class="pftags">' + classTag(o.cls) + (o.level ? '<span class="pflv">Power level ' + o.level + (o.floor ? ' · floor ' + o.floor : '') + '</span>' : '') + '</div>' +
       ((pf.e || []).length ? '<div class="pfemb">' + pf.e.map(emblem).join('') + '</div>' : '') + '</div></div>' +
       (pf.b ? '<p class="pfbio">' + esc(pf.b) + '</p>' : '') +
       (o.w ? '<div class="pfwar">' + warBadge(o.w, true) + '</div>' : '');
@@ -2929,7 +2929,7 @@
         '<div class="cbtns"><button class="btn small" data-stat="' + st.id + '"' + (pts > 0 && sc < L.STAT_MAX ? '' : ' disabled') + ' aria-label="Add a point to ' + st.name + '">+1</button>' +
         (pts >= 5 ? '<button class="btn small ghost" data-stat5="' + st.id + '"' + (sc + 5 <= L.STAT_MAX ? '' : ' disabled') + '>+5</button>' : '') + '</div></div>';
     };
-    box.innerHTML = '<div class="chead"><div><h3>' + esc(L.memberById('you').name) + ', level ' + h.lv + ' ' + c.name + '</h3><small>Earns XP from every fight ' + tipI('Your hero earns XP even when they sit out. Bigger foes give more. Each level gives a stat point.') + '</small></div>' +
+    box.innerHTML = '<div class="chead"><div><h3>' + esc(L.memberById('you').name) + ', hero level ' + h.lv + ' ' + c.name + '</h3><small>Earns XP from every fight ' + tipI('Your hero earns XP even when they sit out. Bigger foes give more. Each level gives a stat point.') + '</small></div>' +
       '<div class="kbal cpts' + (pts ? ' on' : '') + '">' + icon('star') + '<b>' + pts + '</b><small>' + (pts === 1 ? 'Point' : 'Points') + '</small></div></div>' +
       '<div class="cxp"><i style="width:' + Math.min(100, h.xp / h.need * 100).toFixed(1) + '%"></i><span>' + fmt(Math.floor(h.xp)) + ' / ' + fmt(h.need) + ' XP to level ' + (h.lv + 1) + '</span></div>' +
       '<div class="cgrid">' + L.STATS.map(row).join('') + '</div>' +
@@ -2996,7 +2996,7 @@
     $('adminbox').innerHTML =
       '<div class="adm-stats"><div><small>Players</small><b>' + adminList.players.length + '</b></div><div><small>Online now</small><b>' + on + '</b></div><div><small>Banned</small><b>' + banned + '</b></div><div><small>Last wipe</small><b>' + (adminList.epoch ? new Date(adminList.epoch).toLocaleDateString() : 'never') + '</b></div></div>' +
       '<div class="adm-bar"><input id="adm-q" type="search" placeholder="Find a player by name" value="' + esc(adminQ) + '"><button class="btn small ghost" id="adm-re">Refresh</button></div>' +
-      '<div class="adm-list">' + (list.length ? list.map(p => '<div class="adm-row' + (p.banned ? ' banned' : '') + '"><span class="adm-n"><b>' + esc(p.name || 'Unnamed') + '</b>' + (p.cls ? ' ' + classTag(p.cls) : '') + '<small>' + (p.banned ? 'Banned' : (p.on ? '<span class="online">Online now</span> &middot; ' : 'Seen ' + ago(p.seen) + ' &middot; ') + 'level ' + p.level + ', floor ' + p.floor) + '</small></span>' +
+      '<div class="adm-list">' + (list.length ? list.map(p => '<div class="adm-row' + (p.banned ? ' banned' : '') + '"><span class="adm-n"><b>' + esc(p.name || 'Unnamed') + '</b>' + (p.cls ? ' ' + classTag(p.cls) : '') + '<small>' + (p.banned ? 'Banned' : (p.on ? '<span class="online">Online now</span> &middot; ' : 'Seen ' + ago(p.seen) + ' &middot; ') + 'power level ' + p.level + ', floor ' + p.floor) + '</small></span>' +
         (p.canBan ? '<button class="btn small ghost" data-grant="' + p.id + '">Sigils</button><button class="btn small ghost" data-reset="' + p.id + '">Reset</button>' : '') + (p.banned ? '<button class="btn small ghost" data-unban="' + p.id + '">Unban</button>' : '<button class="btn small danger" data-ban="' + p.id + '"' + (p.canBan ? '' : ' disabled title="They need to play once more before they can be banned"') + '>Ban</button>') + '</div>').join('') : '<p class="note">No players match.</p>') + '</div>' +
       '<h3 class="sub">Grand War links</h3>' + (adminLinks.length ? '<p class="note">Players asking to show their Grand War commander badges. Approve only when you know the player is that commander, for example from Discord.</p><div class="adm-list">' + adminLinks.sort((a, c) => a.wv - c.wv).map(l => '<div class="adm-row"><span class="adm-n"><b>' + esc(l.name || 'Unnamed') + '</b> wants to be <b>' + esc(l.wl) + '</b><small>' + (commander(l.wl) ? warBadge(l.wl) : 'Not on the war ladder right now') + (l.wv ? ' &middot; <span class="online">Verified</span>' : ' &middot; Waiting') + '</small></span>' + (l.wv ? '' : '<button class="btn small" data-lok="' + l.id + '">Approve</button>') + '<button class="btn small ghost" data-lno="' + l.id + '">' + (l.wv ? 'Remove' : 'Reject') + '</button></div>').join('') + '</div>' : '<p class="note">No players have asked to link a Grand War commander yet.</p>') +
       '<h3 class="sub">Admin log</h3>' + (adminLog.length ? '<div class="adm-list">' + adminLog.map(l => '<div class="adm-row"><span class="adm-n"><b>' + (l.act === 'wipe' ? 'Server wiped' : 'Reset ' + esc(l.name || 'a player') + (l.self ? ' (their own account)' : '')) + '</b><small>' + esc(l.by) + ' &middot; ' + new Date(l.at).toLocaleString() + (l.act === 'reset' ? ' &middot; ' + (l.sigils ? 'Sigils and purchases wiped too' : 'Sigils and purchases kept') : '') + '</small></span></div>').join('') + '</div>' : '<p class="note">No player resets or server wipes yet.</p>') +
@@ -3095,7 +3095,7 @@
       const r = await fetch(CL.api.replace(/\/$/, '') + '/leaderboard'); if (!r.ok) throw 0;
       const top = (await r.json()).top || [], me = S.hero && S.hero.name;
       box.innerHTML = '<p class="note">The deepest delvers across the Reach. Sign in to put your hero on the board. Updates every minute.</p>' +
-        (top.length ? '<ol class="lboard">' + top.map((p, i) => '<li class="' + (i < 3 ? 'top' + (i + 1) : '') + (p.name === me ? ' me' : '') + '"><span class="lbr">' + (i + 1) + '</span><span class="lbn"><b>' + esc(p.name) + '</b> ' + classTag(p.cls) + (L.SIDES[p.side] ? '<small>' + esc(L.SIDES[p.side].name) + '</small>' : '') + '</span><span class="lbf"><b>Floor ' + p.floor + '</b><small>level ' + p.level + '</small></span></li>').join('') + '</ol>' : '<p class="note">Nobody is on the board yet. Be the first.</p>');
+        (top.length ? '<ol class="lboard">' + top.map((p, i) => '<li class="' + (i < 3 ? 'top' + (i + 1) : '') + (p.name === me ? ' me' : '') + '"><span class="lbr">' + (i + 1) + '</span><span class="lbn"><b>' + esc(p.name) + '</b> ' + classTag(p.cls) + (L.SIDES[p.side] ? '<small>' + esc(L.SIDES[p.side].name) + '</small>' : '') + '</span><span class="lbf"><b>Floor ' + p.floor + '</b><small>power level ' + p.level + '</small></span></li>').join('') + '</ol>' : '<p class="note">Nobody is on the board yet. Be the first.</p>');
     } catch (e) { box.innerHTML = '<p class="note">The leaderboard could not load right now. Try again in a minute.</p>'; lbAt = 0; }
   }
   $('codexseg').addEventListener('click', e => { if (e.target.closest('[data-cx="board"]')) loadBoard(); });
@@ -3575,7 +3575,7 @@
     const seen = {};
     for (const q of rivals || []) {
       if (q.name === me || q.floor < x.first || q.floor > x.last) continue; const p = pts[q.floor - x.first], st = seen[q.floor] = (seen[q.floor] || 0) + 1; if (st > 2) continue;
-      const col = (L.SIDES[q.side] || L.SIDES.unsworn).color; s += '<g><title>' + esc(q.name + ', level ' + q.level + ', deepest floor ' + q.floor) + '</title><circle cx="' + (p.x - 9 - (st - 1) * 8) + '" cy="' + (p.y - 13) + '" r="4" fill="' + col + '" stroke="#04070d" stroke-width="1.3"/></g>';
+      const col = (L.SIDES[q.side] || L.SIDES.unsworn).color; s += '<g><title>' + esc(q.name + ', power level ' + q.level + ', deepest floor ' + q.floor) + '</title><circle cx="' + (p.x - 9 - (st - 1) * 8) + '" cy="' + (p.y - 13) + '" r="4" fill="' + col + '" stroke="#04070d" stroke-width="1.3"/></g>';
     }
     if (cur >= x.first && cur <= x.last) { const p = pts[cur - x.first]; s += '<g class="youhere"><path d="M' + p.x + ' ' + (p.y - 13) + 'l-6 -11h12z" fill="#f5c242" stroke="#1a120b"/><text x="' + p.x + '" y="' + (p.y - 28) + '" class="mh">' + esc(me || 'You') + '</text></g>'; }
     return s + '</svg>';
@@ -3771,8 +3771,12 @@
         'Tap the arena (or press <b>Space</b>) to strike.',
         'Each tap hits for <b>1 + 5% of your party damage per second</b>. The Grim Whetstone relic adds 25% per level, and a critical hit does 5x. Hover the <b>i</b> in the arena corner to see your tap damage.',
         'Each floor has <b>8 monsters</b>. Clear them to go deeper.',
-        'Monsters drop <b>gold</b>. Spend it to <b>train</b> your party in the Party tab.',
-        'Every <b>25 levels</b> a companion gets a big power jump.']],
+        'Monsters drop <b>gold</b>. Spend it to <b>train</b> your party in the Party tab. Training raises a character\'s <b>power level</b>.',
+        'Every <b>25 power levels</b> a character gets a big power jump.']],
+      ['Power level and hero level', 'i:star', 'Two different levels. Power level is how strong each fighter is; hero level is how far your own hero has come.', [
+        '<b>Power level</b>: every character in your party has one, your hero included. Raise it with gold (<b>Train</b> on the Party tab). It sets damage and health, and gear needs a power level to wear. Rekindling resets it.',
+        '<b>Hero level</b>: your own hero\'s experience level, from fighting. It gives stat points, opens new parts of the game and lets you into deeper regions. It is never reset.',
+        'So a hero can be hero level 11 and power level 142 at the same time. Your Party card shows power level; the Skills tab and Codex show hero level.']],
       ['Hero level and unlocks', 'i:star', 'New parts of the game open as your hero levels up. Codex, Progress shows the whole road.', [
         'Level <b>3</b>: Gear. <b>5</b>: the Campfire. <b>8</b>: map travel and buying on the Market. <b>10</b>: camp jobs.',
         '<b>12</b>: the Players Guild. <b>15</b>: the Ember Ring. <b>18</b>: selling and the Sigil exchange. <b>20</b>: rekindling. <b>25</b>: world boss and job sets.',
@@ -3908,7 +3912,7 @@
       ['Gear basics', 's:chest', 'Gear drops from monsters, chests and guardians. Each piece fits one class and slot.', [
         'Slots: main hand, offhand, helmet, trinket, chest, legs, feet, ring. Robes cover chest and legs.',
         'Change gear at <b>camp</b>. <b>Equip best</b> does it in one tap.',
-        'A <b>green arrow</b> marks an upgrade. The corner number is the level needed.',
+        'A <b>green arrow</b> marks an upgrade. The corner number (Lv) is the power level needed.',
         'Upgrade with gold, or salvage what you do not need.']],
       ['Rarity and sets', 'i:crown', 'Rare and epic gear is a real find, and gets likelier deeper down.', [
         'From floor 15, guardians can drop <b>set pieces</b>. Two or three of a set add bonuses.',
@@ -4033,6 +4037,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 73, date: 'November 23, 2026', title: 'Power level and hero level', items: [
+      'The level shown on each Party card is now called power level. It is what training with gold raises, and what gear needs.',
+      'Your hero level (from XP, which opens new parts of the game) is now always called hero level, so the two never get mixed up. A hero can be hero level 11 with a power level of 142.',
+      'The Guide and the wiki explain both.'] },
     { v: 72, date: 'November 23, 2026', title: 'A tidier Hold', items: [
       'The hero setup screen is wider on computers, so class and banner names no longer spill out of their cards.',
       'On phones, all four currencies fit the top bar again (Embers and Dust were cut off once gold reached millions). Quests and blessings sit just under them.',
@@ -4490,7 +4498,7 @@
           const it = l.item, mine = trade.mine || l.seller === trade.me, rar = L.RARITY.find(r => r.id === it.rar);
           return '<button class="mkcard r-' + it.rar + '" data-tview="' + l.id + '">' + tradeTile(it) +
             '<span class="mkname r-' + it.rar + '">' + tradeName(it) + '</span>' +
-            '<span class="mkmeta">' + rar.name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; lvl ' + L.reqLevel(it) + '</span>' +
+            '<span class="mkmeta">' + rar.name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; power level ' + L.reqLevel(it) + '</span>' +
             '<span class="mkfoot"><span class="price">' + icon('coin') + fmt(l.price) + '</span>' + (mine ? '<span class="mkmine">Yours</span>' : marketCmp(it)) + '</span></button>';
         }).join('') + '</div>' : '<div class="mkempty">' + icon('bag') + '<b>' + (trade.mine ? 'Nothing for sale yet' : 'No matching ' + L.CLASSES[trade.cls].name.toLowerCase() + ' gear') + '</b><small>' + (trade.mine ? 'Tap an item in your Gear tab and choose Sell to list it here.' : (trade.list.length ? 'Try a wider filter.' : 'Check back later, or list something of your own.')) + '</small></div>';
       }
@@ -4527,7 +4535,7 @@
     const om = owner && L.memberById(owner);
     const set = it.set && L.SETS.find(x => x.id === it.set), js = it.jset && L.JOB_SETS[it.jset];
     modal('<div class="icard r-' + it.rar + '"><button class="iconbtn icx" id="l-x" aria-label="Close">&times;</button>' +
-      '<div class="ihero">' + tradeTile(it).replace('class="tile', 'class="tile big') + '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + tradeName(it) + '</h2><small>Requires level <b class="' + (om && !L.canWear(S, owner, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
+      '<div class="ihero">' + tradeTile(it).replace('class="tile', 'class="tile big') + '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + tradeName(it) + '</h2><small>Requires power level <b class="' + (om && !L.canWear(S, owner, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
       '<div class="istats">' + stats + '</div>' +
       (om ? '<p class="icmp">' + (reps.length ? 'Compared with ' + esc(om.name) + '’s ' + reps.map(r => esc(L.gearName(r))).join(' and ') + '.' : esc(om.name) + ' has an open ' + L.SLOT_NAME[it.slot].toLowerCase() + ' slot.') + '</p>' : '<p class="icmp">You have no ' + L.CLASSES[it.cls].name.toLowerCase() + ' yet to wear this.</p>') +
       (it.aff ? '<div class="iaff">' + icon('flame') + '<span><b>+' + Math.round(it.aff.v * (1 + 0.1 * it.up) * 100) + '% ' + (L.JOBS.find(j => j.id === it.aff.j) || {}).name + ' job</b><small>Counts while the wearer works that job at the campfire.</small></span></div>' : '') +

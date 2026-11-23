@@ -827,6 +827,7 @@
     { id: 'oil',     name: 'Deep Reservoir',      desc: '+3s lantern time against guardians per rank',   per: 3,    max: 5, base: 2, icon: 'lantern' },
     { id: 'watch',   name: 'Night Watch',         desc: 'Your party keeps earning 16 hours longer while you are away, per rank', per: 16 * 3600, max: 4, base: 2, icon: 'lantern' },
     { id: 'draught', name: 'Slow-burning Draught', desc: 'Campfire Draughts last 20s longer per rank',   per: 20,   max: 3, base: 1, icon: 'flame' },
+    { id: 'sense',   name: 'Sigil Sense',         desc: '+0.01% chance per rank to find Sigils in chests and on guardians', per: 0.0001, max: 5, base: 3, icon: 'star' },
   ];
   const kup = (s, id) => { const u = KINDLE_UPS.find(x => x.id === id); return ((s.kup || {})[id] || 0) * u.per; };
   const kupCost = (s, id) => { const u = KINDLE_UPS.find(x => x.id === id), r = (s.kup || {})[id] || 0; return r >= u.max ? 0 : u.base + r * 2; };
@@ -1142,6 +1143,41 @@
     healParty(s, dmg * CLASSES.necro.drain * 0.05, false);
   }
 
+  // Sigils found in play: very rare, from treasure chests and guardians only. Sigil Sense and depth raise the odds a little.
+  // The server caps how many found Sigils a player can bank per day (perks.js), so this stays a slow trickle.
+  const SIGIL_CHEST = 0.0005, SIGIL_BOSS = 0.001, SIGIL_DEPTH = 0.0001, SIGIL_DROP_DAY = 15;
+  const sigilLuck = s => kup(s, 'sense') + SIGIL_DEPTH * Math.min(5, Math.floor((s.maxFloorEver || 0) / 30));
+  const sigilChance = (s, kind) => (kind === 'boss' ? SIGIL_BOSS : SIGIL_CHEST) + sigilLuck(s);
+  function dropSigils(s, foe, rng, events) {
+    if (!foe.chest && !foe.boss) return;
+    const r = rng || Math.random;
+    if (r() >= sigilChance(s, foe.boss ? 'boss' : 'chest')) return;
+    const n = 1 + Math.floor(r() * 3);
+    s.sigPend = (s.sigPend || 0) + n; s.stats.sigils = (s.stats.sigils || 0) + n;
+    events && events.push({ type: 'sigil', n, chest: !!foe.chest });
+  }
+  // Daily quests: three a day, the same for everyone, picked from the UTC date. Progress counts stats since the day began.
+  const QUESTS = [
+    { id: 'kills',  stat: 'kills',     n: 400, text: 'Defeat {n} monsters' },
+    { id: 'boss',   stat: 'bossKills', n: 12,  text: 'Defeat {n} guardians' },
+    { id: 'chests', stat: 'chests',    n: 10,  text: 'Open {n} treasure chests' },
+    { id: 'crits',  stat: 'crits',     n: 150, text: 'Land {n} critical hits' },
+    { id: 'clicks', stat: 'clicks',    n: 250, text: 'Strike {n} times with your lantern' },
+  ];
+  const QUEST_REWARD = 1, QUEST_BONUS = 2;
+  const questDay = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
+  function dailyQuests(day) {
+    let h = 0; for (const c of day) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    const pool = QUESTS.slice(), out = [];
+    for (let i = 0; i < 3; i++) { h = (h * 1103515245 + 12345) >>> 0; out.push(pool.splice(h % pool.length, 1)[0]); }
+    return out;
+  }
+  // Rolls the quest log over at UTC midnight and returns today's quests with progress.
+  function questState(s) {
+    const day = questDay();
+    if (!s.daily || s.daily.day !== day) s.daily = { day, base: Object.assign({}, s.stats), got: 0 };
+    return dailyQuests(day).map((q, i) => { const have = Math.max(0, (s.stats[q.stat] || 0) - (s.daily.base[q.stat] || 0)); return { i, id: q.id, text: q.text.replace('{n}', q.n.toLocaleString('en-US')), have: Math.min(have, q.n), n: q.n, done: have >= q.n, got: !!(s.daily.got & (1 << i)) }; });
+  }
   function killFoe(s, now, rng, events) {
     const foe = s.foe, f = s.floor;
     let g = foeGold(f, foe.boss) * goldMult(s);
@@ -1152,6 +1188,7 @@
     unlockLore(s, foe.boss ? 'boss' : 'foe_' + foe.sprite, events);
     if (foe.boss && f % 10 === 0) unlockLore(s, 'g' + (Math.floor((f - 1) / 10) % BIOMES.length), events);
     dropGear(s, foe, rng, events);
+    dropSigils(s, foe, rng, events);
     s.foe = null; s.foeSwing = 0;
     if (foe.boss) {
       s.stats.bossKills++;
@@ -1474,7 +1511,7 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, PASS_COST, PASS_DAYS, PASS_BAG, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

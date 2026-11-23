@@ -1,4 +1,4 @@
-/* lh-build 202611231501 */
+/* lh-build 202611231509 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -653,7 +653,7 @@
     if (kind === 'kin') return { name: KIN_TRAIT_NAME[t.cls], when: 'With a ' + CLASSES[t.cls].name.toLowerCase() + ' in the party', fx: pct + fx.n, grade: TRAIT_GRADE[t.g] };
     return { name: CAMP_TRAIT_NAME[t.k], when: 'Resting at camp', fx: (t.k === 'train' ? Math.round(t.v * 100) + '% ' : pct) + fx.n, grade: TRAIT_GRADE[t.g] };
   }
-  function sk(s, key) { return skBase(s, key) + tonicVal(s, key) + traitVal(s, key); }
+  function sk(s, key) { return skBase(s, key) + tonicVal(s, key) + traitVal(s, key) + enchVal(s, key); }
   function skBase(s, key) {
     if (!s.party.includes('you')) return 0;
     if (!s.skills) return auraVal(s, key) + statVal(s, key);
@@ -746,6 +746,8 @@
     if (it.slot === 'weapon') it.slot = 'main';
     else if (it.slot === 'armor') it.slot = CLOTH[it.cls] && !it.set ? 'robe' : 'chest';
     else if (it.slot === 'trinket') it.slot = 'neck';
+    if (typeof it.en !== 'string') { if (it.uid) rollEnch(it, seeded(it.uid)); else it.en = ''; }
+    else if (enchList(it).length > sockets(it) || !/^([a-h][1-9])*$/.test(it.en)) it.en = enchStr(enchList(it).slice(0, sockets(it)));
     return it;
   }
   const RARITY = [
@@ -808,7 +810,7 @@
     let rar;
     if (opts && opts.set) {
       const set = SETS.find(x => x.cls === cls);
-      return { uid: Date.now().toString(36) + (uidSeq++), cls, slot: ['main', 'chest', 'neck'][Math.floor(r() * 3)], rar: 'set', set: set.id, ilvl: f, up: 0 };
+      return rollEnch({ uid: Date.now().toString(36) + (uidSeq++), cls, slot: ['main', 'chest', 'neck'][Math.floor(r() * 3)], rar: 'set', set: set.id, ilvl: f, up: 0 }, r);
     }
     const slot = rollSlot(cls, r);
     // Rarity odds start stingy and open up with depth (d reaches 1 at floor 80).
@@ -817,13 +819,13 @@
     rar = p > 0.995 - 0.03 * d ? 'epic' : p > 0.94 - 0.08 * d ? 'rare' : p > 0.7 - 0.12 * d ? 'fine' : 'common';
     const it = { uid: Date.now().toString(36) + (uidSeq++), cls, slot, rar, ilvl: f, up: 0 };
     if (r() < (AFFIX_CHANCE[rar] || 0)) it.aff = { j: JOB_KEYS[Math.floor(r() * JOB_KEYS.length)], v: Math.round((0.1 + r() * 0.2) * (rar === 'epic' ? 1.5 : 1) * 100) / 100 };
-    return it;
+    return rollEnch(it, r);
   }
   const JOB_KEYS = Object.keys(JOB_SETS);
   function rollJobSet(s, f, r) {
     const classes = Array.from(new Set(s.party.filter(Boolean).map(id => memberById(id).cls)));
     const cls = classes.length ? classes[Math.floor(r() * classes.length)] : CLASS_ORDER[Math.floor(r() * 5)];
-    return { uid: Date.now().toString(36) + (uidSeq++), cls, slot: ['head', 'feet', 'ring'][Math.floor(r() * 3)], rar: 'set', jset: JOB_KEYS[Math.floor(r() * JOB_KEYS.length)], ilvl: f, up: 0 };
+    return rollEnch({ uid: Date.now().toString(36) + (uidSeq++), cls, slot: ['head', 'feet', 'ring'][Math.floor(r() * 3)], rar: 'set', jset: JOB_KEYS[Math.floor(r() * JOB_KEYS.length)], ilvl: f, up: 0 }, r);
   }
   // Lantern Pass: a 30-day convenience pass bought with Sigils. Auto-train, +10 bag slots, +4 hours of offline time. No power.
   const PASS_COST = 500, PASS_DAYS = 30, PASS_BAG = 10, PASS_OFFLINE = 4 * 3600;
@@ -911,6 +913,56 @@
     s.bag = s.bag.filter(x => x !== it);
     const v = salvageValue(it); s.gold += v; return v;
   }
+  // Enchantments (John, 2026-11-23): items have enchant sockets by rarity and item level. A socket can hold one
+  // enchant, stored on the item as a compact string `en` of letter+tier pairs ("c3a1" = Keen III, Might I).
+  // Enchants help the whole party while worn by anyone in it. Disenchanting destroys one item and moves one of
+  // its enchants into a socket on another item, of any class. Sigils never buy enchants.
+  const ENCH = {
+    a: { name: 'Might',   k: 'pdps',    v: 0.01,   cap: 1,    fmt: 'pct', what: 'party damage' },
+    b: { name: 'Vigor',   k: 'php',     v: 0.01,   cap: 1,    fmt: 'pct', what: 'party health' },
+    c: { name: 'Keen',    k: 'crit',    v: 0.003,  cap: 0.15, fmt: 'pct', what: 'critical hit chance' },
+    d: { name: 'Fortune', k: 'gold',    v: 0.015,  cap: 1,    fmt: 'pct', what: 'gold' },
+    e: { name: 'Finder',  k: 'loot',    v: 0.01,   cap: 0.5,  fmt: 'pct', what: 'gear drops' },
+    f: { name: 'Mending', k: 'pheal',   v: 0.01,   cap: 1,    fmt: 'pct', what: 'party healing' },
+    g: { name: 'Warding', k: 'guard',   v: 0.005,  cap: 0.25, fmt: 'pct', what: 'less damage taken' },
+    h: { name: 'Wick',    k: 'lantern', v: 0.3,    cap: 10,   fmt: 's',   what: 'lantern time' },
+  };
+  const ENCH_KEYS = Object.keys(ENCH), ENCH_MAX = 4;
+  const SOCK_BASE = { common: 0, fine: 1, rare: 2, epic: 3, set: 2 }, ENCH_FILL = { common: 0.3, fine: 0.4, rare: 0.5, epic: 0.7, set: 0.5 };
+  const sockets = it => Math.min(ENCH_MAX, (SOCK_BASE[it.rar] || 0) + (it.ilvl >= 30 ? 1 : 0) + (it.ilvl >= 80 ? 1 : 0));
+  const enchList = it => { const o = [], e = it && it.en || ''; for (let i = 0; i + 1 < e.length; i += 2) if (ENCH[e[i]]) o.push({ id: e[i], t: +e[i + 1] }); return o; };
+  const enchStr = l => l.map(x => x.id + x.t).join('');
+  const enchTierMax = it => Math.min(9, 1 + Math.floor(it.ilvl / 12) + (it.rar === 'epic' || it.rar === 'set' ? 1 : 0));
+  function rollEnch(it, r) {
+    let e = ''; const n = sockets(it), tm = enchTierMax(it);
+    for (let i = 0; i < n; i++) if (r() < (ENCH_FILL[it.rar] || 0)) e += ENCH_KEYS[Math.floor(r() * ENCH_KEYS.length)] + (1 + Math.floor(r() * tm));
+    it.en = e; return it;
+  }
+  // Older items get their enchants rolled once, seeded from the item id, so a reload never rerolls them.
+  function seeded(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return () => { h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909); return ((h >>>= 0) % 1e6) / 1e6; }; }
+  const enchVal1 = x => ENCH[x.id].v * x.t;
+  const enchText = x => { const d = ENCH[x.id], v = enchVal1(x); return d.fmt === 's' ? '+' + (Math.round(v * 10) / 10) + 's ' + d.what : '+' + (Math.round(v * 1000) / 10) + '% ' + d.what; };
+  // Party-wide enchant totals, cached briefly because sk() is called many times a tick.
+  let enCache = { s: null, t: 0, v: null };
+  function enchTotals(s) {
+    const now = Date.now();
+    if (enCache.s === s && now - enCache.t < 500) return enCache.v;
+    const v = {};
+    for (const id of s.party) { if (!id) continue; const g = s.gear[id] || {}; for (const p in g) { const it = itemOf(s, g[p]); if (!it || (p === 'legs' && robeOn(s, id))) continue; for (const x of enchList(it)) { const d = ENCH[x.id]; v[d.k] = Math.min(d.cap, (v[d.k] || 0) + enchVal1(x)); } } }
+    enCache = { s, t: now, v }; return v;
+  }
+  const enchVal = (s, key) => (s.gear && s.bag ? enchTotals(s)[key] || 0 : 0);
+  const enchDirty = () => { enCache = { s: null, t: 0, v: null }; };
+  // Move enchant number `idx` of `src` into socket `slot` of `dst` (an empty socket, or one to overwrite). src is destroyed.
+  function disenchant(s, srcUid, idx, dstUid, slot) {
+    const a = itemOf(s, srcUid), b = itemOf(s, dstUid);
+    if (!a || !b || a === b || a.lk || wornAt(s, a.uid)) return null;
+    const la = enchList(a), lb = enchList(b), x = la[idx]; if (!x) return null;
+    const n = sockets(b); if (!(slot >= 0 && slot < n && slot <= lb.length)) return null;
+    const old = lb[slot] || null; lb[slot] = { id: x.id, t: x.t }; b.en = enchStr(lb);
+    s.bag = s.bag.filter(y => y !== a); enchDirty();
+    return { item: b, moved: x, replaced: old, lost: a };
+  }
   // Merging (John, 2026-11-23): two copies of the same item fuse into one a level higher (+1), keeping the higher
   // item level and the better camp-job affix. Every merge can fail and destroy BOTH pieces. The risk climbs with the
   // level you are merging up to; your hero's Luck and Intelligence points shave it down (by up to half).
@@ -930,7 +982,8 @@
     if (lose) { drop(a); drop(b); return { ok: false, risk: m.risk, a, b }; }
     a.up = m.to; a.ilvl = Math.max(a.ilvl, b.ilvl);
     if (b.aff && (!a.aff || b.aff.v > a.aff.v)) a.aff = b.aff;
-    drop(b);
+    a.en = enchStr(enchList(a).concat(enchList(b)).sort((x, y) => y.t - x.t).slice(0, sockets(a)));
+    drop(b); enchDirty();
     return { ok: true, risk: m.risk, item: a };
   }
   // Locked items are kept out of every bulk action: mass scrap, auto-sell on a full pack, and the Loot Goblin.
@@ -1778,7 +1831,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

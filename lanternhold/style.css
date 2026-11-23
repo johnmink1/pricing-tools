@@ -1,4 +1,4 @@
-/* lh-build 202611231501 */
+/* lh-build 202611231509 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1518,3 +1518,19 @@ h3.sub .tipi{vertical-align:2px}
 .mgodds .ok b{color:#7fd88a}.mgodds .bad b{color:#ff8a78}
 .mgcut{font-size:12px;color:var(--muted);margin:2px 0 8px}
 .mergebox .row{display:flex;gap:8px;justify-content:flex-end}
+/* enchantments */
+.iench{margin:10px 0;padding:8px 10px;border:1px solid #3b4f86;border-radius:10px;background:rgba(120,150,255,.06);display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ienh{grid-column:1/-1;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#a9b8ff;display:flex;align-items:center;gap:6px}
+.esock{display:flex;flex-direction:column;padding:6px 8px 6px 22px;border-radius:8px;background:#0e121a;border:1px dashed var(--line2);position:relative;min-width:0}
+.esock i{position:absolute;left:8px;top:11px;width:8px;height:8px;border-radius:50%;border:1px solid #6b7aa8}
+.esock.on{border-style:solid;border-color:#3b4f86}.esock.on i{background:#9fb2ff;border-color:#9fb2ff;box-shadow:0 0 6px #9fb2ff}
+.esock b{font-size:13px;color:#cdd6ff}.esock small{font-size:11.5px;color:var(--muted)}
+.enstep{margin:8px 0}.enstep>small{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.enchips{display:flex;flex-wrap:wrap;gap:6px}
+.enchip{display:flex;flex-direction:column;align-items:flex-start;padding:6px 10px;border-radius:10px;border:1px solid var(--line2);background:#0e121a;color:var(--text);font:inherit;cursor:pointer}
+.enchip b{font-size:13px}.enchip small{font-size:11px;color:var(--muted)}
+.enchip.sel{border-color:var(--gold);background:#2a2410}.enchip.full small{color:#ffb0a0}
+.enchbox .mglist{max-height:30vh}
+a.iconbtn{text-decoration:none}
+#btn-discord:hover{color:#8ea1ff}
+.note.warn{color:#ffb0a0}

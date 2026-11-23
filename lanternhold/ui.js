@@ -502,7 +502,7 @@
         const a = mAnim(e.id); floatText('Back up', 'heal', a.x / W, (a.y - 10) / H);
       } else if (e.type === 'ability') {
         const a = mAnim(e.id), ab = L.CLASSES[e.cls].ability;
-        floatText(ab.name, 'skill', a.x / W, (a.y - 14) / H);
+        floatText(e.name || ab.name, 'skill', a.x / W, (a.y - 14) / H);
         if (e.dmg) floatText(fmt(e.dmg), 'crit', FOE_X, 0.38);
         if (e.cls === 'healer') burst(a.x, a.y, 16, ['#9be87a', '#d6ffc2'], 30);
         tone(440, 0.12, 'triangle', 0.035, 880);
@@ -584,7 +584,7 @@
   }
   function campModal() {
     const n = (S.items && S.items.draught) || 0;
-    modal('<div class="center"><div class="campfire-ic">' + icon('flame') + '</div><h2>That happens at camp</h2><p>Swapping companions, recruiting players, training companions and changing gear all happen at camp, at the top of the stair.</p></div>' +
+    modal('<div class="center"><div class="campfire-ic">' + icon('flame') + '</div><h2>That happens at camp</h2><p>Swapping companions, recruiting players, training companions resting at the campfire and changing gear all happen at camp, at the top of the stair.</p></div>' +
       '<div class="choice"><button class="pick" id="c-go"><b>Return to camp</b><small>Travel up to floor 1. You can head straight back down to floor ' + S.floor + ' afterwards.</small></button>' +
       '<button class="pick" id="c-drink"' + (n ? '' : ' disabled') + '><b>Drink a Campfire Draught (' + n + ' left)</b><small>Make camp right here for 60 seconds.</small></button>' +
       '<button class="pick" id="c-store"><b>Visit the store</b><small>Buy Campfire Draughts and Lantern Oil.</small></button></div>' +
@@ -597,7 +597,7 @@
     const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now());
     if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>At camp</b><small>Swap companions, recruit, train and change gear.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + Math.min(S.maxFloor, Math.max(2, S.campReturn || S.maxFloor)) + '</button>' : '') + '<button class="btn ghost small" data-camp="store">Store</button></div>';
     if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Camp made: ' + Math.ceil(left) + 's</b><small>A Campfire Draught is burning. Make your changes now.</small></div><button class="btn ghost small" data-camp="store">Store</button></div>';
-    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Party changes, companion training and gear happen at camp.</small></div><button class="btn small" data-camp="go">Return to camp</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
+    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Swapping companions and changing gear happen at camp. Your party can train anywhere.</small></div><button class="btn small" data-camp="go">Return to camp</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
   }
   let campWas = null;
   function paintCamp() {
@@ -674,7 +674,7 @@
       if (!guest) {
         const n = buyN() === 'max' ? Math.max(1, L.maxAffordable(S, id)) : buyN();
         const cost = L.trainCost(S, id, n);
-        btn = '<button class="buy" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button>';
+        btn = '<button class="buy anywhere" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button>';
       } else btn = '<button class="btn ghost small" data-dismiss="' + id + '">Dismiss</button>';
       const mv = '<div class="mv"><button class="mini up" data-move="' + i + ':-1"' + (i === 0 ? ' disabled' : '') + ' title="Move forward" aria-label="Move ' + esc(m.name) + ' forward">&#9650;</button><button class="mini dn" data-move="' + i + ':1"' + (i === L.PARTY_SIZE - 1 ? ' disabled' : '') + ' title="Move back" aria-label="Move ' + esc(m.name) + ' back">&#9660;</button></div>';
       html += '<div class="seat' + (down ? ' down' : '') + (m.player ? ' mine' : '') + '"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span>' + mv + portrait(id) +
@@ -712,7 +712,7 @@
     const t = e.target.closest('button'); if (!t) return;
     if (t.dataset.move) { const [i, d] = t.dataset.move.split(':').map(Number); if (L.moveMember(S, i, i + d)) { sfx.buy(); updateSeats(true); updateAbilities(true); } return; }
     if (t.id === 'f-auto') { L.autoFormation(S); S.formationManual = false; sfx.buy(); updateSeats(true); updateAbilities(true); toast('shield', 'Party arranged', 'Tank in front, rogue behind it, healers in the middle where they reach everyone, casters at the back.', ''); return; }
-    if ((t.dataset.train && t.dataset.train !== 'you') || t.dataset.unseat || t.dataset.seat || t.dataset.dismiss || t.dataset.recruit || t.dataset.job || t.dataset.jobfor) { if (!campGate()) return; }
+    if ((t.dataset.train && !S.party.includes(t.dataset.train)) || t.dataset.unseat || t.dataset.seat || t.dataset.dismiss || t.dataset.recruit || t.dataset.job || t.dataset.jobfor) { if (!campGate()) return; }
     if (t.dataset.job) { jobModal(t.dataset.job); return; }
     if (t.dataset.jobfor) { jobForModal(t.dataset.jobfor); return; }
     if (t.dataset.train) { if (L.train(S, t.dataset.train, buyN())) { sfx.buy(); updateSeats(true); } }
@@ -829,15 +829,24 @@
   let abilKey = '';
   function updateAbilities(force) {
     const now = Date.now(), box = $('abilities');
-    const key = S.party.join(',');
+    const specs = L.heroSpecs(S), key = S.party.join(',') + '|' + specs.map(a => a.id).join(',');
     if (force || key !== abilKey) {
       abilKey = key;
+      box.classList.toggle('more', specs.length > 0);
+      const hc = specs.length && L.memberById('you').cls;
       box.innerHTML = S.party.map((id, i) => {
         if (!id) return '<div class="skill locked"><svg viewBox="0 0 24 24"><use href="#i-user"/></svg><div><b>Empty seat</b><small>&nbsp;</small></div><kbd>' + (i + 1) + '</kbd></div>';
         const m = L.memberById(id), ab = L.CLASSES[m.cls].ability;
         return '<button class="skill c-' + m.cls + '" data-cast="' + id + '" title="' + esc(ab.desc) + '"><div class="cd"></div>' + icon(CLASS_ICON[m.cls]) + '<div><b>' + ab.name + '</b><small></small></div><kbd>' + (i + 1) + '</kbd></button>';
-      }).join('');
+      }).join('') + specs.map((ab, i) => '<button class="skill spec c-' + hc + '" data-spec="' + ab.id + '" title="' + esc(ab.desc) + '"><div class="cd"></div>' + icon('star') + '<div><b>' + esc(ab.name) + '</b><small></small></div><kbd>' + (6 + i) + '</kbd></button>').join('');
     }
+    box.querySelectorAll('[data-spec]').forEach(b => {
+      const ab = specs.find(a => a.id === b.dataset.spec); if (!ab) return;
+      const st = S.abil['you:' + ab.id], active = st && st.until > now && ab.dur > 0, cd = st && st.readyAt > now ? (st.readyAt - now) / 1000 : 0, down = !!S.down.you;
+      b.classList.toggle('active', !!active); b.classList.toggle('ready', !cd && !down); b.disabled = down;
+      b.querySelector('small').textContent = down ? 'Your hero has fallen' : active ? 'Active ' + fmtTime((st.until - now) / 1000) : cd ? 'Ready in ' + fmtTime(cd) : 'Ready';
+      b.querySelector('.cd').style.transform = 'scaleX(' + (cd && !active ? cd / ab.cd : 0) + ')';
+    });
     box.querySelectorAll('[data-cast]').forEach(b => {
       const id = b.dataset.cast, m = L.memberById(id), ab = L.CLASSES[m.cls].ability, st = S.abil[id];
       const active = st && st.until > now && ab.dur > 0, cd = st && st.readyAt > now ? (st.readyAt - now) / 1000 : 0;
@@ -848,7 +857,7 @@
       ov.style.transform = 'scaleX(' + (cd && !active ? cd / ab.cd : 0) + ')';
     });
   }
-  $('abilities').addEventListener('click', e => { const b = e.target.closest('[data-cast]'); if (b) { if (L.castAbility(S, b.dataset.cast, Date.now(), events)) { handleEvents(); updateAbilities(); } } });
+  $('abilities').addEventListener('click', e => { const sp = e.target.closest('[data-spec]'); if (sp) { if (L.castSpec(S, sp.dataset.spec, Date.now(), events)) { handleEvents(); updateAbilities(); } return; } const b = e.target.closest('[data-cast]'); if (b) { if (L.castAbility(S, b.dataset.cast, Date.now(), events)) { handleEvents(); updateAbilities(); } } });
 
   // ---------- gear ----------
   let gearWho = 'you', gearKey = '';
@@ -871,6 +880,7 @@
   }
   // Away from camp you only see the party you brought down; the campfire roster stays hidden.
   const gearOwners = () => { const inCamp = camp(); return S.unlocked.filter(id => { const m = L.memberById(id); return m && !m.guest && (inCamp || S.party.includes(id)); }); };
+  let whoRestOpen = false;
   function updateGear(force) {
     const who = gearOwners();
     if (!who.includes(gearWho)) gearWho = who[0];
@@ -878,10 +888,14 @@
     if (!gearWho) return;
     const key = gearWho + '|' + camp() + '|' + S.party.join() + '|' + S.bag.length + '|' + JSON.stringify(S.gear) + '|' + S.bag.map(x => x.up).join('') + '|' + S.unlocked.length + '|' + Math.floor(S.gold);
     if (!force && key === gearKey) return; gearKey = key;
-    $('gearwho').innerHTML = who.map(id => {
-      const m = L.memberById(id), n = Object.keys(L.betterFor(S, id)).length;
-      return '<button class="whochip c-' + m.cls + (id === gearWho ? ' on' : '') + '" data-who="' + id + '"><img src="' + SP.spriteURL(m.cls, 2, m.hue || 0) + '" alt=""><span>' + esc(m.name) + '</span>' + (n ? '<em title="Better gear in your pack">' + n + '</em>' : '') + '</button>';
-    }).join('');
+    { const chip = id => {
+        const m = L.memberById(id), n = Object.keys(L.betterFor(S, id)).length;
+        return '<button class="whochip c-' + m.cls + (id === gearWho ? ' on' : '') + '" data-who="' + id + '"><img src="' + SP.spriteURL(m.cls, 2, m.hue || 0) + '" alt=""><span>' + esc(m.name) + '</span>' + (n ? '<em title="Better gear in your pack">' + n + '</em>' : '') + '</button>';
+      };
+      const inParty = S.party.filter(id => id && who.includes(id)), rest = who.filter(id => !inParty.includes(id));
+      $('gearwho').innerHTML = '<div class="whogroup"><small>Your party</small><div>' + inParty.map(chip).join('') + '</div></div>' +
+        (rest.length ? '<details class="whogroup rest"' + (rest.includes(gearWho) || whoRestOpen ? ' open' : '') + '><summary>At the campfire <em>' + rest.length + '</em></summary><div>' + rest.map(chip).join('') + '</div></details>' : '');
+      const dt = $('gearwho').querySelector('details'); if (dt) dt.ontoggle = () => { whoRestOpen = dt.open; }; }
     const m = L.memberById(gearWho), g = S.gear[gearWho] || {}, cname = L.CLASSES[m.cls].name;
     const set = L.SETS.find(x => x.cls === m.cls), sc = L.setCount(S, gearWho, set.id);
     const better = L.betterFor(S, gearWho), nb = Object.keys(better).length;
@@ -1204,7 +1218,7 @@
     box.innerHTML = '<div class="khead"><div><h3>' + esc(L.memberById('you').name) + '’s ' + c.name + ' skills</h3><small>Your hero’s skills work while they are in the party. Kindling comes from rekindling.</small></div>' +
       '<div class="kbal">' + icon('flame') + '<b>' + k + '</b><small>Kindling</small></div></div>' +
       '<div class="ktree">' + tree.map(br => '<div class="kbranch"><h4>' + br.b + '</h4>' + br.s.map(node).join('<i class="klink"></i>') + '</div>').join('') + '</div>' +
-      '<div class="kfoot"><span>Spent ' + L.skillSpent(S) + ' of 36</span>' + (L.skillSpent(S) ? '<button class="btn ghost small" id="k-reset">Reset tree</button>' : '') + '</div>' +
+      '<div class="kfoot"><span>Spent ' + L.skillSpent(S) + ' of 48</span>' + (L.skillSpent(S) ? '<button class="btn ghost small" id="k-reset">Reset tree</button>' : '') + '</div>' +
       '<h3 class="sub">Spend Kindling</h3><div class="kshop">' +
       '<div class="kitem"><div class="kic">' + icon('bag') + '</div><div><b>Bigger pack</b><small>+' + L.BAG_STEP + ' bag slots. You have ' + L.bagCap(S) + '.</small></div>' +
       (capNext > 0 ? '<button class="btn small" id="k-bag"' + (k >= bc ? '' : ' disabled') + '>' + bc + ' Kindling</button>' : '<em class="kmax">Full size</em>') + '</div>' +
@@ -1327,6 +1341,7 @@
   window.addEventListener('keydown', e => {
     if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || !$('modal').hidden) return;
     const i = +e.key; if (i >= 1 && i <= 5 && S.party[i - 1]) { if (L.castAbility(S, S.party[i - 1], Date.now(), events)) handleEvents(); }
+    else if (i >= 6 && i <= 8) { const ab = L.heroSpecs(S)[i - 6]; if (ab && L.castSpec(S, ab.id, Date.now(), events)) handleEvents(); }
   });
 
   // ---------- story scenes ----------
@@ -1538,6 +1553,7 @@
   }
   function paintAccount() {
     try { if (chat.open) { paintChat(); pollChat(); } } catch (e) {}
+    paintAdminTab();
     const b = $('btn-account'); if (!b) return;
     if (signedIn()) { b.innerHTML = '<span class="avatar">' + ((sess.email || '?')[0].toUpperCase()) + '</span>'; b.setAttribute('aria-label', 'Account'); b.title = 'Signed in. Progress syncs.'; }
     else { b.innerHTML = icon('user') + '<span>Sign in</span>'; b.setAttribute('aria-label', 'Sign in'); b.title = 'Sign in to sync your progress'; }
@@ -1644,6 +1660,103 @@
   // ---------- support link ----------
   if (window.LH_SUPPORT_URL) { const a = $('support'); a.href = window.LH_SUPPORT_URL; a.hidden = false; a.title = 'Buy the developer a coffee'; }
 
+  // ---------- server resets and the admin tab ----------
+  // A server wipe bumps a public "epoch". Saves started before it reset to a new game.
+  const EPOCH_KEY = 'lanternhold.epoch';
+  async function checkEpoch() {
+    if (!CL) return;
+    try {
+      const r = await fetch(CL.api.replace(/\/$/, '') + '/epoch'); if (!r.ok) return;
+      const ep = Number((await r.json()).epoch) || 0;
+      let seen = 0; try { seen = Number(localStorage.getItem(EPOCH_KEY)) || 0; } catch (e) {}
+      if (!ep || ep <= seen || (S.created || 0) >= ep) return;
+      try { localStorage.removeItem(SAVE_KEY); localStorage.setItem(EPOCH_KEY, String(ep)); localStorage.setItem('lanternhold.wiped', '1'); } catch (e) {}
+      S = L.newState(); location.reload();
+    } catch (e) {}
+  }
+  function wipedNotice() {
+    let w = null; try { w = localStorage.getItem('lanternhold.wiped'); localStorage.removeItem('lanternhold.wiped'); } catch (e) {}
+    if (w) setTimeout(() => toast('flame', 'A fresh start', 'The Deep has been reset for everyone. Every delver starts again from the top of the stair.', 'feat'), 1500);
+  }
+  function isAdmin() { return !!(sess && sess.id && String(claims(sess.id)['cognito:groups'] || '').includes('admins')); }
+  async function adminApi(method, path, body) {
+    const tok = await idToken(); if (!tok) throw new Error('Sign in first.');
+    const r = await fetch(CL.api.replace(/\/$/, '') + path, { method, headers: { Authorization: tok, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(r.status === 403 ? 'This account is not an admin.' : j.error === 'self' ? 'You cannot ban yourself.' : j.error === 'player' ? 'That player has not played since bans were added, so their account cannot be found yet.' : 'The server said no (' + r.status + ').');
+    return j;
+  }
+  let adminList = null, adminQ = '', adminBusy = false;
+  function paintAdminTab() { const t = $('tabadmin'); if (t) t.hidden = !isAdmin(); }
+  async function loadAdmin() {
+    $('adminbox').innerHTML = '<p class="note">Loading players…</p>';
+    try { adminList = await adminApi('GET', '/admin/players'); } catch (e) { $('adminbox').innerHTML = '<p class="note">' + esc(e.message) + '</p>'; return; }
+    paintAdmin();
+  }
+  function paintAdmin() {
+    if (!adminList) return;
+    const ago = t => { if (!t) return 'never'; const m = Math.floor((Date.now() - t) / 6e4); return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + ' d ago'; };
+    const q = adminQ.toLowerCase(), list = adminList.players.filter(p => !q || p.name.toLowerCase().includes(q));
+    const on = adminList.players.filter(p => p.on).length, banned = adminList.players.filter(p => p.banned).length;
+    $('adminbox').innerHTML =
+      '<div class="adm-stats"><div><small>Players</small><b>' + adminList.players.length + '</b></div><div><small>Online now</small><b>' + on + '</b></div><div><small>Banned</small><b>' + banned + '</b></div><div><small>Last wipe</small><b>' + (adminList.epoch ? new Date(adminList.epoch).toLocaleDateString() : 'never') + '</b></div></div>' +
+      '<div class="adm-bar"><input id="adm-q" type="search" placeholder="Find a player by name" value="' + esc(adminQ) + '"><button class="btn small ghost" id="adm-re">Refresh</button></div>' +
+      '<div class="adm-list">' + (list.length ? list.map(p => '<div class="adm-row' + (p.banned ? ' banned' : '') + '"><span class="adm-n"><b>' + esc(p.name || 'Unnamed') + '</b>' + (p.cls ? ' ' + classTag(p.cls) : '') + '<small>' + (p.banned ? 'Banned' : (p.on ? '<span class="online">Online now</span> &middot; ' : 'Seen ' + ago(p.seen) + ' &middot; ') + 'level ' + p.level + ', floor ' + p.floor) + '</small></span>' +
+        (p.banned ? '<button class="btn small ghost" data-unban="' + p.id + '">Unban</button>' : '<button class="btn small danger" data-ban="' + p.id + '"' + (p.canBan ? '' : ' disabled title="They need to play once more before they can be banned"') + '>Ban</button>') + '</div>').join('') : '<p class="note">No players match.</p>') + '</div>' +
+      '<div class="adm-danger"><h3 class="sub">Wipe the server</h3><p class="note">Deletes every cloud save, every hero on the guild board and every market listing and letter. Everyone, signed in or not, starts over from a new game the next time they open Lanternhold. Bans stay in place. This cannot be undone.</p><button class="btn danger" id="adm-wipe">Wipe the server…</button></div>';
+  }
+  $('tab-admin').addEventListener('input', e => { if (e.target.id === 'adm-q') { adminQ = e.target.value; const pos = e.target.selectionStart; paintAdmin(); const q = $('adm-q'); q.focus(); q.setSelectionRange(pos, pos); } });
+  $('tab-admin').addEventListener('click', async e => {
+    if (adminBusy) return;
+    if (e.target.closest('#adm-re')) { loadAdmin(); return; }
+    const bn = e.target.closest('[data-ban]'), ub = e.target.closest('[data-unban]');
+    if (bn || ub) {
+      const p = adminList.players.find(x => x.id === (bn || ub).dataset[bn ? 'ban' : 'unban']); if (!p) return;
+      modal('<div class="center"><h2>' + (bn ? 'Ban ' : 'Unban ') + esc(p.name) + '?</h2><p>' + (bn ? 'Their account is switched off and signed out everywhere within the hour. Their hero leaves the guild board and their market listings come down. You can unban them later.' : 'Their account works again and they can sign back in.') + '</p><div class="row"><button class="btn ghost" id="a-no">Cancel</button><button class="btn' + (bn ? ' danger' : '') + '" id="a-yes">' + (bn ? 'Ban player' : 'Unban player') + '</button></div></div>', md => {
+        md.querySelector('#a-no').onclick = closeModal;
+        md.querySelector('#a-yes').onclick = async () => {
+          adminBusy = true; md.querySelector('#a-yes').disabled = true;
+          try { const r = await adminApi('POST', bn ? '/admin/ban' : '/admin/unban', { id: p.id }); closeModal(); toast('lock', bn ? p.name + ' is banned' : p.name + ' is unbanned', bn ? (r.listings ? r.listings + ' market listings taken down.' : 'They had no market listings.') : 'They can sign in again.', 'feat'); }
+          catch (x) { closeModal(); toast('lock', 'That did not work', x.message, 'warn'); }
+          adminBusy = false; loadAdmin();
+        };
+      });
+      return;
+    }
+    if (e.target.closest('#adm-wipe')) {
+      modal('<div class="center"><h2>Wipe the server?</h2><p>Every player loses their progress and starts again from a new game. Cloud saves, guild heroes, market listings and letters are deleted for good.</p><p>Type <b>WIPE</b> to confirm.</p><input id="a-conf" class="adm-conf" autocomplete="off" spellcheck="false"><div class="row"><button class="btn ghost" id="a-no">Cancel</button><button class="btn danger" id="a-yes" disabled>Wipe everything</button></div></div>', md => {
+        const inp = md.querySelector('#a-conf'), yes = md.querySelector('#a-yes');
+        inp.oninput = () => { yes.disabled = inp.value.trim() !== 'WIPE'; };
+        md.querySelector('#a-no').onclick = closeModal;
+        yes.onclick = async () => {
+          adminBusy = true; yes.disabled = true; yes.textContent = 'Wiping…';
+          try {
+            const r = await adminApi('POST', '/admin/wipe', { confirm: 'WIPE' });
+            closeModal(); toast('flame', 'Server wiped', r.saves + ' saves, ' + r.heroes + ' heroes and ' + r.trade + ' market records deleted. Your own game resets now.', 'feat');
+            setTimeout(() => { try { localStorage.removeItem(SAVE_KEY); localStorage.setItem('lanternhold.wiped', '1'); } catch (x) {} S = L.newState(); location.reload(); }, 2500);
+          } catch (x) { closeModal(); toast('lock', 'The wipe did not run', x.message, 'warn'); }
+          adminBusy = false;
+        };
+      });
+    }
+  });
+  document.querySelector('.tabs [data-tab="admin"]').addEventListener('click', () => loadAdmin());
+
+  // ---------- leaderboard ----------
+  let lbAt = 0;
+  async function loadBoard(force) {
+    const box = $('boardtop'); if (!box) return;
+    if (!CL) { box.innerHTML = '<p class="note">The leaderboard needs the online server.</p>'; return; }
+    if (!force && Date.now() - lbAt < 60000) return; lbAt = Date.now();
+    if (!box.innerHTML) box.innerHTML = '<p class="note">Loading the deepest delvers…</p>';
+    try {
+      const r = await fetch(CL.api.replace(/\/$/, '') + '/leaderboard'); if (!r.ok) throw 0;
+      const top = (await r.json()).top || [], me = S.hero && S.hero.name;
+      box.innerHTML = '<p class="note">The deepest delvers across the Reach. Sign in to put your hero on the board. Updates every minute.</p>' +
+        (top.length ? '<ol class="lboard">' + top.map((p, i) => '<li class="' + (i < 3 ? 'top' + (i + 1) : '') + (p.name === me ? ' me' : '') + '"><span class="lbr">' + (i + 1) + '</span><span class="lbn"><b>' + esc(p.name) + '</b> ' + classTag(p.cls) + (L.SIDES[p.side] ? '<small>' + esc(L.SIDES[p.side].name) + '</small>' : '') + '</span><span class="lbf"><b>Floor ' + p.floor + '</b><small>level ' + p.level + '</small></span></li>').join('') + '</ol>' : '<p class="note">Nobody is on the board yet. Be the first.</p>');
+    } catch (e) { box.innerHTML = '<p class="note">The leaderboard could not load right now. Try again in a minute.</p>'; lbAt = 0; }
+  }
+  $('codexseg').addEventListener('click', e => { if (e.target.closest('[data-cx="board"]')) loadBoard(); });
 
   // ---------- chat: Global, Trade and Party ----------
   const CHAT_POLL_OPEN = 5000;
@@ -1873,7 +1986,7 @@
   const TUT = [
     { id: 'strike', title: 'Strike!', text: 'Tap the monster to hit it yourself. Your party fights on its own too, but every tap helps. Try a few.', target: '#arena', tab: null, ready: () => true, done: c => S.stats.clicks >= c.clicks + 5, noNext: true },
     { id: 'gold', title: 'Gold', text: 'Every monster drops gold, even while you are away. Gold is how your party grows stronger.', target: '.stat.gold', ready: () => true },
-    { id: 'train', title: 'Train your party', text: 'Spend gold to train. Higher levels mean more damage, health and healing. You can train your own hero anywhere, and your companions at camp on floor 1, where you are now.', target: '#seats .buy:not([disabled])', tab: 'party', ready: () => S.gold >= 10, done: c => sumLevels() > c.levels, noNext: true },
+    { id: 'train', title: 'Train your party', text: 'Spend gold to train. Higher levels mean more damage, health and healing. You can train anyone in your party anywhere, even deep in the dungeon.', target: '#seats .buy:not([disabled])', tab: 'party', ready: () => S.gold >= 10, done: c => sumLevels() > c.levels, noNext: true },
     { id: 'abil', title: 'Abilities', text: 'Each class has a special move. They fire by themselves, or press keys 1 to 5 (or tap them) to use one right when you need it.', target: '#abilities', ready: () => true },
     { id: 'order', title: 'Marching order', text: 'The top of this list stands at the front. Keep your tank up front, healers in the middle so they reach everyone, and watch the back for ambushes.', target: '.formhead', tab: 'party', ready: () => S.party.filter(Boolean).length >= 2 },
     { id: 'boss', title: 'Guardians', text: 'Every fifth floor has a guardian. Beat it before the lantern oil runs out, or your party falls back to train and try again.', target: '#lanternwrap', ready: () => S.foe && S.foe.boss },
@@ -1929,13 +2042,13 @@
     ['Monsters and guardians', '<p>Monsters hit back. If your whole party falls, it retreats a floor, rests, and tries again in a little over a minute. Use that time to train and check gear.</p><p>Every 5th floor has a <b>guardian</b>. You must beat it before the lantern oil runs out. Guardians drop better gear and, from floor 10, sometimes a relic.</p><p>Soldiers from the Grand War alliances (marked with their banner) are tougher than normal monsters and drop more.</p>'],
     ['Monster tricks and Act One', '<p>Deeper monsters have tricks, shown as coloured tags under their name. Tap or hover a tag to read it.</p><ul><li><b>Enraged</b>: hits much harder once it is badly hurt.</li><li><b>Warded</b>: raises a shield (the striped part of its health bar) that soaks damage first.</li><li><b>Regenerating</b>: heals itself over time.</li><li><b>Venomous</b>: its hits poison the target for a few seconds.</li><li><b>Cleaving</b>: each hit also strikes whoever stands behind its target.</li><li><b>Swift</b>: attacks faster.</li></ul><p>Guardians get more tricks the deeper you go, and each region below the Vault has its own. Act One runs through fifteen regions to the Lampmother on floor 150. Act Two opens with Season 2 of the Grand War, and a countdown appears once you get there.</p>'],
     ['The side panel', '<p><b>Party</b> is your marching order for the fight. <b>Camp</b> is the campfire: resting companions, camp jobs and training. <b>Gear</b> dresses your characters. <b>Skills</b> holds your hero’s skill tree and rekindling. <b>Market</b> has the Trading Post and the Players Guild. <b>Codex</b> keeps your journal, relics and records.</p>'],
-    ['Skills and Kindling', '<p>Every rekindle gives you <b>Kindling</b>: 2 at floor 50, plus 1 for every 10 floors deeper. Spend it in the Skills tab on your hero’s class tree. Each class has three branches of three skills, and a skill needs the one above it first.</p><p>Kindling also buys a bigger pack (+10 slots) and opens extra gear slots for any character: rings 2 to 5 and a second trinket. Tap a locked slot on the Gear tab. You can reset the skill tree for free at camp.</p>'],
+    ['Skills and Kindling', '<p>Every rekindle gives you <b>Kindling</b>: 2 at floor 50, plus 1 for every 10 floors deeper. Spend it in the Skills tab on your hero’s class tree. Each class has three branches of four skills, and a skill needs the one above it first. The last skill of each branch is a <b>specialization</b>: it teaches your hero a brand new ability, which appears on the ability bar (keys 6 to 8).</p><p>Kindling also buys a bigger pack (+10 slots) and opens extra gear slots for any character: rings 2 to 5 and a second trinket. Tap a locked slot on the Gear tab. You can reset the skill tree for free at camp.</p>'],
     ['Job gear', '<p>A few pieces of gear carry a camp-job bonus, shown by an orange dot. It counts while the wearer works that job at the campfire. Fine gear has about a 2% chance, rare 6% and epic 15%.</p><p>Each job also has its own three-piece job set (helmet, feet and ring). These drop very rarely from guardians and chests from floor 20. Two pieces add +40% to that job and all three add +100%.</p>'],
     ['Resting at camp', '<p>When you return to camp, or drink a Campfire Draught, the party sits down around the fire. Nobody fights while you rest, and everyone heals up. Press Descend to head back down.</p>'],
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten and where you are. Tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
-    ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Your own hero can train anywhere, and you can rearrange the marching order at any time.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
+    ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
     ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
     ['Trading Post: market and mail', '<p>Open the <b>Trading Post</b> (the bag button at the top) to trade gear with other players. It needs a free account.</p><p><b>Market</b>: browse gear by class and buy it for gold. To sell, tap an item in your Gear tab and choose <b>Sell on market</b>. Listings last a week, and you can take yours down any time. When something sells, the gold arrives in your mailbox.</p><p><b>Mail</b>: tap an item and choose <b>Send to a player</b> to send it to someone you have recruited or chatted with. Leave the price at 0 for a gift, or set a price they pay if they accept. They can decline, and you can take an offer back until they answer.</p><p>Gold and gear are in-game only and have no real-money value.</p>'],
@@ -1956,6 +2069,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 14, date: 'November 22, 2026', title: 'Specializations and a leaderboard', items: [
+      'At camp the Gear tab shows your party first. Companions resting at the campfire are folded away underneath.',
+      'Train anyone in your party anywhere, even deep in the dungeon. Companions resting at the campfire still train at camp.',
+      'Specializations: each branch of your hero’s skill tree now ends in a new ability, 3 per class, for 15 in all. Learned abilities join the ability bar on keys 6 to 8.',
+      'A Leaderboard in the Codex shows the deepest delvers across the Reach.',
+      'Admins can now reset the server for a fresh season and remove players who break the rules.'] },
     { v: 13, date: 'November 22, 2026', title: 'Act One: below the Starless Vault', items: [
       'Seven new regions below the Starless Vault: the Glass Wastes, the Ironbound Bastion, the Weeping Aqueduct, the Bone Orchard, the Stormglass Spire, the Nexus Scar and the Rift Threshold.',
       'The story goes on through chapter 15, with seven new guardians and the truth about the Lampmother waiting on floor 150.',
@@ -2292,6 +2411,7 @@
     setTimeout(() => { if (signedIn()) loadMail(true); }, 4000);
   }
   // ---------- boot ----------
+  checkEpoch(); wipedNotice(); paintAdminTab(); if (signedIn()) idToken().then(paintAdminTab);
   resize();
   window.addEventListener('resize', resize);
   syncBuySeg();

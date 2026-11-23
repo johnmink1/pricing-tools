@@ -652,8 +652,8 @@ button.scene:hover{border-color:var(--accent)}
 .campbar small{display:block;color:var(--muted);font-size:12.5px}
 .cb-ic svg{width:24px;height:24px;color:var(--dim);display:block}.campbar.on .cb-ic svg{color:var(--ember);filter:drop-shadow(0 0 6px rgba(255,138,61,.6))}
 .campfire-ic svg{width:44px;height:44px;color:var(--ember);filter:drop-shadow(0 0 10px rgba(255,138,61,.6))}
-body:not(.incamp) [data-train]:not([data-train="you"]),body:not(.incamp) [data-unseat],body:not(.incamp) [data-seat],body:not(.incamp) [data-recruit],body:not(.incamp) [data-dismiss],body:not(.incamp) #g-best{opacity:.5;filter:saturate(.4);position:relative}
-body:not(.incamp) [data-train]:not([data-train="you"])::after,body:not(.incamp) [data-seat]::after,body:not(.incamp) [data-recruit]::after{content:"At camp";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#2a2119;color:var(--muted);border:1px solid var(--line2);border-radius:999px;padding:1px 6px;white-space:nowrap}
+body:not(.incamp) [data-train]:not(.anywhere),body:not(.incamp) [data-unseat],body:not(.incamp) [data-seat],body:not(.incamp) [data-recruit],body:not(.incamp) [data-dismiss],body:not(.incamp) #g-best{opacity:.5;filter:saturate(.4);position:relative}
+body:not(.incamp) [data-train]:not(.anywhere)::after,body:not(.incamp) [data-seat]::after,body:not(.incamp) [data-recruit]::after{content:"At camp";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#2a2119;color:var(--muted);border:1px solid var(--line2);border-radius:999px;padding:1px 6px;white-space:nowrap}
 .oilbtn{margin-top:6px;justify-self:start}
 .store .tile svg{width:34px;height:34px;color:var(--rc)}
 .pick[disabled]{opacity:.5;cursor:not-allowed}
@@ -837,3 +837,44 @@ body.resting .arena{cursor:default}
 .picker .pkrow .btn{flex:none}
 .doll .tile[data-pos]{cursor:pointer}
 @media (max-width:420px){.picker .pkrow{flex-wrap:wrap}.picker .pkt{flex-basis:calc(100% - 60px)}}
+/* admin tab */
+.adm-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 12px}
+.adm-stats div{background:#1a130e;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.adm-stats small{display:block;color:var(--muted);font-size:12px}
+.adm-stats b{font-size:18px}
+.adm-bar{display:flex;gap:8px;margin-bottom:8px}
+.adm-bar input{flex:1;min-width:0;background:#120d0a;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit}
+.adm-list{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:auto}
+.adm-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:#1a130e;border:1px solid var(--line)}
+.adm-row.banned{opacity:.65}
+.adm-n{flex:1;min-width:0}
+.adm-n small{display:block;color:var(--muted);font-size:12px}
+.adm-danger{margin-top:18px;padding:12px;border:1px solid #6b2a20;border-radius:12px;background:#1f0f0b}
+.adm-conf{display:block;margin:8px auto 14px;width:160px;text-align:center;font:800 18px/1 inherit;letter-spacing:.2em;background:#120d0a;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px}
+@media (max-width:520px){.adm-stats{grid-template-columns:repeat(2,1fr)}}
+/* gear tab: party first, campfire roster folded away */
+.whoseg{flex-direction:column;gap:8px}
+.whogroup>small,.whogroup>summary{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:0 2px 5px;letter-spacing:.03em;text-transform:uppercase}
+.whogroup>summary{cursor:pointer;list-style:none}
+.whogroup>summary::-webkit-details-marker{display:none}
+.whogroup>summary::before{content:'\25B8';display:inline-block;margin-right:6px;transition:transform .15s}
+.whogroup[open]>summary::before{transform:rotate(90deg)}
+.whogroup>summary em{font-style:normal;color:var(--dim)}
+.whogroup>div{display:flex;flex-wrap:wrap;gap:6px}
+/* leaderboard */
+.lboard{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.lboard li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:#1a130e;border:1px solid var(--line)}
+.lboard li.me{border-color:var(--accent)}
+.lboard .lbr{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;background:#2a1f18;color:var(--muted)}
+.lboard .top1 .lbr{background:#f2c14e;color:#2a1a05}
+.lboard .top2 .lbr{background:#cfd6dc;color:#1e2226}
+.lboard .top3 .lbr{background:#c98a4e;color:#2a1405}
+.lboard .lbn{flex:1;min-width:0}
+.lboard .lbn small,.lboard .lbf small{display:block;color:var(--muted);font-size:12px}
+.lboard .lbf{text-align:right}
+/* specialization abilities */
+.knode.t3{border-color:#8a6524;background:linear-gradient(180deg,#2a1d10,#1a130e)}
+.knode.t3 .kic{color:#f2c14e}
+.skills.more{grid-template-columns:repeat(4,minmax(0,1fr))}
+.skill.spec{border-style:dashed}
+@media (min-width:1100px){.skills.more{grid-template-columns:repeat(4,minmax(0,1fr))}}

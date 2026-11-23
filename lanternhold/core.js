@@ -373,7 +373,7 @@
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id), c = CLASSES[m.cls];
     let d = c.dps * scale(s, id) * partyMult(s) * gearMult(s, id, 'dps');
-    if (id === 'you') d *= 1 + sk(s, 'dps');
+    if (id === 'you') { d *= 1 + sk(s, 'dps'); const fu = fxOn(s, 'fury', now); if (fu) d *= fu; }
     if (m.cls === 'mage' && abilityActive(s, id, now)) d *= (setBonus(s, id) >= 3 ? 6 : 4) * (id === 'you' ? 1 + sk(s, 'power') : 1);
     return d;
   }
@@ -398,9 +398,9 @@
   function abilityDuration(s, ab) { return ab.dur * (1 + relicVal(s, 'hourglass')); }
 
   // ---------- Skill trees ----------
-  // Each class has three branches of three skills. Your own hero uses the tree for their class.
+  // Each class has three branches of four skills; the fourth teaches a new ability. Your own hero uses the tree for their class.
   // Kindling comes only from rekindling. Ranks cost 1, 2 and 3 points by tier, and a skill
-  // needs the one above it in its branch first. A full tree costs 36 points.
+  // needs the one above it in its branch first. A full tree costs 48 points.
   // n: name, k: effect, v: per rank, r: max ranks, d: description ({v} is the rank total).
   const SK = (n, k, v, r, d) => ({ n, k, v, r, d });
   const SKILL_TREES = {
@@ -430,6 +430,28 @@
       { b: 'Pact', s: [SK('Grave Gold', 'gold', 0.08, 3, '+{v} gold'), SK('Death’s Ledger', 'loot', 0.06, 3, '+{v} gear drop chance'), SK('Deathless', 'php', 0.10, 1, '+10% party health')] },
     ],
   };
+  // Specializations: the fourth skill of each branch teaches your hero a new active ability.
+  // fx: burst (seconds of the hero's damage at once), shield (party takes less damage), vuln (foe takes more damage),
+  // fury (hero damage multiplier), heal (party heal), cleanse (cures poison), strip (breaks wards).
+  const AB = (id, name, cd, dur, desc, fx) => ({ id, name, cd, dur, desc, fx });
+  const SPECS = {
+    tank: [AB('roar', 'Taunting Roar', 40, 10, 'The party takes 40% less damage for 10s.', { shield: 0.4 }),
+      AB('slam', 'Shield Slam', 18, 0, 'Strikes for 10 seconds of damage and shatters any ward.', { burst: 10, strip: 1 }),
+      AB('bastion', 'Last Bastion', 60, 6, 'Heals the party for 30% and blocks 60% of damage for 6s.', { heal: 0.3, shield: 0.6 })],
+    healer: [AB('purify', 'Purify', 15, 0, 'Cures all poison and heals the party for 25%.', { cleanse: 1, heal: 0.25 }),
+      AB('sanctum', 'Sanctified Ground', 45, 12, 'The party takes 30% less damage for 12s.', { shield: 0.3 }),
+      AB('smite', 'Radiant Smite', 25, 8, 'The foe takes 30% more damage for 8s.', { vuln: 0.3 })],
+    rogue: [AB('flurry', 'Shadow Flurry', 25, 6, 'Your hero deals triple damage for 6s.', { fury: 3 }),
+      AB('venomblade', 'Envenomed Blade', 30, 10, 'The foe takes 25% more damage for 10s.', { vuln: 0.25 }),
+      AB('smoke', 'Smoke Bomb', 40, 6, 'The party takes 50% less damage for 6s.', { shield: 0.5 })],
+    mage: [AB('barrage', 'Arcane Barrage', 20, 0, 'Strikes for 15 seconds of damage at once.', { burst: 15 }),
+      AB('frost', 'Frost Nova', 35, 8, 'Slows the foe: the party takes 50% less damage for 8s.', { shield: 0.5 }),
+      AB('lance', 'Rift Lance', 25, 0, 'Shatters any ward and strikes for 8 seconds of damage.', { burst: 8, strip: 1 })],
+    necro: [AB('bonewall', 'Bone Wall', 35, 10, 'The party takes 35% less damage for 10s.', { shield: 0.35 }),
+      AB('harvest', 'Soul Reap', 30, 0, 'Strikes for 6 seconds of damage and heals the party for 20%.', { burst: 6, heal: 0.2 }),
+      AB('curse', 'Grave Curse', 30, 8, 'The foe takes 30% more damage for 8s.', { vuln: 0.3 })],
+  };
+  for (const c in SKILL_TREES) SKILL_TREES[c].forEach((br, bi) => { const a = SPECS[c][bi]; br.s.push(Object.assign(SK(a.name, 'abil', 0, 1, 'New ability: ' + a.desc), { ab: a })); });
   // Give every skill a stable id like 'tank.1.2' (branch 1, tier 2).
   for (const c in SKILL_TREES) SKILL_TREES[c].forEach((br, bi) => br.s.forEach((k, ti) => { k.id = c + '.' + bi + '.' + ti; k.tier = ti; k.cls = c; k.branch = bi; }));
   const skillById = id => { const [c, b, t] = (id || '').split('.'); const br = SKILL_TREES[c] && SKILL_TREES[c][+b]; return br && br.s[+t]; };
@@ -445,6 +467,40 @@
     let t = 0;
     for (const id in s.skills) { const k = skillById(id); if (k && k.k === key && k.cls === heroCls(s)) t += k.v * s.skills[id]; }
     return t;
+  }
+  // Specialization abilities your hero has learned (only while your hero is in the party).
+  function heroSpecs(s) {
+    if (!s.skills || !s.party.includes('you')) return [];
+    const c = heroCls(s); if (!c) return [];
+    return SKILL_TREES[c].map(br => br.s[3]).filter(k => k && s.skills[k.id]).map(k => k.ab);
+  }
+  const fxOn = (s, k, now) => { const f = s.fx && s.fx[k]; return f && f.until > now ? f.v : 0; };
+  function castSpec(s, abId, now, events) {
+    if (s.down.you || !lvl(s, 'you')) return false;
+    const ab = heroSpecs(s).find(a => a.id === abId); if (!ab) return false;
+    const key = 'you:' + ab.id, st = s.abil[key] || { readyAt: 0, until: 0 };
+    if (st.readyAt > now) return false;
+    st.readyAt = now + ab.cd * 1000 * (1 - Math.min(0.5, sk(s, 'cd')) * 0.5);
+    st.until = now + abilityDuration(s, ab) * 1000; s.abil[key] = st;
+    const fx = ab.fx; s.fx = s.fx || {};
+    for (const k of ['shield', 'vuln', 'fury']) if (fx[k]) s.fx[k] = { v: fx[k], until: st.until };
+    if (fx.heal) healParty(s, fx.heal, true);
+    if (fx.cleanse) s.poison = {};
+    if (fx.strip && s.foe) s.foe.ward = 0;
+    let d = 0;
+    if (fx.burst) { const c = CLASSES[heroCls(s)]; d = Math.max(c.dps, 1) * scale(s, 'you') * partyMult(s) * gearMult(s, 'you', 'dps') * (1 + sk(s, 'dps')) * fx.burst; }
+    events && events.push({ type: 'ability', id: 'you', cls: heroCls(s), name: ab.name, dmg: d || undefined });
+    if (d) damageFoe(s, d, now, null, events);
+    return true;
+  }
+  function wantsSpec(s, ab, now) {
+    const foe = s.foe; if (!foe || foe.chest) return false;
+    const fx = ab.fx;
+    if (fx.cleanse) return !!(s.poison && Object.keys(s.poison).length) || s.party.some(x => x && (s.hp[x] || 0) < maxHpOf(s, x) * 0.5);
+    if (fx.strip) return foe.ward > 0 || foe.boss;
+    if (fx.shield) return foe.boss || s.party.some(x => x && (s.hp[x] || 0) < maxHpOf(s, x) * 0.6);
+    if (fx.heal) return s.party.some(x => x && (s.hp[x] || 0) < maxHpOf(s, x) * 0.6);
+    return foe.boss || foe.hp > totalDps(s, now) * 3;
   }
   function skillSpent(s) { let t = 0; for (const id in (s.skills || {})) { const k = skillById(id); if (k) t += skillCost(k) * s.skills[id]; } return t; }
   function canLearn(s, id) {
@@ -988,7 +1044,7 @@
     let guard = 0;
     while (amount > 0 && guard++ < 60) {
       if (!s.foe) s.foe = makeFoe(s, rng);
-      const foe = s.foe, mult = foe.boss ? 1 + relicVal(s, 'lens') : 1;
+      const foe = s.foe, mult = (foe.boss ? 1 + relicVal(s, 'lens') : 1) * (1 + fxOn(s, 'vuln', now || Date.now()));
       let dmg = amount * mult;
       if (foe.ward > 0) { const soak = Math.min(foe.ward, dmg); foe.ward -= soak; dmg -= soak; amount = dmg / mult; if (dmg <= 0) return; }
       if (dmg < foe.hp) { foe.hp -= dmg; drain(s, dmg); return; }
@@ -1102,6 +1158,7 @@
     if (c.armor) dmg *= 1 - c.armor;
     if (m.cls === 'tank' && abilityActive(s, t, now)) dmg *= 0.3 * (t === 'you' ? 1 - sk(s, 'power') : 1);
     dmg *= 1 - Math.min(0.5, sk(s, 'guard'));
+    dmg *= 1 - fxOn(s, 'shield', now);
     s.hp[t] = (s.hp[t] == null ? maxHpOf(s, t) : s.hp[t]) - dmg;
     events && events.push({ type: 'foehit', target: t, dmg, behind: !!pick.behind });
     if (mods.includes('venom')) { s.poison = s.poison || {}; s.poison[t] = { dps: dmg * 0.12, until: now + 5000 }; events && events.push({ type: 'poison', id: t }); }
@@ -1209,6 +1266,7 @@
     }
     // abilities
     if (s.autoCast) for (const id of s.party) if (id && !s.down[id]) { const st = s.abil[id]; if ((!st || st.readyAt <= now) && wantsCast(s, id, now)) castAbility(s, id, now, events); }
+    if (s.autoCast && !s.down.you) for (const ab of heroSpecs(s)) { const st = s.abil['you:' + ab.id]; if ((!st || st.readyAt <= now) && wantsSpec(s, ab, now)) castSpec(s, ab.id, now, events); }
     // foe swings
     if (s.foe && s.foe.atk) {
       s.foeSwing += dt;
@@ -1315,7 +1373,7 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

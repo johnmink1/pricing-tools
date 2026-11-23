@@ -1,4 +1,4 @@
-/* lh-build 202611231531 */
+/* lh-build 202611231532 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -3424,7 +3424,7 @@
         'Gold and gear have no real-money value.']],
       ['The Ember Ring (PvP)', 'i:sword', 'Duel other players\u2019 heroes for Laurels and rating.', [
         'Open the <b>PvP</b> tab and press <b>Duel</b>. Only your own hero fights; companions, tonics and Sigils never count.',
-        '10 challenges, one back every 30 minutes. Wins give Laurels and rating; your hero also defends while you are away.',
+        '10 challenges, one back every 30 minutes. Wins give rating and Laurels, losses a few Laurels; your hero also defends while you are away. A full kit is a long climb.',
         'Laurels buy the <b>Ringwarden kit</b>: PvP gear with <b>Edge</b> (more damage to heroes) and <b>Resolve</b> (less damage from heroes). It works only in the Ring.']],
       ['Your profile', 'i:user', 'The card other players see.', [
         'Tap your portrait, then <b>Customize profile</b>: frame, title, color, banner, emblems and a bio.']],
@@ -3451,6 +3451,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 49, date: 'November 23, 2026', title: 'The Ember Ring: a longer climb', items: [
+      'Ringwarden gear is now something to earn over time. A win pays 8 Laurels (up to 12 against a stronger hero), and a loss still pays 3.',
+      'The first win each day adds 10 more, and your hero earns 2 for every challenger it beats while you are away.',
+      'Kit ranks cost more: 60 Laurels for the first rank of a piece, rising by 30 with each rank. Laurels you already have are kept.'] },
     { v: 48, date: 'November 23, 2026', title: 'Dust and Mass merge', items: [
       'Scrapping gear now gives Dust as well as gold. Your Dust shows in the top bar.',
       'Enchanting and disenchanting cost Dust, more for higher tiers.',
@@ -4136,7 +4140,7 @@
   ];
   const RING_ARMS = { tank: 'Warhammer', healer: 'Censer', rogue: 'Twin Fangs', mage: 'Focus Rod', necro: 'Grave Scythe' };
   const RING_MAX = 15, RING_EMAX = 10, RING_EINT = 30 * 6e4;
-  const ringGate = r => r >= 10 ? 1600 : r >= 5 ? 1300 : 0, ringCost = r => 40 + 25 * r;
+  const ringGate = r => r >= 10 ? 1600 : r >= 5 ? 1300 : 0, ringCost = r => 60 + 30 * r;
   const RING_TIER = r => r <= 0 ? ['Plain', 'common'] : r <= 5 ? ['Ironbound', 'rare'] : r <= 10 ? ['Emberforged', 'epic'] : ['Starwrought', 'set'];
   const RING_TITLES = [[1900, 'Riftbreaker'], [1700, 'Lanternsworn'], [1500, 'Gilded'], [1300, 'Emberborn'], [1100, 'Ironclad'], [0, 'Ashen']];
   const ringTitle = r => RING_TITLES.find(t => r >= t[0])[1];
@@ -4173,7 +4177,7 @@
     try { localStorage.setItem('lh_ringdef', JSON.stringify({ dw: me.dw, dl: me.dl })); } catch (e) {}
     if (!old) return;
     const w = me.dw - old.dw, l = me.dl - old.dl;
-    if (w > 0 || l > 0) toast('shield', 'Your hero held the Ring', (w ? w + (w === 1 ? ' challenger beaten' : ' challengers beaten') : '') + (w && l ? ', ' : '') + (l ? l + ' lost' : '') + ' while you were away.' + (w ? ' +' + (w * 4) + ' Laurels.' : ''), w >= l ? 'feat' : '');
+    if (w > 0 || l > 0) toast('shield', 'Your hero held the Ring', (w ? w + (w === 1 ? ' challenger beaten' : ' challengers beaten') : '') + (w && l ? ', ' : '') + (l ? l + ' lost' : '') + ' while you were away.' + (w ? ' +' + (w * 2) + ' Laurels.' : ''), w >= l ? 'feat' : '');
   }
   function ringFig(cls, hue, size) { return '<img class="ringspr" src="' + SP.spriteURL(cls, size || 3, hue || 0) + '" alt="">'; }
   function ringStatLine(s) { return fmt(s.hp) + ' health &middot; ' + fmt(s.at) + ' attack' + (s.E ? ' &middot; Edge ' + s.E : '') + (s.R ? ' &middot; Resolve ' + s.R : ''); }

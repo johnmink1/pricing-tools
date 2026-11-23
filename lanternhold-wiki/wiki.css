@@ -121,7 +121,7 @@ tbody tr:hover td{background:#0e1728}
 table.small{font-size:13px}
 table.small td,table.small th{padding:8px 12px}
 .rar{font-weight:600}
-.r-common{color:#c8d0dc}.r-fine{color:#6fb3ff}.r-rare{color:#c79bff}.r-epic{color:#ff9a4a}.r-set{color:#8fcf6a}
+.r-common{color:#c8d0dc}.r-fine{color:#6fb3ff}.r-rare{color:#c79bff}.r-epic{color:#ff9a4a}.r-set{color:#8fcf6a}.r-goblin{color:#7fe0a0}
 
 /* classes */
 .block{margin-bottom:46px;padding-top:6px}

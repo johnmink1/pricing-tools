@@ -1106,3 +1106,17 @@ body.resting .arena{cursor:default}
 .stat.sigils:hover{border-color:var(--violet)}
 .stat.sigils svg{filter:drop-shadow(0 0 4px rgba(232,121,249,.5))}
 @media (max-width:560px){.stat.sigils{font-size:15px}}
+/* Sigil exchange */
+.sigtile{display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,rgba(232,121,249,.25),transparent 70%),var(--panel2);border-color:rgba(232,121,249,.45)}
+.sigtile .sigil{width:26px;height:26px;fill:var(--violet);filter:drop-shadow(0 0 5px rgba(232,121,249,.6))}
+.sigbal{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:var(--panel2);margin-bottom:6px}
+.sigbal .sigil{width:22px;height:22px;fill:var(--violet)}
+.sigbal span{flex:1}.sigbal b{color:var(--violet)}
+.sigform{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.sigform label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.sigform input{width:150px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit}
+.mkempty .sigil{width:28px;height:28px;fill:var(--violet)}
+/* system lines in chat: a new hero joins */
+.msg.sys{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--muted);font-style:italic;padding:6px 8px;border-left:2px solid var(--side,var(--gold));background:linear-gradient(90deg,rgba(245,194,66,.07),transparent);border-radius:0 8px 8px 0;margin:4px 0}
+.msg.sys svg{width:15px;height:15px;flex:none;margin-top:2px;color:var(--side,var(--gold))}
+.msg.sys-covenant{--side:#9fb4c8}.msg.sys-radiant{--side:#ffd36b}.msg.sys-tide{--side:#d06bff}.msg.sys-mercy{--side:#8fcf6a}.msg.sys-unsworn{--side:#c9b38a}

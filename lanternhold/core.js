@@ -6,7 +6,7 @@
   const FOES_PER_FLOOR = 8;
   const BOSS_EVERY = 5;
   const BASE_LANTERN = 30;
-  const COST_GROWTH = 1.07;
+  const COST_GROWTH = Math.pow(1.07, 0.4);
   const REKINDLE_FLOOR = 50;
   const PARTY_SIZE = 5;
   const REVIVE_TIME = 15;
@@ -54,7 +54,7 @@
   const sidePerk = (s, k) => { const d = sideOf(s); if (!d) return 1;
     if (d === 'unsworn') return k === 'heal' ? 1 : 1.05;
     return ({ covenant: { hp: 1.15 }, radiant: { dps: 1.12 }, tide: { gold: 1.15 }, mercy: { heal: 1.15 } }[d][k]) || 1; };
-  const TIER = [{ cost: 10, stat: 1 }, { cost: 2e6, stat: 2.6e4 }];
+  const TIER = [{ cost: 10, stat: 1 }, { cost: 1320, stat: 2.6e4 }];
   const NPC_POWER = 0.7;   // story companions are always weaker than real players' heroes
   const GUEST_SLOTS_SOLO = 0;
   // Dynamic members: your own hero ('you') and other players' heroes recruited from the board.
@@ -121,20 +121,20 @@
   const BOSS_SPRITES = ['golem', 'wyrm', 'lich'];
 
   const RELICS = [
-    { id: 'locket',   name: "Miner's Locket",          desc: '+15% gold per level',                    per: 0.15 },
-    { id: 'crown',    name: 'Ashen Circlet',           desc: '+10% party damage per level',            per: 0.10 },
+    { id: 'locket',   name: "Miner's Locket",          desc: '+6% gold per level',                    per: 0.06 },
+    { id: 'crown',    name: 'Ashen Circlet',           desc: '+4% party damage per level',            per: 0.04 },
     { id: 'whet',     name: 'Grim Whetstone',          desc: '+25% strike damage per level',           per: 0.25 },
     { id: 'hourglass',name: 'Cracked Hourglass',       desc: '+10% ability duration per level',        per: 0.10 },
     { id: 'lamp',     name: 'Lamp of the First Delve', desc: '+3s lantern time per level',             per: 3 },
     { id: 'moth',     name: 'Moth-wing Charm',         desc: '+1% treasure chest chance per level',    per: 0.01 },
-    { id: 'ledger',   name: 'Ledger of Old Debts',     desc: '-2% training costs per level (max 50%)', per: 0.02 },
+    { id: 'ledger',   name: 'Ledger of Old Debts',     desc: '-1% training costs per level (max 25%)', per: 0.01 },
     { id: 'dice',     name: 'Bone Dice',               desc: '+2% critical strike chance per level',   per: 0.02 },
-    { id: 'lens',     name: 'Deepglass Lens',          desc: '+15% damage to guardians per level',     per: 0.15 },
+    { id: 'lens',     name: 'Deepglass Lens',          desc: '+6% damage to guardians per level',     per: 0.06 },
     { id: 'heart',    name: 'Ember Heart',             desc: '+5% Embers on rekindle per level',       per: 0.05 },
-    { id: 'bell',     name: "Sleepwalker's Bell",      desc: '+20% gold while away per level',         per: 0.20 },
-    { id: 'tooth',    name: 'Gilded Rat Tooth',        desc: '+30% gold from chests per level',        per: 0.30 },
-    { id: 'ward',     name: 'Wardstone Shard',         desc: '+10% party health per level',            per: 0.10 },
-    { id: 'censer',   name: 'Chapel Censer',           desc: '+12% healing per level',                 per: 0.12 },
+    { id: 'bell',     name: "Sleepwalker's Bell",      desc: '+8% gold while away per level',         per: 0.08 },
+    { id: 'tooth',    name: 'Gilded Rat Tooth',        desc: '+12% gold from chests per level',        per: 0.12 },
+    { id: 'ward',     name: 'Wardstone Shard',         desc: '+4% party health per level',            per: 0.04 },
+    { id: 'censer',   name: 'Chapel Censer',           desc: '+5% healing per level',                 per: 0.05 },
   ];
 
   const FEATS = [
@@ -158,7 +158,7 @@
     { id: 'r1',    name: 'Relighting',        desc: 'Rekindle the lantern once',  test: s => s.stats.rekindles >= 1 },
     { id: 'rel5',  name: 'Curio Cabinet',     desc: 'Find 5 different relics',    test: s => Object.keys(s.relics).length >= 5 },
     { id: 'chest', name: 'Lucky Find',        desc: 'Open 25 treasure chests',    test: s => s.stats.chests >= 25 },
-    { id: 'gold',  name: 'Hoarder',           desc: 'Earn 1 million gold in total', test: s => s.stats.goldEarned >= 1e6 },
+    { id: 'gold',  name: 'Hoarder',           desc: 'Earn 100,000 gold in total', test: s => s.stats.goldEarned >= 1e5 },
   ];
 
   // ---------- story ----------
@@ -307,7 +307,7 @@
   function newState() {
     return {
       v: VERSION,
-      gold: 0, floor: 1, foeIdx: 0, maxFloor: 1, maxFloorEver: 1,
+      econ: 2, gold: 0, floor: 1, foeIdx: 0, maxFloor: 1, maxFloorEver: 1,
       mode: null, hero: null, guests: [],
       unlocked: [], levels: {}, party: [null, null, null, null, null],
       hp: {}, down: {}, abil: {}, minions: [], items: { draught: 1, oil: 0 }, campUntil: 0, jobs: {},
@@ -327,18 +327,27 @@
   const isBossFloor = f => f % BOSS_EVERY === 0;
   const biomeOf = f => BIOMES[Math.floor((f - 1) / 10) % BIOMES.length];
   const depthCycle = f => Math.floor((f - 1) / (10 * BIOMES.length));
-  function baseHp(f) {
-    let hp = 10 * Math.pow(1.22, f - 1);
+  // Economy scale: every power curve is the old curve raised to POW, which keeps the same pacing
+  // with much smaller numbers (floor 45 gold drops in the tens instead of tens of thousands).
+  const ECON_AT = Date.UTC(2026, 10, 23, 5);  // letters and listings older than this were priced in old gold
+  const POW = 0.4, TOUGH_POW = 0.9;  // difficulty past floor 15 keeps more of its old bite so the pace matches the old curve
+  const EMBER_PER = 0.04, EMBER_HP = 0.016, FEAT_PER = 0.01;
+  function rawHp(f) {
+    let hp = Math.pow(1.22, f - 1);
     if (f > 60) hp *= Math.pow(1.03, f - 60);
     if (f > 140) hp *= Math.pow(1.04, f - 140);
     return hp;
   }
+  const baseHp = f => 10 * Math.pow(rawHp(f), POW);
+  // Converts gold saved before the rescale into today's gold: the same number of training levels for a hero of level L.
+  const regold = (g, L) => g * Math.pow(COST_GROWTH / 1.07, Math.max(0, L || 0));
   // Difficulty curve: the first floors are gentle, then monsters toughen faster than the gold they drop.
-  const tough = f => (f <= 10 ? 0.8 + 0.02 * f : 1) * (f > 15 ? Math.pow(1.012, f - 15) : 1) * (f > 40 ? Math.pow(1.012, f - 40) : 1);
+  const rawTough = f => (f <= 10 ? 0.8 + 0.02 * f : 1) * (f > 15 ? Math.pow(1.012, f - 15) : 1) * (f > 40 ? Math.pow(1.012, f - 40) : 1);
+  const tough = f => Math.pow(rawTough(f), TOUGH_POW);
   const foeHp = (f, boss) => baseHp(f) * tough(f) * (boss ? 9 : 1);
   const foeGold = (f, boss) => (1 + baseHp(f) / 40) * (boss ? 5 : 1);
   // Foe damage per second. Grows a little slower than foe health, so a well-kept party can hold.
-  const foeDps = (f, boss) => 1.1 * Math.pow(1.205, f - 1) * (f > 60 ? Math.pow(1.025, f - 60) : 1) * Math.sqrt(tough(f)) * (boss ? 2.2 : 1);
+  const foeDps = (f, boss) => 1.1 * Math.pow(Math.pow(1.205, f - 1) * (f > 60 ? Math.pow(1.025, f - 60) : 1) * Math.sqrt(rawTough(f)), POW) * (boss ? 2.2 : 1);
   const FOE_SWING = 1.6;
 
   function relicVal(s, id) { const r = RELICS.find(x => x.id === id); return (s.relics[id] || 0) * r.per; }
@@ -346,7 +355,7 @@
   function nextMilestone(lvl) { return MILESTONES.find(t => t > lvl) || null; }
 
   const lvl = (s, id) => { if (isGuest(s, id)) { const g = s.guests.find(x => x.id === id); return g ? g.level : 0; } return s.levels[id] || 0; };
-  function costDiscount(s) { return Math.min(0.5, relicVal(s, 'ledger')); }
+  function costDiscount(s) { return Math.min(0.25, relicVal(s, 'ledger')); }
   function memberBaseCost(m) { return m.id === 'you' ? 8 : TIER[m.tier].cost * (1 + CLASS_ORDER.indexOf(m.cls) * 0.6); }
   function trainCost(s, id, n) {
     const m = memberById(id), L = lvl(s, id), r = COST_GROWTH;
@@ -360,15 +369,15 @@
   }
 
   function featCount(s) { return Object.keys(s.feats).length; }
-  function emberMult(s) { return 1 + 0.1 * s.embers; }
+  function emberMult(s) { return 1 + EMBER_PER * s.embers; }
   function abilityActive(s, id, now) { const a = s.abil[id]; return !!(a && a.until > now); }
-  const scale = (s, id) => { const m = memberById(id), L = lvl(s, id); return L * milestoneMult(L) * TIER[m.tier].stat * (m.player ? 1 : NPC_POWER); };
+  const scale = (s, id) => { const m = memberById(id), L = lvl(s, id); return Math.pow(L * milestoneMult(L) * TIER[m.tier].stat * (m.player ? 1 : NPC_POWER), POW); };
 
   function maxHpOf(s, id) {
     const m = memberById(id);
-    return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + 0.04 * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp') * (1 + campBonus(s, 'hp')) * (1 + sk(s, 'php') + (id === 'you' ? sk(s, 'hp') : 0)));
+    return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + EMBER_HP * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp') * (1 + campBonus(s, 'hp')) * (1 + sk(s, 'php') + (id === 'you' ? sk(s, 'hp') : 0)));
   }
-  function partyMult(s) { return emberMult(s) * (1 + kup(s, 'edge')) * (1 + 0.02 * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')) * (1 + sk(s, 'pdps')); }
+  function partyMult(s) { return emberMult(s) * (1 + kup(s, 'edge')) * (1 + FEAT_PER * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')) * (1 + sk(s, 'pdps')); }
   function memberDps(s, id, now) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id), c = CLASSES[m.cls];
@@ -388,7 +397,7 @@
   function healPerSec(s, id) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id); if (m.cls !== 'healer') return 0;
-    return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + 0.04 * s.embers) * (1 + 0.02 * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0));
+    return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0));
   }
   function clickDamage(s, now) { return (1 + totalDps(s, now) * 0.05) * (1 + relicVal(s, 'whet')); }
   function goldMult(s) { return emberMult(s) * (1 + kup(s, 'purse')) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
@@ -587,11 +596,11 @@
     return it;
   }
   const RARITY = [
-    { id: 'common', name: 'Common', pct: 0.10, w: 60, prefix: '' },
-    { id: 'fine',   name: 'Fine',   pct: 0.20, w: 28, prefix: 'Keen ' },
-    { id: 'rare',   name: 'Rare',   pct: 0.35, w: 10, prefix: 'Runed ' },
-    { id: 'epic',   name: 'Epic',   pct: 0.60, w: 2,  prefix: 'Lantern-blessed ' },
-    { id: 'set',    name: 'Set',    pct: 0.45, w: 0,  prefix: '' },
+    { id: 'common', name: 'Common', pct: 0.04, w: 60, prefix: '' },
+    { id: 'fine',   name: 'Fine',   pct: 0.08, w: 28, prefix: 'Keen ' },
+    { id: 'rare',   name: 'Rare',   pct: 0.14, w: 10, prefix: 'Runed ' },
+    { id: 'epic',   name: 'Epic',   pct: 0.24, w: 2,  prefix: 'Lantern-blessed ' },
+    { id: 'set',    name: 'Set',    pct: 0.18, w: 0,  prefix: '' },
   ];
   const SETS = [
     { id: 'vigil',  cls: 'tank',   name: "Gravewarden's Vigil", pieces: { main: 'Vigil Hammer', chest: 'Vigil Mail', neck: 'Vigil Lantern' },
@@ -1017,13 +1026,13 @@
   ];
   function shopPrice(s, id) {
     const income = offlineGoldPerSec(s) * 60;
-    return Math.max(id === 'draught' ? 300 : 200, Math.round(income * (id === 'draught' ? 2 : 1.5)));
+    return Math.max(id === 'draught' ? 40 : 25, Math.round(income * (id === 'draught' ? 2 : 1.5)));
   }
   // The walk back up to camp has a price: free in the first ten floors, then a few minutes of income that grows with depth.
   const CAMP_FREE_FLOOR = 10;
   function campCost(s) {
     if (s.floor <= CAMP_FREE_FLOOR) return 0;
-    return Math.max(250, Math.round(offlineGoldPerSec(s) * 60 * (2.5 + s.floor / 60)));
+    return Math.max(30, Math.round(offlineGoldPerSec(s) * 60 * (2.5 + s.floor / 60)));
   }
   function buyShop(s, id, n) {
     n = n || 1; const c = shopPrice(s, id) * n;
@@ -1431,6 +1440,7 @@
     }
     Object.assign(s, o);
     s.stats = Object.assign(newState().stats, o.stats || {});
+    if ((o.econ || 1) < 2) { const L = (o.levels && o.levels.you) || 0; s.gold = regold(o.gold || 0, L); s.stats.goldEarned = regold(s.stats.goldEarned || 0, L); s.econ = 2; }
     s.settings = Object.assign(newState().settings, o.settings || {});
     s.story = Object.assign({ seen: {}, queue: [] }, o.story || {});
     s.party = (o.party || []).concat([null, null, null, null, null]).slice(0, PARTY_SIZE);
@@ -1457,7 +1467,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

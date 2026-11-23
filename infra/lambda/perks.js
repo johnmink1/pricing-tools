@@ -3,6 +3,7 @@ const D = require('@aws-sdk/client-dynamodb');
 const db = new D.DynamoDBClient({}), { WALLETS: W } = process.env;
 const res = (c, b) => ({ statusCode: c, body: JSON.stringify(b) });
 const S = v => ({ S: String(v) }), N = v => ({ N: String(v) });
+const IP = { draught: 10, oil: 5, t_fury: 15, t_bark: 15, t_mend: 10, t_keen: 10, t_gold: 20, t_loot: 20, t_xp: 15 };
 // Mercy's Blessing: every $10, 5 food items or toy given to the Grand War's Mercy Corps adds 2 hours for all
 // players, up to 7 days ahead. GET /mercy (public) reads the war site's totals and keeps the clock in the wallets table.
 let mercy = null, mercyAt = 0;
@@ -51,9 +52,11 @@ exports.handler = async (e) => {
     return res(200, { ok: true, add, bal: bal + add, mask: nm });
   }
   // Lantern Pass: 500 Sigils for 30 days of convenience perks, stacking onto any time left.
+  // Quartermaster items for Sigils ({ what: 'item', id, n }), the gold-free way to the same tonics and flasks.
   // The same route sells a stat reset ({ what: 'respec' }) for 50 Sigils and the Bag of Holding ({ what: 'boh' }), once, for 6,500.
   if (e.routeKey === 'POST /store/pass') {
-    const K = { userId: S(cl.sub) }, w = (await db.send(new D.GetItemCommand({ TableName: W, Key: K }))).Item, bh = b.what === 'boh', rs = bh || b.what === 'respec', c = bh ? 6500 : rs ? 50 : 500;
+    const K = { userId: S(cl.sub) }, w = (await db.send(new D.GetItemCommand({ TableName: W, Key: K }))).Item, bh = b.what === 'boh', it = b.what === 'item' && Object.hasOwn(IP, b.id) && IP[b.id], n = Math.max(1, Math.min(10, b.n | 0)), rs = bh || it || b.what === 'respec', c = bh ? 6500 : it ? it * n : rs ? 50 : 500;
+    if (b.what === 'item' && !it) return res(400, { error: 1 });
     const bal = w && w.bal ? +w.bal.N : 100, was = w && w.pass ? +w.pass.N : 0, until = Math.max(Date.now(), was) + 2592e6;
     if (bal < c) return res(400, { error: 'funds' });
     const v = { ':g': N(100), ':c': N(c), ':o': { SS: ['f.plain'] } };

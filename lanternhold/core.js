@@ -550,12 +550,41 @@
     if (!s.hero) return;
     const base = (1 + s.floor / 25) * (foe.boss ? 15 : foe.chest ? 2 : foe.elite ? 4 : 1) * (foe.pack ? foe.pack * 2 : 1);
     const before = heroLevel(s).lv;
-    s.hxp += base;
+    s.hxp += base * (1 + sk(s, 'xp'));
     const after = heroLevel(s).lv;
     if (after > before && events) events.push({ type: 'herolevel', lv: after, pts: pointsFor(after) - pointsFor(before) });
   }
   // Total of one effect from your hero's tree, Grand War aura and character stats. It only counts while your hero is in the party.
-  function sk(s, key) {
+  // Tonics from the Quartermaster: small timed buffs, one of each at a time; drinking again adds time up to an hour.
+  const TONIC_CAP = 3600;
+  // Sigil prices for Quartermaster items; the server (perks.js IP) charges the same.
+  const ITEM_SIGILS = { draught: 10, oil: 5, t_fury: 15, t_bark: 15, t_mend: 10, t_keen: 10, t_gold: 20, t_loot: 20, t_xp: 15 };
+  const TONICS = [
+    { id: 't_fury',   name: 'Draught of Fury',     icon: 'sword',  k: 'pdps',  v: 0.15, min: 10, mult: 3,   desc: '+15% party damage for 10 minutes.' },
+    { id: 't_bark',   name: 'Ironbark Tonic',      icon: 'shield', k: 'php',   v: 0.15, min: 10, mult: 3,   desc: '+15% party health for 10 minutes.' },
+    { id: 't_mend',   name: 'Mender’s Brew',       icon: 'leaf',   k: 'pheal', v: 0.20, min: 10, mult: 2.5, desc: '+20% healing for 10 minutes.' },
+    { id: 't_keen',   name: 'Keen-Eye Elixir',     icon: 'eye',    k: 'crit',  v: 0.05, min: 10, mult: 2.5, desc: '+5% critical hit chance for 10 minutes.' },
+    { id: 't_gold',   name: 'Prospector’s Luck',   icon: 'coin',   k: 'gold',  v: 0.15, min: 15, mult: 4,   desc: '+15% gold for 15 minutes.' },
+    { id: 't_loot',   name: 'Seeker’s Charm',      icon: 'key',    k: 'loot',  v: 0.15, min: 15, mult: 4,   desc: '+15% gear drops for 15 minutes.' },
+    { id: 't_xp',     name: 'Scholar’s Ink',       icon: 'book',   k: 'xp',    v: 0.25, min: 15, mult: 3,   desc: '+25% hero XP for 15 minutes.' },
+  ];
+  const tonicById = id => TONICS.find(t => t.id === id);
+  const tonicLeft = (s, id, now) => Math.max(0, (((s.tonic || {})[id] || 0) - (now || Date.now())) / 1000);
+  function tonicVal(s, key) {
+    if (!s.tonic) return 0;
+    const now = Date.now(); let t = 0;
+    for (const x of TONICS) if (x.k === key && (s.tonic[x.id] || 0) > now) t += x.v;
+    return t;
+  }
+  function drinkTonic(s, id, now) {
+    now = now || Date.now(); const t = tonicById(id);
+    if (!t || !s.items || !(s.items[id] > 0)) return false;
+    if (tonicLeft(s, id, now) + t.min * 60 > TONIC_CAP + 1) return false;
+    s.items[id]--; s.tonic = s.tonic || {};
+    s.tonic[id] = Math.max(now, s.tonic[id] || 0) + t.min * 60000; return true;
+  }
+  function sk(s, key) { return skBase(s, key) + tonicVal(s, key); }
+  function skBase(s, key) {
     if (!s.party.includes('you')) return 0;
     if (!s.skills) return auraVal(s, key) + statVal(s, key);
     let t = auraVal(s, key) + statVal(s, key);
@@ -1084,9 +1113,11 @@
   const SHOP = [
     { id: 'draught', name: 'Campfire Draught', icon: 'flame', desc: 'Drink it anywhere to make camp for ' + DRAUGHT_TIME + ' seconds. Swap companions, recruit players, train and change gear without the walk back up.' },
     { id: 'oil', name: 'Flask of Lantern Oil', icon: 'oil', desc: 'Pour it during a guardian fight for ' + OIL_TIME + ' more seconds before the lantern gutters.' },
-  ];
+  ].concat(TONICS);
   function shopPrice(s, id) {
     const income = offlineGoldPerSec(s) * 60;
+    const t = tonicById(id);
+    if (t) return Math.max(60, Math.round(income * t.mult));
     return Math.max(id === 'draught' ? 40 : 25, Math.round(income * (id === 'draught' ? 2 : 1.5)));
   }
   // The walk back up to camp has a price: free in the first ten floors, then a few minutes of income that grows with depth.
@@ -1553,7 +1584,7 @@
     s.formation = 1;
     s.foe = null; s.lantern = 0; s.minions = []; s.abil = {}; s.down = {};
     s.guests = o.guests || [];
-    s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
+    s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.tonic = o.tonic || {}; s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
     // Skill trees arrived after some players had already rekindled: 2 points for each past rekindle.
     s.kup = o.kup || {}; s.autoTrain = o.autoTrain || {}; s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
     s.bagUps = o.bagUps || 0; s.boh = !!o.boh; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0;
@@ -1568,7 +1599,7 @@
 
   const api = {
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
-    CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
+    CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, tonicById, tonicLeft, tonicVal, drinkTonic,
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,

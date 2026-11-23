@@ -929,3 +929,9 @@ body.resting .arena{cursor:default}
 @media (max-width:900px){.wcards{grid-template-columns:1fr}.wstats{grid-template-columns:1fr 1fr 1fr}}
 /* banner pick with alliance art */
 .pick.side.art{background-image:linear-gradient(180deg,#0b1220cc,#0b1220f2 55%),var(--art);background-size:cover;background-position:center top}
+/* auto-train toggle */
+.autot{display:inline-flex;align-items:center;justify-content:center;gap:4px;margin-top:4px;width:100%;padding:3px 8px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-weight:800;font-size:11px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
+.autot svg{width:12px;height:12px}
+.autot.on{background:#2a1f0e;border-color:var(--accent);color:var(--accent)}
+.autot.on svg{animation:autospin 2.4s linear infinite}
+@keyframes autospin{to{transform:rotate(360deg)}}

@@ -311,7 +311,7 @@
       mode: null, hero: null, guests: [],
       unlocked: [], levels: {}, party: [null, null, null, null, null],
       hp: {}, down: {}, abil: {}, minions: [], items: { draught: 1, oil: 0 }, campUntil: 0, jobs: {},
-      skills: {}, kindling: 0, bagUps: 0, unlocks: {}, kup: {},
+      skills: {}, kindling: 0, bagUps: 0, unlocks: {}, kup: {}, autoTrain: {},
       relics: {}, embers: 0, feats: {},
       bag: [], gear: {}, lore: { hold: 1 },
       story: { seen: {}, queue: [] },
@@ -778,6 +778,7 @@
     { id: 'edge',    name: 'Lantern Edge',        desc: '+3% party damage per rank',                     per: 0.03, max: 5, base: 2, icon: 'sword' },
     { id: 'purse',   name: 'Ember Purse',         desc: '+5% gold per rank',                             per: 0.05, max: 5, base: 2, icon: 'coin' },
     { id: 'oil',     name: 'Deep Reservoir',      desc: '+3s lantern time against guardians per rank',   per: 3,    max: 5, base: 2, icon: 'lantern' },
+    { id: 'watch',   name: 'Night Watch',         desc: 'Your party keeps earning 16 hours longer while you are away, per rank', per: 16 * 3600, max: 4, base: 2, icon: 'lantern' },
     { id: 'draught', name: 'Slow-burning Draught', desc: 'Campfire Draughts last 20s longer per rank',   per: 20,   max: 3, base: 1, icon: 'flame' },
   ];
   const kup = (s, id) => { const u = KINDLE_UPS.find(x => x.id === id); return ((s.kup || {})[id] || 0) * u.per; };
@@ -1354,6 +1355,23 @@
     return got;
   }
 
+  // Away from the game the party earns a quarter of its active gold, for a limited time.
+  // The base window is 8 hours; Night Watch (Kindling) extends it, up to 3 days at most.
+  const OFFLINE_BASE = 8 * 3600, OFFLINE_MAX = 72 * 3600;
+  const offlineWindow = s => Math.min(OFFLINE_MAX, OFFLINE_BASE + kup(s, 'watch'));
+  const offlineEarnPerSec = s => offlineGoldPerSec(s) * 0.5;
+  // Auto-train: spend gold on the members who have it switched on, cheapest level first.
+  function autoTrain(s, inCamp) {
+    const on = Object.keys(s.autoTrain || {}).filter(id => s.autoTrain[id] && s.unlocked.includes(id) && !isGuest(s, id) && (inCamp || s.party.includes(id)));
+    let n = 0;
+    while (on.length && n < 200) {
+      let best = null, bc = Infinity;
+      for (const id of on) { const c = trainCost(s, id, 1); if (c < bc) { bc = c; best = id; } }
+      if (!best || bc > s.gold) break;
+      train(s, best, 1); n++;
+    }
+    return n;
+  }
   function offlineGoldPerSec(s) {
     const d = totalDps(s, 0);
     if (d <= 0) return 0;
@@ -1385,7 +1403,7 @@
     s.guests = o.guests || [];
     s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
     // Skill trees arrived after some players had already rekindled: 2 points for each past rekindle.
-    s.kup = o.kup || {}; s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
+    s.kup = o.kup || {}; s.autoTrain = o.autoTrain || {}; s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
     s.bagUps = o.bagUps || 0; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0;
     if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
     s.bag = (o.bag || []).map(normItem); s.gear = o.gear || {};
@@ -1401,7 +1419,7 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

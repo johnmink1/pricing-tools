@@ -1,4 +1,4 @@
-/* lh-build 202611231414 */
+/* lh-build 202611231429 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1372,3 +1372,10 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 .wbtop li{padding:4px 8px;border-radius:8px;background:var(--panel)}
 .wbtop li{display:list-item}.wbtop li span{font-weight:700}.wbtop li b{float:right;color:var(--gold)}
 @media (max-width:560px){.wbhero{grid-template-columns:72px 1fr}.wbhero img{width:72px;height:72px}}
+/* Item lock */
+.tile .lkb{top:3px;left:50%;transform:translateX(-50%);background:#0b1019e6;color:var(--gold);padding:2px 3px;border:1px solid #c9a24a66}
+.tile .lkb svg{width:11px;height:11px;display:block}
+.itool.on{color:var(--gold);border-color:#c9a24a66;background:#2a2410}
+.itool.off{opacity:.45}
+.ilocked{display:flex;align-items:center;gap:6px;margin:8px 0 0;font-size:13px;color:var(--muted)}
+.ilocked svg{width:14px;height:14px;flex:none;color:var(--gold)}

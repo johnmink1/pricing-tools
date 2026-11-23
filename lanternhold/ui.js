@@ -578,8 +578,8 @@
           };
         };
         m.querySelector('#s-reset').onclick = () => {
-          m.querySelector('#s-extra').innerHTML = '<p style="color:#ff9c88">This erases everything, including Embers and relics. It cannot be undone.</p><div class="row"><button class="btn danger" id="s-doreset">Yes, erase it all</button></div>';
-          m.querySelector('#s-doreset').onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} S = L.newState(); location.reload(); };
+          m.querySelector('#s-extra').innerHTML = '<p style="color:#ff9c88">This erases everything, including Embers and relics' + (user ? ' and the save stored with your account' : '') + '. It cannot be undone.</p><div class="row"><button class="btn danger" id="s-doreset">Yes, erase it all</button></div>';
+          m.querySelector('#s-doreset').onclick = async () => { await eraseCloud(); try { localStorage.removeItem(SAVE_KEY); } catch (e) {} S = L.newState(); location.reload(); };
         };
       });
   }
@@ -611,6 +611,97 @@
     if (now - lastSave > 10000) { lastSave = now; save(); }
   }
 
+  // ---------- optional sign-in and cloud saves (Firebase) ----------
+  // Switched on by window.LH_FIREBASE in index.html. Guests can always play without signing in.
+  const FB_VER = '10.14.1';
+  let fb = null, user = null, lastCloud = 0;
+  function saveObj() { S.lastSeen = Date.now(); const o = Object.assign({}, S); delete o.foe; delete o._frenzyAcc; return o; }
+  function summary(o) {
+    return 'Floor ' + (o.maxFloorEver || 1) + ', ' + fmt(o.embers || 0) + ' Embers, ' + fmtTime((o.stats && o.stats.playTime) || 0) + ' played';
+  }
+  async function fbInit() {
+    const cfg = window.LH_FIREBASE;
+    if (!cfg || !cfg.apiKey) return;
+    const base = 'https://www.gstatic.com/firebasejs/' + FB_VER + '/';
+    try {
+      const [appM, authM, fsM] = await Promise.all([import(base + 'firebase-app.js'), import(base + 'firebase-auth.js'), import(base + 'firebase-firestore.js')]);
+      const app = appM.initializeApp(cfg);
+      fb = { auth: authM.getAuth(app), db: fsM.getFirestore(app), authM, fsM };
+    } catch (e) { console.warn('Cloud saves unavailable', e); return; }
+    $('btn-account').hidden = false;
+    fb.authM.onAuthStateChanged(fb.auth, async u => {
+      user = u; paintAccount();
+      if (u) await reconcile();
+    });
+  }
+  function paintAccount() {
+    const b = $('btn-account');
+    if (user) {
+      const initial = (user.displayName || user.email || '?').trim()[0].toUpperCase();
+      b.innerHTML = '<span class="avatar">' + initial + '</span>'; b.setAttribute('aria-label', 'Account'); b.title = 'Signed in. Progress syncs.';
+    } else { b.innerHTML = icon('user') + '<span>Sign in</span>'; b.setAttribute('aria-label', 'Sign in'); b.title = 'Sign in to sync your progress'; }
+  }
+  const cloudRef = () => fb.fsM.doc(fb.db, 'saves', user.uid);
+  async function pushCloud(quiet) {
+    if (!fb || !user) return;
+    try {
+      const o = saveObj();
+      await fb.fsM.setDoc(cloudRef(), { data: JSON.stringify(o), floor: o.maxFloorEver, embers: o.embers, updated: Date.now(), v: L.VERSION });
+      lastCloud = Date.now();
+      if (!quiet) toast('star', 'Progress synced', 'Your save is stored with your account.', 'feat');
+    } catch (e) { if (!quiet) toast('lock', 'Could not sync right now', 'Your progress is still saved on this device.', 'warn'); }
+  }
+  async function reconcile() {
+    let snap;
+    try { snap = await fb.fsM.getDoc(cloudRef()); } catch (e) { return; }
+    const local = saveObj();
+    const fresh = !local.stats.kills && !local.embers;
+    if (!snap.exists()) { await pushCloud(false); return; }
+    let cloud; try { cloud = JSON.parse(snap.data().data); } catch (e) { await pushCloud(true); return; }
+    const same = Math.abs(((cloud.stats && cloud.stats.playTime) || 0) - local.stats.playTime) < 5;
+    if (same) return;
+    if (fresh) { useSave(cloud); return; }
+    $('modal').dataset.lock = '1';
+    modal('<h2>Choose a save</h2><p>Your account already has progress, and this device has different progress. Which one do you want to keep? The other is replaced.</p>' +
+      '<div class="choice"><button class="pick" id="c-cloud"><b>Account save</b><small>' + summary(cloud) + '</small></button>' +
+      '<button class="pick" id="c-local"><b>This device</b><small>' + summary(local) + '</small></button></div>', m => {
+        m.querySelector('#c-cloud').onclick = () => { delete $('modal').dataset.lock; closeModal(); useSave(cloud); };
+        m.querySelector('#c-local').onclick = () => { delete $('modal').dataset.lock; closeModal(); pushCloud(false); };
+      });
+  }
+  function useSave(o) {
+    S = L.migrate(o); S.lastSeen = Date.now();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(saveObj())); } catch (e) {}
+    location.reload();
+  }
+  function openAccount() {
+    if (!fb) return;
+    if (!user) {
+      modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Keep your progress safe</h2><p>Sign in to store your save with your account and play on any device. It is optional, and the game works the same without it.</p>' +
+        '<div class="row" style="justify-content:center"><button class="btn gbtn" id="a-google">' + icon('google') + 'Continue with Google</button></div>' +
+        '<p class="credits">We only keep your name, email and game save. <a href="privacy.html" target="_blank" rel="noopener" style="color:var(--muted)">Privacy</a></p></div>', m => {
+          m.querySelector('#a-google').onclick = async () => {
+            try { await fb.authM.signInWithPopup(fb.auth, new fb.authM.GoogleAuthProvider()); closeModal(); }
+            catch (e) { if (e && e.code !== 'auth/popup-closed-by-user') toast('lock', 'Sign-in did not finish', 'Please try again.', 'warn'); }
+          };
+        });
+      return;
+    }
+    modal('<h2>Your account</h2><p>Signed in as <b style="color:var(--text)"></b>. Your progress syncs every minute and whenever you leave the game.</p>' +
+      '<div class="row"><button class="btn" id="a-sync">Sync now</button><button class="btn ghost" id="a-out">Sign out</button></div>' +
+      '<p class="credits"><a href="privacy.html" target="_blank" rel="noopener" style="color:var(--muted)">Privacy</a> &middot; To delete your account data, use Erase progress in Settings while signed in.</p>' +
+      '<div class="row"><button class="btn ghost" id="a-close">Done</button></div>', m => {
+        m.querySelector('b').textContent = user.displayName || user.email;
+        m.querySelector('#a-sync').onclick = () => pushCloud(false);
+        m.querySelector('#a-out').onclick = async () => { await pushCloud(true); await fb.authM.signOut(fb.auth); closeModal(); toast('user', 'Signed out', 'Your progress stays on this device too.', ''); };
+        m.querySelector('#a-close').onclick = closeModal;
+      });
+  }
+  async function eraseCloud() { if (fb && user) { try { await fb.fsM.deleteDoc(cloudRef()); } catch (e) {} } }
+  $('btn-account').addEventListener('click', openAccount);
+  setInterval(() => { if (user && Date.now() - lastCloud > 60000) pushCloud(true); }, 15000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && user) pushCloud(true); });
+
   // ---------- support link ----------
   if (window.LH_SUPPORT_URL) { const a = $('support'); a.href = window.LH_SUPPORT_URL; a.hidden = false; a.title = 'Buy the developer a coffee'; }
 
@@ -631,6 +722,7 @@
   updateStage(); updatePanel(true);
   setInterval(logic, 100);
   requestAnimationFrame(render);
+  fbInit();
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
   window.addEventListener('pagehide', save);
   window.LHDebug = { get S() { return S; }, save, L };

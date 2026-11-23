@@ -1,4 +1,4 @@
-/* lh-build 202611232204 */
+/* lh-build 202611232214 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1855,3 +1855,7 @@ body.resting .taptip{display:none}
 .dmto[hidden]{display:none}.dmto b{color:#c4b5fd}.dmto .iconbtn{width:24px;height:24px;font-size:16px}
 .msg.dm .who{color:#c4b5fd}.msg.dm span{color:#ddd6fe}
 .dmdir{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}
+/* the Nexus Guardian (click-rhythm brake) */
+.tag.nexus{background:#1e0f3a;color:#e6d2ff;border-color:#7a4ae0;box-shadow:0 0 10px #7a3cff55}
+.bar.lantern.nexus i{background:linear-gradient(180deg,#e6d2ff,#8a5af0)}
+.bar.nexus>i{background:repeating-linear-gradient(135deg,#5a2fb0 0 8px,#7a4ae0 8px 16px)!important}

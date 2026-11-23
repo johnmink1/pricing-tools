@@ -1,4 +1,4 @@
-/* lh-build 202611232214 */
+/* lh-build 202611232217 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1131,7 +1131,7 @@
     else if (t.id === 'm-market') openTrade('market');
     else if (t.id === 'm-mail') openTrade('mail');
   };
-  ['tab-party', 'tab-camp', 'tab-market'].forEach(id => $(id).addEventListener('click', partyClick));
+  ['tab-party', 'tab-camp', 'tab-market', 'tab-guild'].forEach(id => $(id).addEventListener('click', partyClick));
   // camp jobs: pick who does a job, or which job someone does
   function jobsFull() { const n = L.JOB_SLOT_LV.find(x => x > L.heroLv(S)); toast('lock', 'Every job slot is taken', 'You can run ' + L.jobSlots(S) + (L.jobSlots(S) === 1 ? ' camp job' : ' camp jobs') + ' at once.' + (n ? ' Another slot opens at hero level ' + n + '.' : '') + ' Clear a job to move someone.', 'warn'); }
   function jobModal(jid) {
@@ -1428,7 +1428,7 @@
     if (e.target.closest('.dfig')) { profileModal(gearWho); return; }
     const it = e.target.closest('[data-item]'); if (it) { if ((e.ctrlKey || e.metaKey) && linkItem(L.itemOf(S, it.dataset.item))) return; itemModal(it.dataset.item); }
   });
-  ['tab-gear', 'tab-party', 'tab-camp', 'tab-market'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof],[data-pos],[data-unlock]')) { e.preventDefault(); e.target.click(); } }));
+  ['tab-gear', 'tab-party', 'tab-camp', 'tab-market', 'tab-guild'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof],[data-pos],[data-unlock]')) { e.preventDefault(); e.target.click(); } }));
   const itemStats = it => L.itemStats(it);
   function itemModal(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
@@ -3987,6 +3987,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 68, date: 'November 23, 2026', title: 'Guild invites fixed', items: [
+      'Fixed: the Invite buttons in the Guild tab did nothing. Pressing Invite now sends the invite right away, shows Invited with a Cancel button, and pops up a notice. The same fix covers accepting or declining party invitations and opening a hero’s profile from the Guild tab.'] },
     { v: 67, date: 'November 23, 2026', title: 'The Nexus Guardian', items: [
       'The Nexus has started listening to the Deep. A rhythm that never tires, strikes that land too fast for too long or with perfectly even spacing, sounds to it like a siege engine at the wall.',
       'When it hears one, the back wall starts to crack and glow. Keep it up and the Nexus Guardian breaks through and takes the stage. Nothing lands on it, not your strikes and not your party.',

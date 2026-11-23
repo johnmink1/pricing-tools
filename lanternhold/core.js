@@ -55,9 +55,12 @@
   const MERCY_FX = { gold: 0.10, hp: 0.10, heal: 0.20 };
   const mercyOn = s => !!(s && s.mercy && s.mercy > Date.now());
   const sidePerk = (s, k) => sidePerk0(s, k) * (mercyOn(s) ? 1 + (MERCY_FX[k] || 0) : 1);
+  // Banner kin: every other party member who marches under your banner amplifies your banner perk by 40%.
+  const KIN_AMP = 0.4;
+  const bannerKin = s => { const d = sideOf(s); if (!d || !s.party) return 0; let n = 0; for (const id of s.party) { if (!id || id === 'you') continue; const m = memberById(id); if (m && m.side === d) n++; } return n; };
   const sidePerk0 = (s, k) => { const d = sideOf(s); if (!d) return 1;
-    if (d === 'unsworn') return k === 'heal' ? 1 : 1.05;
-    return ({ covenant: { hp: 1.15 }, radiant: { dps: 1.12 }, tide: { gold: 1.15 }, mercy: { heal: 1.15 } }[d][k]) || 1; };
+    const v = d === 'unsworn' ? (k === 'heal' ? 1 : 1.05) : (({ covenant: { hp: 1.15 }, radiant: { dps: 1.12 }, tide: { gold: 1.15 }, mercy: { heal: 1.15 } }[d][k]) || 1);
+    return 1 + (v - 1) * (1 + KIN_AMP * bannerKin(s)); };
   const TIER = [{ cost: 10, stat: 1 }, { cost: 1320, stat: 2.6e4 }];
   const NPC_POWER = 0.7;   // story companions are always weaker than real players' heroes
   const GUEST_SLOTS_SOLO = 0;
@@ -65,7 +68,7 @@
   const dyn = {};
   function registerHero(s) {
     if (s.hero) dyn.you = { id: 'you', name: s.hero.name, title: (SIDES[s.hero.side] ? SIDES[s.hero.side].name + ' ' : '') + 'Lantern-bearer', cls: s.hero.cls, tier: 0, hue: 0, player: true, line: 'That\u2019s you.' };
-    for (const g of s.guests || []) dyn[g.id] = { id: g.id, name: g.name, title: 'Recruited player', cls: g.cls, tier: 0, hue: 0, player: true, guest: true, line: 'Another delver, lending you their strength.' };
+    for (const g of s.guests || []) dyn[g.id] = { id: g.id, name: g.name, title: 'Recruited player', cls: g.cls, side: g.side || null, tier: 0, hue: 0, player: true, guest: true, line: 'Another delver, lending you their strength.' };
   }
   const memberById = id => dyn[id] || MEMBERS.find(m => m.id === id);
   const isGuest = (s, id) => !!(dyn[id] && dyn[id].guest);
@@ -1069,7 +1072,7 @@
     // g: { id, name, cls, level } from the hero board
     if (s.mode !== 'multi') return false;
     s.guests = (s.guests || []).filter(x => x.id !== g.id);
-    s.guests.push({ id: g.id, name: g.name, cls: g.cls, level: Math.max(1, Math.floor(g.level)), at: Date.now() });
+    s.guests.push({ id: g.id, name: g.name, cls: g.cls, side: SIDES[g.side] ? g.side : null, level: Math.max(1, Math.floor(g.level)), at: Date.now() });
     registerHero(s);
     const slot = s.party.indexOf(null);
     if (slot >= 0) s.party[slot] = g.id;
@@ -1511,7 +1514,7 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

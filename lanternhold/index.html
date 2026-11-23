@@ -17,7 +17,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611230405">
+<link rel="stylesheet" href="style.css?v=202611230407">
 </head>
 <body>
 <div id="app">
@@ -97,6 +97,7 @@
         <div id="campbar"></div>
         <div class="buybar"><span>Train</span><div class="seg" id="buyseg"><button data-n="1" class="on">x1</button><button data-n="10">x10</button><button data-n="25">x25</button><button data-n="max">Max</button></div></div>
         <div class="formhead"><span><b>Marching order</b> <small>Top of the list stands at the front, nearest the monsters.</small></span><span class="fbtns"><button class="btn ghost small" id="f-recruit">Recruit players</button><button class="btn ghost small" id="f-auto">Auto-arrange</button></span></div>
+        <div class="kin" id="kinline" hidden></div>
         <div id="seats"></div>
         <details class="ftips"><summary id="fsum">Formation tips</summary><ul class="fnotes" id="fnotes"></ul></details>
       </div>
@@ -150,7 +151,7 @@
   </main>
   <div class="coach" id="coach" hidden role="dialog" aria-live="polite"><div class="coach-step" id="coachstep"></div><b id="coachtitle"></b><p id="coachtext"></p><div class="coach-row"><button class="linkbtn" id="coachskip">Skip tutorial</button><button class="btn small" id="coachnext">Next</button></div></div>
   <aside class="chat" id="chat" hidden aria-label="Chat">
-    <div class="chathead"><div class="seg" id="chatch"><button data-ch="global" class="on">Global</button><button data-ch="trade">Trade</button><button data-ch="party">Party</button></div><button class="iconbtn" id="chatx" aria-label="Close chat">&times;</button></div>
+    <div class="chathead"><div class="seg" id="chatch"><button data-ch="global" class="on">Global</button><button data-ch="banner">Banner</button><button data-ch="trade">Trade</button><button data-ch="party">Party</button></div><button class="iconbtn" id="chatx" aria-label="Close chat">&times;</button></div>
     <select id="chatroom" hidden aria-label="Which party"></select>
     <div class="chatlog" id="chatlog" aria-live="polite"></div>
     <form class="chatform" id="chatform" autocomplete="off"><input id="chatin" maxlength="200" placeholder="Say something" aria-label="Message"><button class="btn small" type="submit">Send</button></form>
@@ -205,10 +206,10 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611230405";</script>
+<script>window.LH_BUILD = "202611230407";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611230405"></script>
-<script src="sprites.js?v=202611230405"></script>
-<script src="ui.js?v=202611230405"></script>
+<script src="core.js?v=202611230407"></script>
+<script src="sprites.js?v=202611230407"></script>
+<script src="ui.js?v=202611230407"></script>
 </body>
 </html>

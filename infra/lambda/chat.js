@@ -13,6 +13,7 @@ async function canParty(me, leader) {
 async function room(me, q) {
   const ch = q.ch;
   if (ch === 'global' || ch === 'trade') return ch;
+  if (ch === 'banner') { const r = await db.send(new D.GetItemCommand({ TableName: H, Key: { pid: S(me) }, ProjectionExpression: 'sd' })); return r.Item && r.Item.sd ? 'banner#' + r.Item.sd.S : null; }
   if (ch === 'party') { const L = /^[0-9a-f]{16}$/.test(q.leader || '') ? q.leader : me; return (await canParty(me, L)) ? 'party#' + L : null; }
   return null;
 }

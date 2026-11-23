@@ -238,7 +238,7 @@
       gold: 0, floor: 1, foeIdx: 0, maxFloor: 1, maxFloorEver: 1,
       mode: null, hero: null, guests: [],
       unlocked: [], levels: {}, party: [null, null, null, null, null],
-      hp: {}, down: {}, abil: {}, minions: [], items: { draught: 1, oil: 0 }, campUntil: 0,
+      hp: {}, down: {}, abil: {}, minions: [], items: { draught: 1, oil: 0 }, campUntil: 0, jobs: {},
       relics: {}, embers: 0, feats: {},
       bag: [], gear: {}, lore: { hold: 1 },
       story: { seen: {}, queue: [] },
@@ -291,9 +291,9 @@
 
   function maxHpOf(s, id) {
     const m = memberById(id);
-    return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + 0.04 * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp'));
+    return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + 0.04 * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp') * (1 + campBonus(s, 'hp')));
   }
-  function partyMult(s) { return emberMult(s) * (1 + 0.02 * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps'); }
+  function partyMult(s) { return emberMult(s) * (1 + 0.02 * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')); }
   function memberDps(s, id, now) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id), c = CLASSES[m.cls];
@@ -312,12 +312,12 @@
   function healPerSec(s, id) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id); if (m.cls !== 'healer') return 0;
-    return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + 0.04 * s.embers) * (1 + 0.02 * featCount(s)) * sidePerk(s, 'heal');
+    return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + 0.04 * s.embers) * (1 + 0.02 * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal'));
   }
   function clickDamage(s, now) { return (1 + totalDps(s, now) * 0.05) * (1 + relicVal(s, 'whet')); }
-  function goldMult(s) { return emberMult(s) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold'); }
+  function goldMult(s) { return emberMult(s) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')); }
   function critChance(s) { return 0.04 + relicVal(s, 'dice'); }
-  function lanternTime(s) { return BASE_LANTERN + relicVal(s, 'lamp'); }
+  function lanternTime(s) { return BASE_LANTERN + relicVal(s, 'lamp') + campBonus(s, 'lamp'); }
   function chestChance(s) { return 0.03 + relicVal(s, 'moth'); }
   function abilityDuration(s, ab) { return ab.dur * (1 + relicVal(s, 'hourglass')); }
 
@@ -380,14 +380,14 @@
     return { uid: Date.now().toString(36) + (uidSeq++), cls, slot, rar, ilvl: f, up: 0 };
   }
   function dropGear(s, foe, rng, events) {
-    const r = rng || Math.random, f = s.floor;
+    const r = rng || Math.random, f = s.floor, loot = 1 + campBonus(s, 'loot');
     let it = null;
     if (foe.boss) {
       if (f >= 15 && r() < 0.14) it = rollGear(s, f, { set: true }, r);
       else it = rollGear(s, f, { boost: 1 }, r);
-    } else if (foe.chest) { if (r() < 0.6) it = rollGear(s, f, { boost: 0.5 }, r); }
-    else if (foe.elite) { if (r() < 0.3) it = rollGear(s, f, { boost: 0.5 }, r); }
-    else if (r() < 0.025) it = rollGear(s, f, null, r);
+    } else if (foe.chest) { if (r() < 0.6 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
+    else if (foe.elite) { if (r() < 0.3 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
+    else if (r() < 0.025 * loot) it = rollGear(s, f, null, r);
     if (!it) return;
     if (s.bag.length >= GEAR_CAP) {
       // full bag: the lowest value common item gets sold automatically
@@ -525,6 +525,7 @@
   }
   function seat(s, id, slot) {
     if (!s.unlocked.includes(id) && !isGuest(s, id)) return false;
+    if (s.jobs) for (const k in s.jobs) if (s.jobs[k] === id) delete s.jobs[k]; // leaves their camp job
     if (s.party[slot] === 'you' && id !== 'you') return false; // your hero is never benched
     const cur = s.party.indexOf(id);
     if (cur >= 0) s.party[cur] = s.party[slot];
@@ -563,6 +564,39 @@
     return out;
   }
 
+
+
+  // ---------- camp jobs ----------
+  // Companions resting at the campfire can take a job that helps the whole party. The bonus grows
+  // with the companion's level (square root), and half again when the job suits their class.
+  const JOBS = [
+    { id: 'forage', name: 'Forager', stat: 'loot', aff: 'rogue', base: 0.03, icon: 'bag', fmt: 'more gear drops', desc: 'Scours the floors behind the party for anything worth carrying.' },
+    { id: 'smith', name: 'Runesmith', stat: 'dps', aff: 'mage', base: 0.02, icon: 'hammer', fmt: 'party damage', desc: 'Etches the party’s weapons with Rift-glass runes.' },
+    { id: 'herb', name: 'Herbalist', stat: 'heal', aff: 'healer', base: 0.02, icon: 'leaf', fmt: 'healing', desc: 'Brews poultices from the cavern moss.' },
+    { id: 'armor', name: 'Armorer', stat: 'hp', aff: 'tank', base: 0.02, icon: 'shield', fmt: 'party health', desc: 'Hammers dents out of shields and straps on spare plate.' },
+    { id: 'prospect', name: 'Prospector', stat: 'gold', aff: 'rogue', base: 0.025, icon: 'coin', fmt: 'gold', desc: 'Pans the underground streams for coin the dead left behind.' },
+    { id: 'lamp', name: 'Lamplighter', stat: 'lamp', aff: 'necro', base: 0.35, icon: 'lamp', fmt: 'lantern oil per guardian', desc: 'Trims the wick and rations the oil.' },
+  ];
+  function jobValue(s, job, id) {
+    const m = memberById(id); if (!m) return 0;
+    return job.base * Math.sqrt(Math.max(1, lvl(s, id))) * (m.cls === job.aff ? 1.5 : 1);
+  }
+  const jobFree = (s, id) => id && id !== 'you' && s.unlocked.includes(id) && !s.party.includes(id) && !isGuest(s, id);
+  function campBonus(s, stat) {
+    if (!s.jobs) return 0;
+    let v = 0;
+    for (const j of JOBS) if (j.stat === stat) { const id = s.jobs[j.id]; if (jobFree(s, id)) v += jobValue(s, j, id); }
+    return v;
+  }
+  function jobOf(s, id) { for (const k in (s.jobs || {})) if (s.jobs[k] === id) return JOBS.find(j => j.id === k); return null; }
+  function assignJob(s, id, jobId) {
+    s.jobs = s.jobs || {};
+    for (const k in s.jobs) if (s.jobs[k] === id) delete s.jobs[k];
+    if (!jobId) return true;
+    if (!JOBS.some(j => j.id === jobId) || !jobFree(s, id)) return false;
+    s.jobs[jobId] = id; return true;
+  }
+  const jobText = (job, v) => job.stat === 'lamp' ? '+' + v.toFixed(1) + 's ' + job.fmt : '+' + Math.round(v * 100) + '% ' + job.fmt;
 
   // ---------- camp, store and consumables ----------
   // Party changes (swapping, recruiting, training companions, gear) only happen at camp: floor 1,
@@ -931,7 +965,7 @@
     s.formation = 1;
     s.foe = null; s.lantern = 0; s.minions = []; s.abil = {}; s.down = {};
     s.guests = o.guests || [];
-    s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.campUntil = o.campUntil || 0;
+    s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
     if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
     s.bag = o.bag || []; s.gear = o.gear || {}; s.lore = Object.assign({ hold: 1 }, o.lore || {});
     registerHero(s);
@@ -940,6 +974,7 @@
   }
 
   const api = {
+    JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,

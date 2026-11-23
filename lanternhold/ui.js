@@ -1,4 +1,4 @@
-/* lh-build 202611231429 */
+/* lh-build 202611231434 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1294,15 +1294,17 @@
 
   // ---------- mass scrap ----------
   const scrapOpts = { common: true, fine: true, rare: false, epic: false, set: false, keepBest: true, keepUp: true };
-  function scrapList() {
+  // Items a bulk action may take, by rarity ticks and keep rules. Worn and locked items are always left alone.
+  function bulkList(o) {
     const best = new Set();
-    if (scrapOpts.keepBest) {
+    if (o.keepBest) {
       const top = {};
       for (const it of S.bag) { const k = it.cls + it.slot; if (!top[k] || L.gearPct(it) > L.gearPct(top[k])) top[k] = it; }
       Object.values(top).forEach(it => best.add(it.uid));
     }
-    return S.bag.filter(it => scrapOpts[it.rar] && !it.lk && !L.wearer(S, it.uid) && !best.has(it.uid) && !(scrapOpts.keepUp && it.up > 0));
+    return S.bag.filter(it => o[it.rar] && !it.lk && !L.wearer(S, it.uid) && !best.has(it.uid) && !(o.keepUp && it.up > 0));
   }
+  const scrapList = () => bulkList(scrapOpts);
   function openScrap() {
     const draw = () => {
       const list = scrapList(), gold = list.reduce((a, it) => a + L.salvageValue(it), 0);
@@ -3150,6 +3152,10 @@
       ['Locking items', 'i:lock', 'Tap an item in your pack and choose Lock to protect it.', [
         'Locked items show a small padlock and are skipped by <b>Mass scrap</b>, auto-selling when your pack is full, and the <b>Loot Goblin</b>.',
         'You can still equip and upgrade a locked item. Unlock it to sell, send or salvage it.']],
+      ['Mass scrap and Mass sell', 'i:coin', 'Clear out your pack in one go from the Gear tab.', [
+        '<b>Mass scrap</b> turns the rarities you tick into gold right away.',
+        '<b>Mass sell</b> lists them on the market at their current value, up to 25 listings at a time. You get mail with the gold as each one sells.',
+        'Worn and locked items are never touched by either.']],
       ['Gear basics', 's:chest', 'Gear drops from monsters, chests and guardians. Each piece fits one class and slot.', [
         'Slots: main hand, offhand, helmet, trinket, chest, legs, feet, ring. Robes cover chest and legs.',
         'Change gear at <b>camp</b>. <b>Equip best</b> does it in one tap.',
@@ -3256,6 +3262,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 42, date: 'November 23, 2026', title: 'Mass sell', items: [
+      'New Mass sell button next to Mass scrap in your Gear tab. Pick rarities and list many pieces on the market at once, each at its current value.',
+      'Worn and locked items are never listed. You can keep the best piece of each kind and anything you have upgraded.',
+      'You can now have up to 25 items on the market at a time, up from 10.'] },
     { v: 41, date: 'November 23, 2026', title: 'Lock your favorite gear', items: [
       'Tap any item in your pack and choose Lock. A small padlock shows on its tile.',
       'Locked items are never touched by Mass scrap, auto-selling when your pack is full, or the Loot Goblin.',
@@ -3489,7 +3499,7 @@
     if (what === 'send' && e && e.status === 404) return 'That player could not be found. They may need to sign in again.';
     if (what === 'send' && e && e.status === 400) return 'That offer could not be sent. You may have 20 offers waiting already.';
     if (what === 'sig') return c === 'full' ? 'You have 5 Sigil listings already. Take one down first.' : c === 'state' ? 'You do not have that many Sigils.' : c === 'gone' || (e && e.status === 404) ? 'Someone else bought those Sigils first.' : e && e.status === 401 ? 'Sign in again to trade.' : 'The Sigil exchange could not be reached. Try again in a moment.';
-    return c === 'full' ? (what === 'list' ? 'You have 10 items listed already. Cancel one first.' : 'You have 20 offers waiting already. Recall one first.')
+    return c === 'full' ? (what === 'list' ? 'You have ' + MKT_CAP + ' items listed already. Take one down first.' : 'You have 20 offers waiting already. Recall one first.')
       : c === 'gone' || (e && e.status === 404) ? 'That is no longer available.'
       : c === 'nobody' ? 'That player has not published a hero yet.'
       : e && e.status === 401 ? 'Sign in again to trade.' : 'The Trading Post could not be reached. Try again in a moment.';
@@ -3757,6 +3767,49 @@
         }, 'send');
       });
   }
+  // ---------- mass sell: list many pack items on the market in one go ----------
+  const MKT_CAP = 25, sellOpts = { common: false, fine: true, rare: true, epic: false, set: false, keepBest: true, keepUp: true };
+  async function openMassSell() {
+    if (!CL) return;
+    if (!signedIn()) { toast('lock', 'Sign in to trade', 'The market needs a free account.', 'warn'); authForm('in'); return; }
+    let used = null;
+    // Each piece is listed at its current value: the same price the Sell button suggests for it.
+    const unit = it => Math.max(10, Math.round(L.salvageValue(it) * 3));
+    const draw = () => {
+      const free = used === null ? 0 : Math.max(0, MKT_CAP - used);
+      const all = bulkList(sellOpts).sort((a, b) => unit(b) - unit(a)), list = all.slice(0, free), gold = list.reduce((a, it) => a + unit(it), 0);
+      const chk = (k, label, sub) => '<label class="chk"><input type="checkbox" data-opt="' + k + '"' + (sellOpts[k] ? ' checked' : '') + '><span><b>' + label + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></label>';
+      modal('<h2>Mass sell</h2><p>List many pieces on the market at once, each at its current value. Other players can buy them for a week, and you get mail with the gold when each one sells. Worn and locked items are never listed.</p>' +
+        '<div class="scrapgrid">' + L.RARITY.map(r => chk(r.id, '<span class="r-' + r.id + '" style="color:var(--rc)">' + r.name + '</span>', S.bag.filter(x => x.rar === r.id && !x.lk && !L.wearer(S, x.uid)).length + ' to sell')).join('') + '</div>' +
+        chk('keepBest', 'Keep the best of each kind', 'Saves your strongest spare piece for every class and slot.') +
+        chk('keepUp', 'Keep upgraded pieces', 'Anything you have spent gold upgrading stays.') +
+        '<p class="scrapsum">' + (used === null ? 'Checking your market slots…' : !free ? 'All ' + MKT_CAP + ' of your market slots are in use. Take something down under My listings first.' : list.length ? 'Lists <b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' for <b>' + fmt(gold) + ' gold</b> in total.' + (all.length > list.length ? ' ' + (all.length - list.length) + ' more will not fit.' : '') + ' <small>' + free + ' of ' + MKT_CAP + ' market slots free.</small>' : 'Nothing matches. Tick more rarities above.') + '</p>' +
+        '<div class="row"><button class="btn" id="ms-go"' + (list.length ? '' : ' disabled') + '>List ' + list.length + '</button><button class="btn ghost" id="ms-x">Cancel</button></div>', md => {
+          md.querySelectorAll('[data-opt]').forEach(c => c.onchange = () => { sellOpts[c.dataset.opt] = c.checked; draw(); });
+          md.querySelector('#ms-x').onclick = closeModal;
+          md.querySelector('#ms-go').onclick = () => tradeAct(async () => {
+            const go = md.querySelector('#ms-go'); go.disabled = true;
+            let n = 0, g = 0;
+            try {
+              for (const it of list) {
+                if (!L.itemOf(S, it.uid) || it.lk || L.wearer(S, it.uid)) continue;
+                go.textContent = 'Listing ' + (n + 1) + ' of ' + list.length + '…';
+                await chatCall('POST', '/market/list', { item: tradeItem(it), price: unit(it), name: S.hero.name });
+                takeFromBag(it.uid); n++; g += unit(it);
+              }
+            } finally {
+              if (n) { afterTrade(); sfx.buy(); }
+              closeModal();
+              if (n) toast('coin', 'Listed ' + n + (n === 1 ? ' piece' : ' pieces'), 'Worth ' + fmt(g) + ' gold in total. You will get mail as they sell.', 'feat');
+            }
+          }, 'list');
+        });
+    };
+    draw();
+    try { const r = await chatCall('GET', '/market?mine=1'); used = (r.listings || []).length; } catch (e) { used = MKT_CAP; toast('lock', 'Could not reach the market', 'Try again in a moment.', 'warn'); }
+    if (!$('modal').hidden && $('ms-go')) draw();
+  }
+  if ($('g-msell')) { $('g-msell').hidden = !CL; $('g-msell').addEventListener('click', openMassSell); }
   if (CL) {
     setInterval(() => { if (signedIn() && !document.hidden) loadMail(true); }, 90000);
     setTimeout(() => { if (signedIn()) loadMail(true); }, 4000);
@@ -3768,7 +3821,7 @@
   const wbDur = ms => { const s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return d ? d + 'd ' + h + 'h' : h ? h + 'h ' + m + 'm' : m + ':' + String(x).padStart(2, '0'); };
   async function loadBoss() {
     if (!CL || !signedIn()) { wb.st = null; return; }
-    try { wb.st = await api('GET', null, '/boss'); wb.at = Date.now(); } catch (e) {}
+    try { const r = await api('GET', null, '/boss'); if (r && r.w && r.me) { wb.st = r; wb.at = Date.now(); } } catch (e) {}
   }
   // What the player can do right now: join, wait for the cooldown, claim, or wait for the next weekend.
   function wbState() {

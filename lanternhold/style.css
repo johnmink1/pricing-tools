@@ -1,4 +1,4 @@
-/* lh-build 202611231429 */
+/* lh-build 202611231434 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1379,3 +1379,4 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 .itool.off{opacity:.45}
 .ilocked{display:flex;align-items:center;gap:6px;margin:8px 0 0;font-size:13px;color:var(--muted)}
 .ilocked svg{width:14px;height:14px;flex:none;color:var(--gold)}
+.scrapsum small{display:block;color:var(--muted);margin-top:2px}

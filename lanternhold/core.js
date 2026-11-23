@@ -1253,6 +1253,10 @@
   const PACK_CHANCE = 0.03, PACK_FLOOR = 3, PACK_GOLD = 2;
   function makeFoe(s, rng) {
     const f = s.floor, boss = isBossFloor(f), r = rng || Math.random;
+    if (!boss) {
+      if (s.goblin && s.goblin.item && f >= s.goblin.floor) return goblinFoe(s, true);
+      if (!s.goblin && f >= GOBLIN_FLOOR && r() < GOBLIN_CHANCE && s.bag.some(it => !wearer(s, it.uid))) return goblinFoe(s, false);
+    }
     const chest = !boss && r() < chestChance(s);
     const b = biomeOf(f);
     let sprite, name;
@@ -1274,6 +1278,33 @@
     if (pack) { hpx = hp * pack * 0.85; ambush = 2; }
     const mods = chest ? [] : rollMods(f, boss, elite, b, r);
     return { name, sprite, boss, chest, elite, side, ambush, pack, hp: hpx, max: hpx, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) * (pack ? 1 + 0.3 * (pack - 1) : 1) * (mods.includes('swift') ? 1.35 : 1), mods, ward: 0, wardAt: 0 };
+  }
+  // Loot Goblin: a rare thief that fights back. Kill it before it flees, or it runs off with one unworn item from the pack
+  // and hides a few floors deeper. Find it there and kill it to win the item back. Worn gear is never taken.
+  const GOBLIN_FLOOR = 8, GOBLIN_CHANCE = 0.006, GOBLIN_TIME = 20, GOBLIN_GOLD = 6;
+  const goblinHide = (s, r) => { const f = s.floor + 2 + Math.floor(r() * 4); return actTwoOpen() ? f : Math.min(ACT_ONE_END, f); };
+  function goblinFoe(s, carrying) {
+    // Tough enough that idle damage alone barely gets there in time: strikes and abilities make the difference.
+    const f = s.floor, hp = Math.max(foeHp(f, false) * 3, totalDps(s, s.clock || Date.now()) * GOBLIN_TIME * 1.9);
+    return { name: 'Loot Goblin', sprite: 'goblin', goblin: carrying ? 2 : 1, boss: false, chest: false, elite: false, side: null, ambush: 0, pack: 0, hp, max: hp, hue: 0, atk: foeDps(f, false) * FOE_SWING * 0.7, mods: [], ward: 0, wardAt: 0, flee: 0 };
+  }
+  // Picks what the goblin grabs: any unworn item, better ones more likely.
+  function goblinGrab(s, r) {
+    const pool = s.bag.filter(it => !wearer(s, it.uid)); if (!pool.length) return null;
+    const w = pool.map(it => 1 + 2 * Math.max(0, RARITY.findIndex(x => x.id === it.rar)));
+    let x = r() * w.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < pool.length; i++) { x -= w[i]; if (x <= 0) return pool[i]; }
+    return pool[pool.length - 1];
+  }
+  function goblinFlee(s, rng, events) {
+    const r = rng || Math.random, foe = s.foe;
+    let it = s.goblin && s.goblin.item;
+    if (!it) { it = goblinGrab(s, r); if (it) s.bag = s.bag.filter(x => x !== it); }
+    s.foe = null; s.foeSwing = 0;
+    if (!it) { events && events.push({ type: 'goblinflee', item: null }); return; }
+    s.goblin = { item: it, floor: goblinHide(s, r), at: Date.now() };
+    s.stats.goblinRuns = (s.stats.goblinRuns || 0) + 1;
+    events && events.push({ type: 'goblinflee', item: it, floor: s.goblin.floor, again: foe && foe.goblin === 2 });
   }
   function rollMods(f, boss, elite, b, r) {
     let n = boss ? (f >= 20 ? 1 : 0) + (f >= 60 ? 1 : 0) + (f >= 110 ? 1 : 0) : elite ? (f >= 30 ? 1 : 0) + (f >= 100 ? 1 : 0) : (f >= 40 && r() < Math.min(0.4, 0.08 + (f - 40) / 300) ? 1 : 0);
@@ -1344,6 +1375,12 @@
     if (foe.chest) { g *= 10 * (1 + relicVal(s, 'tooth')); s.stats.chests++; }
     if (foe.elite) { g *= 3; unlockLore(s, 'war_' + foe.side, events); }
     if (foe.pack) { g *= foe.pack * PACK_GOLD * (1 + sk(s, 'spoils')); s.stats.packs = (s.stats.packs || 0) + 1; s.stats.kills += foe.pack - 1; }
+    if (foe.goblin) {
+      g *= GOBLIN_GOLD; s.stats.goblins = (s.stats.goblins || 0) + 1;
+      const back = foe.goblin === 2 && s.goblin && s.goblin.item;
+      if (back) { s.bag.push(back); s.goblin = null; }
+      events && events.push({ type: 'goblinkill', item: back || null });
+    }
     s.gold += g; s.stats.goldEarned += g; s.stats.kills++;
     gainXp(s, foe, events);
     events && events.push({ type: 'kill', gold: g, foe });
@@ -1507,7 +1544,7 @@
   // Resting at camp: after Return to camp (floor 1) or under a Campfire Draught. Nobody fights; everyone heals up.
   const resting = (s, now) => !!((s.campReturn && s.floor <= CAMP_FLOOR) || s.campUntil > now);
   function tick(s, dt, now, rng, events) {
-    s.stats.playTime += dt;
+    s.stats.playTime += dt; s.clock = now;
     if (s.unlocked.length && !(s.traits && s.unlocked.every(id => s.traits[id]))) for (const id of s.unlocked) traitsOf(s, id);
     if (resting(s, now)) {
       for (const id of s.party) if (id) { delete s.down[id]; const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + mx * 0.25 * (1 + campTrait(s, 'rest')) * dt); }
@@ -1520,6 +1557,10 @@
     if (!alive(s).length) return; // nobody to fight
     if (!s.foe) { s.foe = makeFoe(s, rng); if (s.foe.pack) events && events.push({ type: 'pack', n: s.foe.pack, name: s.foe.name }); }
     if (s.retryAt && !s.autoAdvance && now >= s.retryAt) { s.autoAdvance = true; s.retryAt = 0; events && events.push({ type: 'retry' }); }
+    if (s.foe.goblin) {
+      s.foe.flee += dt;
+      if (s.foe.flee >= GOBLIN_TIME) { goblinFlee(s, rng, events); return; }
+    }
     if (s.foe.boss) {
       s.lantern += dt;
       if (s.lantern >= lanternTime(s)) {
@@ -1659,7 +1700,7 @@
     s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.tonic = o.tonic || {}; s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
     // Skill trees arrived after some players had already rekindled: 2 points for each past rekindle.
     s.kup = o.kup || {}; s.autoTrain = o.autoTrain || {}; s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
-    s.bagUps = o.bagUps || 0; s.boh = !!o.boh; s.traits = o.traits || {}; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0;
+    s.bagUps = o.bagUps || 0; s.boh = !!o.boh; s.traits = o.traits || {}; s.goblin = o.goblin && o.goblin.item ? { item: normItem(o.goblin.item), floor: o.goblin.floor || 1, at: o.goblin.at || 0 } : null; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0;
     if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
     s.bag = (o.bag || []).map(normItem); s.gear = o.gear || {};
     const OLD = { weapon: 'main', armor: 'chest', trinket: 'neck' };
@@ -1676,7 +1717,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

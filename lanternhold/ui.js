@@ -551,6 +551,12 @@
         claimFound();
       } else if (e.type === 'lore') {
         const lo = L.LORE.find(x => x.id === e.id); toast('book', 'New journal entry', lo.title, 'feat');
+      } else if (e.type === 'goblinflee') {
+        sfx.fail(); floatText(e.item ? 'Stolen!' : 'Escaped!', 'crit', 0.5, 0.3);
+        if (e.item) toast('bag', e.again ? 'He got away again' : 'The Loot Goblin stole ' + L.gearName(e.item), (e.again ? 'He still has ' + L.gearName(e.item) + ' and' : 'He') + ' fled to floor ' + e.floor + '. Find him there and kill him to get it back.', 'warn');
+      } else if (e.type === 'goblinkill') {
+        sfx.relic(); floatText(e.item ? 'Got it back!' : 'Goblin slain!', 'skill', FOE_X, 0.2);
+        toast('bag', e.item ? 'You got it back' : 'Loot Goblin slain', e.item ? L.gearName(e.item) + ' is back in your pack, and the goblin dropped a fat purse of gold.' : 'It dropped a fat purse of gold. Your pack is safe.', 'feat');
       } else if (e.type === 'pack') {
         floatText('Ambush!', 'crit', 0.5, 0.3);
         if (!(S.stats.packs > 0)) toast('sword', 'Ambush!', e.n + ' monsters have teamed up to jump your party. They hit harder and strike the back first, but they pay ' + (e.n * L.PACK_GOLD) + ' times the gold and often drop gear.', 'feat');
@@ -640,7 +646,7 @@
     const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now());
     if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>At camp</b><small>Swap companions, recruit, train and change gear.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + Math.min(S.maxFloor, Math.max(2, S.campReturn || S.maxFloor)) + '</button>' : '') + '<button class="btn ghost small" data-camp="store">Store</button></div>';
     if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Camp made: ' + Math.ceil(left) + 's</b><small>A Campfire Draught is burning. Make your changes now.</small></div><button class="btn ghost small" data-camp="store">Store</button></div>';
-    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Swapping companions and changing gear happen at camp. Your party can train anywhere.</small></div><button class="btn small" data-camp="go"' + (L.campCost(S) > S.gold ? ' disabled' : '') + '>Return to camp' + (L.campCost(S) ? ' · ' + fmt(L.campCost(S)) : '') + '</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
+    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Swap companions and gear at camp. Training works anywhere.</small></div><button class="btn small" data-camp="go"' + (L.campCost(S) > S.gold ? ' disabled' : '') + '>Return to camp' + (L.campCost(S) ? ' · ' + fmt(L.campCost(S)) : '') + '</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
   }
   let campWas = null;
   function paintCamp() {
@@ -825,7 +831,7 @@
     else if (t.dataset.invno) answerInvite(t.dataset.invno, 'no');
     else if (t.id === 'b-find') findHeroes();
     else if (t.id === 'b-signin') openAccount();
-    else if (t.id === 'f-recruit') { trade.view = 'guild'; switchTab('market'); }
+    else if (t.id === 'f-recruit') switchTab('guild');
     else if (t.id === 'm-market') openTrade('market');
     else if (t.id === 'm-mail') openTrade('mail');
   };
@@ -965,7 +971,7 @@
     try {
       const r = await api('GET', null, '/invites');
       inv.asks = r.asks || [];
-      for (const g of inv.asks) if (!inv.seen[g.id]) { inv.seen[g.id] = 1; toast('users', g.name + ' invited you', 'They want ' + S.hero.name + ' in their party. Answer in the Players Guild on the Party tab.', 'feat'); }
+      for (const g of inv.asks) if (!inv.seen[g.id]) { inv.seen[g.id] = 1; toast('users', g.name + ' invited you', 'They want ' + S.hero.name + ' in their party. Answer in the Guild tab.', 'feat'); }
       S.sentInv = S.sentInv || {};
       for (const id of Object.keys(S.sentInv)) if (!(r.sent || []).includes(id)) delete S.sentInv[id];
       for (const id of r.sent || []) if (!inv.sent[id]) inv.sent[id] = S.sentInv[id] || { id };
@@ -1451,6 +1457,7 @@
     $('embers').textContent = fmt(S.embers); { const hp = S.hero ? L.heroPoints(S) : 0; $('kindcount').textContent = S.kindling ? S.kindling : hp > 0 ? '+' + hp : ''; }
     if (tab === 'party' || tab === 'camp') updateSeats(force);
     if (tab === 'market' && force) showMarketView();
+    if (tab === 'guild' && force) { if (!boardList && CL && signedIn() && !boardMsg) findHeroes(); else paintBoard(); }
     if (tab === 'gear') updateGear(force);
     if (tab === 'codex') {
       if (cx === 'journal' && force) updateJournal();
@@ -1483,17 +1490,23 @@
     }
     $('goalch').textContent = 'Chapter ' + L.chapterOf(S);
     { let g = L.currentGoal(S); if (S.maxFloorEver > L.ACT_ONE_END && !L.actTwoOpen()) { const d = Math.max(0, L.ACT_TWO_AT - Date.now()), dd = Math.floor(d / 864e5), hh = Math.floor(d / 36e5) % 24; g = 'Act Two opens with Season 2, in ' + (dd ? dd + 'd ' : '') + hh + 'h'; } if ($('goaltext').textContent !== g) $('goaltext').textContent = g; }
+    paintGoblinHunt();
     const f = S.foe;
     if (f) {
       $('foename').textContent = f.pack ? f.name + ' and ' + (f.pack - 1) + ' more' : f.name;
-      const tag = $('foetag'); tag.textContent = f.pack ? 'Ambush ×' + f.pack : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; tag.className = 'tag' + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
+      if (f.goblin && !f.seen) { f.seen = 1; goblinArrives(f); }
+      const tag = $('foetag'); tag.textContent = f.goblin ? 'Thief' : f.pack ? 'Ambush ×' + f.pack : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; tag.className = 'tag' + (f.goblin ? ' thief' : '') + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
       { const mk = (f.mods || []).join(','); if (mk !== lastModKey) { lastModKey = mk; $('foemods').innerHTML = (f.mods || []).map(m => '<span class="mod m-' + m + '" title="' + esc(L.MODS[m].desc) + '">' + esc(L.MODS[m].name) + '</span>').join(''); } }
       $('hpbar').style.width = Math.max(0, f.hp / f.max * 100) + '%';
       $('wardbar').style.width = Math.min(100, (f.ward || 0) / f.max * 100) + '%';
       $('hptext').textContent = fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max) + (f.ward > 0 ? ' + ' + fmt(f.ward) + ' ward' : '');
-      $('lanternwrap').hidden = !f.boss;
+      $('lanternwrap').hidden = !f.boss && !f.goblin; $('lanternwrap').classList.toggle('flee', !!f.goblin);
       { const n = (S.items && S.items.oil) || 0; $('b-oil').hidden = !f.boss || !n || S.lantern <= 0; $('b-oil').textContent = 'Pour lantern oil (' + n + ')'; }
-      if (f.boss) {
+      if (f.goblin) {
+        const left = Math.max(0, L.GOBLIN_TIME - f.flee);
+        $('lanternbar').style.width = (left / L.GOBLIN_TIME * 100) + '%';
+        $('lanterntext').textContent = 'Runs off in ' + left.toFixed(1) + 's';
+      } else if (f.boss) {
         const lt = L.lanternTime(S), left = Math.max(0, lt - S.lantern);
         $('lanternbar').style.width = (left / lt * 100) + '%';
         $('lanterntext').textContent = 'Lantern oil ' + left.toFixed(1) + 's';
@@ -1586,6 +1599,24 @@
     draw();
   }
 
+
+  // ---------- Loot Goblin ----------
+  function goblinArrives(f) {
+    sfx.boss(); floatText('Loot Goblin!', 'crit', 0.5, 0.3);
+    if (f.goblin === 2) toast('bag', 'There he is!', 'The Loot Goblin has ' + L.gearName(S.goblin.item) + '. Bring him down in ' + L.GOBLIN_TIME + ' seconds to get it back.', 'feat');
+    else toast('bag', 'A Loot Goblin!', 'Kill it within ' + L.GOBLIN_TIME + ' seconds or it steals an item from your pack. Strike fast and use your abilities. Worn gear is safe.', 'feat');
+  }
+  let gobKey = '';
+  function paintGoblinHunt() {
+    const g = S.goblin, el = $('gobhunt'), k = g ? g.floor + '|' + g.item.uid + '|' + (S.maxFloor >= g.floor) : '';
+    if (k === gobKey) return; gobKey = k; el.hidden = !g; if (!g) return;
+    el.innerHTML = icon('bag') + '<span>The Loot Goblin is hiding on <b>floor ' + g.floor + '</b> with your <b class="r-' + g.item.rar + '">' + esc(L.gearName(g.item)) + '</b></span>' + (S.maxFloor >= g.floor && S.floor !== g.floor ? '<em>Go there</em>' : '');
+  }
+  $('gobhunt').addEventListener('click', () => {
+    const g = S.goblin; if (!g) return;
+    if (S.maxFloor >= g.floor) { if (S.floor !== g.floor) { L.gotoFloor(S, g.floor); S.campReturn = 0; updateStage(); toast('map', 'Floor ' + g.floor, 'Find the Loot Goblin and bring him down.', ''); } }
+    else toast('map', 'Keep descending', 'Reach floor ' + g.floor + ' and the goblin will show himself.', '');
+  });
   // ---------- settings ----------
   $('btn-settings').addEventListener('click', openSettings);
   function openSettings() {
@@ -2566,13 +2597,16 @@
     chatNote(); paintChat(); pollChat();
   }
   function openChat(open) {
-    chat.open = open; $('chat').hidden = !open; $('chatdot').hidden = true;
+    chat.open = open; $('chat').hidden = !open; $('btn-chat').hidden = open; $('chatdot').hidden = true;
+    try { localStorage.setItem('lh_chat', open ? '1' : '0'); } catch (e) {}
     if (open) { paintChat(); pollChat(); if (signedIn()) setTimeout(() => $('chatin').focus(), 50); } else clearTimeout(chat.timer);
   }
   if (CL) {
     $('btn-chat').hidden = false;
-    $('btn-chat').addEventListener('click', () => openChat($('chat').hidden));
-    $('chatx').addEventListener('click', () => openChat(false));
+    $('btn-chat').addEventListener('click', () => openChat(true));
+    $('chatmin').addEventListener('click', () => openChat(false));
+    // The chat window stays as you left it: open or tucked away.
+    try { if (localStorage.getItem('lh_chat') === '1' && matchMedia('(min-width:721px)').matches) setTimeout(() => openChat(true), 1500); } catch (e) {}
     $('chatch').addEventListener('click', e => { const b = e.target.closest('[data-ch]'); if (b) setChannel(b.dataset.ch); });
     $('chatroom').addEventListener('change', e => { chat.leader = e.target.value || null; paintChat(); pollChat(); });
     $('chatlog').addEventListener('click', e => {
@@ -2977,12 +3011,13 @@
         'You earn <b>a quarter</b> of your usual gold for up to <b>8 hours</b>.',
         '<b>Night Watch</b> (Skills tab) stretches that up to 3 days.',
         'The <b>Lantern Pass</b> adds 4 more hours.']],
-      ['The side panel', 'i:map', 'Six tabs, each with one job.', [
+      ['The side panel', 'i:map', 'Seven tabs, each with one job.', [
         '<b>Party</b>: who fights, and in what order.',
         '<b>Camp</b>: resting companions, camp jobs and training.',
         '<b>Gear</b>: dress your characters.',
         '<b>Skills</b>: your character sheet, skill tree and rekindling.',
-        '<b>Market</b>: trading, Sigils and the Players Guild.',
+        '<b>Market</b>: buy and sell gear, mail and the Sigil exchange.',
+        '<b>Guild</b>: invite other players’ heroes into your party.',
         '<b>Codex</b>: journal, relics and records.']],
       ['Controls', 'i:help', 'Everything works with taps; keys are shortcuts.', [
         '<b>Tap, Space or Enter</b>: strike',
@@ -3012,7 +3047,7 @@
         'Seat changes happen at <b>camp</b>.',
         'Companions are a little weaker than other players’ heroes.']],
       ['Players Guild', 'i:users', 'Fill seats with other players’ heroes. They are stronger than companions.', [
-        'Sign in, open <b>Players Guild</b>, press <b>Invite</b>.',
+        'Sign in, open the <b>Guild</b> tab, press <b>Invite</b>.',
         'They <b>accept or decline</b>. Accepted heroes join at camp.',
         'Invites to <i>you</i> show at the top with <b>Accept</b> and <b>Decline</b>. Accepting lends a copy of your hero and earns you gold.',
         '<b>Dismiss</b> on a seat lets a hero go.']],
@@ -3035,6 +3070,11 @@
       ['Ambushes', 's:hound,bat,riftling', 'Sometimes 2 to 4 monsters team up and jump the party.', [
         'Shown as <b>Ambush ×2</b> to <b>×4</b>. More health, harder hits, rear first.',
         'Pays several times the gold, better gear odds and extra XP. Luck makes it bigger.']],
+      ['Loot Goblin', 's:goblin', 'A rare thief that turns up from floor 8. Kill it within 20 seconds.', [
+        'It fights back. Strike fast and fire your abilities: idle damage alone barely gets there.',
+        'If it escapes it steals one item from your pack and hides a few floors deeper. <b>Gear you wear is never taken.</b>',
+        'A green note under the chapter goal shows where it hides. Reach that floor and kill it to get the item back.',
+        'Every goblin you kill drops six times the gold.']],
       ['Abilities', 'i:star', 'Each party member has one ability; your hero can learn more.', [
         'They fire by themselves. Turn that off under the arena to time them.',
         'Keys <b>1 to 5</b> use them; <b>6 to 8</b> are specializations from the skill tree.']],
@@ -3114,6 +3154,7 @@
       ['Accounts', 'i:user', 'A free account saves your progress online, on any device.', [
         '<b>Continue with Born 2 Game</b> signs you in with your store account.']],
       ['Chat', 'i:chat', 'Global, Trade, Party and Banner channels.', [
+        'Press <b>Chat</b> at the bottom right to open the window, and the dash to tuck it away again.',
         'Banner chat reaches only players under your banner.',
         'Ctrl+click an item to link it. Tap a name to mute or report. No links, and be kind.']],
       ['Trading Post', 'i:bag', 'Buy and sell gear for gold, or mail it to a player.', [
@@ -3145,11 +3186,19 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 37, date: 'November 23, 2026', title: 'Clearer store and the Lanternholder membership', items: [
+    { v: 38, date: 'November 23, 2026', title: 'Clearer store and the Lanternholder membership', items: [
       'Sigil packs are plain one-time purchases. You pay once, nothing renews, and the checkout no longer shows a duration.',
       'New: Lanternholder, a $4.99 monthly membership. While it is active you get Auto-train, 10 extra bag slots and 4 more hours of offline earnings, with no Sigils to spend.',
       'The Get Sigils screen now shows one-time packs and the monthly membership separately, and says plainly that the membership renews until you cancel.',
       'Cancel any time under My Subscriptions in your Born 2 Game account. Perks stay on until the end of the month you paid for.'] },
+    { v: 37, date: 'November 23, 2026', title: 'The Loot Goblin and a cleaner screen', items: [
+      'Watch out for the Loot Goblin. From floor 8 a sneaky thief can jump your party. Kill it within 20 seconds or it runs off with an item from your pack. Gear you are wearing is never taken.',
+      'If it gets away, a green note under your chapter goal shows the floor where it is hiding. Reach that floor and kill it to get your item back. Every goblin you kill drops six times the gold.',
+      'On a computer the whole game now fits on one screen. Only the side panel scrolls.',
+      'Ability buttons are bigger and easier to read: full names, a clear Ready glow and a cooldown bar.',
+      'The Players Guild has its own Guild tab.',
+      'Chat is now a floating window. Press Chat at the bottom right to open it, and the dash to tuck it away.',
+      'Your Sigil balance shows as soon as the game opens.'] },
     { v: 36, date: 'November 23, 2026', title: 'Companion traits and a new Guide', items: [
       'Every story companion now has three traits, rolled when they join: a position trait for one party seat, a kinship trait that works beside a certain class, and a camp trait for resting at the fire.',
       'Working traits glow gold on the Party and Camp tabs. Rearrange your party to switch on as many as you can.',
@@ -3414,8 +3463,7 @@
   }
   function showMarketView() {
     document.querySelectorAll('#mktseg button').forEach(b => b.classList.toggle('on', b.dataset.mv === trade.view));
-    $('tradebox').hidden = trade.view === 'guild'; $('boardwrap').hidden = trade.view !== 'guild';
-    if (trade.view === 'guild') { paintBoard(); return; }
+    if (trade.view === 'guild') trade.view = 'market';
     if (!trade.cls) { const m = L.memberById('you'); trade.cls = m ? m.cls : 'tank'; }
     paintTrade();
     if (!CL || !signedIn()) return;
@@ -3627,8 +3675,6 @@
       });
   }
   if (CL) {
-    $('btn-trade').hidden = false;
-    $('btn-trade').addEventListener('click', () => { trade.view = 'market'; openTrade(); if (phone()) { const p = document.querySelector('.panel'); p && window.scrollTo({ top: p.getBoundingClientRect().top + window.scrollY - 8, behavior: 'smooth' }); } });
     setInterval(() => { if (signedIn() && !document.hidden) loadMail(true); }, 90000);
     setTimeout(() => { if (signedIn()) loadMail(true); }, 4000);
   }

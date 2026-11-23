@@ -50,7 +50,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611231344">
+<link rel="stylesheet" href="style.css?v=202611231345">
 </head>
 <body>
 <div id="app">
@@ -69,9 +69,7 @@
     </div>
     <a class="support" id="support" href="#" target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24"><use href="#i-cup"/></svg><span>Support the game</span></a>
     <button class="updatebtn" id="btn-update" hidden><svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span>Update ready</span></button>
-    <button class="iconbtn chatbtn" id="btn-trade" hidden aria-label="Trading Post" title="Trading Post: market and mail"><svg viewBox="0 0 24 24"><use href="#i-bag"/></svg><i id="tradedot" class="tdot" hidden></i></button>
-    <button class="iconbtn chatbtn" id="btn-chat" hidden aria-label="Chat"><svg viewBox="0 0 24 24"><use href="#i-chat"/></svg><i id="chatdot" hidden></i></button>
-    <button class="account" id="btn-account" hidden aria-label="Sign in"></button>
+            <button class="account" id="btn-account" hidden aria-label="Sign in"></button>
     <button class="iconbtn" id="btn-guide" aria-label="Guide" title="Guide"><svg viewBox="0 0 24 24"><use href="#i-help"/></svg></button>
     <button class="iconbtn" id="btn-settings" aria-label="Settings"><svg viewBox="0 0 24 24"><use href="#i-gear"/></svg></button>
   </header>
@@ -94,8 +92,8 @@
         <button class="nav" id="next" aria-label="Next floor">&#8250;</button>
       </div>
       <div class="pips" id="pips"></div>
-      <button class="mapbtn" id="btn-map"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg>Map of the Deep</button>
-      <div class="goal" id="goal"><span id="goalch">Chapter 1</span><b id="goaltext"></b></div>
+      <div class="stagebar"><button class="mapbtn" id="btn-map"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg>Map of the Deep</button><div class="goal" id="goal"><span id="goalch">Chapter 1</span><b id="goaltext"></b></div></div>
+      <button class="gobhunt" id="gobhunt" hidden></button>
 
       <div class="arena" id="arena" role="button" tabindex="0" aria-label="Strike the foe">
         <canvas id="cv"></canvas>
@@ -123,7 +121,8 @@
         <button data-tab="camp"><svg><use href="#i-flame"/></svg><span>Camp</span></button>
         <button data-tab="gear"><svg><use href="#i-bag"/></svg><span>Gear</span><em id="gearcount"></em></button>
         <button data-tab="rekindle"><svg><use href="#i-star"/></svg><span>Skills</span><em id="kindcount"></em></button>
-        <button data-tab="market"><svg><use href="#i-coin"/></svg><span>Market</span></button>
+        <button data-tab="market"><svg><use href="#i-coin"/></svg><span>Market</span><i id="tradedot" class="tdot" hidden></i></button>
+        <button data-tab="guild"><svg><use href="#i-crown"/></svg><span>Guild</span></button>
         <button data-tab="codex"><svg><use href="#i-book"/></svg><span>Codex</span></button>
         <button data-tab="admin" id="tabadmin" hidden><svg><use href="#i-lock"/></svg><span>Admin</span></button>
       </nav>
@@ -140,10 +139,10 @@
         <div id="benchwrap" class="camp"><h3 class="sub">Campfire</h3><p class="note">Companions resting by the fire work camp jobs that help the whole party, even while you are deep below. Train them here to make their jobs count for more.</p><div id="bench"></div><div id="campnext"></div></div>
       </div>
       <div class="tabbody" id="tab-market" hidden>
-        <div class="seg mktseg" id="mktseg"><button data-mv="market" class="on">Market</button><button data-mv="mail">Mailbox <em id="mailn"></em></button><button data-mv="sigils">Sigils</button><button data-mv="guild">Players Guild</button></div>
+        <div class="seg mktseg" id="mktseg"><button data-mv="market" class="on">Market</button><button data-mv="mail">Mailbox <em id="mailn"></em></button><button data-mv="sigils">Sigils</button></div>
         <div id="tradebox"></div>
-        <div id="boardwrap" hidden></div>
       </div>
+      <div class="tabbody" id="tab-guild" hidden><div id="boardwrap"></div></div>
       <div class="tabbody" id="tab-gear" hidden>
         <div id="gearcamp"></div>
         <div class="whoseg" id="gearwho"></div>
@@ -185,8 +184,10 @@
     </aside>
   </main>
   <div class="coach" id="coach" hidden role="dialog" aria-live="polite"><div class="coach-step" id="coachstep"></div><b id="coachtitle"></b><p id="coachtext"></p><div class="coach-row"><button class="linkbtn" id="coachskip">Skip tutorial</button><button class="btn small" id="coachnext">Next</button></div></div>
+  <button class="chatfab" id="btn-chat" hidden aria-label="Open chat"><svg viewBox="0 0 24 24"><use href="#i-chat"/></svg><span>Chat</span><small id="chatpeek"></small><i id="chatdot" hidden></i></button>
   <aside class="chat" id="chat" hidden aria-label="Chat">
-    <div class="chathead"><div class="seg" id="chatch"><button data-ch="global" class="on">Global</button><button data-ch="banner">Banner</button><button data-ch="trade">Trade</button><button data-ch="party">Party</button></div><button class="iconbtn" id="chatx" aria-label="Close chat">&times;</button></div>
+    <div class="chattitle"><b>Chat</b><button class="iconbtn" id="chatmin" aria-label="Minimize chat" title="Minimize"><svg viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>
+    <div class="chathead"><div class="seg" id="chatch"><button data-ch="global" class="on">Global</button><button data-ch="banner">Banner</button><button data-ch="trade">Trade</button><button data-ch="party">Party</button></div></div>
     <select id="chatroom" hidden aria-label="Which party"></select>
     <div class="chatlog" id="chatlog" aria-live="polite"></div>
     <form class="chatform" id="chatform" autocomplete="off"><input id="chatin" maxlength="200" placeholder="Say something" aria-label="Message"><button class="btn small" type="submit">Send</button></form>
@@ -241,11 +242,11 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611231344";</script>
+<script>window.LH_BUILD = "202611231345";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611231344"></script>
-<script src="sprites.js?v=202611231344"></script>
-<script src="vector.js?v=202611231344"></script>
-<script src="ui.js?v=202611231344"></script>
+<script src="core.js?v=202611231345"></script>
+<script src="sprites.js?v=202611231345"></script>
+<script src="vector.js?v=202611231345"></script>
+<script src="ui.js?v=202611231345"></script>
 </body>
 </html>

@@ -1307,40 +1307,6 @@
     if (phone()) { const p = document.querySelector('.panel'); p && window.scrollTo({ top: p.getBoundingClientRect().top + window.scrollY - 8, behavior: 'smooth' }); }
   }));
 
-  // ---------- Character sheet: hero level, XP and stats ----------
-  const STAT_LBL = { pdps: 'party damage', crit: 'crit chance', dodge: 'dodge', php: 'party health', power: 'ability power', pheal: 'party healing', cd: 'faster abilities', gold: 'gold', loot: 'loot', chest: 'chest chance', sig: 'Sigil odds', spoils: 'ambush spoils' };
-  const pctTxt = v => { const p = v * 100; return '+' + (p >= 1 ? Math.round(p * 10) / 10 : p >= 0.01 ? Math.round(p * 100) / 100 : Math.round(p * 10000) / 10000) + '%'; };
-  const statMod = sc => { const m = Math.floor((sc - 10) / 2); return (m >= 0 ? '+' : '') + m; };
-  function paintSheet() {
-    const box = $('charsheet'); if (!box) return;
-    const cls = L.heroCls(S);
-    if (!cls) { box.innerHTML = ''; return; }
-    const h = L.heroLevel(S), pts = L.heroPoints(S), pri = L.STAT_CLASS[cls] || [], c = L.CLASSES[cls];
-    const row = st => {
-      const n = (S.attr || {})[st.id] || 0, sc = L.statScore(S, st.id), fav = pri.includes(st.id), mult = fav ? L.STAT_AFFINITY : 1;
-      const fx = Object.keys(st.fx).map(k => pctTxt(st.fx[k] * Math.max(n, 0) * mult) + ' ' + STAT_LBL[k]).join(', ');
-      return '<div class="cstat' + (fav ? ' fav' : '') + '"><div class="cscore"><b>' + sc + '</b><small>' + statMod(sc) + '</small></div>' +
-        '<div class="ctx"><b>' + st.name + (fav ? ' <span class="cfav">' + c.name + ' favoured</span>' : '') + '</b><small>' + (n ? fx : 'Raises ' + st.desc + '.') + '</small></div>' +
-        '<div class="cbtns"><button class="btn small" data-stat="' + st.id + '"' + (pts > 0 && sc < L.STAT_MAX ? '' : ' disabled') + ' aria-label="Add a point to ' + st.name + '">+1</button>' +
-        (pts >= 5 ? '<button class="btn small ghost" data-stat5="' + st.id + '"' + (sc + 5 <= L.STAT_MAX ? '' : ' disabled') + '>+5</button>' : '') + '</div></div>';
-    };
-    box.innerHTML = '<div class="chead"><div><h3>' + esc(L.memberById('you').name) + ', level ' + h.lv + ' ' + c.name + '</h3><small>Your hero earns XP from every fight, even when they sit out. Bigger foes give more.</small></div>' +
-      '<div class="kbal cpts' + (pts ? ' on' : '') + '">' + icon('star') + '<b>' + pts + '</b><small>' + (pts === 1 ? 'Point' : 'Points') + '</small></div></div>' +
-      '<div class="cxp"><i style="width:' + Math.min(100, h.xp / h.need * 100).toFixed(1) + '%"></i><span>' + fmt(Math.floor(h.xp)) + ' / ' + fmt(h.need) + ' XP to level ' + (h.lv + 1) + '</span></div>' +
-      '<div class="cgrid">' + L.STATS.map(row).join('') + '</div>' +
-      '<div class="kfoot"><span>Favoured stats count half again. Stats work while your hero is in the party.</span>' + ((S.attr && Object.keys(S.attr).length) ? '<button class="btn ghost small" id="c-reset">Reset stats</button>' : '') + '</div>';
-  }
-  $('charsheet') && $('charsheet').addEventListener('click', e => {
-    const b = e.target.closest('[data-stat],[data-stat5]');
-    if (b) { if (L.addStat(S, b.dataset.stat || b.dataset.stat5, b.dataset.stat5 ? 5 : 1)) { sfx.buy(); save(); updateSkills(); } return; }
-    if (e.target.closest('#c-reset')) {
-      if (!campGate()) return;
-      modal('<div class="center"><h2>Reset your stats?</h2><p>Every point comes back so you can place them again. It is free, and only works at camp.</p><div class="row"><button class="btn ghost" id="r-no">Keep them</button><button class="btn" id="r-yes">Reset</button></div></div>', md => {
-        md.querySelector('#r-no').onclick = closeModal;
-        md.querySelector('#r-yes').onclick = () => { L.resetStats(S); save(); closeModal(); updateSkills(); };
-      });
-    }
-  });
   // ---------- header & stage ----------
   let lastRelicCount = -1, lastFeatCount = -1, slowTick = 0;
   function updatePanel(force) {
@@ -2118,6 +2084,47 @@
       : 'Recruit companions or players who fly the banner of <b>' + esc(d.name) + '</b>. Each one makes your banner perk (' + esc(d.perk) + ') 40% stronger.';
   }
   setInterval(paintKin, 2000); setTimeout(paintKin, 600);
+  // ---------- Character sheet: hero level, XP and stats ----------
+  const STAT_LBL = { pdps: 'party damage', crit: 'crit chance', dodge: 'dodge', php: 'party health', power: 'ability power', pheal: 'party healing', cd: 'faster abilities', gold: 'gold', loot: 'loot', chest: 'chest chance', sig: 'Sigil odds', spoils: 'ambush spoils' };
+  const pctTxt = v => { const p = v * 100; return '+' + (p >= 1 ? Math.round(p * 10) / 10 : p >= 0.01 ? Math.round(p * 100) / 100 : Math.round(p * 10000) / 10000) + '%'; };
+  const statMod = sc => { const m = Math.floor((sc - 10) / 2); return (m >= 0 ? '+' : '') + m; };
+  function paintSheet() {
+    const box = $('charsheet'); if (!box) return;
+    const cls = L.heroCls(S);
+    if (!cls) { box.innerHTML = ''; return; }
+    const h = L.heroLevel(S), pts = L.heroPoints(S), pri = L.STAT_CLASS[cls] || [], c = L.CLASSES[cls];
+    const row = st => {
+      const n = (S.attr || {})[st.id] || 0, sc = L.statScore(S, st.id), fav = pri.includes(st.id), mult = fav ? L.STAT_AFFINITY : 1;
+      const fx = Object.keys(st.fx).map(k => pctTxt(st.fx[k] * Math.max(n, 0) * mult) + ' ' + STAT_LBL[k]).join(', ');
+      return '<div class="cstat' + (fav ? ' fav' : '') + '"><div class="cscore"><b>' + sc + '</b><small>' + statMod(sc) + '</small></div>' +
+        '<div class="ctx"><b>' + st.name + (fav ? ' <span class="cfav">' + c.name + ' favoured</span>' : '') + '</b><small>' + (n ? fx : 'Raises ' + st.desc + '.') + '</small></div>' +
+        '<div class="cbtns"><button class="btn small" data-stat="' + st.id + '"' + (pts > 0 && sc < L.STAT_MAX ? '' : ' disabled') + ' aria-label="Add a point to ' + st.name + '">+1</button>' +
+        (pts >= 5 ? '<button class="btn small ghost" data-stat5="' + st.id + '"' + (sc + 5 <= L.STAT_MAX ? '' : ' disabled') + '>+5</button>' : '') + '</div></div>';
+    };
+    box.innerHTML = '<div class="chead"><div><h3>' + esc(L.memberById('you').name) + ', level ' + h.lv + ' ' + c.name + '</h3><small>Your hero earns XP from every fight, even when they sit out. Bigger foes give more.</small></div>' +
+      '<div class="kbal cpts' + (pts ? ' on' : '') + '">' + icon('star') + '<b>' + pts + '</b><small>' + (pts === 1 ? 'Point' : 'Points') + '</small></div></div>' +
+      '<div class="cxp"><i style="width:' + Math.min(100, h.xp / h.need * 100).toFixed(1) + '%"></i><span>' + fmt(Math.floor(h.xp)) + ' / ' + fmt(h.need) + ' XP to level ' + (h.lv + 1) + '</span></div>' +
+      '<div class="cgrid">' + L.STATS.map(row).join('') + '</div>' +
+      '<div class="kfoot"><span>Favoured stats count half again. Stats work while your hero is in the party. A reset costs ' + L.RESPEC_COST + ' ' + TOKEN + '.</span>' + ((S.attr && Object.keys(S.attr).length) ? '<button class="btn ghost small" id="c-reset">Reset stats</button>' : '') + '</div>';
+  }
+  $('charsheet') && $('charsheet').addEventListener('click', e => {
+    const b = e.target.closest('[data-stat],[data-stat5]');
+    if (b) { if (L.addStat(S, b.dataset.stat || b.dataset.stat5, b.dataset.stat5 ? 5 : 1)) { sfx.buy(); save(); updateSkills(); } return; }
+    if (e.target.closest('#c-reset')) {
+      const cost = L.RESPEC_COST, on = signedIn(), bal = prof && prof.bal != null ? prof.bal : null;
+      modal('<div class="center"><h2>Reset your stats?</h2><p>All ' + L.statSpent(S) + ' points come back so you can place them again. A reset costs ' + sigil + ' <b>' + cost + ' ' + TOKEN + '</b>.' + (bal != null ? ' You have ' + bal + '.' : '') + '</p>' +
+        (on ? '' : '<p class="note">Sign in to the game to pay with ' + TOKEN + '.</p>') +
+        '<div class="row"><button class="btn ghost" id="r-no">Keep them</button>' + (on ? (bal == null || bal >= cost ? '<button class="btn" id="r-yes">' + sigil + ' Reset for ' + cost + '</button>' : '<button class="btn" id="r-get">Get ' + TOKEN + '</button>') : '') + '</div></div>', md => {
+        md.querySelector('#r-no').onclick = closeModal;
+        const g = md.querySelector('#r-get'); if (g) g.onclick = () => getSigils();
+        const y = md.querySelector('#r-yes'); if (y) y.onclick = async () => {
+          y.disabled = true;
+          try { const r = await papi('POST', '/store/pass', { what: 'respec' }); if (prof) prof.bal = r.bal; L.resetStats(S); save(); sfx.buy(); closeModal(); updateSkills(); toast('star', 'Stats reset', 'Your points are back. Place them however you like.', 'feat'); }
+          catch (e) { y.disabled = false; toast('lock', 'That did not go through', e.code === 'funds' ? 'Not enough ' + TOKEN + '.' : 'Try again in a moment.', 'warn'); }
+        };
+      });
+    }
+  });
   // ---------- server resets and the admin tab ----------
   // A server wipe bumps a public "epoch". Saves started before it reset to a new game.
   const EPOCH_KEY = 'lanternhold.epoch';
@@ -2783,7 +2790,7 @@
     ['Monsters and guardians', '<p>Monsters hit back. If your whole party falls, it retreats a floor, rests, and tries again in a little over a minute. Use that time to train and check gear.</p><p>Every 5th floor has a <b>guardian</b>. You must beat it before the lantern oil runs out. Guardians drop better gear and, from floor 10, sometimes a relic.</p><p>Soldiers from the Grand War alliances (marked with their banner) are tougher than normal monsters and drop more.</p>'],
     ['Monster tricks and Act One', '<p>Deeper monsters have tricks, shown as coloured tags under their name. Tap or hover a tag to read it.</p><ul><li><b>Enraged</b>: hits much harder once it is badly hurt.</li><li><b>Warded</b>: raises a shield (the striped part of its health bar) that soaks damage first.</li><li><b>Regenerating</b>: heals itself over time.</li><li><b>Venomous</b>: its hits poison the target for a few seconds.</li><li><b>Cleaving</b>: each hit also strikes whoever stands behind its target.</li><li><b>Swift</b>: attacks faster.</li></ul><p>Guardians get more tricks the deeper you go, and each region below the Vault has its own. Act One runs through fifteen regions to the Lampmother on floor 150. Act Two opens with Season 2 of the Grand War, and a countdown appears once you get there.</p>'],
     ['The side panel', '<p><b>Party</b> is your marching order for the fight. <b>Camp</b> is the campfire: resting companions, camp jobs and training. <b>Gear</b> dresses your characters. <b>Skills</b> holds your hero’s skill tree and rekindling. <b>Market</b> has the Trading Post and the Players Guild. <b>Codex</b> keeps your journal, relics and records.</p>'],
-    ['Your character and stats', '<p>Your hero earns <b>XP</b> from every fight, even while sitting out. Bigger foes give more. Each level brings a <b>stat point</b>, and every fifth level brings two. Spend them on the character sheet at the top of the Skills tab.</p><ul><li><b>Strength</b>: party damage</li><li><b>Dexterity</b>: critical hits and dodging</li><li><b>Constitution</b>: party health</li><li><b>Intelligence</b>: ability power and some damage</li><li><b>Wisdom</b>: healing and faster abilities</li><li><b>Charisma</b>: gold</li><li><b>Luck</b>: a little of everything, from loot and chests to crits, gold, Sigil finds and ambush spoils</li></ul><p>Every class <b>favours</b> two stats, and points there count half again: tanks Strength and Constitution, healers Wisdom and Charisma, rogues Dexterity and Luck, mages Intelligence and Wisdom, necromancers Intelligence and Constitution. Stats work while your hero is in the party. Reset them for free at camp. Your level and stats stay when you rekindle.</p>'],
+    ['Your character and stats', '<p>Your hero earns <b>XP</b> from every fight, even while sitting out. Bigger foes give more. Each level brings a <b>stat point</b>, and every fifth level brings two. Spend them on the character sheet at the top of the Skills tab.</p><ul><li><b>Strength</b>: party damage</li><li><b>Dexterity</b>: critical hits and dodging</li><li><b>Constitution</b>: party health</li><li><b>Intelligence</b>: ability power and some damage</li><li><b>Wisdom</b>: healing and faster abilities</li><li><b>Charisma</b>: gold</li><li><b>Luck</b>: a little of everything, from loot and chests to crits, gold, Sigil finds and ambush spoils</li></ul><p>Every class <b>favours</b> two stats, and points there count half again: tanks Strength and Constitution, healers Wisdom and Charisma, rogues Dexterity and Luck, mages Intelligence and Wisdom, necromancers Intelligence and Constitution. Stats work while your hero is in the party. A reset costs 50 Sigils. Your level and stats stay when you rekindle.</p>'],
     ['Ambushes', '<p>Now and then a few monsters team up and jump your party. The foe shows <b>Ambush ×2</b> to <b>×4</b>. They have more health, hit harder and strike the back of the line first, so a tank at the rear helps. Beat them for gold several times over, a good chance at gear, extra XP and kills that count toward your quests. Luck makes the spoils bigger.</p>'],
     ['Skills and Kindling', '<p>Every rekindle gives you <b>Kindling</b>: 2 at floor 50, plus 1 for every 10 floors deeper. Spend it in the Skills tab on your hero’s class tree. Each class has three branches of four skills, and a skill needs the one above it first. The last skill of each branch is a <b>specialization</b>: it teaches your hero a brand new ability, which appears on the ability bar (keys 6 to 8).</p><p>Kindling also buys a bigger pack (+10 slots) and opens extra gear slots for any character: rings 2 to 5 and a second trinket. Tap a locked slot on the Gear tab. You can reset the skill tree for free at camp.</p><p>Kindling upgrades (Lantern Edge, Ember Purse, Deep Reservoir, Night Watch, Slow-burning Draught and Sigil Sense) are permanent bonuses. At camp you can also <b>change your hero’s class</b> for 15 Kindling. Your skill-tree Kindling is refunded first, but Kindling spent on the pack, gear slots and upgrades stays spent.</p>'],
     ['Job gear', '<p>A few pieces of gear carry a camp-job bonus, shown by an orange dot. It counts while the wearer works that job at the campfire. Fine gear has about a 2% chance, rare 6% and epic 15%.</p><p>Each job also has its own three-piece job set (helmet, feet and ring). These drop very rarely from guardians and chests from floor 20. Two pieces add +40% to that job and all three add +100%.</p>'],
@@ -2821,6 +2828,7 @@
       'Your hero now earns XP and levels up. Each level brings a stat point to spend on Strength, Dexterity, Constitution, Intelligence, Wisdom, Charisma or Luck. Find the character sheet at the top of the Skills tab.',
       'Each class favours two stats, and points there count half again. Luck touches everything: loot, chests, crits, gold, Sigil finds and ambush spoils.',
       'Ambushes: now and then two to four monsters team up and jump your party. They are tougher and strike the back of the line, but pay several times the gold and often drop gear.',
+      'Resetting your stats costs 50 Sigils, so place points with care.',
       'Veteran heroes start with XP for their past fights, so you may have points waiting already.'] },
     { v: 28, date: 'November 23, 2026', title: 'Fly your banner', items: [
       'New Banner chat: talk only with heroes who fly the same banner as you. Find it next to Global in the chat.',

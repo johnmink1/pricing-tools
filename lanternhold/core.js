@@ -538,7 +538,8 @@
     if (!STATS.some(x => x.id === id) || heroPoints(s) < n || statScore(s, id) + n > STAT_MAX) return false;
     s.attr = s.attr || {}; s.attr[id] = (s.attr[id] || 0) + n; return true;
   }
-  function resetStats(s, now) { if (!atCamp(s, now)) return false; s.attr = {}; return true; }
+  const RESPEC_COST = 50; // Sigils, paid on the server before the client calls resetStats
+  function resetStats(s) { s.attr = {}; return true; }
   function statVal(s, key) {
     const c = heroCls(s), pri = STAT_CLASS[c] || [];
     let t = 0;
@@ -1566,7 +1567,7 @@
   const api = {
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
-    STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
+    STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,

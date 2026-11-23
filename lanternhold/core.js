@@ -1,4 +1,4 @@
-/* lh-build 202611231445 */
+/* lh-build 202611231501 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -911,6 +911,28 @@
     s.bag = s.bag.filter(x => x !== it);
     const v = salvageValue(it); s.gold += v; return v;
   }
+  // Merging (John, 2026-11-23): two copies of the same item fuse into one a level higher (+1), keeping the higher
+  // item level and the better camp-job affix. Every merge can fail and destroy BOTH pieces. The risk climbs with the
+  // level you are merging up to; your hero's Luck and Intelligence points shave it down (by up to half).
+  const mergeKey = it => [it.cls, it.slot, it.rar, it.set || '', it.jset || ''].join('|');
+  const mergeable = (a, b) => !!a && !!b && a !== b && mergeKey(a) === mergeKey(b) && Math.max(a.up, b.up) < UP_MAX;
+  function mergeRisk(s, a, b) {
+    const to = Math.max(a.up, b.up) + 1, base = Math.min(0.9, 0.08 + 0.06 * (to - 1));
+    const at = s.attr || {}, cut = Math.min(0.5, (at.lck || 0) * 0.006 + (at.int || 0) * 0.004);
+    return { to, base, cut, risk: Math.round(base * (1 - cut) * 1000) / 1000 };
+  }
+  function mergeItems(s, uidA, uidB, rng) {
+    const a = itemOf(s, uidA), b = itemOf(s, uidB);
+    if (!mergeable(a, b) || a.lk || b.lk) return null;
+    if (wornAt(s, b.uid) && !wornAt(s, a.uid)) return mergeItems(s, uidB, uidA, rng);
+    const m = mergeRisk(s, a, b), lose = (rng || Math.random)() < m.risk;
+    const drop = it => { const w = wornAt(s, it.uid); if (w) delete s.gear[w[0]][w[1]]; s.bag = s.bag.filter(x => x !== it); };
+    if (lose) { drop(a); drop(b); return { ok: false, risk: m.risk, a, b }; }
+    a.up = m.to; a.ilvl = Math.max(a.ilvl, b.ilvl);
+    if (b.aff && (!a.aff || b.aff.v > a.aff.v)) a.aff = b.aff;
+    drop(b);
+    return { ok: true, risk: m.risk, item: a };
+  }
   // Locked items are kept out of every bulk action: mass scrap, auto-sell on a full pack, and the Loot Goblin.
   function toggleLock(s, uid) { const it = itemOf(s, uid); if (!it) return false; if (it.lk) delete it.lk; else it.lk = 1; return !!it.lk; }
   // The best kit a member could wear from their own gear and unworn pack items: { pos: item }.
@@ -1756,7 +1778,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

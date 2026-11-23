@@ -1,4 +1,4 @@
-/* lh-build 202611231442 */
+/* lh-build 202611231445 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -68,6 +68,42 @@
     thud() { const n = performance.now(); if (n - lastThud < 120) return; lastThud = n; tone(90, 0.08, 'triangle', 0.035, 50); },
   };
 
+
+  // ---------- tooltips ----------
+  // One styled tooltip for the whole game. Anything with data-tip (or an old-style title, which gets converted)
+  // shows it on hover with a mouse, or on a tap of a small (i) badge on touch screens. It stays inside the window.
+  const tipEl = document.getElementById('tip');
+  let tipFor = null, tipHide = 0;
+  function tipText(el) {
+    if (el.hasAttribute('title')) { const t = el.getAttribute('title'); el.removeAttribute('title'); if (t) el.dataset.tip = t; }
+    return el.dataset.tip || '';
+  }
+  function showTip(el) {
+    const t = tipText(el); if (!t || !tipEl) return;
+    tipFor = el; tipEl.textContent = t; tipEl.hidden = false; tipEl.classList.remove('up');
+    const r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight, vw = document.documentElement.clientWidth;
+    let x = r.left + r.width / 2 - w / 2; x = Math.max(8, Math.min(vw - w - 8, x));
+    let y = r.bottom + 8; if (y + h > innerHeight - 8) { y = r.top - h - 8; tipEl.classList.add('up'); }
+    tipEl.style.left = Math.round(x) + 'px'; tipEl.style.top = Math.round(y) + 'px';
+    tipEl.style.setProperty('--ax', Math.round(r.left + r.width / 2 - x) + 'px');
+  }
+  function hideTip() { tipFor = null; if (tipEl) tipEl.hidden = true; }
+  const fine = matchMedia('(hover: hover) and (pointer: fine)');
+  document.addEventListener('pointerover', e => {
+    if (!fine.matches) return;
+    const el = e.target.closest('[data-tip],[title]');
+    if (el === tipFor) return;
+    if (!el || el.closest('#tip')) { hideTip(); return; }
+    clearTimeout(tipHide); showTip(el);
+  });
+  document.addEventListener('pointerout', e => { if (tipFor && !tipFor.contains(e.relatedTarget)) { clearTimeout(tipHide); tipHide = setTimeout(hideTip, 60); } });
+  document.addEventListener('click', e => {
+    const i = e.target.closest('.tipi');
+    if (i) { e.preventDefault(); e.stopPropagation(); if (tipFor === i) hideTip(); else { showTip(i); clearTimeout(tipHide); tipHide = setTimeout(hideTip, 5000); } return; }
+    if (!fine.matches) hideTip();
+  }, true);
+  addEventListener('scroll', hideTip, true);
+  const tipI = t => '<i class="tipi" data-tip="' + esc(t) + '">i</i>';
   // ---------- arena rendering ----------
   const arena = $('arena'), cv = $('cv'), ctx = cv.getContext('2d');
   let W = 240, H = 150, bgCanvas = null, bgKey = '';
@@ -647,10 +683,13 @@
       });
   }
   function campBarHtml() {
-    const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now());
-    if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>At the main camp</b><small>Swap companions, recruit, train and change gear.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + backTo() + '</button>' : '') + '<button class="btn ghost small" data-camp="store">Store</button></div>';
-    if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Field camp: ' + Math.ceil(left) + 's</b><small>Change your party\'s gear now. You carry on from floor ' + S.floor + ' when it burns out.</small></div><button class="btn ghost small" data-camp="store">Store</button></div>';
-    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Draught: change gear here and keep going. Main camp: change everything, then restart at floor ' + Math.min(S.maxFloor, L.regionTop(S.floor)) + '.</small></div><button class="btn small" data-camp="go">Return to camp</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
+    const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now()), store = '<button class="btn ghost small" data-camp="store" data-tip="Draughts, lantern oil and tonics.">Store</button>';
+    if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Main camp</b><small>Everything can change here</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down" data-tip="Head back down. You start at the top of the region you left.">Descend to ' + backTo() + '</button>' : '') + store + '</div>';
+    if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Field camp · ' + Math.ceil(left) + 's</b><small>Change gear, then carry on</small></div>' + store + '</div>';
+    const top = Math.min(S.maxFloor, L.regionTop(S.floor));
+    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Floor ' + S.floor + ' ' + tipI('Gear changes need a camp. A Campfire Draught makes a field camp right here and keeps your floor. The main camp lets you change everything, but you restart at floor ' + top + ', the top of this region.') + '</small></div>' +
+      '<button class="btn small" data-camp="go" data-tip="Change everything at the main camp. You restart at floor ' + top + '.">Return to camp</button>' +
+      '<button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + ' data-tip="' + (n ? 'Change gear here for 60 seconds and keep your floor.' : 'No Draughts left. Buy more in the Store.') + '">Draught · ' + n + '</button>' + store + '</div>';
   }
   let campWas = null;
   function paintCamp() {
@@ -2286,7 +2325,7 @@
   function paintQuests() {
     const q = L.questState(S), b = $('quests'); if (!b) return;
     const n = q.filter(x => x.got).length, rd = questsReady(), all = n === 3 && (S.daily.got & 8);
-    $('questct').textContent = rd ? 'Claim ' + rd : all ? 'Quests done' : 'Quests ' + n + '/3';
+    $('questct').innerHTML = rd ? 'Claim ' + rd : '<small class="ql">Quests </small>' + (all ? 'done' : n + '/3');
     b.classList.toggle('ready', rd > 0); b.classList.toggle('done', !rd && !!all);
     b.title = rd ? 'Daily quests: ' + rd + (rd === 1 ? ' reward' : ' rewards') + ' ready to claim' : all ? 'Daily quests: all done for today' : 'Daily quests: ' + n + ' of 3 done';
   }
@@ -2319,8 +2358,8 @@
     const d = L.SIDES[S.hero.side], n = L.bannerKin(S);
     if (!d || S.hero.side === 'unsworn' && !n) { el.hidden = true; return; }
     el.hidden = false; el.style.setProperty('--side', d.color);
-    el.innerHTML = n ? '<b>Banner kin ×' + n + '</b>: ' + n + (n === 1 ? ' ally marches' : ' allies march') + ' under ' + esc(d.name) + ', so your banner perk (' + esc(d.perk) + ') is <b>' + Math.round(L.KIN_AMP * n * 100) + '% stronger</b>.'
-      : 'Recruit companions or players who fly the banner of <b>' + esc(d.name) + '</b>. Each one makes your banner perk (' + esc(d.perk) + ') 40% stronger.';
+    el.innerHTML = n ? '<b>Banner kin ×' + n + '</b><span>' + esc(d.perk) + ' is <b>' + Math.round(L.KIN_AMP * n * 100) + '% stronger</b></span>' + tipI(n + (n === 1 ? ' ally marches' : ' allies march') + ' under ' + d.name + '. Each one makes your banner perk 40% stronger.')
+      : '<b>Banner kin</b><span>Recruit allies of ' + esc(d.name) + '</span>' + tipI('Companions or players who fly the banner of ' + d.name + ' each make your banner perk (' + d.perk + ') 40% stronger.');
   }
   setInterval(paintKin, 2000); setTimeout(paintKin, 600);
   // ---------- Character sheet: hero level, XP and stats ----------
@@ -3266,6 +3305,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 45, date: 'November 23, 2026', title: 'A cleaner screen', items: [
+      'The top bar is tidier. Gold, damage, Embers and Sigils now sit together in one strip.',
+      'Hover over almost anything to see what it does. On a phone, tap the small i badges.',
+      'The camp bar, marching order, campfire and banner sections are shorter, with the details in tooltips.'] },
     { v: 44, date: 'November 23, 2026', title: 'The Ember Ring: duels between players', items: [
       'Open the new PvP tab to duel other players\u2019 heroes one on one. Only your own hero fights: no companions, tonics or Sigils.',
       'Wins earn Laurels and rating. Climb from Ashen through Ironclad, Emberborn, Gilded and Lanternsworn to Riftbreaker on the Ring standings.',

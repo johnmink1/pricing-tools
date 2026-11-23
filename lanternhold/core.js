@@ -1,4 +1,4 @@
-/* lh-build 202611231509 */
+/* lh-build 202611231520 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -1729,7 +1729,7 @@
     if (e <= 0) return 0;
     s.kindling = (s.kindling || 0) + skillPointsFor(s);
     s.embers += e; s.stats.rekindles++;
-    s.gold = 0; s.floor = 1; s.foeIdx = 0; s.maxFloor = 1; s.foe = null; s.lantern = 0;
+    s.gold = 0; s.floor = 1; s.foeIdx = 0; s.maxFloor = 1; s.foe = null; s.lantern = 0; s.campReturn = 0; s.campUntil = 0;
     for (const id of s.unlocked) s.levels[id] = 1;
     if (s.hero) s.levels.you = 1;
     s.hp = {}; s.down = {}; s.abil = {}; s.minions = []; s.autoAdvance = true; s.retryAt = 0;

@@ -1,4 +1,4 @@
-/* lh-build 202611231509 */
+/* lh-build 202611231520 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -654,6 +654,7 @@
   function campGate(full) { if (full ? mainCamp() : camp()) return true; campModal(full); return false; }
   // Where Descend takes you: the top of the region you climbed up from.
   const backTo = () => Math.min(S.maxFloor, L.regionTop(S.campReturn || S.maxFloor));
+  const downLabel = () => backTo() > 1 ? 'Descend to floor ' + backTo() : 'Start fighting';
   function goCamp() {
     S.campReturn = Math.max(S.campReturn || 0, S.floor);
     L.gotoFloor(S, L.CAMP_FLOOR); S.autoAdvance = false; $('auto').checked = false;
@@ -684,7 +685,7 @@
   }
   function campBarHtml() {
     const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now()), store = '<button class="btn ghost small" data-camp="store" data-tip="Draughts, lantern oil and tonics.">Store</button>';
-    if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Main camp</b><small>Everything can change here</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down" data-tip="Head back down. You start at the top of the region you left.">Descend to ' + backTo() + '</button>' : '') + store + '</div>';
+    if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Main camp</b><small>Everything can change here</small></div>' + (S.maxFloor > 1 || S.campReturn ? '<button class="btn small" data-camp="down" data-tip="Head back down. You start at the top of the region you left.">' + downLabel() + '</button>' : '') + store + '</div>';
     if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Field camp · ' + Math.ceil(left) + 's</b><small>Change gear, then carry on</small></div>' + store + '</div>';
     const top = Math.min(S.maxFloor, L.regionTop(S.floor));
     return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Floor ' + S.floor + ' ' + tipI('Gear changes need a camp. A Campfire Draught makes a field camp right here and keeps your floor. The main camp lets you change everything, but you restart at floor ' + top + ', the top of this region.') + '</small></div>' +
@@ -701,7 +702,7 @@
     if (rc) {
       const left = L.campLeft(S, Date.now());
       const r = left > 0 && S.floor > L.CAMP_FLOOR ? '<div><b>Resting by the fire, ' + Math.ceil(left) + 's</b><small>The party heals up. The fight waits until the draught burns out.</small></div>'
-        : '<div><b>Resting at camp</b><small>The party heals by the fire. Nobody fights while you rest.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + backTo() + '</button>' : '');
+        : '<div><b>Resting at camp</b><small>The party heals by the fire. Nobody fights while you rest.</small></div>' + (S.maxFloor > 1 || S.campReturn ? '<button class="btn small" data-camp="down">' + downLabel() + '</button>' : '');
       if (rc.dataset.h !== r) { rc.innerHTML = r; rc.dataset.h = r; }
     }
   }

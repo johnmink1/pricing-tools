@@ -9,6 +9,10 @@ Parameters:
     Type: String
     Default: https://tools.born2develop.com
     Description: Website address the game is served from (for CORS).
+  GameOrigin2:
+    Type: String
+    Default: https://lanternhold.born2gamellc.com
+    Description: Second address the game is served from (for CORS), used while the game moves domains.
 
 Resources:
   UserPool:
@@ -380,6 +384,7 @@ Resources:
       CorsConfiguration:
         AllowOrigins:
           - !Ref GameOrigin
+          - !Ref GameOrigin2
           - http://localhost:8765
         AllowMethods: [GET, PUT, POST, DELETE, OPTIONS]
         AllowHeaders: [authorization, content-type]

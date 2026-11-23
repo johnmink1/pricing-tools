@@ -1,4 +1,4 @@
-/* lh-build 202611232122 */
+/* lh-build 202611232124 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1966,6 +1966,8 @@
   function openSettings() {
     modal('<h2>Settings</h2>' +
       '<label class="setrow"><span>Sound effects</span><input type="checkbox" id="s-sound"' + (S.settings.sound ? ' checked' : '') + '></label>' +
+      (window.LHMusic ? '<label class="setrow"><span>Music</span><input type="checkbox" id="s-music"' + (LHMusic.on() ? ' checked' : '') + '></label>' +
+        '<p class="setnote">Pick tracks, set the volume or mute from the <button class="linkbtn" id="s-musicpanel">music player</button> (the note button at the top).</p>' : '') +
       '<p style="margin-top:16px">Your progress saves automatically in this browser. Copy a backup to move it to another device.</p>' +
       '<div class="row"><button class="btn ghost" id="s-export">Copy backup</button><button class="btn ghost" id="s-import">Load backup</button><button class="btn danger" id="s-reset">Erase progress</button></div>' +
       '<div id="s-extra"></div>' +
@@ -1973,6 +1975,10 @@
       '<p class="credits">Lanternhold &middot; A Grand War game by Born 2 Game, LLC. &copy; 2026 Born 2 Game, LLC. Made with care, no ads, no tracking.</p>' +
       '<div class="row"><button class="btn" id="s-close">Done</button></div>', m => {
         m.querySelector('#s-sound').onchange = e => { S.settings.sound = e.target.checked; };
+        if (window.LHMusic) {
+          m.querySelector('#s-music').onchange = e => LHMusic.setOn(e.target.checked);
+          m.querySelector('#s-musicpanel').onclick = () => { closeModal(); LHMusic.open(); };
+        }
         m.querySelector('#s-close').onclick = () => { save(); closeModal(); };
         m.querySelector('#s-export').onclick = () => {
           save(); const code = btoa(unescape(encodeURIComponent(localStorage.getItem(SAVE_KEY) || '')));
@@ -3333,7 +3339,7 @@
     return head.indexOf('lh-build ' + b) >= 0;
   }
   async function allFresh(b) {
-    for (const f of ['./', 'ui.js', 'core.js', 'sprites.js', 'vector.js', 'style.css']) if (!(await hasMark(f, b))) return false;
+    for (const f of ['./', 'ui.js', 'core.js', 'sprites.js', 'vector.js', 'music.js', 'style.css']) if (!(await hasMark(f, b))) return false;
     return true;
   }
   async function loadBuild(b) {
@@ -3681,6 +3687,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 62, date: 'November 23, 2026', title: 'Music for the Deep', items: [
+      'Lanternhold now has its own soundtrack: eight original pieces, from the Hearthfire Waltz at camp to the Ember Ring battle theme and a quiet piano nocturne for late watches.',
+      'Tap the note button at the top to open the player. Skip forward or back, pick any track, shuffle, set the volume or mute. Your choices are remembered on this device.',
+      'Music starts on your first tap and streams one track at a time, so it stays light on phones. You can turn it off in Settings too.'] },
     { v: 61, date: 'November 23, 2026', title: 'Auto-scrap fixed', items: [
       'Fixed: auto-scrap kept most drops. It treated anything a benched companion, or a hero not yet high enough level, might someday wear as an upgrade. Now only a piece someone in your party can wear right now, and that beats their gear, is kept.',
       'New: the Auto-scrap window shows how many pieces already in your pack match your settings, with a button to scrap them all at once. Locked and worn gear, sets and each party member’s best spare piece are kept.'] },

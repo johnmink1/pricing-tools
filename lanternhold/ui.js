@@ -1,4 +1,4 @@
-/* lh-build 202611231530 */
+/* lh-build 202611231532 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1628,6 +1628,9 @@
     $('gold').textContent = fmt(S.gold);
     { const sg = $('sigils'); if (sg) { let bal = typeof prof !== 'undefined' && prof ? prof.bal : null; if (!(bal >= 0)) { bal = null; try { const c = localStorage.getItem('lh_bal'); if (c != null && +c >= 0) bal = +c; } catch (e) {} } const on = bal != null && signedIn(); if (sg.hidden === on) sg.hidden = !on; if (on) { const t = bal.toLocaleString(); if ($('sigilct').textContent !== t) { $('sigilct').textContent = t; try { localStorage.setItem('lh_bal', String(bal)); } catch (e) {} } } } }
     $('dps').textContent = fmt(L.totalDps(S, now));
+    { const tt = $('taptip'); if (tt) { const now = Date.now(), d = L.clickDamage(S, now), w = L.relicVal ? L.relicVal(S, 'whet') : 0, c = L.critChance(S);
+      const t = 'Tap damage: ' + fmt(d) + ' per tap (' + fmt(d * 5) + ' on a critical hit). Each tap hits for 1 + 5% of your party damage per second' + (w ? ', plus ' + Math.round(w * 100) + '% from the Grim Whetstone' : '') + '. ' + Math.round(c * 1000) / 10 + '% of taps are critical hits for 5x damage.';
+      if (tt.dataset.tip !== t) tt.dataset.tip = t; } }
     $('embers').textContent = fmt(S.embers); { const d = $('dust'); if (d) d.textContent = fmt(S.dust || 0); } { const hp = S.hero ? L.heroPoints(S) : 0; $('kindcount').textContent = S.kindling ? S.kindling : hp > 0 ? '+' + hp : ''; }
     if (tab === 'party' || tab === 'camp') updateSeats(force);
     if (tab === 'market' && force) showMarketView();
@@ -1808,6 +1811,7 @@
   }
   $('online').addEventListener('click', () => switchTab('guild'));
   setTimeout(loadOnline, 2000); setInterval(loadOnline, 60000);
+  { const tt = $('taptip'); if (tt) ['click', 'pointerdown', 'mousedown', 'touchstart'].forEach(ev => tt.addEventListener(ev, e => e.stopPropagation())); }
   // ---------- settings ----------
   $('btn-settings').addEventListener('click', openSettings);
   function openSettings() {
@@ -3232,6 +3236,7 @@
     { id: 'start', name: 'Getting started', icon: 'lantern', topics: [
       ['The basics', 's:tank,healer,slime', 'Your party fights on its own. You tap to help, and spend gold to get stronger.', [
         'Tap the arena (or press <b>Space</b>) to strike.',
+        'Each tap hits for <b>1 + 5% of your party damage per second</b>. The Grim Whetstone relic adds 25% per level, and a critical hit does 5x. Hover the <b>i</b> in the arena corner to see your tap damage.',
         'Each floor has <b>8 monsters</b>. Clear them to go deeper.',
         'Monsters drop <b>gold</b>. Spend it to <b>train</b> your party in the Party tab.',
         'Every <b>25 levels</b> a companion gets a big power jump.']],

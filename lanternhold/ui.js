@@ -1,4 +1,4 @@
-/* lh-build 202611231722 */
+/* lh-build 202611231725 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -561,6 +561,8 @@
       case 'wipe': flog('party', '<b class="bad">The party is beaten</b>' + (e.name ? ' by ' + esc(e.name) : '')); break;
       case 'bossfail': flog('fight', '<b class="bad">The lantern ran out</b> before the guardian fell'); break;
       case 'newfloor': flog('fight', 'Reached a new depth: <b>floor ' + e.floor + '</b>'); break;
+      case 'rset': flog('loot', 'Region set piece: <b class="r-set" style="color:var(--rc)">' + esc(L.gearName(e.item)) + '</b>'); break;
+      case 'goblinsack': flog('loot', '<b class="r-goblin" style="color:var(--rc)">The Loot Goblin dropped his Sack!</b>'); break;
       case 'loot': flog('loot', 'Found <b class="r-' + e.item.rar + '" style="color:var(--rc)">' + esc(L.gearName(e.item)) + '</b>'); break;
       case 'autoscrap': flog('loot', 'Auto-scrapped <b class="r-' + e.item.rar + '" style="color:var(--rc)">' + esc(L.gearName(e.item)) + '</b> for ' + fmt(e.gold) + ' gold, ' + e.dust + ' Dust'); break;
       case 'autosell': flog('loot', 'Pack full: sold ' + esc(L.gearName(e.item))); break;
@@ -631,6 +633,14 @@
         const it = e.item;
         if (it.rar !== 'common') { toast('gear-trinket', L.gearName(it), L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' for a ' + L.CLASSES[it.cls].name, 'loot ' + it.rar); sfx.relic(); }
         floatText(L.gearName(it), 'skill', FOE_X, 0.2);
+      } else if (e.type === 'rset') {
+        const it = e.item, rs = L.REGION_SETS[it.rset];
+        sfx.relic(); floatText(L.gearName(it), 'skill', FOE_X, 0.2);
+        toast('gear-trinket', L.gearName(it), 'A piece of ' + rs.name + ', the ' + L.BIOMES[it.rset].name + ' region set, for a ' + L.CLASSES[it.cls].name + '.', 'loot set');
+      } else if (e.type === 'goblinsack') {
+        sfx.boss(); floatText('Loot Goblin’s Sack!', 'crit', FOE_X, 0.15);
+        toast('bag', 'The Loot Goblin’s Sack!', 'One of the rarest finds in the Deep: +' + Math.round(L.GOBLIN_SACK_GOLD * 100) + '% gold for your whole party while worn. It is in your pack.', 'loot goblin');
+        bragSack(e.item);
       } else if (e.type === 'sigil') {
         sfx.relic(); floatText('+' + e.n + ' Sigils', 'skill', FOE_X, 0.15);
         toast('star', 'Sigils found!', (e.chest ? 'A chest' : 'The guardian') + ' held ' + e.n + (e.n === 1 ? ' Sigil' : ' Sigils') + '. ' + (signedIn() ? 'They go straight to your wallet.' : 'Sign in to keep them in your wallet.'), 'relic');
@@ -684,6 +694,7 @@
     t.querySelector('b').textContent = title; t.querySelector('small').textContent = sub || '';
     const box = $('toasts'); box.appendChild(t);
     while (box.children.length > (innerWidth < 560 ? 2 : 3)) box.firstChild.remove();
+    t.onclick = () => t.remove();
     setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 400); }, 4200);
   }
   function modal(html, onMount) {
@@ -1130,6 +1141,13 @@
   const SLOT_ICON = { weapon: 'sword', armor: 'gear-armor', trinket: 'gear-trinket' };
   const jobName = jid => (L.JOBS.find(j => j.id === jid) || {}).name || '';
   const affText = it => '+' + Math.round(it.aff.v * (1 + 0.1 * it.up) * 100) + '% ' + jobName(it.aff.j) + ' job';
+  // Region set bonus text, for the item card, the doll and the Guide.
+  const pct100 = v => Math.round(v * 100) + '%';
+  const RSET_KIND = { dps: 'damage', hp: 'health', heal: 'healing (health for non-healers)', gold: 'gold for the whole party' };
+  const rsetTwoText = i => '+' + pct100(L.rsetTwo(i)) + ' ' + RSET_KIND[L.REGION_SETS[i].k];
+  const rsetFourText = i => '+' + pct100(L.rsetFour(i)) + ' damage and health' + (L.REGION_SETS[i].k === 'heal' ? ' (and healing for healers)' : '');
+  const regionName = i => L.BIOMES[i].name;
+  const bound = it => it.rset != null || it.rar === 'goblin';
   function itemEffect(it) {
     const st = L.itemStats(it);
     return st.map(([k, v], i) => '+' + Math.round(v * 100) + '% ' + k.toLowerCase()).join(', ') + (it.aff ? ', ' + affText(it) : '');
@@ -1190,6 +1208,7 @@
       '<div class="dcol">' + ['main', 'off', 'neck2', 'feet'].map(slotTile).join('') + '</div>' +
       '<div class="drings">' + ['ring1', 'ring2', 'ring3', 'ring4', 'ring5'].map(slotTile).join('') + '</div></div>' +
       '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>' +
+      Object.entries(L.rsetCounts(S, gearWho)).map(([i, n]) => '<div class="setinfo rset' + (n >= 2 ? ' on' : '') + '"><b>' + L.REGION_SETS[i].name + '</b> <span class="pips">' + [0, 1, 2, 3].map(k => '<i class="' + (k < n ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + rsetTwoText(+i) + '. 4 pieces: ' + rsetFourText(+i) + '.</small></div>').join('') +
       '<div class="dollbar"><small>' + cname + ' gear only. Tap a slot to change it. Worn gear stays on the character, not in the pack.</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
     { const pn = $('packn'); if (pn) pn.textContent = L.packCount(S); }
@@ -1235,7 +1254,7 @@
     const it = L.itemOf(S, uid); if (!it) return;
     let m = L.memberById(gearWho), w = L.wearer(S, uid);
     if (m.cls !== it.cls) { const o = gearOwners().find(id => L.memberById(id).cls === it.cls); if (o) { gearWho = o; m = L.memberById(o); } }
-    const set = it.set && L.SETS.find(x => x.id === it.set);
+    const set = it.set && L.SETS.find(x => x.id === it.set), rs = it.rset != null && L.REGION_SETS[it.rset];
     const fits = m.cls === it.cls, rar = L.RARITY.find(r => r.id === it.rar);
     const cost = L.upgradeCost(it), maxed = it.up >= L.UP_MAX;
     const reps = fits && !w ? L.replaces(S, gearWho, it) : [], ci = reps[0];
@@ -1259,6 +1278,8 @@
       (it.aff ? '<div class="iaff">' + icon('flame') + '<span><b>' + affText(it) + '</b><small>Counts while the wearer works the ' + jobName(it.aff.j) + ' job at the campfire.</small></span></div>' : '') +
       (it.jset ? (() => { const js = L.JOB_SETS[it.jset], n = wearer ? L.jobSetCount(S, w, it.jset) : 0; return '<div class="iset"><b>' + js.name + (wearer ? ' <em>' + n + '/3 worn</em>' : '') + '</b><small>A job set for the ' + jobName(it.jset) + '. It helps whoever wears it while they work that job at camp.</small><small><em>2 pieces</em> +' + Math.round(L.JOB_SET_TWO * 100) + '% ' + jobName(it.jset) + ' output</small><small><em>3 pieces</em> +' + Math.round(L.JOB_SET_THREE * 100) + '% ' + jobName(it.jset) + ' output</small></div>'; })() : '') +
       (set ? '<div class="iset"><b>' + set.name + '</b><small><em>2 pieces</em> ' + set.two + '</small><small><em>3 pieces</em> ' + set.three + '</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
+      (rs ? (() => { const n = wearer ? (L.rsetCounts(S, w)[it.rset] || 0) : 0; return '<div class="iset rset"><b>' + rs.name + (wearer ? ' <em>' + n + '/4 worn</em>' : '') + '</b><small>A region set from ' + esc(regionName(it.rset)) + '. Head, chest, legs and feet, for any class. The bonuses multiply all of the wearer’s gear.</small><small><em>2 pieces</em> ' + rsetTwoText(it.rset) + '</small><small><em>4 pieces</em> ' + rsetFourText(it.rset) + '</small><small class="lore">' + esc(rs.lore) + '</small></div>'; })() : '') +
+      (it.rar === 'goblin' ? '<div class="iset gobset"><b>The Loot Goblin’s Sack</b><small>+' + pct100(L.GOBLIN_SACK_GOLD) + ' gold for the whole party while worn. Roughly one Loot Goblin in ' + Math.round(1 / L.GOBLIN_SACK_CHANCE).toLocaleString('en-US') + ' drops it.</small><small class="lore">Still lumpy with whatever he stole last. Nobody has been brave enough to empty it.</small></div>' : '') +
       (wearer ? '<div class="iworn"><img src="' + SP.spriteURL(wearer.cls, 2, wearer.hue || 0) + '" alt="">Worn by <b>' + esc(wearer.name) + '</b></div>' : '') +
       '<div class="iacts">' +
       (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? (L.canWear(S, gearWho, it) ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>' + esc(m.name) + ' needs level ' + L.reqLevel(it) + '</button>') : '<button class="btn" disabled>No ' + L.CLASSES[it.cls].name + ' in your roster yet</button>') +
@@ -1268,8 +1289,9 @@
       (S.bag.some(x => L.mergeable(it, x)) ? tool('i-merge', 'relic', 'Merge', it.lk ? 'off' : '') : '') +
       (L.sockets(it) && S.bag.some(x => x !== it && L.enchList(x).length && !x.lk && !L.wearer(S, x.uid)) ? tool('i-ench', 'star', 'Enchant') : '') +
       (L.enchList(it).length ? tool('i-dis', 'flare', 'Disenchant', it.lk || w ? 'off' : '') : '') +
-      (CL ? tool('i-mkt', 'coin', 'Sell', it.lk ? 'off' : '') + tool('i-send', 'users', 'Send', it.lk ? 'off' : '') + tool('i-link', 'chat', 'Link') : '') +
+      (CL ? (bound(it) ? '' : tool('i-mkt', 'coin', 'Sell', it.lk ? 'off' : '') + tool('i-send', 'users', 'Send', it.lk ? 'off' : '')) + tool('i-link', 'chat', 'Link') : '') +
       tool('i-sell', 'flame', 'Salvage ' + fmt(L.salvageValue(it)), 'danger' + (it.lk ? ' off' : '')) + '</div>' +
+      (bound(it) ? '<p class="note ibound">' + icon('lock') + 'Bound to your Hold. It cannot be sold on the market or sent by mail.</p>' : '') +
       (it.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked. Mass scrap, a full pack and the Loot Goblin all leave it alone. Unlock it to sell, send or salvage.</p>' : '') + '</div>', md => {
         const locked = () => { toast('lock', 'This item is locked', 'Unlock it first to sell, send or salvage it.', 'warn'); };
         md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin.' : L.gearName(it) + ' can be scrapped and sold again.', ''); };
@@ -1573,7 +1595,7 @@
     if (!S.autoScrap) S.autoScrap = { on: false, r: ['common'], up: false };
     const a = S.autoScrap;
     const draw = () => {
-      const rows = L.RARITY.filter(r => r.id !== 'set').map(r => {
+      const rows = L.RARITY.filter(r => r.id !== 'set' && r.id !== 'goblin').map(r => {
         const n = S.bag.filter(x => x.rar === r.id).length;
         return '<label class="aschip r-' + r.id + '"><input type="checkbox" data-r="' + r.id + '"' + (a.r.includes(r.id) ? ' checked' : '') + '><span class="gem"></span><b>' + r.name + '</b><small>' + n + ' in pack</small></label>';
       }).join('');
@@ -2864,16 +2886,25 @@
   }
   function chatNote(t, warn) { const n = $('chatnote'); n.textContent = t || 'Be kind. No web links. Ctrl+click an item to link it. Tap a name to mute or report.'; n.classList.toggle('warn', !!warn); }
   // Item links: Ctrl/Cmd+click an item (or use Link in chat) to drop it into the message.
-  const ITEM_TOKEN = /\[\[i:(tank|healer|rogue|mage|necro),(weapon|armor|trinket|main|off|head|neck|chest|robe|legs|feet|ring),(common|fine|rare|epic|set),([a-z]{0,8}),(\d{1,6}),(\d{1,2})\]\]/g;
-  const tokenOf = it => '[[i:' + it.cls + ',' + it.slot + ',' + it.rar + ',' + (it.set || '') + ',' + it.ilvl + ',' + (it.up || 0) + ']]';
+  const ITEM_TOKEN = /\[\[i:(tank|healer|rogue|mage|necro),(weapon|armor|trinket|main|off|head|neck|chest|robe|legs|feet|ring),(common|fine|rare|epic|set|goblin),([a-z]{0,8}),(\d{1,6}),(\d{1,2})\]\]/g;
+  // Region set pieces ride in the set field as r plus a letter (ra = the first region).
+  const tokenOf = it => '[[i:' + it.cls + ',' + it.slot + ',' + it.rar + ',' + (it.set || (it.rset != null ? 'r' + String.fromCharCode(97 + it.rset) : '')) + ',' + it.ilvl + ',' + (it.up || 0) + ']]';
   const itemLabel = it => L.gearName(it) + (it.up ? ' +' + it.up : '');
   function itemFromToken(m) {
-    const it = L.normItem({ cls: m[1], slot: m[2], rar: m[3], set: m[4] || undefined, ilvl: +m[5], up: Math.min(+m[6], L.UP_MAX) });
+    const rs = /^r[a-z]$/.test(m[4]) ? m[4].charCodeAt(1) - 97 : -1;
+    if (rs >= 0 && (!L.REGION_SETS[rs] || m[3] !== 'set' || L.RSET_SLOTS.indexOf(m[2]) < 0)) return null;
+    const it = L.normItem({ cls: m[1], slot: m[2], rar: m[3], set: rs < 0 && m[4] || undefined, rset: rs >= 0 ? rs : undefined, ilvl: +m[5], up: Math.min(+m[6], L.UP_MAX) });
+    if (it.rar === 'goblin') { if (it.slot !== 'neck') return null; it.gob = 1; }
     if (it.set && !L.SETS.some(x => x.id === it.set && x.cls === it.cls)) return null;
-    if (it.rar === 'set' && !it.set) return null;
+    if (it.rar === 'set' && !it.set && it.rset == null) return null;
     try { L.gearName(it); return it; } catch (e) { return null; }
   }
   chat.links = [];
+  // A Loot Goblin's Sack is rare enough to tell everyone: post it to Global chat with a link (signed-in players only).
+  async function bragSack(it) {
+    if (!CL || !signedIn() || !S.hero) return;
+    try { await chatCall('POST', '/chat', { ch: 'global', text: 'just pulled the Loot Goblin’s Sack off a Loot Goblin! ' + tokenOf(it), name: S.hero.name, cls: S.hero.cls }); } catch (e) {}
+  }
   function linkItem(it) {
     if (!it || !CL) return false;
     if (!signedIn()) { toast('lock', 'Sign in to chat', 'Item links go to chat, which needs a free account.', 'warn'); return true; }
@@ -3485,6 +3516,15 @@
       ['Dust', 'i:dust', 'Scrap gear to get Dust for enchanting.', [
         'Every item you salvage or mass scrap gives Dust as well as gold. Rarer, deeper and upgraded pieces give more.',
         'Your Dust shows in the top bar. Rekindling keeps it.']],
+      ['Region sets', 's:chest', 'Every region of the Deep has its own four-piece armor set.', [
+        'Each region from the Lamplit Cellars to the Rift Threshold drops its own set: a helm, chest, legs and boots, made for whichever classes are in your party.',
+        'Pieces only drop on that region’s floors, and rarely. Guardians are your best chance, then chests and elites. Plan on a long hunt for a full set.',
+        'Two pieces give a bonus to one stat. Four pieces add a big damage and health bonus. Set bonuses multiply all of the wearer’s gear, so they stay strong after you rekindle and dive deeper.',
+        'Deeper regions have stronger sets. Merging two copies of the same piece upgrades it, like any other gear.',
+        'Region pieces are bound to your Hold and cannot be sold or sent. Auto-scrap never takes them.']],
+      ['The Loot Goblin’s Sack', 'i:bag', 'A very rare brag item from the Loot Goblin.', [
+        'Every Loot Goblin you kill has a tiny chance, about 1 in 2,000, to drop the Loot Goblin’s Sack: a trinket with +15% gold for your whole party.',
+        'When one drops, the game tells Global chat so everyone knows. It is bound to your Hold and cannot be traded.']],
       ['Auto-scrap', 'i:dust', 'Scrap low drops the moment they are found.', [
         'Open <b>Auto-scrap</b> in the Gear tab pack view and tick the rarities you never want to keep. New drops of those rarities turn straight into gold and Dust.',
         'Set pieces, job set pieces and anything that beats what a companion wears are always kept, unless you tick <b>Scrap upgrades too</b>.',
@@ -3606,16 +3646,20 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 55, date: 'November 23, 2026', title: 'Region sets and the Goblin’s Sack', items: [
+      'New: region sets. All fifteen regions of the Deep now drop their own four-piece armor set for any class. Two pieces boost one stat, and four pieces add a big damage and health bonus that multiplies all of your gear, so a finished set stays strong through rekindles.',
+      'Region pieces only drop in their own region and they are rare, with guardians your best chance. Collecting a full set is a real hunt.',
+      'New: kill a Loot Goblin and there is a tiny chance he drops the Loot Goblin’s Sack, a +15% party gold trinket. Global chat hears about it when one drops.'] },
     { v: 54, date: 'November 23, 2026', title: 'The Lanternhold Wiki', items: [
-      'New: the <b>Lanternhold Wiki</b> at lanternhold.born2gamellc.com/wiki. Every class and skill tree, companion, region, monster, set, enchant and relic, with search.',
-      'It is built from the game itself, so it updates whenever the game does. Open it from <b>Full wiki</b> in the Guide (the ? at the top).'] },
+      'New: the Lanternhold Wiki at lanternhold.born2gamellc.com/wiki. Every class and skill tree, companion, region, monster, set, enchant and relic, with search.',
+      'It is built from the game itself, so it updates whenever the game does. Open it from Full wiki in the Guide (the ? at the top).'] },
     { v: 53, date: 'November 23, 2026', title: 'Easier sign-up', items: [
       'Fixed: confirming a new account could reject a correct-looking code after asking for several. The game no longer sends extra codes on its own, tells you when the newest one was sent, and ignores spaces in the code.',
-      'Every sign-in screen now has <b>Play without an account</b>. Accounts are optional and only keep your save safe across devices.',
-      'Returning players can tap <b>Sign in</b> on the very first screen to load their hero, with no need to make a new one first.'] },
+      'Every sign-in screen now has Play without an account. Accounts are optional and only keep your save safe across devices.',
+      'Returning players can tap Sign in on the very first screen to load their hero, with no need to make a new one first.'] },
     { v: 52, date: 'November 23, 2026', title: 'Auto-scrap and a cleaner pack', items: [
-      'New: <b>Auto-scrap</b>. Tick the rarities you never want, and new drops of those turn straight into gold and Dust without taking pack space. Set pieces and upgrades for your party are always kept.',
-      'The pack view has a tidy header: a space meter that turns red when the pack is full, and one <b>Bulk actions</b> menu for mass sell, merge and scrap.'] },
+      'New: Auto-scrap. Tick the rarities you never want, and new drops of those turn straight into gold and Dust without taking pack space. Set pieces and upgrades for your party are always kept.',
+      'The pack view has a tidy header: a space meter that turns red when the pack is full, and one Bulk actions menu for mass sell, merge and scrap.'] },
     { v: 51, date: 'November 23, 2026', title: 'Tidier tabs and a fight log', items: [
       'Gear now has two views, Equipped and Pack, so you are not scrolling past one to reach the other.',
       'Skills is split into Stats, Skill tree and Rekindle.',
@@ -4171,10 +4215,10 @@
     const unit = it => Math.max(10, Math.round(L.salvageValue(it) * 3));
     const draw = () => {
       const free = used === null ? 0 : Math.max(0, MKT_CAP - used);
-      const all = bulkList(sellOpts).sort((a, b) => unit(b) - unit(a)), list = all.slice(0, free), gold = list.reduce((a, it) => a + unit(it), 0);
+      const all = bulkList(sellOpts).filter(it => !bound(it)).sort((a, b) => unit(b) - unit(a)), list = all.slice(0, free), gold = list.reduce((a, it) => a + unit(it), 0);
       const chk = (k, label, sub) => '<label class="chk"><input type="checkbox" data-opt="' + k + '"' + (sellOpts[k] ? ' checked' : '') + '><span><b>' + label + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></label>';
       modal('<h2>Mass sell</h2><p>List many pieces on the market at once, each at its current value. Other players can buy them for a week, and you get mail with the gold when each one sells. Worn and locked items are never listed.</p>' +
-        '<div class="scrapgrid">' + L.RARITY.map(r => chk(r.id, '<span class="r-' + r.id + '" style="color:var(--rc)">' + r.name + '</span>', S.bag.filter(x => x.rar === r.id && !x.lk && !L.wearer(S, x.uid)).length + ' to sell')).join('') + '</div>' +
+        '<div class="scrapgrid">' + L.RARITY.filter(r => r.id !== 'goblin').map(r => chk(r.id, '<span class="r-' + r.id + '" style="color:var(--rc)">' + r.name + '</span>', S.bag.filter(x => x.rar === r.id && !x.lk && !L.wearer(S, x.uid)).length + ' to sell')).join('') + '</div>' +
         chk('keepBest', 'Keep the best of each kind', 'Saves your strongest spare piece for every class and slot.') +
         chk('keepUp', 'Keep upgraded pieces', 'Anything you have spent gold upgrading stays.') +
         '<p class="scrapsum">' + (used === null ? 'Checking your market slots…' : !free ? 'All ' + MKT_CAP + ' of your market slots are in use. Take something down under My listings first.' : list.length ? 'Lists <b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' for <b>' + fmt(gold) + ' gold</b> in total.' + (all.length > list.length ? ' ' + (all.length - list.length) + ' more will not fit.' : '') + ' <small>' + free + ' of ' + MKT_CAP + ' market slots free.</small>' : 'Nothing matches. Tick more rarities above.') + '</p>' +

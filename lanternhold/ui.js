@@ -1,4 +1,4 @@
-/* lh-build 202611232204 */
+/* lh-build 202611232217 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -272,6 +272,9 @@
       ctx.save(); ctx.globalAlpha = 1 - k; ctx.translate(Math.round(o.x - k * 90) + spr.lw * 2, Math.round(o.y + Math.abs(Math.sin(k * 18)) * -2)); ctx.scale(-1, 1);
       ctx.drawImage(spr, 0, 0, spr.lw * 2, spr.lh * 2); ctx.restore();
     }
+    // the party's war banner, planted behind the rear of the march (Wardrobe)
+    const mb = myBanner(), bi = mb && lay.length && banImg(mb);
+    if (bi) { const r = lay[lay.length - 1], sw = Math.sin(tAnim * 1.3) * 0.6; ctx.fillStyle = '#4a3220'; ctx.fillRect(Math.round(r.x - 7), Math.round(r.y - 14), 1.6, 47); ctx.drawImage(bi, Math.round(r.x - 18 + sw), Math.round(r.y - 16), 20, 30); }
     for (const p of lay) {
       const m = L.memberById(p.id), a = mAnim(p.id), down = !!S.down[p.id];
       const flash = tAnim < a.hit;
@@ -1109,7 +1112,7 @@
       h += (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note">Your party is full. When a player accepts your invite, you choose who steps out.</p>') +
         '<button class="btn small" id="b-find">' + (boardList ? 'Show other heroes' : 'Browse the guild') + '</button>';
       if (boardMsg) h += '<p class="note">' + esc(boardMsg) + '</p>';
-      if (boardList) h += '<div class="board">' + boardList.map(g => { const pf = g.pf || {}; return '<div class="seat bench gboard"><div class="pfava sm fr-' + cosOf('f', pf.f)[0] + '">' + (g.wd && g.wd.k && g.wd.k.you ? '<div class="ic c-' + g.cls + ' player dressed"><img src="' + SP.spriteURL(g.cls, 2, outfitHue(g.wd.k.you)) + '" alt=""></div>' : '<div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div>') + '</div><div class="info"><div class="nm"><button class="linkname nc-' + cosOf('c', pf.c)[0] + '" data-gprof="' + g.id + '">' + esc(g.name) + '</button> ' + classTag(g.cls) + (pf.t ? ' <small class="pftitle">' + esc(cosOf('t', pf.t)[1]) + '</small>' : '') + (g.w ? ' ' + warBadge(g.w) : '') + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
+      if (boardList) h += '<div class="board">' + boardList.map(g => { const pf = g.pf || {}; return '<div class="seat bench gboard' + (g.wd && g.wd.b && BANNERS[g.wd.b] ? ' hasgb">' + bannerSVG(g.wd.b, 'gban') : '">') + '<div class="pfava sm fr-' + cosOf('f', pf.f)[0] + '">' + (g.wd && g.wd.k && g.wd.k.you ? '<div class="ic c-' + g.cls + ' player dressed"><img src="' + SP.spriteURL(g.cls, 2, outfitHue(g.wd.k.you)) + '" alt=""></div>' : '<div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div>') + '</div><div class="info"><div class="nm"><button class="linkname nc-' + cosOf('c', pf.c)[0] + '" data-gprof="' + g.id + '">' + esc(g.name) + '</button> ' + classTag(g.cls) + (pf.t ? ' <small class="pftitle">' + esc(cosOf('t', pf.t)[1]) + '</small>' : '') + (g.w ? ' ' + warBadge(g.w) : '') + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
         ((S.guests || []).some(x => x.id === 'p_' + g.id) ? '<span class="muted">In party</span>' : inv.sent[g.id] ? '<span class="invact"><span class="invwait">Invited</span><button class="btn ghost small" data-uninv="' + g.id + '">Cancel</button></span>' : '<button class="btn small" data-recruit="' + g.id + '">Invite</button>') + '</div>'; }).join('') + '</div>';
       if ((S.guests || []).length) h += '<p class="note">To let a player’s hero go, press Dismiss on their seat.</p>';
     }
@@ -2421,7 +2424,8 @@
   // The profile card: banner, framed portrait, colored name, title, emblems, bio and war badges.
   function looksCard(o) {
     const pf = o.pf || {}, ok = o.wd && o.wd.k && o.wd.k.you, fr = cosOf('f', pf.f)[0], bn = cosOf('g', pf.g)[0], nc = cosOf('c', pf.c)[0], tt = pf.t ? cosOf('t', pf.t)[1] : '';
-    return '<div class="pfcard bn-' + bn + '"><div class="pfava fr-' + fr + '"><div class="ic c-' + o.cls + ' player' + (ok ? ' dressed' : '') + '">' + (ok ? '<img src="' + SP.spriteURL(o.cls, 2, outfitHue(ok)) + '" alt="">' : icon(CLASS_ICON[o.cls])) + '</div></div>' +
+    const wb = o.wd && o.wd.b && BANNERS[o.wd.b] ? o.wd.b : '';
+    return '<div class="pfcard bn-' + bn + (wb ? ' hasban' : '') + '">' + (wb ? '<div class="pfban">' + bannerSVG(wb) + '</div>' : '') + '<div class="pfava fr-' + fr + '"><div class="ic c-' + o.cls + ' player' + (ok ? ' dressed' : '') + '">' + (ok ? '<img src="' + SP.spriteURL(o.cls, 2, outfitHue(ok)) + '" alt="">' : icon(CLASS_ICON[o.cls])) + '</div></div>' +
       '<div class="pfmain"><b class="pfname nc-' + nc + '">' + esc(o.name) + '</b>' + (tt ? '<small class="pftitle">' + esc(tt) + '</small>' : '') +
       '<div class="pftags">' + classTag(o.cls) + (o.level ? '<span class="pflv">Level ' + o.level + (o.floor ? ' · floor ' + o.floor : '') + '</span>' : '') + '</div>' +
       ((pf.e || []).length ? '<div class="pfemb">' + pf.e.map(emblem).join('') + '</div>' : '') + '</div></div>' +
@@ -3095,7 +3099,8 @@
   // A sender's name in their Wardrobe name color, with their title, once their looks are known.
   function chatName(m) {
     const lk = looksCache[m.from], c = lk && lk.c && lk.c !== 'none' ? lk.c : '', t = lk && lk.t ? (COSMETICS.t.items.find(x => x[0] === lk.t) || [])[1] : '';
-    return (c ? '<span class="nc-' + esc(c) + '">' + esc(m.name) + '</span>' : esc(m.name)) + (t ? '<small class="ctitle">' + esc(t) + '</small>' : '');
+    const bn = lk && lk.b && BANNERS[lk.b] ? lk.b : '';
+    return (bn ? bannerSVG(bn, 'chatban') : '') + (c ? '<span class="nc-' + esc(c) + '">' + esc(m.name) + '</span>' : esc(m.name)) + (t ? '<small class="ctitle">' + esc(t) + '</small>' : '');
   }
   function paintChat() {
     const log = $('chatlog'), k = roomKey(), list = (chat.msgs[k] || []).filter(m => !chat.muted.has(m.from));
@@ -4706,7 +4711,7 @@
     const st = rg.st;
     if (!st || !st.me) { box.innerHTML = '<div class="ringempty"><h3>The Ember Ring</h3>' + intro + '<p class="note">' + (rg.err || 'Stepping into the Ring…') + '</p>' + (rg.err ? '<button class="btn small" id="ring-retry">Try again</button>' : '') + '</div>'; const b = $('ring-retry'); if (b) b.onclick = () => loadRing(true); return; }
     const me = st.me, you = L.memberById('you'), en = ringEnergy(me), nextIn = me.et - Date.now() - (RING_EMAX - en - 1) * RING_EINT;
-    let h = '<div class="ringhead"><div class="rhfig">' + ringFig(you.cls, lookHue(you), 3) + '</div><div class="rhinfo"><div class="rhtop"><h3>The Ember Ring</h3><span class="rtitle rt-' + ringTitle(me.r).toLowerCase() + '">' + ringTitle(me.r) + '</span></div>' +
+    let h = '<div class="ringhead' + (myBanner() ? ' hasban' : '') + '">' + (myBanner() ? '<div class="rhban">' + bannerSVG(myBanner()) + '</div>' : '') + '<div class="rhfig">' + ringFig(you.cls, lookHue(you), 3) + '</div><div class="rhinfo"><div class="rhtop"><h3>The Ember Ring</h3><span class="rtitle rt-' + ringTitle(me.r).toLowerCase() + '">' + ringTitle(me.r) + '</span></div>' +
       '<div class="rhrate"><b>' + me.r.toLocaleString('en-US') + '</b> rating' + (st.rank ? ' &middot; rank ' + st.rank + ' of ' + st.n : '') + (me.pk > me.r ? ' &middot; best ' + me.pk.toLocaleString('en-US') : '') + '</div>' +
       '<div class="rhchips"><span title="Wins and losses">' + icon('sword') + me.w + '&ndash;' + me.l + '</span>' + '<span title="Laurels, spent on Ring skills and the Ringwarden kit">' + laurel(me.ll) + '</span>' +
       '<span title="Challenges refill one every 30 minutes, up to 10" class="' + (en ? '' : 'out') + '">' + icon('flame') + en + '/' + RING_EMAX + (en < RING_EMAX ? ' <small>+1 in ' + fmtTime(Math.max(1, Math.ceil(nextIn / 1000))) + '</small>' : '') + '</span></div></div></div>' +
@@ -4720,7 +4725,7 @@
         const rc = me.rc && me.rc[f.id], rq = rc ? (me.rep || [1, .5, .25, 0])[Math.min(rc[0], 3)] : 1;
         const rm = !rc ? '' : rq > 0 ? '<span class="mu rep">' + icon('refresh') + 'Rematch: ' + Math.round(rq * 100) + '% rating and Laurels</span>' : '<span class="mu bad">' + icon('refresh') + 'Rematch pays nothing for ' + ringIn(rc[1] - Date.now()) + '</span>';
         const brings = (f.lo ? f.lo.a.concat(f.lo.p) : []).map(id => { const k = ringSkill(id); return k ? k.n : ''; }).filter(Boolean);
-        return '<div class="ringfoe"><div class="rffig">' + ringFig(f.c, outfitHue((looksCache[f.id] || {}).k), 2) + '</div><div class="rfinfo"><div class="nm">' + esc(f.n) + ' ' + classTag(f.c) + '</div><small><span class="rtitle sm rt-' + ringTitle(f.r).toLowerCase() + '">' + ringTitle(f.r) + '</span> ' + f.r.toLocaleString('en-US') + ' &middot; ' + f.w + '&ndash;' + f.l + ' &middot; <i class="odds ' + odd[0] + '">' + odd[1] + '</i></small>' + (mu ? '<small>' + mu + '</small>' : '') + (rm ? '<small>' + rm + '</small>' : '') + (brings.length ? '<small class="brings">Brings ' + brings.map(esc).join(' &middot; ') + '</small>' : '') + '<small class="dim">' + ringStatLine(f.s) + '</small></div>' +
+        return '<div class="ringfoe"><div class="rffig">' + (theirBanner(f.id) ? bannerSVG(theirBanner(f.id), 'rfban') : '') + ringFig(f.c, outfitHue((looksCache[f.id] || {}).k), 2) + '</div><div class="rfinfo"><div class="nm">' + esc(f.n) + ' ' + classTag(f.c) + '</div><small><span class="rtitle sm rt-' + ringTitle(f.r).toLowerCase() + '">' + ringTitle(f.r) + '</span> ' + f.r.toLocaleString('en-US') + ' &middot; ' + f.w + '&ndash;' + f.l + ' &middot; <i class="odds ' + odd[0] + '">' + odd[1] + '</i></small>' + (mu ? '<small>' + mu + '</small>' : '') + (rm ? '<small>' + rm + '</small>' : '') + (brings.length ? '<small class="brings">Brings ' + brings.map(esc).join(' &middot; ') + '</small>' : '') + '<small class="dim">' + ringStatLine(f.s) + '</small></div>' +
           '<button class="btn small" data-duel="' + f.id + '"' + (en ? '' : ' disabled title="No challenges left. One returns every 30 minutes."') + '>Duel</button></div>';
       }).join('') + '</div>' : '<p class="note">No other heroes have entered the Ring yet. Check back soon, or tell a friend to bring their hero.</p>';
       h += '<div class="row"><button class="btn ghost small" id="ring-ref">' + icon('refresh') + ' New challengers</button></div>';
@@ -4739,7 +4744,7 @@
         return '<div class="ringpiece r-' + t[1] + '"><div class="tile r-' + t[1] + (r ? '' : ' ghost') + '"><img class="iimg" src="' + SP.itemIcon(you.cls, p.slot, r ? t[1] : 'common') + '" alt=""></div><div class="rpinfo"><b>' + nm + '</b><small>' + (r ? fx(r) : 'Not claimed yet') + '</small>' + (r < RING_MAX ? '<small class="dim">Next rank: ' + fx(1) + '</small>' : '') + '</div><div class="rpact">' + act + '</div></div>';
       }).join('') + '</div>';
     } else {
-      h += st.top.length ? '<ol class="ringtop">' + st.top.map((t, i) => '<li class="' + (t.id === me.id ? 'me' : '') + '"><span class="rk">' + (i + 1) + '</span>' + ringFig(t.c, outfitHue((looksCache[t.id] || {}).k), 1) + '<span class="nm c-' + esc(t.c) + '">' + esc(t.n) + '</span><span class="rtitle sm rt-' + ringTitle(t.r).toLowerCase() + '">' + ringTitle(t.r) + '</span><b>' + t.r.toLocaleString('en-US') + '</b><small>' + t.w + '&ndash;' + t.l + '</small></li>').join('') + '</ol>' : '<p class="note">Nobody has fought yet. The first win puts you on top.</p>';
+      h += st.top.length ? '<ol class="ringtop">' + st.top.map((t, i) => '<li class="' + (t.id === me.id ? 'me' : '') + '"><span class="rk">' + (i + 1) + '</span>' + ((t.id === me.id ? myBanner() : theirBanner(t.id)) ? bannerSVG(t.id === me.id ? myBanner() : theirBanner(t.id), 'tban') : '') + ringFig(t.c, outfitHue((looksCache[t.id] || {}).k), 1) + '<span class="nm c-' + esc(t.c) + '">' + esc(t.n) + '</span><span class="rtitle sm rt-' + ringTitle(t.r).toLowerCase() + '">' + ringTitle(t.r) + '</span><b>' + t.r.toLocaleString('en-US') + '</b><small>' + t.w + '&ndash;' + t.l + '</small></li>').join('') + '</ol>' : '<p class="note">Nobody has fought yet. The first win puts you on top.</p>';
       h += '<p class="note small">Everyone starts at 1,000. Beating a higher-rated hero is worth more. Heroes that defend well while their owner is away climb too.</p>';
     }
     box.innerHTML = h;
@@ -4916,7 +4921,7 @@
   // Other players' looks (name color, title, outfit, lantern), cached by player id for chat and the Ring.
   const looksCache = {}, looksAt = {};
   // The Wardrobe shows once its server answers (signed-out players see it and are asked to sign in).
-  var wardOK = false;
+  var wardOK = false, wardV = 1;
   const wardOn = () => !!CL && (!signedIn() || wardOK);
   async function fetchLooks(ids) {
     if (!CL || !signedIn()) return false;
@@ -4937,12 +4942,64 @@
     return o && SP.OUTFITS && SP.OUTFITS[o] ? '0~' + o : (m.hue || 0);
   }
   const outfitHue = o => o && SP.OUTFITS && SP.OUTFITS[o] ? '0~' + o : 0;
+  // ---- war banners (b.*): drawn as inline SVG; keep ids and prices in step with CAT in infra/lambda/looks.js ----
+  // [name, price, description, shape, field top, field bottom, trim, charge (emblem), charge colour, effect]
+  const BANNERS = {
+    delver:   ['Delver’s Pennant', 0, 'A plain pennant for anyone who has gone down the stair.', 'point', '#4a5063', '#23262f', '#b8a27a', 'lantern', '#f3d9a0', ''],
+    covenant: ['Iron Covenant', 200, 'Steel and slate for those who hold the line.', 'swallow', '#56698a', '#232e44', '#d4dde8', 'shield', '#eef3f8', ''],
+    radiant:  ['Radiant Ascendancy', 200, 'Sun-gold silk for scholars who rise beyond.', 'point', '#f0c75e', '#9c6a14', '#fff3c4', 'sun', '#fffaf0', ''],
+    tide:     ['Devouring Tide', 200, 'Deep violet, worn by those who feed the Tide.', 'swallow', '#7a3aa0', '#2a0f3e', '#d9b8ff', 'wave', '#efe0ff', ''],
+    mercy:    ['Mercy Corps', 200, 'White linen and a red rose, for those who leave no one in the dark.', 'point', '#f2f5f6', '#b3c1c6', '#c23a3a', 'rose', '#c23a3a', ''],
+    unsworn:  ['The Unsworn', 200, 'Weathered leather and a raven. No masters.', 'swallow', '#6a5440', '#2a1e14', '#b8a07a', 'raven', '#e8dcc4', ''],
+    ember:    ['Emberfall', 350, 'Forge-red cloth that sheds sparks in the dark.', 'swallow', '#d4522a', '#5a140c', '#ffbf5a', 'flame', '#ffe3a0', 'sparks'],
+    frost:    ['Wintermark', 350, 'Ice-blue silk with a frozen star, glittering as it moves.', 'point', '#a8dcf0', '#24527e', '#f0fbff', 'star', '#ffffff', 'glint'],
+    rift:     ['Riftbreaker', 500, 'Torn from the Rift itself. Its charge glows with teal light.', 'swallow', '#5a30a0', '#120624', '#7affe8', 'rift', '#a8fff0', 'glow'],
+    crown:    ['Crown of the Deep', 750, 'Royal crimson, gold fringe and a crown that catches every light.', 'square', '#9a1e30', '#3a0810', '#f5c242', 'crown', '#ffe08a', 'glint'],
+    lantern:  ['The Last Lantern', 1000, 'Night-black silk around a burning lantern. Embers drift from it.', 'point', '#1e2a42', '#05070d', '#f5c242', 'lantern', '#ffd27a', 'embers'],
+  };
+  let banN = 0;
+  function bannerSVG(id, cls) {
+    const B = BANNERS[id]; if (!B) return '';
+    const [, , , shape, c1, c2, trim, ch, cc, fx] = B, n = 'bn' + (++banN);
+    const cloth = shape === 'swallow' ? 'M9 9H39V64L24 55L9 64Z' : shape === 'square' ? 'M9 9H39V60H9Z' : 'M9 9H39V57L24 67L9 57Z';
+    const inner = shape === 'swallow' ? 'M12 15H36V58.5L24 51.5L12 58.5Z' : shape === 'square' ? 'M12 15H36V57H12Z' : 'M12 15H36V55.4L24 63.4L12 55.4Z';
+    const glow = fx === 'glow' || fx === 'embers';
+    const motes = fx === 'sparks' || fx === 'embers' ? [[17, 50, 0], [30, 46, 0.8], [24, 40, 1.6]].map(([x, y, d]) =>
+      '<circle cx="' + x + '" cy="' + y + '" r="1.1" fill="' + cc + '"><animate attributeName="cy" values="' + y + ';' + (y - 30) + '" dur="2.6s" begin="' + d + 's" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0" dur="2.6s" begin="' + d + 's" repeatCount="indefinite"/></circle>').join('') : '';
+    const glint = fx === 'glint' ? '<rect x="-20" y="9" width="10" height="60" fill="url(#' + n + 'g)" transform="skewX(-18)"><animate attributeName="x" values="-20;60;60" dur="4.5s" repeatCount="indefinite"/></rect>' : '';
+    return '<svg class="ban' + (cls ? ' ' + cls : '') + '" viewBox="0 0 48 72" aria-hidden="true"><defs>' +
+      '<linearGradient id="' + n + 'f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + c1 + '"/><stop offset="1" stop-color="' + c2 + '"/></linearGradient>' +
+      '<linearGradient id="' + n + 's" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".35"/><stop offset=".3" stop-color="#fff" stop-opacity=".1"/><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset=".8" stop-color="#000" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity=".4"/></linearGradient>' +
+      '<linearGradient id="' + n + 'g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+      '<clipPath id="' + n + 'c"><path d="' + cloth + '"/></clipPath>' +
+      (glow ? '<filter id="' + n + 'b" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="1.6"/></filter>' : '') + '</defs>' +
+      '<path d="M15 9L19 3M33 9L29 3" stroke="' + trim + '" stroke-width="1" fill="none" opacity=".8"/>' +
+      '<path d="' + cloth + '" fill="url(#' + n + 'f)" stroke="#0b0d14" stroke-width="1.6" stroke-linejoin="round"/>' +
+      '<g clip-path="url(#' + n + 'c)"><rect x="9" y="9" width="30" height="60" fill="url(#' + n + 's)"/>' + glint + '</g>' +
+      '<path d="' + inner + '" fill="none" stroke="' + trim + '" stroke-width="1.1" opacity=".9"/>' +
+      '<rect x="9" y="9" width="30" height="4.5" fill="' + trim + '" opacity=".85"/>' +
+      (glow ? '<g transform="translate(12 21)" filter="url(#' + n + 'b)"><path d="' + EMB[ch] + '" fill="none" stroke="' + cc + '" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/></g>' : '') +
+      '<g transform="translate(12 21)"><path d="' + EMB[ch] + '" fill="none" stroke="' + cc + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></g>' + motes +
+      (shape === 'square' ? '<path d="M10 60.5V64M13 60.5V64M16 60.5V64M19 60.5V64M22 60.5V64M25 60.5V64M28 60.5V64M31 60.5V64M34 60.5V64M37 60.5V64" stroke="' + trim + '" stroke-width="1.2"/>' : '') +
+      '<rect x="3" y="6.5" width="42" height="3.4" rx="1.7" fill="#6a4a2c" stroke="#0b0d14" stroke-width="1"/><circle cx="3.5" cy="8.2" r="2.3" fill="' + trim + '" stroke="#0b0d14" stroke-width=".8"/><circle cx="44.5" cy="8.2" r="2.3" fill="' + trim + '" stroke="#0b0d14" stroke-width=".8"/>' +
+      '</svg>';
+  }
+  // The banner a player shows: yours from your wardrobe, others' from their looks.
+  const myBanner = () => (S.wd && S.wd.b && BANNERS[S.wd.b]) ? S.wd.b : '';
+  const theirBanner = id => { const l = looksCache[id]; return l && l.b && BANNERS[l.b] ? l.b : ''; };
+  WARDROBE.b = { label: 'Banners', items: [['none', 'No banner', 0, 'Fly no banner.']].concat(Object.keys(BANNERS).map(id => [id, BANNERS[id][0], BANNERS[id][1], BANNERS[id][2]])) };
+  const banImgs = {};
+  function banImg(id) {
+    const o = banImgs[id]; if (o) return o.complete && o.naturalWidth ? o : null;
+    const im = new Image(); im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(bannerSVG(id).replace('<svg class', '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="144" class')); banImgs[id] = im; return null;
+  }
   const lanternOf = () => (S.wd && S.wd.l && SP.LANTERNS && SP.LANTERNS[S.wd.l]) ? S.wd.l : 'ember';
   async function loadWardrobe() {
     if (!CL || !signedIn()) return null;
     try {
       const r = await papi('GET', '/wardrobe');
       if (!wardOK) { wardOK = true; try { updateGear(true); } catch (e) {} }
+      wardV = r.v || 1;
       if (prof) { prof.bal = r.bal; prof.own = r.own; }
       syncRoster(r.own);
       const was = JSON.stringify(S.wd || {}); S.wd = r.wd || {};
@@ -4967,7 +5024,7 @@
     const [r] = await Promise.all([loadWardrobe(), prof ? null : loadProfile()]);
     if (!r) { modal('<div class="center"><h2>The Wardrobe</h2><p>The Wardrobe could not be reached. Try again in a minute.</p><div class="row"><button class="btn ghost" id="wd-x">Close</button></div></div>', md => md.querySelector('#wd-x').onclick = closeModal); return; }
     wd = r;
-    wdDraft = { k: Object.assign({}, (S.wd && S.wd.k) || {}), l: (S.wd && S.wd.l) || 'ember' };
+    wdDraft = { k: Object.assign({}, (S.wd && S.wd.k) || {}), l: (S.wd && S.wd.l) || 'ember', b: (S.wd && S.wd.b) || '' };
     if (!wardMembers().includes(wdWho)) wdWho = 'you';
     // warm the art for this hero in every outfit so the grid shows finished sprites
     const m0 = L.memberById(wdWho); WARDROBE.k.items.forEach(([id]) => { try { SP.render(m0.cls, 1, outfitHue(id)); } catch (e) {} });
@@ -4976,13 +5033,13 @@
   const wardOwns = (k, id, price) => !price || (wd && wd.own.includes(k + '.' + id));
   function wardPreview() {
     const m = L.memberById(wdWho), o = wdDraft.k[wdWho] || 'none', it = wardItem('k', o), ln = wardItem('l', wdDraft.l);
-    return '<div class="wdstage ln-' + ln[0] + '"><div class="wdfig"><img src="' + SP.spriteURL(m.cls, 5, outfitHue(o) || (o === 'none' ? m.hue || 0 : 0)) + '" alt=""></div>' +
+    return '<div class="wdstage ln-' + ln[0] + '">' + (wdDraft.b && BANNERS[wdDraft.b] ? '<div class="wdban">' + bannerSVG(wdDraft.b) + '</div>' : '') + '<div class="wdfig"><img src="' + SP.spriteURL(m.cls, 5, outfitHue(o) || (o === 'none' ? m.hue || 0 : 0)) + '" alt=""></div>' +
       '<img class="wdlamp" src="' + SP.spriteURL('lantern', 3, '0~' + ln[0]) + '" alt="">' +
       '<div class="wdcap"><b>' + esc(m.name) + '</b><small>' + esc(it[1]) + ' &middot; ' + esc(ln[1]) + ' lantern</small></div></div>';
   }
   function paintWardrobe() {
     if (!wd) return;
-    const tabs = Object.keys(WARDROBE).map(k => '<button class="' + (wdTab === k ? 'on' : '') + '" data-wt="' + k + '">' + WARDROBE[k].label + '</button>').join('');
+    const tabs = Object.keys(WARDROBE).filter(k => k !== 'b' || wardV >= 2).map(k => '<button class="' + (wdTab === k ? 'on' : '') + '" data-wt="' + k + '">' + WARDROBE[k].label + '</button>').join('');
     let body = '';
     if (wdTab === 'k') {
       const m = L.memberById(wdWho), cur = wdDraft.k[wdWho] || 'none';
@@ -4992,13 +5049,18 @@
           return '<button class="cos wdcos' + (on ? ' on' : '') + (have ? '' : ' locked') + (price >= 600 ? ' rare' : '') + '" data-wk="' + id + '"><img src="' + SP.spriteURL(m.cls, 2, id === 'none' ? m.hue || 0 : outfitHue(id)) + '" alt=""><b>' + esc(name) + '</b><small>' + (have ? (on ? 'Wearing' : 'Owned') : sigil + price) + '</small></button>';
         }).join('') + '</div>' +
         '<p class="note">An outfit is bought once and every hero in your company can wear it.' + (wardOwns('k', cur, wardItem('k', cur)[2]) && cur !== 'none' ? ' <button class="linkbtn" id="wd-all">Dress the whole party in ' + esc(wardItem('k', cur)[1]) + '</button>' : '') + '</p>';
+    } else if (wdTab === 'b' && wardV >= 2) {
+      body = '<div class="cosgrid wdgrid">' + WARDROBE.b.items.map(([id, name, price]) => {
+        const have = wardOwns('b', id, price), on = (wdDraft.b || 'none') === id;
+        return '<button class="cos wdcos wdbn' + (on ? ' on' : '') + (have ? '' : ' locked') + (price >= 500 ? ' rare' : '') + '" data-wb="' + id + '">' + (id === 'none' ? '<span class="nobn">None</span>' : bannerSVG(id)) + '<b>' + esc(name) + '</b><small>' + (have ? (on ? 'Flying' : 'Owned') : sigil + price) + '</small></button>';
+      }).join('') + '</div><p class="note">Your banner flies behind your party and shows on your hero in the Ember Ring, the Players Guild and chat.</p>';
     } else {
       body = '<div class="cosgrid wdgrid">' + WARDROBE.l.items.map(([id, name, price]) => {
         const have = wardOwns('l', id, price), on = wdDraft.l === id;
         return '<button class="cos wdcos' + (on ? ' on' : '') + (have ? '' : ' locked') + (price >= 500 ? ' rare' : '') + '" data-wl="' + id + '"><img class="lamp" src="' + SP.spriteURL('lantern', 2, '0~' + id) + '" alt=""><b>' + esc(name) + '</b><small>' + (have ? (on ? 'Carried' : 'Owned') : sigil + price) + '</small></button>';
       }).join('') + '</div><p class="note">Your lantern lights the Deep around your party and hangs beside your lead hero.</p>';
     }
-    modal('<div class="maphead"><div><h2>The Wardrobe</h2><small>Looks only. Nothing here changes your party’s power. Other players see your hero’s outfit and lantern in chat, the Players Guild and the Ember Ring.</small></div><button class="iconbtn" id="wd-x" aria-label="Close">&times;</button></div>' +
+    modal('<div class="maphead"><div><h2>The Wardrobe</h2><small>Looks only. Nothing here changes your party’s power. Other players see your hero’s outfit, lantern and banner in chat, the Players Guild and the Ember Ring.</small></div><button class="iconbtn" id="wd-x" aria-label="Close">&times;</button></div>' +
       wardPreview() +
       '<div class="pfbal"><span>' + sigil + '<b>' + fmt(wd.bal) + '</b> ' + TOKEN + '</span><button class="btn small ghost" id="wd-get">Get ' + TOKEN + '</button></div>' +
       '<div class="seg pfseg">' + tabs + '</div><div class="pfbody">' + body + '</div>' +
@@ -5010,6 +5072,7 @@
         md.querySelectorAll('[data-ww]').forEach(b => b.onclick = () => { wdWho = b.dataset.ww; const x = L.memberById(wdWho); WARDROBE.k.items.forEach(([id]) => { try { SP.render(x.cls, 1, outfitHue(id)); } catch (e) {} }); paintWardrobe(); });
         md.querySelectorAll('[data-wk]').forEach(b => b.onclick = () => wardPick('k', b.dataset.wk));
         md.querySelectorAll('[data-wl]').forEach(b => b.onclick = () => wardPick('l', b.dataset.wl));
+        md.querySelectorAll('[data-wb]').forEach(b => b.onclick = () => wardPick('b', b.dataset.wb));
         const all = md.querySelector('#wd-all'); if (all) all.onclick = () => { const o = wdDraft.k[wdWho]; S.party.filter(Boolean).forEach(id => { if (!String(id).startsWith('p_')) wdDraft.k[id] = o; }); paintWardrobe(); };
         md.querySelector('#wd-save').onclick = wardSave;
       });
@@ -5017,7 +5080,7 @@
   function wardPick(k, id) {
     const it = wardItem(k, id);
     if (!wardOwns(k, id, it[2])) return wardBuy(k, it);
-    if (k === 'k') { if (id === 'none') delete wdDraft.k[wdWho]; else wdDraft.k[wdWho] = id; } else wdDraft.l = id;
+    if (k === 'k') { if (id === 'none') delete wdDraft.k[wdWho]; else wdDraft.k[wdWho] = id; } else if (k === 'b') wdDraft.b = id === 'none' ? '' : id; else wdDraft.l = id;
     paintWardrobe();
   }
   let wdBuyArgs = null;
@@ -5026,8 +5089,9 @@
     if (k === 'k') ['tank', 'healer', 'rogue', 'mage', 'necro'].forEach(c => { try { SP.render(c, 1, outfitHue(it[0])); } catch (e) {} });
     const [id, name, price, desc] = it, can = wd.bal >= price, m = L.memberById(wdWho);
     const pic = k === 'k' ? '<div class="wdbuy">' + ['tank', 'healer', 'rogue', 'mage', 'necro'].map(c => '<img src="' + SP.spriteURL(c, 3, outfitHue(id)) + '" alt="">').join('') + '</div>'
+      : k === 'b' ? '<div class="wdbuy banner">' + bannerSVG(id) + '</div>'
       : '<div class="wdbuy lamp"><img src="' + SP.spriteURL('lantern', 4, '0~' + id) + '" alt=""></div>';
-    modal('<div class="center">' + pic + '<h2>' + esc(name) + '</h2><p>' + esc(desc) + '</p><p class="note">' + (k === 'k' ? 'An outfit for every hero in your company, owned forever.' : 'A lantern for your party, owned forever.') + ' Looks only. ' + sigil + '<b>' + price + '</b> ' + TOKEN + '. You have ' + fmt(wd.bal) + '.</p>' +
+    modal('<div class="center">' + pic + '<h2>' + esc(name) + '</h2><p>' + esc(desc) + '</p><p class="note">' + (k === 'k' ? 'An outfit for every hero in your company, owned forever.' : k === 'b' ? 'A war banner for your hero, owned forever.' : 'A lantern for your party, owned forever.') + ' Looks only. ' + sigil + '<b>' + price + '</b> ' + TOKEN + '. You have ' + fmt(wd.bal) + '.</p>' +
       '<div class="row"><button class="btn ghost" id="wb-no">Back</button>' + (can ? '<button class="btn" id="wb-yes">Buy for ' + price + '</button>' : '<button class="btn" id="wb-get">Get ' + TOKEN + '</button>') + '</div></div>', md => {
         md.querySelector('#wb-no').onclick = paintWardrobe;
         const g = md.querySelector('#wb-get'); if (g) g.onclick = () => getSigils(paintWardrobe);
@@ -5036,7 +5100,7 @@
           try {
             const r = await papi('POST', '/wardrobe', { buy: k + '.' + id }); wd.bal = r.bal; wd.own = r.own; if (prof) { prof.bal = r.bal; prof.own = r.own; }
             try { localStorage.setItem('lh_bal', String(r.bal)); } catch (e) {}
-            sfx.buy(); if (k === 'k') wdDraft.k[wdWho] = id; else wdDraft.l = id;
+            sfx.buy(); if (k === 'k') wdDraft.k[wdWho] = id; else if (k === 'b') wdDraft.b = id; else wdDraft.l = id;
             toast('star', name + ' is yours', 'Press Save looks to wear it' + (k === 'k' ? ' on ' + m.name : '') + '.', 'feat');
           } catch (e) { toast('lock', 'That did not go through', e.code === 'funds' ? 'Not enough ' + TOKEN + '.' : e.code === 'owned' ? 'You already own it.' : 'Try again in a moment.', 'warn'); }
           paintWardrobe();
@@ -5046,7 +5110,7 @@
   async function wardSave() {
     const b = $('modalbody').querySelector('#wd-save'); if (b) b.disabled = true;
     try {
-      const r = await papi('POST', '/wardrobe', { k: wdDraft.k, l: wdDraft.l === 'ember' ? '' : wdDraft.l });
+      const r = await papi('POST', '/wardrobe', Object.assign({ k: wdDraft.k, l: wdDraft.l === 'ember' ? '' : wdDraft.l }, wardV >= 2 ? { b: wdDraft.b || '' } : {}));
       S.wd = r.wd; save(); try { pushCloud(true); } catch (e) {} wardRefresh(); closeModal(); sfx.buy();
       toast('star', 'Looking sharp', 'Your party wears its new looks.', 'feat');
     } catch (e) { if (b) b.disabled = false; toast('lock', 'Could not save your looks', e.code === 'item' ? 'Buy an item before you wear it.' : 'Try again in a moment.', 'warn'); }

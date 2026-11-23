@@ -826,7 +826,8 @@
   }
   // Lantern Pass: a 30-day convenience pass bought with Sigils. Auto-train, +10 bag slots, +4 hours of offline time. No power.
   const PASS_COST = 500, PASS_DAYS = 30, PASS_BAG = 10, PASS_OFFLINE = 4 * 3600;
-  const passOn = s => !!(s && ((s.pass && s.pass > Date.now()) || (s.passTrial && s.passTrial > Date.now())));
+  // Lanternholder: the $4.99/month store subscription turns on the same perks for as long as it is paid (s.sub, from the server).
+  const passOn = s => !!(s && ((s.pass && s.pass > Date.now()) || (s.passTrial && s.passTrial > Date.now()) || (s.sub && s.sub > Date.now())));
   // Bag of Holding: a one-time 6,500 Sigil buy that removes the pack limit. Convenience only, never power.
   const BOH_COST = 6500;
   const bagCap = s => s.boh ? Infinity : GEAR_CAP + BAG_STEP * (s.bagUps || 0) + (passOn(s) ? PASS_BAG : 0);

@@ -1132,6 +1132,14 @@ body.resting .arena{cursor:default}
 .pack span{margin-top:8px;padding:5px 12px;border-radius:999px;background:rgba(245,194,66,.14);color:var(--text);font-weight:700;font-size:14px}
 .storelink{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--panel)}
 .storelink span{flex:1 1 220px;color:var(--muted);font-size:14px}.storelink span b{color:var(--text)}
+/* Get Sigils: one-time packs and the Lanternholder membership, clearly apart */
+.shopsec{margin:4px 0 8px}.shopsec h3{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 4px;font-size:17px}
+.shopsec .shopsub{margin:0;color:var(--muted);font-size:14px}
+.shopsec.subbox{margin:8px 0 12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line2);background:linear-gradient(180deg,var(--panel2),var(--panel))}
+.shopsec.subbox .passfx{margin:10px 0}.shopsec.subbox .row{margin:6px 0 0}
+.tag{font-size:11px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:999px;text-transform:uppercase}
+.tag.once{background:rgba(120,200,140,.16);color:#9fe0b0}.tag.renew{background:rgba(245,194,66,.18);color:var(--gold)}
+.renewnote{margin:10px 0 0}.renewnote b{color:var(--text)}
 @media (max-width:560px){.packs{grid-template-columns:repeat(2,1fr);row-gap:16px}}
 .storelink+.note{margin-top:10px}
 /* Mercy's Blessing pill */

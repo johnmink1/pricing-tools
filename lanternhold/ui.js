@@ -566,6 +566,9 @@
   const camp = () => L.atCamp(S, Date.now());
   function campGate() { if (camp()) return true; campModal(); return false; }
   function goCamp() {
+    const cost = L.campCost(S);
+    if (cost > S.gold) { toast('coin', 'Not enough gold for the climb', 'Returning to camp from floor ' + S.floor + ' costs ' + fmt(cost) + ' gold. A Campfire Draught from the store is cheaper for a quick change.', 'warn'); return; }
+    S.gold -= cost;
     S.campReturn = Math.max(S.campReturn || 0, S.floor);
     L.gotoFloor(S, L.CAMP_FLOOR); S.autoAdvance = false; $('auto').checked = false;
     closeModal(); save(); updateStage(); updatePanel(true); sfx.buy();
@@ -585,7 +588,7 @@
   function campModal() {
     const n = (S.items && S.items.draught) || 0;
     modal('<div class="center"><div class="campfire-ic">' + icon('flame') + '</div><h2>That happens at camp</h2><p>Swapping companions, recruiting players, training companions resting at the campfire and changing gear all happen at camp, at the top of the stair.</p></div>' +
-      '<div class="choice"><button class="pick" id="c-go"><b>Return to camp</b><small>Travel up to floor 1. You can head straight back down to floor ' + S.floor + ' afterwards.</small></button>' +
+      '<div class="choice"><button class="pick" id="c-go"><b>Return to camp</b><small>Travel up to floor 1' + (L.campCost(S) ? ' for ' + fmt(L.campCost(S)) + ' gold' : ', free this close to the top') + '. You can head straight back down to floor ' + S.floor + ' afterwards.</small></button>' +
       '<button class="pick" id="c-drink"' + (n ? '' : ' disabled') + '><b>Drink a Campfire Draught (' + n + ' left)</b><small>Make camp right here for 60 seconds.</small></button>' +
       '<button class="pick" id="c-store"><b>Visit the store</b><small>Buy Campfire Draughts and Lantern Oil.</small></button></div>' +
       '<div class="row"><button class="btn ghost" id="c-x">Not now</button></div>', md => {
@@ -597,7 +600,7 @@
     const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now());
     if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>At camp</b><small>Swap companions, recruit, train and change gear.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + Math.min(S.maxFloor, Math.max(2, S.campReturn || S.maxFloor)) + '</button>' : '') + '<button class="btn ghost small" data-camp="store">Store</button></div>';
     if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Camp made: ' + Math.ceil(left) + 's</b><small>A Campfire Draught is burning. Make your changes now.</small></div><button class="btn ghost small" data-camp="store">Store</button></div>';
-    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Swapping companions and changing gear happen at camp. Your party can train anywhere.</small></div><button class="btn small" data-camp="go">Return to camp</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
+    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Swapping companions and changing gear happen at camp. Your party can train anywhere.</small></div><button class="btn small" data-camp="go"' + (L.campCost(S) > S.gold ? ' disabled' : '') + '>Return to camp' + (L.campCost(S) ? ' · ' + fmt(L.campCost(S)) : '') + '</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
   }
   let campWas = null;
   function paintCamp() {
@@ -709,6 +712,7 @@
   }
   const partyClick = e => {
     const pf = e.target.closest('[data-prof]'); if (pf) { profileModal(pf.dataset.prof); return; }
+    const gp = e.target.closest('[data-gprof]'); if (gp) { const g = (boardList || []).find(x => x.id === gp.dataset.gprof); if (g) boardProfile(g); return; }
     const t = e.target.closest('button'); if (!t) return;
     if (t.dataset.move) { const [i, d] = t.dataset.move.split(':').map(Number); if (L.moveMember(S, i, i + d)) { sfx.buy(); updateSeats(true); updateAbilities(true); } return; }
     if (t.dataset.autot) { const id = t.dataset.autot; S.autoTrain = S.autoTrain || {}; S.autoTrain[id] = !S.autoTrain[id]; if (!S.autoTrain[id]) delete S.autoTrain[id]; sfx.buy(); updateSeats(true); if (S.autoTrain[id]) toast('refresh', 'Auto-train on', L.memberById(id).name + ' will train whenever you have the gold' + (S.party.includes(id) ? '.' : ' and you are at camp.'), ''); return; }
@@ -793,15 +797,15 @@
       h += (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note">Your party is full. When you recruit, you choose who steps out.</p>') +
         '<button class="btn small" id="b-find">' + (boardList ? 'Show other heroes' : 'Browse the guild') + '</button>';
       if (boardMsg) h += '<p class="note">' + esc(boardMsg) + '</p>';
-      if (boardList) h += '<div class="board">' + boardList.map(g => '<div class="seat bench"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div><div class="info"><div class="nm">' + esc(g.name) + ' ' + classTag(g.cls) + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
-        ((S.guests || []).some(x => x.id === 'p_' + g.id) ? '<span class="muted">In party</span>' : '<button class="btn small" data-recruit="' + g.id + '">Recruit</button>') + '</div>').join('') + '</div>';
+      if (boardList) h += '<div class="board">' + boardList.map(g => { const pf = g.pf || {}; return '<div class="seat bench gboard"><div class="pfava sm fr-' + cosOf('f', pf.f)[0] + '"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div></div><div class="info"><div class="nm"><button class="linkname nc-' + cosOf('c', pf.c)[0] + '" data-gprof="' + g.id + '">' + esc(g.name) + '</button> ' + classTag(g.cls) + (pf.t ? ' <small class="pftitle">' + esc(cosOf('t', pf.t)[1]) + '</small>' : '') + (g.w ? ' ' + warBadge(g.w) : '') + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
+        ((S.guests || []).some(x => x.id === 'p_' + g.id) ? '<span class="muted">In party</span>' : '<button class="btn small" data-recruit="' + g.id + '">Recruit</button>') + '</div>'; }).join('') + '</div>';
       if ((S.guests || []).length) h += '<p class="note">To let a player’s hero go, press Dismiss on their seat.</p>';
     }
     w.innerHTML = h + '</div>';
   }
   async function findHeroes() {
     boardMsg = 'Searching the guild…'; paintBoard();
-    try { const r = await api('GET', null, '/heroes'); boardList = (r && r.heroes) || []; boardMsg = boardList.length ? '' : 'The guild hall is quiet right now. Check back soon.'; }
+    try { const r = await api('GET', null, '/heroes'); await loadWar(); boardList = (r && r.heroes) || []; boardMsg = boardList.length ? '' : 'The guild hall is quiet right now. Check back soon.'; }
     catch (e) { boardMsg = 'Could not reach the Players Guild. Try again in a moment.'; }
     paintBoard();
   }
@@ -809,6 +813,7 @@
     const g = (boardList || []).find(x => x.id === gid); if (!g) return;
     const join = async () => {
       L.addGuest(S, { id: 'p_' + g.id, name: g.name, cls: g.cls, level: g.level });
+      const gg = (S.guests || []).find(x => x.id === 'p_' + g.id); if (gg) { gg.pf = g.pf || null; gg.w = g.w || ''; }
       try { await api('POST', { heroId: g.id }, '/recruit'); } catch (e) {}
       sfx.buy(); toast('users', g.name + ' joins your party', 'A ' + L.CLASSES[g.cls].name + ' at level ' + g.level + '.', 'feat');
       updateSeats(true); updateAbilities(true); paintBoard();
@@ -1069,7 +1074,7 @@
   function profileModal(id) {
     const m = L.memberById(id); if (!m) return;
     const c = L.CLASSES[m.cls], now = Date.now(), side = SIDE_OF_MEMBER(id), sd = side && L.SIDES[side];
-    const guest = L.isGuest(S, id), lv = L.lvl(S, id) || 1, inParty = S.party.includes(id);
+    const guest = L.isGuest(S, id), lv = L.lvl(S, id) || 1, inParty = S.party.includes(id), g0 = guest && (S.guests || []).find(x => x.id === id);
     const stats = [['Level', lv], ['Health', fmt(L.maxHpOf(S, id))], ['Damage', fmt(L.memberDps(S, id, now) || 0) + '/s']];
     if (m.cls === 'healer') stats.push(['Healing', fmt(L.healPerSec(S, id)) + '/s']);
     if (c.armor) stats.push(['Blocks', Math.round(c.armor * 100) + '% of hits']);
@@ -1083,6 +1088,8 @@
       : (m.bio || m.line);
     modal('<div class="prof"><div class="profhead"><div class="profspr c-' + m.cls + '"></div><div><h2>' + esc(m.name) + '</h2><small>' + esc(m.title) + '</small><div class="tags">' + classTag(m.cls) + (sd ? '<span class="sidetag" style="--side:' + sd.color + '">' + sd.name + '</span>' : '') + (guest ? '<span class="you guest">Player</span>' : '') + '</div></div></div>' +
       '<p class="bio">' + esc(bio) + '</p>' + (m.line && !guest && id !== 'you' ? '<p class="quote">“' + esc(m.line) + '”</p>' : '') +
+      (id === 'you' && CL ? '<h3 class="sub">Profile card</h3><p class="note">What other players see in the Players Guild.</p><div class="pfwrap" id="p-card">' + looksCard({ name: m.name, cls: m.cls, level: lv, floor: S.maxFloorEver, pf: prof && prof.pf, w: prof && prof.wv ? prof.wl : '' }) + '</div><button class="btn small" id="p-looks">Customize profile</button>' : '') +
+      (guest && g0 && (g0.pf || g0.w) ? '<div class="pfwrap">' + looksCard(Object.assign({}, g0, { name: m.name, cls: m.cls })) + '</div>' : '') +
       '<h3 class="sub">' + c.name + '</h3><p class="note">' + esc(CLASS_BLURB[m.cls]) + '</p>' +
       '<div class="ability"><b>' + c.ability.name + '</b> <span>every ' + c.ability.cd + 's</span><small>' + esc(c.ability.desc) + '</small></div>' +
       '<div class="pstats">' + stats.map(([k, v]) => '<div><span>' + k + '</span><b>' + v + '</b></div>').join('') + '</div>' +
@@ -1093,6 +1100,8 @@
         const g = md.querySelector('#p-gear'); if (g) g.onclick = () => { closeModal(); gearWho = id; switchTab('gear'); };
         const st = md.querySelector('#p-seat'); if (st) st.onclick = () => { closeModal(); if (campGate()) pickSeat(id); };
         md.querySelector('#p-close').onclick = closeModal;
+        const lk = md.querySelector('#p-looks'); if (lk) lk.onclick = openProfileEditor;
+        if (id === 'you' && CL && signedIn() && !prof) Promise.all([loadProfile(), loadWar()]).then(() => { const c = md.querySelector('#p-card'); if (c && prof) c.innerHTML = looksCard({ name: m.name, cls: m.cls, level: lv, floor: S.maxFloorEver, pf: prof.pf, w: prof.wv ? prof.wl : '' }); });
       });
   }
 
@@ -1547,6 +1556,7 @@
   async function publishHero() {
     try {
       const r = await api('PUT', { name: S.hero.name, cls: S.hero.cls, side: S.hero.side, level: L.lvl(S, 'you'), floor: S.maxFloorEver }, '/hero');
+      if (!prof) loadProfile();
       const n = r && r.recruits;
       if (n > 0) {
         const g = Math.max(100, L.offlineGoldPerSec(S) * 600) * n;
@@ -1685,6 +1695,154 @@
   // ---------- support link ----------
   if (window.LH_SUPPORT_URL) { const a = $('support'); a.href = window.LH_SUPPORT_URL; a.hidden = false; a.title = 'Buy the developer a coffee'; }
 
+  // ---------- player profiles: looks bought with Sigils, and Grand War commander badges ----------
+  // Prices live on the server too (infra/lambda/profile.js). Cosmetics only: nothing here changes power.
+  const TOKEN = 'Sigils';
+  const EMB = {
+    lantern: 'M9 3h6M10 3v2M14 3v2M8 5h8l1 3v8l-1 3H8l-1-3V8zM12 10v4', shield: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z', sword: 'M14.5 3H20v5.5L10 18.5 5.5 14zM7 16l-3 3 1 1 3-3',
+    skull: 'M12 3a7 7 0 0 0-7 7c0 3 1.5 4.5 3 5.5V19h8v-3.5c1.5-1 3-2.5 3-5.5a7 7 0 0 0-7-7zM8.5 11a1 1 0 1 0 2 0a1 1 0 1 0-2 0M13.5 11a1 1 0 1 0 2 0a1 1 0 1 0-2 0M10 19v2M14 19v2',
+    flame: 'M12 3c1 4 5 5.5 5 11a5 5 0 0 1-10 0c0-3 1.5-4.5 3-6 0 2 1 3 2 3 0-3-1-5.5 0-8z', wave: 'M3 14c2-3 4-3 6 0s4 3 6 0 4-3 6 0M3 19c2-3 4-3 6 0s4 3 6 0 4-3 6 0M6 9c1-4 6-6 9-3',
+    sun: 'M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2', moon: 'M20 14A8 8 0 1 1 10 4a6.5 6.5 0 0 0 10 10z',
+    star: 'M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z', key: 'M3 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M11 12h10M18 12v3M15 12v2',
+    anvil: 'M4 7h13c0 3-2 4-4 4v3h3v3H7v-3h3v-3C7 11 4 9 4 7zM17 7h3', crown: 'M3 8l4 4 5-7 5 7 4-4-2 11H5z', eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0',
+    rose: 'M12 13c-3 0-5-2-5-5 2 0 3 1 3.5 2C11 7 12 5 12 5s1 2 1.5 5c.5-1 1.5-2 3.5-2 0 3-2 5-5 5zM12 13v8M12 17c-2 0-3-1-4-2M12 18c2 0 3-1 4-2',
+    raven: 'M3 13c3-1 5-4 9-4 3 0 5 2 6 1l3-1-2 3c0 4-4 7-9 7l-2 3v-3c-2-1-4-3-5-6z', rift: 'M12 2c-2 4 3 6 0 10s3 6 0 10M8 7c-2 2-2 8 0 10M16 7c2 2 2 8 0 10',
+  };
+  const COSMETICS = {
+    f: { label: 'Frame', items: [['plain', 'Plain Iron', 0], ['iron', 'Covenant Iron', 150], ['radiant', 'Radiant Gilt', 150], ['tide', 'Tide Maw', 150], ['mercy', 'Mercy Laurel', 150], ['ember', 'Ember Ring', 250], ['rift', 'Riftglass', 400], ['nexus', 'Nexus Crown', 600]] },
+    t: { label: 'Title', items: [['delver', 'Delver', 0], ['lampbearer', 'Lampbearer', 80], ['ashborn', 'Ashborn', 120], ['nightwatch', 'of the Night Watch', 120], ['riftwalker', 'Rift-Walker', 200], ['warden', 'Warden of the Hold', 200], ['stormcaller', 'Stormcaller', 200], ['oathkeeper', 'Oathkeeper', 250], ['heir', 'Heir of the Lamp', 400]] },
+    c: { label: 'Name color', items: [['none', 'Plain', 0], ['gold', 'War Gold', 100], ['violet', 'Nyx Violet', 100], ['ember', 'Ember', 100], ['frost', 'Frost', 100], ['verdant', 'Verdant', 100], ['rift', 'Riftlight', 300]] },
+    g: { label: 'Banner', items: [['night', 'Night Watch', 0], ['forge', 'Cinder Forge', 150], ['crypt', 'Mosswater', 150], ['glass', 'Glass Wastes', 150], ['storm', 'Stormglass', 200], ['rift', 'The Rift', 350], ['nexus', 'The Nexus', 500]] },
+    e: { label: 'Emblems', items: [['lantern', 'Lantern', 0], ['shield', 'Shield', 0], ['sword', 'Sword', 0], ['skull', 'Skull', 40], ['flame', 'Flame', 40], ['wave', 'Wave', 40], ['sun', 'Sun', 40], ['moon', 'Moon', 40], ['star', 'Star', 40], ['key', 'Key', 40], ['anvil', 'Anvil', 40], ['crown', 'Crown', 60], ['eye', 'Eye', 60], ['rose', 'Rose', 60], ['raven', 'Raven', 80], ['rift', 'Rift', 100]] },
+  };
+  const cosOf = (k, id) => (COSMETICS[k].items.find(x => x[0] === id) || COSMETICS[k].items[0]);
+  const emblem = id => EMB[id] ? '<svg viewBox="0 0 24 24" class="emb"><path d="' + EMB[id] + '"/></svg>' : '';
+  const sigil = '<svg viewBox="0 0 24 24" class="sigil"><path d="M12 2l3 5 6 1-4 4 1 6-6-3-6 3 1-6-4-4 6-1z"/></svg>';
+  let prof = null, warList = null, warAt = 0;
+  async function papi(method, path, body) {
+    const tok = await idToken(); if (!tok) throw Object.assign(new Error('Sign in first.'), { code: 'auth' });
+    const r = await fetch(CL.api.replace(/\/$/, '') + path, { method, headers: { Authorization: tok, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(j.error || ('server ' + r.status)), { code: j.error || r.status });
+    return j;
+  }
+  async function loadProfile() { if (!CL || !signedIn()) return null; try { prof = await papi('GET', '/profile'); } catch (e) {} return prof; }
+  async function loadWar() {
+    if (!CL) return [];
+    if (warList && Date.now() - warAt < 3e5) return warList;
+    try { const r = await fetch(CL.api.replace(/\/$/, '') + '/war'); if (r.ok) { warList = (await r.json()).c || []; warAt = Date.now(); } } catch (e) {}
+    return warList || [];
+  }
+  const commander = n => n && (warList || []).find(c => c.n.toLowerCase() === String(n).toLowerCase());
+  // A Grand War badge: alliance, rank on the war ladder, and honors.
+  function warBadge(n, big) {
+    if (!n) return '';
+    const c = commander(n), sd = c && L.SIDES[c.a];
+    if (!c) return '<span class="warbadge"><b>Grand War</b> ' + esc(n) + '</span>';
+    return '<span class="warbadge' + (big ? ' big' : '') + '" style="--side:' + (sd ? sd.color : '#f5c242') + '" title="' + esc('Grand War commander ' + c.n + (sd ? ', ' + sd.name : '') + ', ' + c.r) + '"><b>' + esc(c.r) + '</b>' + (big ? esc(sd ? sd.name : '') : esc(c.n)) + '</span>' +
+      (big ? c.h.map(h => '<span class="warbadge honor"><b>Honor</b>' + esc(h) + '</span>').join('') : c.h.length ? '<span class="warbadge honor" title="' + esc(c.h.join(', ')) + '"><b>' + c.h.length + '</b>' + (c.h.length === 1 ? 'honor' : 'honors') + '</span>' : '');
+  }
+  // The profile card: banner, framed portrait, colored name, title, emblems, bio and war badges.
+  function looksCard(o) {
+    const pf = o.pf || {}, fr = cosOf('f', pf.f)[0], bn = cosOf('g', pf.g)[0], nc = cosOf('c', pf.c)[0], tt = pf.t ? cosOf('t', pf.t)[1] : '';
+    return '<div class="pfcard bn-' + bn + '"><div class="pfava fr-' + fr + '"><div class="ic c-' + o.cls + ' player">' + icon(CLASS_ICON[o.cls]) + '</div></div>' +
+      '<div class="pfmain"><b class="pfname nc-' + nc + '">' + esc(o.name) + '</b>' + (tt ? '<small class="pftitle">' + esc(tt) + '</small>' : '') +
+      '<div class="pftags">' + classTag(o.cls) + (o.level ? '<span class="pflv">Level ' + o.level + (o.floor ? ' · floor ' + o.floor : '') + '</span>' : '') + '</div>' +
+      ((pf.e || []).length ? '<div class="pfemb">' + pf.e.map(emblem).join('') + '</div>' : '') + '</div></div>' +
+      (pf.b ? '<p class="pfbio">' + esc(pf.b) + '</p>' : '') +
+      (o.w ? '<div class="pfwar">' + warBadge(o.w, true) + '</div>' : '');
+  }
+  function boardProfile(g) {
+    loadWar().then(() => {
+      modal('<div class="pfwrap">' + looksCard(g) + '<div class="row"><button class="btn ghost" id="bp-x">Close</button></div></div>', md => { md.querySelector('#bp-x').onclick = closeModal; });
+    });
+  }
+  // ---- the editor ----
+  let edTab = 'f', draft = null;
+  async function openProfileEditor() {
+    if (!CL) return;
+    if (!signedIn()) { modal('<div class="center"><h2>Your profile</h2><p>Sign in to set up a profile that other players can see. Your looks and Sigils stay with your account, even after a server reset.</p><div class="row"><button class="btn ghost" id="pe-x">Close</button></div></div>', md => md.querySelector('#pe-x').onclick = closeModal); return; }
+    modal('<div class="center"><p class="note">Opening your profile…</p></div>');
+    await Promise.all([loadProfile(), loadWar()]);
+    if (!prof) { modal('<div class="center"><h2>Your profile</h2><p>The profile server could not be reached. Try again in a minute.</p><div class="row"><button class="btn ghost" id="pe-x">Close</button></div></div>', md => md.querySelector('#pe-x').onclick = closeModal); return; }
+    const p = prof.pf || {};
+    draft = { b: p.b || '', t: p.t || '', f: p.f || '', c: p.c || '', g: p.g || '', e: (p.e || []).slice() };
+    paintEditor();
+  }
+  const owns = (k, id, price) => !price || prof.own.includes(k + '.' + id);
+  function paintEditor() {
+    const me = { name: S.hero ? S.hero.name : 'You', cls: S.hero ? S.hero.cls : 'tank', level: L.lvl(S, 'you'), floor: S.maxFloorEver, pf: draft, w: prof.wv ? prof.wl : '' };
+    const tabs = Object.keys(COSMETICS).map(k => '<button class="' + (edTab === k ? 'on' : '') + '" data-et="' + k + '">' + COSMETICS[k].label + '</button>').join('') +
+      '<button class="' + (edTab === 'b' ? 'on' : '') + '" data-et="b">Bio</button><button class="' + (edTab === 'w' ? 'on' : '') + '" data-et="w">Grand War</button>';
+    let body = '';
+    if (COSMETICS[edTab]) {
+      const k = edTab, multi = k === 'e';
+      body = (multi ? '<p class="note">Pick up to 6 emblems for your card. ' + draft.e.length + ' of 6 chosen.</p>' : '') + '<div class="cosgrid">' + COSMETICS[k].items.map(([id, name, price]) => {
+        const have = owns(k, id, price), on = multi ? draft.e.includes(id) : (draft[k] || COSMETICS[k].items[0][0]) === id;
+        const sw = k === 'f' ? '<span class="cs-f fr-' + id + '"><i></i></span>' : k === 'c' ? '<span class="cs-c nc-' + id + '">Aa</span>' : k === 'g' ? '<span class="cs-g bn-' + id + '"></span>' : k === 'e' ? emblem(id) : '<span class="cs-t">' + esc(name) + '</span>';
+        return '<button class="cos' + (on ? ' on' : '') + (have ? '' : ' locked') + '" data-cos="' + id + '">' + sw + (k === 't' ? '' : '<b>' + esc(name) + '</b>') +
+          '<small>' + (have ? (on ? (multi ? 'Shown' : 'Equipped') : 'Owned') : sigil + price) + '</small></button>';
+      }).join('') + '</div>';
+    } else if (edTab === 'b') {
+      body = '<label class="note" for="pe-bio">A line or two about your hero. Other players see it on your card. No links.</label><textarea id="pe-bio" maxlength="140" rows="3" placeholder="Sworn to the lantern since the first floor.">' + esc(draft.b) + '</textarea><small class="note" id="pe-bc">' + draft.b.length + ' / 140</small>';
+    } else {
+      const c = commander(prof.wl);
+      body = '<p class="note">Play in the Grand War? Link your commander and your war rank and honors appear on your card and in the Players Guild. The Born 2 Game team checks each link before it shows, so nobody can borrow your name.</p>' +
+        (prof.wl ? '<div class="wlink"><div>' + (c ? warBadge(prof.wl, true) : '<b>' + esc(prof.wl) + '</b>') + '</div><small>' + (prof.wv ? 'Verified. Your badges are showing.' : 'Waiting for the team to confirm it is you. Mention it in the Grand War Discord to speed it up.') + '</small><button class="btn small ghost" id="pe-unlink">Remove link</button></div>' :
+          '<div class="wform"><input id="pe-cmd" list="pe-cmds" placeholder="Your commander name in the Grand War" autocomplete="off"><datalist id="pe-cmds">' + (warList || []).map(c => '<option value="' + esc(c.n) + '">').join('') + '</datalist><button class="btn small" id="pe-link">Request link</button></div>' +
+          '<p class="note">Commanders on the Grand War ladder right now: ' + (warList || []).length + '. Not listed yet? Play a game in the war first.</p>');
+    }
+    modal('<div class="maphead"><div><h2>Your profile</h2><small>Looks only. Nothing here changes your party’s power.</small></div><button class="iconbtn" id="pe-x" aria-label="Close">&times;</button></div>' +
+      '<div class="pfwrap">' + looksCard(me) + '</div>' +
+      '<div class="pfbal"><span>' + sigil + '<b>' + prof.bal + '</b> ' + TOKEN + '</span><button class="btn small ghost" id="pe-get">Get Sigils</button></div>' +
+      '<div class="seg pfseg">' + tabs + '</div><div class="pfbody">' + body + '</div>' +
+      '<div class="row"><button class="btn ghost" id="pe-cancel">Cancel</button><button class="btn" id="pe-save">Save profile</button></div>', md => {
+        md.querySelector('#pe-x').onclick = closeModal; md.querySelector('#pe-cancel').onclick = closeModal;
+        md.querySelector('#pe-get').onclick = getSigils;
+        md.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { if (edTab === 'b') draft.b = (md.querySelector('#pe-bio') || {}).value || draft.b; edTab = b.dataset.et; paintEditor(); });
+        const bio = md.querySelector('#pe-bio'); if (bio) bio.oninput = () => { draft.b = bio.value; md.querySelector('#pe-bc').textContent = bio.value.length + ' / 140'; };
+        md.querySelectorAll('[data-cos]').forEach(b => b.onclick = () => pickCos(edTab, b.dataset.cos));
+        const lk = md.querySelector('#pe-link'); if (lk) lk.onclick = () => linkCommander(md.querySelector('#pe-cmd').value);
+        const ul = md.querySelector('#pe-unlink'); if (ul) ul.onclick = () => linkCommander('');
+        md.querySelector('#pe-save').onclick = saveLooks;
+      });
+  }
+  function pickCos(k, id) {
+    const it = cosOf(k, id);
+    if (!owns(k, id, it[2])) return buyCos(k, it);
+    if (k === 'e') { const i = draft.e.indexOf(id); if (i >= 0) draft.e.splice(i, 1); else if (draft.e.length < 6) draft.e.push(id); else toast('star', 'Six emblems at most', 'Tap a shown emblem to take it off first.', 'warn'); }
+    else draft[k] = id;
+    paintEditor();
+  }
+  function buyCos(k, it) {
+    const [id, name, price] = it, can = prof.bal >= price;
+    modal('<div class="center"><div class="cosbuy">' + (k === 'e' ? emblem(id) : k === 'f' ? '<span class="cs-f fr-' + id + '"><i></i></span>' : k === 'g' ? '<span class="cs-g bn-' + id + '"></span>' : k === 'c' ? '<span class="cs-c nc-' + id + '">Aa</span>' : '') + '</div><h2>' + esc(name) + '</h2><p>' + COSMETICS[k].label + ' for your profile card. ' + sigil + '<b>' + price + '</b> ' + TOKEN + '. You have ' + prof.bal + '.</p>' +
+      '<div class="row"><button class="btn ghost" id="cb-no">Back</button>' + (can ? '<button class="btn" id="cb-yes">Buy for ' + price + '</button>' : '<button class="btn" id="cb-get">Get Sigils</button>') + '</div></div>', md => {
+        md.querySelector('#cb-no').onclick = paintEditor;
+        const g = md.querySelector('#cb-get'); if (g) g.onclick = getSigils;
+        const y = md.querySelector('#cb-yes'); if (y) y.onclick = async () => {
+          y.disabled = true;
+          try { const r = await papi('POST', '/shop', { id: k + '.' + id }); Object.assign(prof, r); sfx.buy(); if (k === 'e') { if (draft.e.length < 6) draft.e.push(id); } else draft[k] = id; toast('star', name + ' is yours', 'Press Save profile to show it.', 'feat'); }
+          catch (e) { toast('lock', 'That did not go through', e.code === 'funds' ? 'Not enough ' + TOKEN + '.' : e.code === 'owned' ? 'You already own it.' : 'Try again in a moment.', 'warn'); }
+          paintEditor();
+        };
+      });
+  }
+  function getSigils() {
+    modal('<div class="center"><div class="cosbuy">' + sigil + '</div><h2>' + TOKEN + '</h2><p>' + TOKEN + ' buy looks for your profile: frames, titles, name colors, banners and emblems. They never buy power.</p><p>Every account starts with 100. Sigil packs are coming to the shop soon, and the Born 2 Game team also hands them out at Grand War events.</p><div class="row"><button class="btn" id="gs-ok">Back to my profile</button></div></div>', md => { md.querySelector('#gs-ok').onclick = paintEditor; });
+  }
+  async function linkCommander(n) {
+    n = String(n || '').trim();
+    if (n && !commander(n)) { toast('lock', 'Commander not found', 'Pick your name from the Grand War list. It must match the war ladder exactly.', 'warn'); return; }
+    try { await papi('POST', '/warlink', { name: n }); prof.wl = n; prof.wv = false; toast('star', n ? 'Link requested' : 'Link removed', n ? 'Your badges appear once the team confirms it is you.' : 'Your card no longer shows Grand War badges.', 'feat'); }
+    catch (e) { toast('lock', 'That did not work', e.code === 'state' ? 'Play a little first so your hero is registered, then try again.' : 'Try again in a moment.', 'warn'); }
+    paintEditor();
+  }
+  async function saveLooks() {
+    const bio = $('pe-bio'); if (bio) draft.b = bio.value;
+    try { const r = await papi('PUT', '/profile', draft); prof.pf = r.pf; closeModal(); sfx.buy(); toast('star', 'Profile saved', 'Other players see your new look in the Players Guild.', 'feat'); }
+    catch (e) { toast('lock', 'Could not save', e.code === 'bio' ? 'Keep the bio friendly, without links, under 140 characters.' : e.code === 'state' ? 'Play a little first so your hero is registered, then try again.' : 'Try again in a moment.', 'warn'); }
+  }
   // ---------- server resets and the admin tab ----------
   // A server wipe bumps a public "epoch". Saves started before it reset to a new game.
   const EPOCH_KEY = 'lanternhold.epoch';
@@ -1711,11 +1869,12 @@
     if (!r.ok) throw new Error(r.status === 403 ? 'This account is not an admin.' : j.error === 'self' ? 'You cannot ban yourself.' : j.error === 'player' ? 'That player has not played since bans were added, so their account cannot be found yet.' : 'The server said no (' + r.status + ').');
     return j;
   }
-  let adminList = null, adminQ = '', adminBusy = false;
+  let adminList = null, adminQ = '', adminBusy = false, adminLinks = [];
   function paintAdminTab() { const t = $('tabadmin'); if (t) t.hidden = !isAdmin(); }
   async function loadAdmin() {
     $('adminbox').innerHTML = '<p class="note">Loading players…</p>';
     try { adminList = await adminApi('GET', '/admin/players'); } catch (e) { $('adminbox').innerHTML = '<p class="note">' + esc(e.message) + '</p>'; return; }
+    try { adminLinks = (await adminApi('GET', '/admin/links')).links || []; await loadWar(); } catch (e) { adminLinks = []; }
     paintAdmin();
   }
   function paintAdmin() {
@@ -1727,13 +1886,36 @@
       '<div class="adm-stats"><div><small>Players</small><b>' + adminList.players.length + '</b></div><div><small>Online now</small><b>' + on + '</b></div><div><small>Banned</small><b>' + banned + '</b></div><div><small>Last wipe</small><b>' + (adminList.epoch ? new Date(adminList.epoch).toLocaleDateString() : 'never') + '</b></div></div>' +
       '<div class="adm-bar"><input id="adm-q" type="search" placeholder="Find a player by name" value="' + esc(adminQ) + '"><button class="btn small ghost" id="adm-re">Refresh</button></div>' +
       '<div class="adm-list">' + (list.length ? list.map(p => '<div class="adm-row' + (p.banned ? ' banned' : '') + '"><span class="adm-n"><b>' + esc(p.name || 'Unnamed') + '</b>' + (p.cls ? ' ' + classTag(p.cls) : '') + '<small>' + (p.banned ? 'Banned' : (p.on ? '<span class="online">Online now</span> &middot; ' : 'Seen ' + ago(p.seen) + ' &middot; ') + 'level ' + p.level + ', floor ' + p.floor) + '</small></span>' +
-        (p.banned ? '<button class="btn small ghost" data-unban="' + p.id + '">Unban</button>' : '<button class="btn small danger" data-ban="' + p.id + '"' + (p.canBan ? '' : ' disabled title="They need to play once more before they can be banned"') + '>Ban</button>') + '</div>').join('') : '<p class="note">No players match.</p>') + '</div>' +
-      '<div class="adm-danger"><h3 class="sub">Wipe the server</h3><p class="note">Deletes every cloud save, every hero on the guild board and every market listing and letter. Everyone, signed in or not, starts over from a new game the next time they open Lanternhold. Bans stay in place. This cannot be undone.</p><button class="btn danger" id="adm-wipe">Wipe the server…</button></div>';
+        (p.canBan ? '<button class="btn small ghost" data-grant="' + p.id + '">Sigils</button>' : '') + (p.banned ? '<button class="btn small ghost" data-unban="' + p.id + '">Unban</button>' : '<button class="btn small danger" data-ban="' + p.id + '"' + (p.canBan ? '' : ' disabled title="They need to play once more before they can be banned"') + '>Ban</button>') + '</div>').join('') : '<p class="note">No players match.</p>') + '</div>' +
+      '<h3 class="sub">Grand War links</h3>' + (adminLinks.length ? '<p class="note">Players asking to show their Grand War commander badges. Approve only when you know the player is that commander, for example from Discord.</p><div class="adm-list">' + adminLinks.sort((a, c) => a.wv - c.wv).map(l => '<div class="adm-row"><span class="adm-n"><b>' + esc(l.name || 'Unnamed') + '</b> wants to be <b>' + esc(l.wl) + '</b><small>' + (commander(l.wl) ? warBadge(l.wl) : 'Not on the war ladder right now') + (l.wv ? ' &middot; <span class="online">Verified</span>' : ' &middot; Waiting') + '</small></span>' + (l.wv ? '' : '<button class="btn small" data-lok="' + l.id + '">Approve</button>') + '<button class="btn small ghost" data-lno="' + l.id + '">' + (l.wv ? 'Remove' : 'Reject') + '</button></div>').join('') + '</div>' : '<p class="note">No players have asked to link a Grand War commander yet.</p>') +
+      '<div class="adm-danger"><h3 class="sub">Wipe the server</h3><p class="note">Deletes every cloud save, every hero on the guild board and every market listing and letter. Everyone, signed in or not, starts over from a new game the next time they open Lanternhold. Bans, Sigils, bought looks and Grand War links stay in place. This cannot be undone.</p><button class="btn danger" id="adm-wipe">Wipe the server…</button></div>';
   }
   $('tab-admin').addEventListener('input', e => { if (e.target.id === 'adm-q') { adminQ = e.target.value; const pos = e.target.selectionStart; paintAdmin(); const q = $('adm-q'); q.focus(); q.setSelectionRange(pos, pos); } });
   $('tab-admin').addEventListener('click', async e => {
     if (adminBusy) return;
     if (e.target.closest('#adm-re')) { loadAdmin(); return; }
+    const lok = e.target.closest('[data-lok]'), lno = e.target.closest('[data-lno]');
+    if (lok || lno) {
+      adminBusy = true;
+      try { await adminApi('POST', '/admin/verify', { id: (lok || lno).dataset[lok ? 'lok' : 'lno'], ok: !!lok }); toast('star', lok ? 'Link approved' : 'Link removed', lok ? 'Their Grand War badges now show on their card.' : 'Their card no longer shows Grand War badges.', 'feat'); }
+      catch (x) { toast('lock', 'That did not work', x.message, 'warn'); }
+      adminBusy = false; loadAdmin(); return;
+    }
+    const gr = e.target.closest('[data-grant]');
+    if (gr) {
+      const p = adminList.players.find(x => x.id === gr.dataset.grant); if (!p) return;
+      modal('<div class="center"><h2>Give ' + esc(p.name) + ' Sigils</h2><p>Sigils buy looks only. Use a minus number to take some back.</p><input id="a-n" class="adm-conf" type="number" value="100" step="10"><div class="row"><button class="btn ghost" id="a-no">Cancel</button><button class="btn" id="a-yes">Give Sigils</button></div></div>', md => {
+        md.querySelector('#a-no').onclick = closeModal;
+        md.querySelector('#a-yes').onclick = async () => {
+          const n = Math.trunc(Number(md.querySelector('#a-n').value) || 0); if (!n) return;
+          adminBusy = true;
+          try { const r = await adminApi('POST', '/admin/grant', { id: p.id, n }); closeModal(); toast('star', 'Sigils sent', p.name + ' now has ' + r.bal + ' Sigils.', 'feat'); }
+          catch (x) { closeModal(); toast('lock', 'That did not work', x.message, 'warn'); }
+          adminBusy = false;
+        };
+      });
+      return;
+    }
     const bn = e.target.closest('[data-ban]'), ub = e.target.closest('[data-unban]');
     if (bn || ub) {
       const p = adminList.players.find(x => x.id === (bn || ub).dataset[bn ? 'ban' : 'unban']); if (!p) return;
@@ -2318,7 +2500,8 @@
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten, where you are and where other delvers have reached. Tap a region to zoom in on its ten floors and read its dossier (its history, who holds it, its monsters and its guardian), then tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
-    ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
+    ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p>'],
+    ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
     ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
     ['Trading Post: market and mail', '<p>Open the <b>Trading Post</b> (the bag button at the top) to trade gear with other players. It needs a free account.</p><p><b>Market</b>: browse gear by class and buy it for gold. To sell, tap an item in your Gear tab and choose <b>Sell on market</b>. Listings last a week, and you can take yours down any time. When something sells, the gold arrives in your mailbox.</p><p><b>Mail</b>: tap an item and choose <b>Send to a player</b> to send it to someone you have recruited or chatted with. Leave the price at 0 for a gift, or set a price they pay if they accept. They can decline, and you can take an offer back until they answer.</p><p>Gold and gear are in-game only and have no real-money value.</p>'],
@@ -2339,6 +2522,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 21, date: 'November 22, 2026', title: 'Profiles, Sigils and Grand War badges', items: [
+      'Your hero now has a profile card that other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. Open it from your hero’s portrait and press Customize profile.',
+      'Sigils buy looks for your card. Every account starts with 100. Looks never change your party’s power, and they stay with your account even through a server reset.',
+      'Grand War commanders can link their commander name. Once the team confirms it, your war rank, alliance and honors show on your card and next to your name in the guild.',
+      'Returning to camp now costs gold once you are past floor 10. The deeper you are, the more the climb costs, so a Campfire Draught is often the cheaper choice for a quick change.'] },
     { v: 20, date: 'November 22, 2026', title: 'One look, one war', items: [
       'The whole game now wears the Grand War colors: deep night-blue panels, war-gold highlights and the same lettering as the Grand War site, so the war pages and the rest of the game finally match.',
       'Tidier header on phones: everything fits on one line.'] },

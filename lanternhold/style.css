@@ -1192,3 +1192,9 @@ button.stat.quests{background:var(--panel);border:1px solid var(--line);border-r
 button.stat.quests:hover{border-color:var(--line2)}
 button.stat.quests.ready{color:#fff;background:rgba(232,121,249,.18);border-color:var(--violet)}
 button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);border-color:rgba(143,207,106,.45)}
+/* party invites */
+.invites{border:1px solid var(--gold,#f5c242);border-radius:10px;padding:10px 12px;margin:0 0 12px;background:rgba(245,194,66,.06)}
+.invites h4{margin:0 0 8px;font-family:'Chakra Petch',sans-serif;color:#f5c242;font-size:14px;letter-spacing:.04em;text-transform:uppercase}
+.invites .seat{gap:8px}
+.invwait{font-size:12px;font-weight:700;color:#f5c242;margin-right:6px;white-space:nowrap}
+.invact{display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:auto}

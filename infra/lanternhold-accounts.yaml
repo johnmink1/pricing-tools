@@ -1041,6 +1041,77 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
 
+  InviteFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: invite-heroes
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:BatchGetItem, dynamodb:UpdateItem]
+                Resource: !GetAtt HeroesTable.Arn
+
+  InviteFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-invite
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 10
+      Role: !GetAtt InviteFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE: !Ref HeroesTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/invite.js by infra/build.py
+          const u=require("@aws-sdk/client-dynamodb"),q=require("crypto"),D=new u.DynamoDBClient({}),p=process.env.TABLE,i=(e,a)=>({statusCode:e,headers:{"content-type":"application/json"},body:JSON.stringify(a)}),g=e=>q.createHash("sha256").update("lh:"+e).digest("hex").slice(0,16),f=e=>({SS:e}),b=e=>({pid:{S:e}}),c=(e,a,n,t)=>D.send(new u.UpdateItemCommand(Object.assign({TableName:p,Key:b(e),UpdateExpression:a,ExpressionAttributeValues:n},t?{ConditionExpression:t}:{}))),w=e=>e&&e.SS||[];async function N(e){if(!e.length)return{};const a=await D.send(new u.BatchGetItemCommand({RequestItems:{[p]:{Keys:e.slice(0,50).map(b),ProjectionExpression:"pid, #n, cls, lv, sd, pf, wl, wv, seen",ExpressionAttributeNames:{"#n":"name"}}}})),n={};for(const t of a.Responses[p]||[])t.name&&(n[t.pid.S]={id:t.pid.S,name:t.name.S,cls:t.cls.S,level:+t.lv.N,side:t.sd?t.sd.S:"unsworn",on:Date.now()-+(t.seen||{N:0}).N<18e4,pf:t.pf?JSON.parse(t.pf.S):null,w:t.wv&&t.wv.N==="1"?t.wl.S:""});return n}exports.handler=async e=>{const a=e.requestContext.authorizer&&e.requestContext.authorizer.jwt&&e.requestContext.authorizer.jwt.claims;if(!a||!a.sub)return i(401,{error:1});const n=g(a.sub);if(e.routeKey==="GET /invites"){const s=(await D.send(new u.GetItemCommand({TableName:p,Key:b(n),ProjectionExpression:"req, sent, acc, dec"}))).Item||{},x=w(s.req),l=w(s.acc),m=w(s.dec),S=await N([...new Set([...x,...l,...m])]);if(l.length||m.length){const r=[],y={};l.length&&(r.push("acc :a"),y[":a"]=f(l)),m.length&&(r.push("dec :d"),y[":d"]=f(m)),await c(n,"DELETE "+r.join(", "),y)}return i(200,{asks:x.map(r=>S[r]).filter(Boolean),acc:l.map(r=>S[r]).filter(Boolean),dec:m.map(r=>S[r]||{id:r,name:"A player"}),sent:w(s.sent)})}if(e.routeKey!=="POST /invite")return i(404,{error:1});let t={};try{t=JSON.parse(e.isBase64Encoded?Buffer.from(e.body||"","base64").toString():e.body||"{}")}catch{return i(400,{error:1})}const o=String(t.id||""),d=t.act,h=f([n]),E=f([o]);if(!/^[0-9a-f]{16}$/.test(o)||o===n)return i(400,{error:"hero"});try{if(d==="ask")await c(o,"ADD req :m",{":m":h},"attribute_exists(cls) AND attribute_not_exists(ban)"),await c(n,"ADD sent :i",{":i":E});else if(d==="cancel")await c(o,"DELETE req :m",{":m":h}),await c(n,"DELETE sent :i",{":i":E});else if(d==="yes"||d==="no"){const s=d==="yes";await c(n,"DELETE req :i"+(s?" ADD recruits :one, pin :i":""),Object.assign({":i":E,":s":{S:o}},s?{":one":{N:"1"}}:{}),"contains(req, :s)"),await c(o,"DELETE sent :m ADD "+(s?"inv :m, acc :m":"dec :m"),{":m":h})}else return i(400,{error:"act"})}catch(s){if(s.name==="ConditionalCheckFailedException")return i(404,{error:"gone"});throw s}return i(200,{ok:!0})};
+
+  InviteIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt InviteFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  InviteInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref InviteFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  InviteListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /invites
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${InviteIntegration}'
+
+  InviteSendRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /invite
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${InviteIntegration}'
+
   PerksFunctionRole:
     Type: AWS::IAM::Role
     Properties:

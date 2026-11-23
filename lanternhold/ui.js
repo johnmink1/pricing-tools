@@ -762,7 +762,7 @@
     if (t.dataset.autot && !L.passOn(S)) { openPass(); return; }
     if (t.dataset.autot) { const id = t.dataset.autot; S.autoTrain = S.autoTrain || {}; S.autoTrain[id] = !S.autoTrain[id]; if (!S.autoTrain[id]) delete S.autoTrain[id]; sfx.buy(); updateSeats(true); if (S.autoTrain[id]) toast('refresh', 'Auto-train on', L.memberById(id).name + ' will train whenever you have the gold' + (S.party.includes(id) ? '.' : ' and you are at camp.'), ''); return; }
     if (t.id === 'f-auto') { L.autoFormation(S); S.formationManual = false; sfx.buy(); updateSeats(true); updateAbilities(true); toast('shield', 'Party arranged', 'Tank in front, rogue behind it, healers in the middle where they reach everyone, casters at the back.', ''); return; }
-    if ((t.dataset.train && !S.party.includes(t.dataset.train)) || t.dataset.unseat || t.dataset.seat || t.dataset.dismiss || t.dataset.recruit || t.dataset.job || t.dataset.jobfor) { if (!campGate()) return; }
+    if ((t.dataset.train && !S.party.includes(t.dataset.train)) || t.dataset.unseat || t.dataset.seat || t.dataset.dismiss || t.dataset.job || t.dataset.jobfor) { if (!campGate()) return; }
     if (t.dataset.job) { jobModal(t.dataset.job); return; }
     if (t.dataset.jobfor) { jobForModal(t.dataset.jobfor); return; }
     if (t.dataset.train) { if (L.train(S, t.dataset.train, buyN())) { sfx.buy(); updateSeats(true); } }
@@ -774,6 +774,9 @@
     else if (t.dataset.seat) pickSeat(t.dataset.seat);
     else if (t.dataset.dismiss) { const id = t.dataset.dismiss, i = S.party.indexOf(id), m = L.memberById(id); L.dismissGuest(S, id); if (m && i >= 0) sendOff(i, id, m.name + ' headed home', 'A player’s hero you recruited has left your party.'); updateSeats(true); updateAbilities(true); paintBoard(); }
     else if (t.dataset.recruit) recruitPlayer(t.dataset.recruit);
+    else if (t.dataset.uninv) cancelInvite(t.dataset.uninv);
+    else if (t.dataset.invyes) answerInvite(t.dataset.invyes, 'yes');
+    else if (t.dataset.invno) answerInvite(t.dataset.invno, 'no');
     else if (t.id === 'b-find') findHeroes();
     else if (t.id === 'b-signin') openAccount();
     else if (t.id === 'f-recruit') { trade.view = 'guild'; switchTab('market'); }
@@ -836,14 +839,15 @@
     if (!CL) {
       h += '<p>The Players Guild is not available right now. Try again later.</p>';
     } else if (!signedIn()) {
-      h += '<ol class="steps"><li><b>Sign in</b> with a free account.</li><li>Press <b>Browse the guild</b> to see players’ heroes.</li><li>Press <b>Recruit</b> to put one in an empty seat.</li></ol>' +
+      h += '<ol class="steps"><li><b>Sign in</b> with a free account.</li><li>Press <b>Browse the guild</b> to see players’ heroes.</li><li>Press <b>Invite</b>. When the player accepts, their hero joins your party.</li></ol>' +
         '<button class="btn small" id="b-signin">Sign in to recruit</button>';
     } else {
-      h += (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note">Your party is full. When you recruit, you choose who steps out.</p>') +
+      h += invCard();
+      h += (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note">Your party is full. When a player accepts your invite, you choose who steps out.</p>') +
         '<button class="btn small" id="b-find">' + (boardList ? 'Show other heroes' : 'Browse the guild') + '</button>';
       if (boardMsg) h += '<p class="note">' + esc(boardMsg) + '</p>';
       if (boardList) h += '<div class="board">' + boardList.map(g => { const pf = g.pf || {}; return '<div class="seat bench gboard"><div class="pfava sm fr-' + cosOf('f', pf.f)[0] + '"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div></div><div class="info"><div class="nm"><button class="linkname nc-' + cosOf('c', pf.c)[0] + '" data-gprof="' + g.id + '">' + esc(g.name) + '</button> ' + classTag(g.cls) + (pf.t ? ' <small class="pftitle">' + esc(cosOf('t', pf.t)[1]) + '</small>' : '') + (g.w ? ' ' + warBadge(g.w) : '') + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
-        ((S.guests || []).some(x => x.id === 'p_' + g.id) ? '<span class="muted">In party</span>' : '<button class="btn small" data-recruit="' + g.id + '">Recruit</button>') + '</div>'; }).join('') + '</div>';
+        ((S.guests || []).some(x => x.id === 'p_' + g.id) ? '<span class="muted">In party</span>' : inv.sent[g.id] ? '<span class="invact"><span class="invwait">Invited</span><button class="btn ghost small" data-uninv="' + g.id + '">Cancel</button></span>' : '<button class="btn small" data-recruit="' + g.id + '">Invite</button>') + '</div>'; }).join('') + '</div>';
       if ((S.guests || []).length) h += '<p class="note">To let a player’s hero go, press Dismiss on their seat.</p>';
     }
     w.innerHTML = h + '</div>';
@@ -854,26 +858,78 @@
     catch (e) { boardMsg = 'Could not reach the Players Guild. Try again in a moment.'; }
     paintBoard();
   }
+  // ---------- party invites: a player's hero joins only after its owner accepts ----------
+  const inv = { asks: [], sent: {}, seen: {}, busy: 0 };
+  function invCard() {
+    const a = inv.asks, q = S.joinQ || [];
+    let h = '';
+    if (a.length) h += '<div class="invites"><h4>Party invitations</h4>' + a.map(g => '<div class="seat bench gboard"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div><div class="info"><div class="nm">' + esc(g.name) + ' ' + classTag(g.cls) + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; wants your hero in their party</div></div><span class="invact"><button class="btn small" data-invyes="' + g.id + '">Accept</button><button class="btn ghost small" data-invno="' + g.id + '">Decline</button></span></div>').join('') +
+      '<p class="note">Accepting lends a copy of your hero to their party, and you earn gold for it. Your own game and party do not change.</p></div>';
+    if (q.length) h += '<p class="note">' + q.map(g => '<b>' + esc(g.name) + '</b>').join(', ') + (q.length === 1 ? ' accepted your invite and joins' : ' accepted your invites and join') + ' when you are at camp.</p>';
+    return h;
+  }
   async function recruitPlayer(gid) {
-    const g = (boardList || []).find(x => x.id === gid); if (!g) return;
-    const join = async () => {
+    const g = (boardList || []).find(x => x.id === gid); if (!g || inv.sent[gid]) return;
+    inv.sent[gid] = g; paintBoard();
+    try { await api('POST', { id: gid, act: 'ask' }, '/invite'); }
+    catch (e) { delete inv.sent[gid]; paintBoard(); toast('lock', 'Invite not sent', 'That hero could not be reached. Try another.', 'warn'); return; }
+    S.sentInv = S.sentInv || {}; S.sentInv[gid] = { name: g.name, cls: g.cls, at: Date.now() };
+    sfx.buy(); toast('users', 'Invite sent to ' + g.name, g.on ? 'They are online now. Their hero joins your party once they accept.' : 'They will see it next time they play. Their hero joins your party once they accept.', '');
+  }
+  async function cancelInvite(gid) {
+    delete inv.sent[gid]; if (S.sentInv) delete S.sentInv[gid]; paintBoard();
+    try { await api('POST', { id: gid, act: 'cancel' }, '/invite'); } catch (e) {}
+  }
+  async function answerInvite(gid, act) {
+    const g = inv.asks.find(x => x.id === gid); inv.asks = inv.asks.filter(x => x.id !== gid); paintBoard();
+    try { await api('POST', { id: gid, act }, '/invite'); } catch (e) { toast('lock', 'That invite has expired', 'The player may have cancelled it.', 'warn'); return; }
+    if (act === 'yes' && g) { sfx.buy(); toast('users', 'You joined ' + g.name + '’s party', 'A copy of ' + S.hero.name + ' now fights alongside them. You earn gold for it, and you can chat in Party chat.', 'feat'); try { pushCloud(true); } catch (e) {} }
+  }
+  // Seat a player's hero, asking who steps out when the party is full.
+  function seatGuest(g) {
+    const join = () => {
       L.addGuest(S, { id: 'p_' + g.id, name: g.name, cls: g.cls, side: g.side, level: g.level });
       const gg = (S.guests || []).find(x => x.id === 'p_' + g.id); if (gg) { gg.pf = g.pf || null; gg.w = g.w || ''; }
-      try { await api('POST', { heroId: g.id }, '/recruit'); } catch (e) {}
-      sfx.buy(); toast('users', g.name + ' joins your party', 'A ' + L.CLASSES[g.cls].name + ' at level ' + g.level + '.', 'feat');
+      sfx.buy(); toast('users', g.name + ' joins your party', 'They accepted your invite. A ' + L.CLASSES[g.cls].name + ' at level ' + g.level + '.', 'feat');
       updateSeats(true); updateAbilities(true); paintBoard();
     };
     if (S.party.includes(null)) return join();
-    modal('<h2>Make room for ' + esc(g.name) + '</h2><p>Your party is full. Who should step out? Story companions go back to the campfire, and players’ heroes are dismissed.</p><div class="choice">' +
+    modal('<h2>Make room for ' + esc(g.name) + '</h2><p>' + esc(g.name) + ' accepted your invite, and your party is full. Who should step out? Story companions go back to the campfire, and players’ heroes are dismissed.</p><div class="choice">' +
       S.party.map((x, i) => x === 'you' || !x ? '' : '<button class="pick" data-out="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', level ' + L.lvl(S, x) + (L.isGuest(S, x) ? ' &middot; player' : '') + '</small></button>').join('') +
-      '</div><div class="row"><button class="btn ghost" id="m-cancel">Cancel</button></div>', md => {
+      '</div><div class="row"><button class="btn ghost" id="m-cancel">Not now</button></div>', md => {
         md.querySelectorAll('[data-out]').forEach(b => b.onclick = () => {
           const i = +b.dataset.out, x = S.party[i];
           if (L.isGuest(S, x)) L.dismissGuest(S, x); else L.unseat(S, i);
           closeModal(); join();
         });
-        md.querySelector('#m-cancel').onclick = closeModal;
+        md.querySelector('#m-cancel').onclick = () => { closeModal(); toast('users', g.name + ' is waiting', 'Their hero stays ready. Make room at camp when you want them.', ''); };
       });
+    return false;
+  }
+  // Accepted heroes wait in S.joinQ until the party is at camp.
+  function drainJoins() {
+    if (!(S.joinQ || []).length || !camp() || !$('modal').hidden) return;
+    const g = S.joinQ.shift();
+    if (!(S.guests || []).some(x => x.id === 'p_' + g.id)) seatGuest(g);
+    paintBoard();
+  }
+  async function pollInvites() {
+    if (!CL || !signedIn() || S.mode !== 'multi' || inv.busy) return;
+    inv.busy = 1;
+    try {
+      const r = await api('GET', null, '/invites');
+      inv.asks = r.asks || [];
+      for (const g of inv.asks) if (!inv.seen[g.id]) { inv.seen[g.id] = 1; toast('users', g.name + ' invited you', 'They want ' + S.hero.name + ' in their party. Answer in the Players Guild on the Party tab.', 'feat'); }
+      S.sentInv = S.sentInv || {};
+      for (const id of Object.keys(S.sentInv)) if (!(r.sent || []).includes(id)) delete S.sentInv[id];
+      for (const id of r.sent || []) if (!inv.sent[id]) inv.sent[id] = S.sentInv[id] || { id };
+      for (const id of Object.keys(inv.sent)) if (!(r.sent || []).includes(id)) delete inv.sent[id];
+      for (const g of r.acc || []) { S.joinQ = (S.joinQ || []).filter(x => x.id !== g.id); S.joinQ.push(g); if (!camp()) toast('users', g.name + ' accepted your invite', 'Their hero joins your party when you are back at camp.', 'feat'); }
+      for (const g of r.dec || []) toast('user', g.name + ' declined your invite', 'Try another hero in the Players Guild.', '');
+      paintBoard();
+    } catch (e) {}
+    inv.busy = 0;
+    drainJoins();
   }
 
   // ---------- abilities bar ----------
@@ -1739,6 +1795,7 @@
     $('btn-account').addEventListener('click', openAccount);
     if (signedIn()) setTimeout(reconcile, 800);
     setInterval(() => { if (signedIn() && Date.now() - lastCloud > 60000) pushCloud(true); }, 15000);
+    setTimeout(pollInvites, 3000); setInterval(() => { if (!document.hidden) pollInvites(); }, 30000); setInterval(drainJoins, 2000);
     document.addEventListener('visibilitychange', () => { if (document.hidden && signedIn()) pushCloud(true); });
   }
 
@@ -2836,7 +2893,7 @@
     ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in. Want more Sigils? Press <b>Get Sigils</b>, sign in once with your Born 2 Game store account, and buy a pack. It lands in your wallet within a minute.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset. You can also trade Sigils with other players for gold on the <b>Sigils</b> page of the Trading Post.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
     ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
-    ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
+    ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Invite</b>. The player sees your invite and chooses to accept or decline. Once they accept, their hero joins your party the next time you are at camp. Heroes marked <b>Online now</b> belong to players who are playing right now, so they can answer quickly. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too. When someone invites it, the invite shows at the top of the Players Guild with <b>Accept</b> and <b>Decline</b>. Accepting lends a copy of your hero to their party, earns you gold, and does not change your own game.</p>'],
     ['Trading Post: market and mail', '<p>Open the <b>Trading Post</b> (the bag button at the top) to trade gear with other players. It needs a free account.</p><p><b>Market</b>: browse gear by class and buy it for gold. To sell, tap an item in your Gear tab and choose <b>Sell on market</b>. Listings last a week, and you can take yours down any time. When something sells, the gold arrives in your mailbox.</p><p><b>Mail</b>: tap an item and choose <b>Send to a player</b> to send it to someone you have recruited or chatted with. Leave the price at 0 for a gift, or set a price they pay if they accept. They can decline, and you can take an offer back until they answer.</p><p>Gold and gear are in-game only and have no real-money value.</p>'],
     ['Multiplayer and chat', '<p>With a free account your progress is saved online and works on any device.</p><p>Once you sign in, your hero appears on a board where other players can recruit it, and you earn gold each time. You can recruit their heroes too. Player heroes are stronger than story companions.</p><p>Have a Born 2 Game store account? Press <b>Continue with Born 2 Game</b> on the sign-in screen and you are in, no new password needed.</p><p><b>Chat</b> (the speech bubble) has Global, Trade, Party and <b>Banner</b> channels. Banner chat only reaches players who fly the same banner as your hero. Ctrl+click an item to link it. Tap a name to mute or report. No web links, and be kind.</p>'],
     ['Controls', '<ul><li><b>Tap the arena, Space or Enter</b>: strike</li><li><b>1 to 5</b>: use an ability</li><li><b>Ctrl+click an item</b>: link it in chat</li><li><b>Arrows on the floor header</b>: move between floors you have reached</li></ul>'],
@@ -2855,6 +2912,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 31, date: 'November 23, 2026', title: 'Party invites', items: [
+      'Recruiting a player now sends them an invite. Their hero joins your party only after they accept.',
+      'Invites you receive show at the top of the Players Guild on the Party tab, with Accept and Decline. You also get a notice when one arrives.',
+      'An accepted hero joins at camp. If your party is full, you choose who steps out.'] },
     { v: 30, date: 'November 23, 2026', title: 'A new look', items: [
       'Every hero, companion and monster has been redrawn as detailed illustrated art, with armor, cloth, lighting and glowing eyes.',
       'The dungeon, the doorway and the camp under the stars are redrawn too, with torchlight, flagstones and a crackling campfire.',

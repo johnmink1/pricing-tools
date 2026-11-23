@@ -1,0 +1,28 @@
+# Publishes Lanternhold within a minute of a merge, instead of waiting for
+# the mirror repo's 10-minute schedule (GitHub often runs crons late).
+# Needs repo secret LANTERNHOLD_DEPLOY_TOKEN: a fine-grained token with
+# "Actions: read and write" on johnmink1/lanternhold only.
+name: Publish Lanternhold
+on:
+  push:
+    branches: [main]
+    paths: ['lanternhold/**']
+  workflow_dispatch:
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the lanternhold deploy
+        env:
+          TOKEN: ${{ secrets.LANTERNHOLD_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::LANTERNHOLD_DEPLOY_TOKEN is not set; the 10-minute schedule will publish instead."
+            exit 0
+          fi
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/johnmink1/lanternhold/actions/workflows/deploy.yml/dispatches \
+            -d '{"ref":"main"}'
+          echo "Deploy started."

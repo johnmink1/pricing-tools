@@ -1,3 +1,4 @@
+/* lh-build 202611231414 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2929,43 +2930,73 @@
   function closeMap() { $('modalbody').classList.remove('mapsheet'); closeModal(); }
   $('btn-map').addEventListener('click', openMap);
 
-  // ---------- update available ----------
-  // version.json is stamped on every release; if it differs from this page's build, offer a refresh.
-  // Updates are mandatory: when a new build is out, the game saves, counts down and reloads, so nobody plays on old code.
-  let updating = false;
+  // ---------- updates ----------
+  // version.json is stamped on every release. The web host's cache ignores query strings and keeps each file for up
+  // to 10 minutes, so a reload right after a release can hand back the old page. Instead the game waits until every
+  // file it needs carries the new build's marker, then saves, counts down and reloads by itself. Players never have
+  // to press anything, and an older or half-cached version.json never triggers a reload.
+  let updating = false, checking = false, upTimer = 0;
+  const newer = b => /^\d{12}$/.test(b || '') && /^\d{12}$/.test(window.LH_BUILD || '') && b > window.LH_BUILD;
+  // Read just the start of a file and look for the build marker.
+  async function hasMark(f, b) {
+    const r = await fetch(f + (f.indexOf('?') < 0 ? '?' : '&') + 'fresh=' + Date.now().toString(36), { cache: 'no-store' });
+    if (!r.ok) return false;
+    let head = '';
+    if (r.body && r.body.getReader) {
+      const rd = r.body.getReader(), dec = new TextDecoder();
+      while (head.length < 400) { const c = await rd.read(); if (c.done) break; head += dec.decode(c.value, { stream: true }); }
+      try { rd.cancel(); } catch (e) {}
+    } else head = (await r.text()).slice(0, 400);
+    return head.indexOf('lh-build ' + b) >= 0;
+  }
+  async function allFresh(b) {
+    for (const f of ['./', 'ui.js', 'core.js', 'sprites.js', 'vector.js', 'style.css']) if (!(await hasMark(f, b))) return false;
+    return true;
+  }
   async function loadBuild(b) {
     try { save(); } catch (e) {}
     try { if (typeof pushCloud === 'function' && signedIn()) await Promise.race([pushCloud(true), new Promise(r => setTimeout(r, 4000))]); } catch (e) {}
-    // A fresh query string skips any cached copy of the page.
+    // A new address keeps the browser from reusing its own cached copy of the page.
     location.replace(location.pathname + '?u=' + encodeURIComponent(b || '') + '&t=' + Date.now().toString(36) + location.hash);
   }
+  function countdown(b) {
+    updating = true;
+    let n = 10;
+    modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Updating Lanternhold</h2><p>A new version is out. Your progress is saved, and the game reloads in <b id="up-n">' + n + '</b> seconds.</p><div class="row" style="justify-content:center"><button class="btn" id="up-now">Update now</button></div></div>', md => {
+      md.querySelector('#up-now').onclick = () => loadBuild(b);
+    });
+    const t = setInterval(() => { n--; const e = $('up-n'); if (e) e.textContent = Math.max(0, n); if (n <= 0) { clearInterval(t); loadBuild(b); } }, 1000);
+  }
   async function checkUpdate() {
-    if (!window.LH_BUILD || updating) return;
+    if (!window.LH_BUILD || updating || checking) return;
+    clearTimeout(upTimer); checking = true;
+    let wait = 120000;
     try {
-      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
-      const j = await r.json();
-      if (!j.build || j.build === window.LH_BUILD) return;
-      window.LH_NEXT = j.build;
-      // Already reloaded for this build but the page is still old (a slow cache): offer the button instead of looping.
-      // The web host can take a minute to hand every visitor the new files, so try again quietly a few times first.
-      if (new URLSearchParams(location.search).get('u') === j.build) {
-        let n = 0; try { n = +sessionStorage.getItem('lh_upretry') || 0; sessionStorage.setItem('lh_upretry', String(n + 1)); } catch (e) {}
-        if (n < 3) { updating = true; setTimeout(() => loadBuild(j.build), 15000 * (n + 1)); return; }
-        $('btn-update').hidden = false; return;
+      const j = await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json();
+      if (newer(j.build)) {
+        window.LH_NEXT = j.build; wait = 20000;
+        const tried = new URLSearchParams(location.search).get('u') === j.build;
+        let n = 0; if (tried) try { n = +sessionStorage.getItem('lh_upretry') || 0; } catch (e) {}
+        if (n >= 3) { $('btn-update').hidden = false; wait = 120000; }
+        else if (await allFresh(j.build) && !(S.wb && S.wb.until > Date.now())) {
+          if (tried) try { sessionStorage.setItem('lh_upretry', String(n + 1)); } catch (e) {}
+          checking = false; countdown(j.build); return;
+        }
       }
-      updating = true;
-      let n = 10;
-      modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Update required</h2><p>A new version of Lanternhold is out. Your progress is saved, and the game reloads in <b id="up-n">' + n + '</b> seconds.</p><div class="row" style="justify-content:center"><button class="btn" id="up-now">Update now</button></div></div>', md => {
-        md.querySelector('#up-now').onclick = () => loadBuild(j.build);
-      });
-      const t = setInterval(() => { n--; const e = $('up-n'); if (e) e.textContent = Math.max(0, n); if (n <= 0) { clearInterval(t); loadBuild(j.build); } }, 1000);
     } catch (e) {}
+    checking = false;
+    upTimer = setTimeout(checkUpdate, wait);
   }
   $('btn-update').addEventListener('click', () => { try { sessionStorage.removeItem('lh_upretry'); } catch (e) {} loadBuild(window.LH_NEXT || ''); });
-  try { if (new URLSearchParams(location.search).get('u') === window.LH_BUILD) sessionStorage.removeItem('lh_upretry'); } catch (e) {}
-  setInterval(checkUpdate, 2 * 60 * 1000);
+  try {
+    if (new URLSearchParams(location.search).get('u') === window.LH_BUILD) {
+      sessionStorage.removeItem('lh_upretry');
+      // Tidy the address bar after an update so a bookmark or a shared link stays clean.
+      history.replaceState(null, '', location.pathname + location.hash);
+    }
+  } catch (e) {}
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
-  setTimeout(checkUpdate, new URLSearchParams(location.search).get('u') ? 4000 : 20000);
+  upTimer = setTimeout(checkUpdate, 15000);
 
   // ---------- tutorial (coach marks) and the Guide ----------
   // Steps show one at a time, point at the real control, and wait for the player to do the thing.
@@ -3222,7 +3253,8 @@
       'Tap the purple bar on the stage to join a two-minute assault. You can go again every 15 minutes. Strike and use your abilities for more damage.',
       'Damage counts at the strength of your deepest floor, so everyone helps. Each phase broken makes the next one tougher.',
       'When the event ends, claim Sigils: 3 for taking part, 1 per phase broken (up to 5) and 5 more for the top three, plus a purse of gold.',
-      'From now on a new world boss attacks every weekend, Friday to Sunday (UTC). This first one runs until Friday as a preview.'] },
+      'From now on a new world boss attacks every weekend, Friday to Sunday (UTC). This first one runs until Friday as a preview.',
+      'Updates now install by themselves. The game waits until the new version is fully out, saves, and reloads, so the Update button should no longer get stuck.'] },
     { v: 39, date: 'November 23, 2026', title: 'Players online', items: [
       'A green counter next to the Lanternhold name shows how many players are online right now. Tap it to see heroes in the Guild.'] },
     { v: 38, date: 'November 23, 2026', title: 'Clearer store and the Lanternholder membership', items: [

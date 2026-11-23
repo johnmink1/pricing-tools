@@ -1440,7 +1440,7 @@
       const j = await r.json();
       if (j.build && j.build !== window.LH_BUILD && $('btn-update').hidden) {
         $('btn-update').hidden = false;
-        toast('refresh', 'A new update is ready', 'Tap Update ready at the top to load it. Your progress is saved first.', 'feat');
+        toast('refresh', 'A new update is ready', 'Tap Update ready at the top to load it. Your progress is saved first, and the patch notes show what changed.', 'feat');
       }
     } catch (e) {}
   }
@@ -1464,7 +1464,7 @@
     { id: 'end', title: 'You are ready', text: 'That is the basics. The story will introduce new companions as you descend. Open the Guide (the ? at the top) any time for the details.', target: '#btn-guide', ready: () => true },
   ];
   let coachCtx = null, coachEl = null;
-  function tutState() { S.tut = S.tut || { i: 0, done: false }; return S.tut; }
+  function tutState() { if (!S.tut) { S.tut = { i: 0, done: false }; S.seenNotes = NOTES_V; } return S.tut; }
   function coachHide() { $('coach').hidden = true; if (coachEl) coachEl.classList.remove('tut-hi'); coachEl = null; }
   function coachShow(step, i) {
     if (step.tab && tab !== step.tab) switchTab(step.tab);
@@ -1517,12 +1517,52 @@
   function openGuide() {
     modal('<div class="maphead"><div><h2>Delver’s Guide</h2><small>Everything you need to know about the descent.</small></div><button class="iconbtn" id="g-x" aria-label="Close guide">&times;</button></div>' +
       '<div class="guide">' + GUIDE.map(([t, h], i) => '<details' + (i === 0 ? ' open' : '') + '><summary>' + t + '</summary><div>' + h + '</div></details>').join('') + '</div>' +
-      '<div class="row"><button class="btn ghost" id="g-tut">Replay the tutorial</button><button class="btn" id="g-ok">Close</button></div>', md => {
+      '<div class="row"><button class="btn ghost" id="g-notes">What\u2019s new</button><button class="btn ghost" id="g-tut">Replay the tutorial</button><button class="btn" id="g-ok">Close</button></div>', md => {
+        md.querySelector('#g-notes').onclick = openNotes;
         md.querySelector('#g-x').onclick = closeModal; md.querySelector('#g-ok').onclick = closeModal;
         md.querySelector('#g-tut').onclick = () => { S.tut = { i: 0, done: false }; coachCtx = null; closeModal(); switchTab('party'); save(); };
       });
   }
   $('btn-guide').addEventListener('click', openGuide);
+
+  // ---------- patch notes ----------
+  // Newest first. Bump `v` for each release; players see the notes once after updating.
+  const PATCH_NOTES = [
+    { v: 6, date: 'November 22, 2026', title: 'Help for new delvers', items: [
+      'A step-by-step tutorial for new players that points at the real buttons.',
+      'The Delver’s Guide: open the ? at the top for a handbook on every system.',
+      'Mass scrap in the Gear tab: salvage many pieces at once by rarity, keeping your best and upgraded gear.',
+      'These patch notes. They open once after each update, and you can find them in the Guide.'] },
+    { v: 5, date: 'November 22, 2026', title: 'Chat, map and item links', items: [
+      'Chat with Global, Trade and Party channels (free account needed). Tap a name to mute or report.',
+      'Ctrl+click an item, or use Link in chat, to show it off in chat.',
+      'The Map of the Deep: see every region, the guardians you have beaten, and travel back to any floor.',
+      'An Update ready button appears at the top when a new version is out.'] },
+    { v: 4, date: 'November 22, 2026', title: 'Marching order', items: [
+      'Rearrange your party. The front takes the hits, so keep your tank there.',
+      'Healers heal less the farther they stand from who they heal.',
+      'Some monsters ambush from behind and strike the rear first. A tank at the back guards it.'] },
+    { v: 3, date: 'November 22, 2026', title: 'Gear made clear', items: [
+      'The Gear tab shows what fits each companion, with Equip buttons, upgrade tags and Equip best.',
+      'Tap any companion for their profile: bio, alliance, class, ability, stats and gear.',
+      'Multiplayer: the hero board is live. Recruit other players’ heroes and earn gold when yours is recruited.'] },
+    { v: 2, date: 'November 22, 2026', title: 'A front of the Grand War', items: [
+      'Create your own hero and lead a party of five: Tank, Healer, Rogue, Mage and Necromancer.',
+      'Monsters fight back. Healers and tanks matter.',
+      'A 15-chapter story set beneath the Hold, on a hidden front of the Grand War. Pledge your banner when you start.',
+      'Class gear with rarities, upgrades and five class sets. A lore journal that fills as you explore.',
+      'Solo and Multiplayer modes. Optional accounts with cloud saves.'] },
+  ];
+  const NOTES_V = PATCH_NOTES[0].v;
+  function openNotes() {
+    S.seenNotes = NOTES_V; save();
+    modal('<div class="maphead"><div><h2>What’s new</h2><small>Patch notes for Lanternhold.</small></div><button class="iconbtn" id="n-x" aria-label="Close">&times;</button></div><div class="notes">' +
+      PATCH_NOTES.map((n, i) => '<section' + (i ? '' : ' class="latest"') + '><div class="nh"><b>' + esc(n.title) + '</b><span>' + esc(n.date) + (i ? '' : ' · Latest') + '</span></div><ul>' + n.items.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul></section>').join('') +
+      '</div><div class="row"><button class="btn" id="n-ok">Back to the Deep</button></div>', md => { md.querySelector('#n-x').onclick = closeModal; md.querySelector('#n-ok').onclick = closeModal; });
+  }
+  // Show once after an update, when nothing else is on screen. Brand-new players get the tutorial instead.
+  if (S.hero && !S.seenNotes && S.tut && !S.tut.done) S.seenNotes = NOTES_V;
+  setInterval(() => { if (S.hero && (S.seenNotes || 0) < NOTES_V && $('modal').hidden && !sceneOpen && !(S.tut && !S.tut.done)) openNotes(); }, 3000);
   // ---------- boot ----------
   resize();
   window.addEventListener('resize', resize);

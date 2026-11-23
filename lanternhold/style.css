@@ -529,3 +529,13 @@ button.scene:hover{border-color:var(--accent)}
   .brand .logo{width:24px;height:24px}
 }
 @media (max-width:380px){.brand b{display:none}}
+
+/* patch notes */
+.notes{display:grid;gap:8px;max-height:calc(100vh - 240px);overflow-y:auto}
+.notes section{border:1px solid var(--line);border-radius:10px;background:var(--bg2);padding:10px 12px}
+.notes section.latest{border-color:var(--accent)}
+.notes .nh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.notes .nh b{font-size:15px}
+.notes .nh span{font-size:12px;color:var(--dim)}
+.notes ul{margin:6px 0 2px;padding-left:18px}
+.notes li{color:var(--muted);font-size:14px;line-height:1.45;margin-bottom:3px}

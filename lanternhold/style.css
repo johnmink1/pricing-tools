@@ -1,4 +1,4 @@
-/* lh-build 202611232223 */
+/* lh-build 202611232231 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1897,3 +1897,26 @@ body.resting .taptip{display:none}
 .lt-s span{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;background:#1a151e;border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
 .lt-s span small{font-weight:400;color:var(--dim);font-size:11px}
 .lt-f{margin:6px 0 0;font-size:11px;color:var(--dim)}
+/* marching order: calmer seat cards (John, 2026-11-23) */
+#seats .traits.slim{gap:4px;margin-top:4px}
+#seats .trait{font-size:11px;padding:1px 7px;border-radius:999px;cursor:help}
+#seats .trait.off{background:transparent;border-color:#1a2334;color:#5d6a80}
+#seats .trait.off b{color:#6f7d94;font-weight:600}
+#seats .trait.on{padding-left:6px}
+#seats .trait.on b::before{content:'';display:inline-block;width:5px;height:5px;margin:0 5px 1px 0;border-radius:50%;background:#f5c242;vertical-align:middle}
+#seats .seat .hpbar{height:3px;margin-top:6px}
+#seats .acts{gap:4px;min-width:96px}
+#seats .minirow{display:flex;gap:4px}
+#seats .minirow .autot{margin-top:0;flex:1}
+#seats .rest.icon{flex:none;display:inline-flex;align-items:center;justify-content:center;width:30px;padding:3px 0;border-radius:999px}
+#seats .rest.icon svg{width:13px;height:13px}
+#seats .rest.icon:hover{color:var(--ember);border-color:var(--ember)}
+@media (max-width:560px){
+  #seats .seat:not(.empty){grid-template-columns:22px 40px minmax(0,1fr);row-gap:8px}
+  #seats .seat .acts{grid-column:1/-1;flex-direction:row;align-items:stretch;gap:6px;min-width:0}
+  #seats .seat .buy{flex:1;min-width:0;flex-direction:row;justify-content:center;gap:10px;padding:6px 10px}
+  #seats .minirow{flex:none}
+  #seats .minirow .autot{width:auto;padding:0 12px}
+  #seats .rest.icon{width:36px}
+  #seats .trait{font-size:10.5px}
+}

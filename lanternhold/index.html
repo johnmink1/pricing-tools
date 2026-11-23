@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611230115">
+<link rel="stylesheet" href="style.css?v=202611230122">
 </head>
 <body>
 <div id="app">
@@ -68,18 +68,19 @@
 
     <aside class="panel">
       <nav class="tabs" role="tablist">
-        <button class="on" data-tab="party">Party</button>
-        <button data-tab="gear">Gear <em id="gearcount"></em></button>
-        <button data-tab="journal">Journal <em id="lorecount"></em></button>
-        <button data-tab="relics">Relics <em id="relcount"></em></button>
-        <button data-tab="rekindle">Rekindle</button>
-        <button data-tab="stats">Records <em id="featcount"></em></button>
+        <button class="onlyphone" data-go="arena"><svg><use href="#i-sword"/></svg><span>Fight</span></button>
+        <button class="on" data-tab="party"><svg><use href="#i-users"/></svg><span>Party</span></button>
+        <button data-tab="gear"><svg><use href="#i-bag"/></svg><span>Gear</span><em id="gearcount"></em></button>
+        <button data-tab="journal"><svg><use href="#i-book"/></svg><span>Journal</span><em id="lorecount"></em></button>
+        <button data-tab="relics"><svg><use href="#i-relic"/></svg><span>Relics</span><em id="relcount"></em></button>
+        <button data-tab="rekindle"><svg><use href="#i-flame"/></svg><span>Rekindle</span></button>
+        <button data-tab="stats"><svg><use href="#i-star"/></svg><span>Records</span><em id="featcount"></em></button>
       </nav>
       <div class="tabbody" id="tab-party">
         <div class="buybar"><span>Train</span><div class="seg" id="buyseg"><button data-n="1" class="on">x1</button><button data-n="10">x10</button><button data-n="25">x25</button><button data-n="max">Max</button></div></div>
         <div class="formhead"><span><b>Marching order</b> <small>Top of the list stands at the front, nearest the monsters.</small></span><span class="fbtns"><button class="btn ghost small" id="f-recruit">Players Guild</button><button class="btn ghost small" id="f-auto">Auto-arrange</button></span></div>
         <div id="seats"></div>
-        <ul class="fnotes" id="fnotes"></ul>
+        <details class="ftips"><summary id="fsum">Formation tips</summary><ul class="fnotes" id="fnotes"></ul></details>
         <div id="benchwrap" class="camp"><h3 class="sub">Campfire</h3><p class="note">Story companions rest by the fire. Bring any of them along, or leave seats open for heroes from the Players Guild.</p><div id="bench"></div><div id="campnext"></div></div>
         <div id="boardwrap"></div>
       </div>
@@ -87,7 +88,6 @@
         <div class="whoseg" id="gearwho"></div>
         <div class="slots" id="gearslots"></div>
         <div class="packbar"><h3 class="sub">Pack <em id="bagcount"></em></h3><button class="btn ghost small" id="g-scrap">Mass scrap</button></div>
-        <p class="note">Gear drops from monsters, chests and guardians. Each piece fits one class, so pick a companion above to see what they can wear. Green tags show upgrades.</p>
         <div class="bag" id="bag"></div>
       </div>
       <div class="tabbody" id="tab-journal" hidden>
@@ -172,10 +172,10 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611230115";</script>
+<script>window.LH_BUILD = "202611230122";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611230115"></script>
-<script src="sprites.js?v=202611230115"></script>
-<script src="ui.js?v=202611230115"></script>
+<script src="core.js?v=202611230122"></script>
+<script src="sprites.js?v=202611230122"></script>
+<script src="ui.js?v=202611230122"></script>
 </body>
 </html>

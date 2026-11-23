@@ -366,5 +366,37 @@
     return 'rgb(' + f(0) + ',' + f(8) + ',' + f(4) + ')';
   }
 
-  root.LHSprites = { render, list: Object.keys(S) };
+
+  // ---------- item icons (12x12): one per class and slot; 'a' takes the rarity colour ----------
+  const ICONS = {"sword":["..........kk",".........klk","........klmk",".......klmk.","......klmk..",".....klmk...",".kk.klmk....",".kakmmk.....","..kaak......","..kwkak.....",".kwk.kk.....",".kk........."],"staff":["....kkkk....","...kallak...","...kaalak...","...kaaaak...","....kkkk....","....kggk....",".....kwk....",".....kwk....",".....kwk....",".....kwk....",".....kwk....",".....kkk...."],"dagger":["............","..........k.",".........klk","........klk.",".......klk..","......klk...","....kkmk....","....kakk....","...kwkak....","..kwk..k....","..kk........","............"],"wand":[".......kkk..","......kaalk.",".....kalaak.",".....kaaaak.","......kaak..","......kwk...",".....kwk....","....kwk.....","...kwk......","..kwk.......",".kak........",".kk........."],"scythe":[".kkkkkk.....","klllmmmkk...","kmkkkkkmwk..","kk....kwk...","......kwk...",".....kwk....",".....kwk....","....kwk.....","....kwk.....","...kak......","...kwk......","...kk......."],"plate":[".kkk....kkk.","klmmkkkkmmlk","kmmmllllmmmk","kmmmmllmmmmk",".kkmmllmmkk.","..kmmllmmk..","..kaaaaaak..","..kmmmmmmk..","..kmmmmmmk..","..kdmmmmdk..","..kkkkkkkk..","............"],"robe":["...kk..kk...","..kmmkkmmk..",".kmmmlammmk.","kmmmmlammmmk","kkkmmlammkkk","..kmmlammk..","..kaaaaaak..","..kmmlammk..",".kmmmlammmk.",".kmmmlammmk.","kdmmmlammmdk","kkkkkkkkkkkk"],"hood":["....kkkk....","...kmmmmk...","..kmmllmmk..","..kmkkkkmk..",".kmkdddddmk.",".kmmkkkkmmk.","kmmmmaammmmk","kmmmmlammmmk","kkmmmlammmkk",".kmmmlammmk.",".kdmmlammdk.",".kkkkkkkkkk."],"badge":[".kkkkkkkkkk.",".kmllmmmmmk.",".kmaaaaaamk.",".kmaalaaamk.",".kmaalaaamk.",".kmaaaaaamk.","..kmaaaamk..","..kmaaaamk..","...kmaamk...","....kmmk....",".....kk.....","............"],"amulet":["...kkkkkk...","..kd....dk..",".kd......dk.",".kd......dk.","..kd....dk..","...kd..dk...","....kkkk....","...kmaamk...","..kmaalamk..","..kmaaaamk..","...kmaamk...","....kkkk...."],"ring":["....kkkk....","...kaalak...","...kaaaak...","....kkkk....","...kmllmk...","..kmkkkkmk..",".kmk....kmk.",".kmk....kmk.",".kdk....kdk.","..kdkkkkdk..","...kddddk...","....kkkk...."],"crystal":[".....kk.....","....kalk....","...kaalak...","...kaalak...","..kaaalaak..","..kaaalaak..","..kaaalaak..","...kaalak...","...kaaaak...","....kaak....",".....kk.....","............"],"skull":["...kkkkkk...","..kmmmmmmk..",".kmllmmmmmk.",".kmkkmmkkmk.",".kmkakmkakk.",".kmkkmmkkmk.",".kmmmkkmmmk.","..kmmmmmmk..","...kmkmkmk..","...kkkkkkk..","....kaak....",".....kk....."]};
+  const ITEM_SHAPE = {
+    weapon: { tank: 'sword', healer: 'staff', rogue: 'dagger', mage: 'wand', necro: 'scythe' },
+    armor: { tank: 'plate', healer: 'robe', rogue: 'hood', mage: 'robe', necro: 'robe' },
+    trinket: { tank: 'badge', healer: 'amulet', rogue: 'ring', mage: 'crystal', necro: 'skull' },
+  };
+  const CLS_CLOTH = { tank: ['#8fa3b5', '#c9d6e0', '#5b6b7a'], healer: ['#5f9a54', '#8fcf6a', '#3a6234'], rogue: ['#4a4258', '#6e6484', '#2a2533'], mage: ['#b8443a', '#ee7a5a', '#7a2a1f'], necro: ['#5a3a7a', '#8a6aa8', '#2e1f40'] };
+  const RAR_COL = { common: '#d8cfb8', fine: '#8fcf6a', rare: '#6cc4e8', epic: '#c78bff', set: '#f2c14e' };
+  const iconCache = {};
+  function itemIcon(cls, slot, rar, scale) {
+    scale = scale || 4;
+    const key = cls + slot + rar + scale;
+    if (iconCache[key]) return iconCache[key];
+    const shape = ICONS[ITEM_SHAPE[slot][cls]];
+    const cloth = CLS_CLOTH[cls], a = RAR_COL[rar] || RAR_COL.common;
+    const pal = slot === 'armor' ? { k: '#120d0a', m: cloth[0], l: cloth[1], d: cloth[2], a }
+      : slot === 'weapon' ? { k: '#120d0a', m: '#9aa8b6', l: '#eef3f7', d: '#5b6b7a', w: '#8a5a2e', g: cloth[1], a }
+      : { k: '#120d0a', m: cls === 'necro' ? '#e8dfc8' : '#d9a441', l: cls === 'necro' ? '#ffffff' : '#ffe7a0', d: cls === 'necro' ? '#a89c80' : '#8a6420', a };
+    const c = document.createElement('canvas'); c.width = c.height = 12 * scale;
+    const x = c.getContext('2d');
+    shape.forEach((row, j) => { for (let i = 0; i < row.length; i++) { const col = pal[row[i]]; if (col) { x.fillStyle = col; x.fillRect(i * scale, j * scale, scale, scale); } } });
+    return (iconCache[key] = c.toDataURL());
+  }
+  const spriteCache = {};
+  function spriteURL(name, scale, hue) {
+    const key = name + scale + (hue || 0);
+    if (!spriteCache[key]) { const c = render(name, scale, hue); spriteCache[key] = c ? c.toDataURL() : ''; }
+    return spriteCache[key];
+  }
+
+  root.LHSprites = { render, itemIcon, spriteURL, list: Object.keys(S) };
 })(this);

@@ -1,4 +1,4 @@
-/* lh-build 202611231544 */
+/* lh-build 202611231553 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -562,6 +562,7 @@
       case 'bossfail': flog('fight', '<b class="bad">The lantern ran out</b> before the guardian fell'); break;
       case 'newfloor': flog('fight', 'Reached a new depth: <b>floor ' + e.floor + '</b>'); break;
       case 'loot': flog('loot', 'Found <b class="r-' + e.item.rar + '" style="color:var(--rc)">' + esc(L.gearName(e.item)) + '</b>'); break;
+      case 'autoscrap': flog('loot', 'Auto-scrapped <b class="r-' + e.item.rar + '" style="color:var(--rc)">' + esc(L.gearName(e.item)) + '</b> for ' + fmt(e.gold) + ' gold, ' + e.dust + ' Dust'); break;
       case 'autosell': flog('loot', 'Pack full: sold ' + esc(L.gearName(e.item))); break;
       case 'sigil': flog('loot', 'Found <b>' + e.n + ' Sigils</b>'); break;
       case 'relic': flog('loot', 'Relic: <b>' + esc(e.relic.name) + '</b>' + (e.level > 1 ? ' (level ' + e.level + ')' : '')); break;
@@ -1187,7 +1188,7 @@
       '<div class="dollbar"><small>' + cname + ' gear only. Tap a slot to change it. Worn gear stays on the character, not in the pack.</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
     { const pn = $('packn'); if (pn) pn.textContent = L.packCount(S); }
-    $('bagcount').textContent = S.boh ? L.packCount(S) + ' · Bag of Holding' : L.packCount(S) + '/' + L.bagCap(S); $('g-boh').hidden = !!S.boh || !CL;
+    paintPackCap();
     const tile = (it, dim) => {
       const w = L.wearer(S, it.uid), fit = it.cls === m.cls;
       const d = fit && !w ? Math.round((L.itemScore(it) - L.replaces(S, gearWho, it).reduce((a, x) => a + L.itemScore(x), 0)) * 100) : 0;
@@ -1547,6 +1548,49 @@
     };
     draw();
   }
+  // ---------- pack header: capacity meter, auto-scrap, bulk actions menu ----------
+  function paintPackCap() {
+    const n = L.packCount(S), cap = L.bagCap(S), full = !S.boh && n >= cap;
+    $('bagcount').innerHTML = S.boh ? fmt(n) + ' <small>Bag of Holding</small>' : fmt(n) + ' <small>/ ' + fmt(cap) + '</small>';
+    $('packfill').style.width = (S.boh ? 100 : Math.min(100, n / cap * 100)) + '%';
+    $('packcap').classList.toggle('full', full); $('packcap').classList.toggle('boh', !!S.boh);
+    $('packwarn').hidden = !full; $('packwarn').textContent = n > cap ? (n - cap) + ' over · new finds are sold' : 'Full · new finds are sold';
+    $('g-boh').hidden = !!S.boh || !CL;
+    const a = S.autoScrap || {}, on = a.on && a.r && a.r.length;
+    $('g-auto').classList.toggle('on', !!on);
+    $('g-autos').textContent = on ? (a.r.length === 1 ? L.RARITY.find(r => r.id === a.r[0]).name : a.r.length + ' rarities') : 'Off';
+  }
+  const bulkMenu = open => { $('g-bulkmenu').hidden = !open; $('g-bulk').setAttribute('aria-expanded', open ? 'true' : 'false'); };
+  $('g-bulk').addEventListener('click', e => { e.stopPropagation(); bulkMenu($('g-bulkmenu').hidden); });
+  document.addEventListener('click', e => { if (!$('g-bulkmenu').hidden && !e.target.closest('.bulk')) bulkMenu(false); });
+  $('g-bulkmenu').addEventListener('click', e => { if (e.target.closest('button')) bulkMenu(false); });
+  function openAutoScrap() {
+    if (!S.autoScrap) S.autoScrap = { on: false, r: ['common'], up: false };
+    const a = S.autoScrap;
+    const draw = () => {
+      const rows = L.RARITY.filter(r => r.id !== 'set').map(r => {
+        const n = S.bag.filter(x => x.rar === r.id).length;
+        return '<label class="aschip r-' + r.id + '"><input type="checkbox" data-r="' + r.id + '"' + (a.r.includes(r.id) ? ' checked' : '') + '><span class="gem"></span><b>' + r.name + '</b><small>' + n + ' in pack</small></label>';
+      }).join('');
+      modal('<div class="asbox"><h2>Auto-scrap</h2><p class="note">Scrap new drops of the rarities you tick the moment they are found, for gold and Dust. They never take up pack space.</p>' +
+        '<label class="asmaster"><span class="sw' + (a.on ? ' on' : '') + '"><i></i></span><input type="checkbox" id="as-on"' + (a.on ? ' checked' : '') + '><b>Auto-scrap is ' + (a.on ? 'on' : 'off') + '</b></label>' +
+        '<div class="asgrid' + (a.on ? '' : ' off') + '">' + rows + '</div>' +
+        '<label class="chk"><input type="checkbox" id="as-up"' + (a.up ? ' checked' : '') + '><span><b>Scrap upgrades too</b><small>Off by default, so a drop that beats what a companion wears is always kept.</small></span></label>' +
+        '<p class="asnote">Set pieces and job set pieces are always kept. Auto-scrap only touches new drops, never what is already in your pack.</p>' +
+        '<div class="row"><button class="btn" id="as-x">Done</button></div></div>', md => {
+          md.querySelector('#as-on').onchange = e => { a.on = e.target.checked; save(); paintPackCap(); draw(); };
+          md.querySelector('#as-up').onchange = e => { a.up = e.target.checked; save(); };
+          md.querySelectorAll('[data-r]').forEach(c => c.onchange = () => {
+            a.r = L.RARITY.map(r => r.id).filter(id => id === c.dataset.r ? c.checked : a.r.includes(id));
+            if (c.checked) a.on = true;
+            save(); paintPackCap(); draw();
+          });
+          md.querySelector('#as-x').onclick = closeModal;
+        });
+    };
+    draw();
+  }
+  $('g-auto').addEventListener('click', openAutoScrap);
   $('g-mmerge').addEventListener('click', openMassMerge);
   $('g-scrap').addEventListener('click', openScrap);
   $('g-boh').addEventListener('click', () => openBoh());
@@ -3416,7 +3460,11 @@
       ['Dust', 'i:dust', 'Scrap gear to get Dust for enchanting.', [
         'Every item you salvage or mass scrap gives Dust as well as gold. Rarer, deeper and upgraded pieces give more.',
         'Your Dust shows in the top bar. Rekindling keeps it.']],
-      ['Mass scrap and Mass sell', 'i:coin', 'Clear out your pack in one go from the Gear tab.', [
+      ['Auto-scrap', 'i:dust', 'Scrap low drops the moment they are found.', [
+        'Open <b>Auto-scrap</b> in the Gear tab pack view and tick the rarities you never want to keep. New drops of those rarities turn straight into gold and Dust.',
+        'Set pieces, job set pieces and anything that beats what a companion wears are always kept, unless you tick <b>Scrap upgrades too</b>.',
+        'It only touches new drops, never what is already in your pack. The fight log lists every piece it scraps.']],
+      ['Mass scrap and Mass sell', 'i:coin', 'Clear out your pack in one go from Bulk actions in the Gear tab.', [
         '<b>Mass scrap</b> turns the rarities you tick into gold right away.',
         '<b>Mass sell</b> lists them on the market at their current value, up to 25 listings at a time. You get mail with the gold as each one sells.',
         'Worn and locked items are never touched by either.']],
@@ -3533,6 +3581,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 52, date: 'November 23, 2026', title: 'Auto-scrap and a cleaner pack', items: [
+      'New: <b>Auto-scrap</b>. Tick the rarities you never want, and new drops of those turn straight into gold and Dust without taking pack space. Set pieces and upgrades for your party are always kept.',
+      'The pack view has a tidy header: a space meter that turns red when the pack is full, and one <b>Bulk actions</b> menu for mass sell, merge and scrap.'] },
     { v: 51, date: 'November 23, 2026', title: 'Tidier tabs and a fight log', items: [
       'Gear now has two views, Equipped and Pack, so you are not scrolling past one to reach the other.',
       'Skills is split into Stats, Skill tree and Rekindle.',

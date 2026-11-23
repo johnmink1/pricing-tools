@@ -1629,13 +1629,14 @@
       confirm: '<button type="button" class="link" id="f-resend">Send a new code</button>',
       forgot: '<button type="button" class="link" data-go="in">Back to sign in</button>', reset: '',
     }[mode];
-    modal('<form class="auth" novalidate><h2>' + titles[mode] + '</h2><p>' + lead + '</p>' + f +
+    modal('<form class="auth" novalidate><h2>' + titles[mode] + '</h2><p>' + lead + '</p>' + (mode === 'in' || mode === 'up' ? '<button type="button" class="btn b2g" id="f-b2g">Continue with Born 2 Game</button><div class="or"><span>or use your email</span></div>' : '') + f +
       '<div class="err" id="f-err"></div><button class="btn" type="submit" id="f-go">' + btn + '</button><div class="links">' + links + '</div>' +
       '<p class="credits">We only keep your email and game save. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a></p></form>', m => {
         m.querySelectorAll('.em').forEach(x => x.textContent = email || '');
         const em = m.querySelector('#f-email'); if (em && email) em.value = email;
         const err = m.querySelector('#f-err'); if (note) { err.textContent = note; err.classList.add('ok'); }
         m.querySelectorAll('[data-go]').forEach(x => x.onclick = () => authForm(x.dataset.go, em ? em.value.trim() : email));
+        const bg = m.querySelector('#f-b2g'); if (bg) bg.onclick = async () => { bg.disabled = true; try { await storeSignIn(); } catch (e) { bg.disabled = false; err.textContent = 'Could not reach the Born 2 Game store. Please try again.'; } };
         const rs = m.querySelector('#f-resend'); if (rs) rs.onclick = async () => { try { await cognito('ResendConfirmationCode', { Username: email }); err.textContent = 'New code sent.'; err.classList.add('ok'); } catch (e) { err.textContent = friendly(e); } };
         (m.querySelector('input') || {}).focus && m.querySelector('input').focus();
         m.querySelector('form').onsubmit = async ev => {
@@ -1920,7 +1921,15 @@
       if (!p || p.st !== h.get('state')) return;
       try { keepTokens(await wixPost('/oauth2/token', { clientId: WIX_APP, grantType: 'authorization_code', redirectUri: homeUrl(), code, codeVerifier: p.v })); }
       catch (e) { toast('lock', 'Store sign-in did not finish', 'Try signing in again from Get Sigils.', 'warn'); return; }
-      if (!signedIn()) { toast('star', 'Store account remembered', 'Sign in to the game and your purchases will reach your hero.', ''); return; }
+      if (!signedIn()) {
+        // Not signed in to the game: the store account becomes the game sign-in.
+        try {
+          const r = await fetch(CL.api.replace(/\/$/, '') + '/store/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: await wixToken() }) });
+          const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status);
+          takeTokens(j, j.name); toast('user', 'Signed in with Born 2 Game', 'Welcome, ' + j.name + '. Your progress will sync to your account.', 'feat'); reconcile();
+        } catch (e) { toast('lock', 'Could not sign in', 'The store sign-in worked, but the game could not open your account. Try again in a moment.', 'warn'); return; }
+        await new Promise(ok => setTimeout(ok, 1500));
+      }
       await storeSync(false);
       const w = wixGet(); if (w && w.n) toast('user', 'Store account linked', w.n + ' is linked to this hero. Packs you buy land in your wallet.', 'feat');
     } else if (back) {
@@ -2702,7 +2711,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 26, date: 'November 23, 2026', title: 'The Lantern Pass', items: [
+    { v: 26, date: 'November 23, 2026', title: 'The Lantern Pass and Born 2 Game sign-in', items: [
+      'You can now sign in with your Born 2 Game store account. Press Continue with Born 2 Game on the sign-in screen. If you already linked your store account to a hero, it opens that hero.',
       'New: the Lantern Pass. For 500 Sigils you get 30 days of convenience: the Auto-train buttons, 10 extra bag slots and 4 more hours of offline earnings. It never adds power.',
       'Every hero gets a free 3-day trial, starting now. Open it from your profile or tap a locked Auto button.',
       'Sigils can be bought in the Born 2 Game store or bought from other players for gold on the Sigil exchange, so the pass is open to everyone.'] },

@@ -6,7 +6,7 @@ here = os.path.dirname(os.path.abspath(__file__))
 esb = os.environ.get('ESBUILD', 'esbuild')
 yml = os.path.join(here, 'lanternhold-accounts.yaml')
 s = open(yml).read()
-for fn, res in [('heroes.js', 'HeroFunction'), ('chat.js', 'ChatFunction'), ('market.js', 'MarketFunction'), ('mail.js', 'MailFunction'), ('admin.js', 'AdminFunction'), ('profile.js', 'ProfileFunction'), ('warden.js', 'WardenFunction'), ('exchange.js', 'ExchangeFunction'), ('store.js', 'StoreFunction'), ('perks.js', 'PerksFunction')]:
+for fn, res in [('heroes.js', 'HeroFunction'), ('chat.js', 'ChatFunction'), ('market.js', 'MarketFunction'), ('mail.js', 'MailFunction'), ('admin.js', 'AdminFunction'), ('profile.js', 'ProfileFunction'), ('warden.js', 'WardenFunction'), ('exchange.js', 'ExchangeFunction'), ('store.js', 'StoreFunction'), ('perks.js', 'PerksFunction'), ('authchal.js', 'AuthChalFunction'), ('wixlogin.js', 'WixLoginFunction')]:
     code = subprocess.check_output([esb, os.path.join(here, 'lambda', fn), '--minify', '--platform=node', '--format=cjs', '--log-level=warning']).decode().strip()
     if len(code.encode()) > 4000: sys.exit(f'{fn} is {len(code)} bytes minified; the inline limit is 4096')
     i = s.index('\n  ' + res + ':\n'); z = s.index('ZipFile: |', i) + len('ZipFile: |'); e = s.index('\n\n', z)

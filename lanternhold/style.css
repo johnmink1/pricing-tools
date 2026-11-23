@@ -1,4 +1,4 @@
-/* lh-build 202611232138 */
+/* lh-build 202611232146 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1756,6 +1756,46 @@ body.resting .taptip{display:none}
 .picker .pkrow .cmp{display:inline-flex;align-items:center;gap:4px}.picker .pkrow .cmp svg{width:12px;height:12px}
 #pk-lk{display:inline-flex;align-items:center;gap:5px}#pk-lk svg{width:13px;height:13px}#pk-lk.on{color:var(--gold);border-color:#c9a24a88}
 .mu.rep{color:var(--gold)}
+/* pacing v2: hero-level unlocks, campfire roster, region mastery */
+.tabs button.locked{color:var(--dim)}
+.tabs button.locked svg{opacity:.45}
+.tabs button.locked span::after{content:'';display:inline-block;width:6px;height:6px;margin-left:5px;border-radius:50%;background:var(--line2);vertical-align:middle}
+.road{display:grid;gap:12px}
+.roadlock,.lockrow{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line2);border-radius:var(--r);background:var(--panel2)}
+.roadlock svg,.lockrow svg{width:22px;height:22px;flex:none;color:var(--gold);margin-top:1px}
+.roadlock b,.lockrow b{display:block;font-family:var(--title);letter-spacing:.02em}
+.roadlock small,.lockrow small{display:block;color:var(--muted);font-size:13px;line-height:1.45;margin-top:3px}
+.lockrow{margin:4px 0 12px}
+.roadhead h3{margin:2px 0 2px;font-family:var(--title);font-size:15px;letter-spacing:.1em;text-transform:uppercase}
+.roadhead small{color:var(--muted);font-size:13px}
+.roadxp{height:6px;border-radius:4px;background:var(--line);overflow:hidden}
+.roadxp i{display:block;height:100%;background:var(--gold)}
+.roadlist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.roadlist li{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.roadlist .ric svg{width:20px;height:20px;color:var(--dim)}
+.roadlist li.open .ric svg{color:var(--good)}
+.roadlist li.focus{border-color:var(--gold)}
+.roadlist b{display:block;font-size:14px}.roadlist small{display:block;color:var(--muted);font-size:12.5px;line-height:1.4}
+.roadlist em{font-style:normal;font-weight:700;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.roadlist li.open em{color:var(--good)}
+.rosterbar{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:10px 12px;margin:0 0 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.rosterbar>span{display:flex;align-items:center;gap:6px;font-weight:600}
+.rosterbar>span svg{width:18px;height:18px;color:var(--ember)}
+.rosterbar small{flex:1 1 220px;color:var(--muted);font-size:12.5px;line-height:1.4}
+.rosterbar .btn .sigil{width:14px;height:14px;fill:currentColor;vertical-align:-2px}
+.jobhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 10px;margin:4px 2px 8px}
+.jobhead b{font-family:var(--title);letter-spacing:.06em;text-transform:uppercase;font-size:13px}
+.jobhead small{color:var(--muted);font-size:12.5px}
+.rdis em{color:var(--bad)}
+.mastery .mlist{display:grid;gap:6px}
+.mrow{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.mname b{display:block;font-size:13.5px}.mname small{color:var(--dim);font-size:12px}
+.mgoals{display:flex;flex-wrap:wrap;gap:6px}
+.mg{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);font-size:12px}
+.mg svg{width:13px;height:13px}
+.mg.done{border-color:var(--gold2);color:var(--gold)}
+.mrow em{font-style:normal;font-weight:700;color:var(--gold);font-size:13px}
+@media (max-width:560px){.mrow{grid-template-columns:minmax(0,1fr) auto}.mgoals{grid-column:1/-1;order:3}}
 .aspack{display:flex;align-items:center;gap:12px;margin:12px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .aspack>div{flex:1;min-width:0}.aspack b{display:block;font-size:14px}.aspack small{display:block;color:var(--muted);font-size:12.5px;line-height:1.35;margin-top:2px}
 .aspack.on{border-color:#e8604a66;background:rgba(232,96,74,.06)}.aspack .btn{flex:none}

@@ -1,4 +1,4 @@
-/* lh-build 202611232147 */
+/* lh-build 202611232148 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -540,7 +540,7 @@
   document.head.appendChild(fl);
 
   // ---------- events ----------
-  let pendingGold = 0, lastGoldFloat = 0, sealedToast = false;
+  let pendingGold = 0, lastGoldFloat = 0, sealedToast = false, lockToast = 0;
   const RARITY_COLOR = { common: '#d8cfb8', fine: '#8fcf6a', rare: '#6cc4e8', epic: '#c78bff', set: '#f2c14e' };
   // ---------- fight log (John, 2026-11-23): a short record of what happened in recent fights ----------
   const FLOG = [], FLOG_MAX = 120, flogThrottle = {};
@@ -619,6 +619,10 @@
         const a = mAnim(e.id); if (Math.random() < 0.5) floatText('Poisoned', 'heal', a.x / W, (a.y - 12) / H);
       } else if (e.type === 'ward') {
         floatText('Ward', 'skill', FOE_X, 0.3); burst(foeAnim.cx, foeAnim.cy, 18, ['#bfe6ff', '#ffffff', '#7fb8e8'], 35);
+      } else if (e.type === 'regionlock') {
+        if (lockToast !== e.floor) { lockToast = e.floor; toast('lock', 'The way down is barred', 'Floors ' + e.floor + ' and deeper need a stronger hero: level ' + e.need + '. Your party keeps working this region for XP, gold and its mastery goals.', 'feat'); }
+      } else if (e.type === 'mastery') {
+        sfx.relic(); toast('star', 'Region mastery: ' + e.goal.name, (L.BIOMES[e.region] || { name: 'Region' }).name + ': +' + Math.round(L.MASTERY_PER * 100) + '% ' + e.goal.fx + ' for good.', 'feat');
       } else if (e.type === 'sealed') {
         if (!sealedToast) { sealedToast = true; toast('lock', 'The way is sealed', 'Act One ends here. The Rift Threshold opens again with Season 2 of the Grand War. Your party holds the landing and keeps earning.', 'feat'); }
       } else if (e.type === 'revive') {
@@ -634,7 +638,7 @@
         const f = e.foe, spr = sprite(f.sprite, f.chest ? 0 : f.hue, true);
         foeAnim.dying = { spr, t: tAnim, x: foeAnim.cx - foeAnim.w / 2, y: foeAnim.cy - foeAnim.h / 2, w: foeAnim.w, h: foeAnim.h };
         burst(foeAnim.cx, foeAnim.cy, f.boss ? 50 : f.chest ? 40 : 14, f.chest || f.boss ? ['#f2c14e', '#fff0a0', '#c8952a'] : ['#f2c14e', '#fff0a0', '#9b8a70'], f.boss ? 70 : 45);
-        if (f.boss) { sfx.boss(); toast('crown', f.name + ' defeated', 'The way down is open.', ''); }
+        if (f.boss) { sfx.boss(); if (!(S.maxFloor % 10 === 0 && L.regionNeed(S, S.maxFloor + 1))) toast('crown', f.name + ' defeated', 'The way down is open.', ''); }
       } else if (e.type === 'loot') {
         const it = e.item;
         if (it.rar !== 'common') { toast('gear-trinket', L.gearName(it), L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' for a ' + L.CLASSES[it.cls].name, 'loot ' + it.rar); sfx.relic(); }
@@ -668,6 +672,11 @@
         sfx.relic(); floatText('Level ' + e.lv + '!', 'crit', 0.5, 0.25);
         toast('star', L.memberById('you').name + ' reached level ' + e.lv, (e.pts === 1 ? 'A new stat point' : e.pts + ' new stat points') + ' to spend on the character sheet in the Skills tab.', 'feat');
         if (tab === 'rekindle') updateSkills(); else { const hp = L.heroPoints(S); if (!S.kindling && hp) $('kindcount').textContent = '+' + hp; }
+        for (const u of L.newUnlocks(S, e.from || e.lv - 1, e.lv)) toast(u.icon, 'Unlocked: ' + u.name, u.desc, 'feat');
+        { const r = L.REGION_LV.findIndex((need, i) => need > (e.from || e.lv - 1) && need <= e.lv && i * 10 + 1 > S.maxFloorEver); if (r > 0) toast('map', 'The way down opens', 'Floors ' + (r * 10 + 1) + ' to ' + (r * 10 + 10) + ' are open to you now.', 'feat'); }
+        if (L.ROSTER_LV.includes(e.lv)) toast('flame', 'A bigger campfire', 'Room for ' + L.rosterCap(S) + ' companions now.', 'feat');
+        if (L.JOB_SLOT_LV.includes(e.lv) && e.lv > L.JOB_SLOT_LV[0]) toast('hammer', 'A new camp job slot', L.jobSlots(S) + ' camp jobs can be worked at once now.', 'feat');
+        paintTabLocks(); if (TAB_FEATURE[tab]) switchTab(tab);
       } else if (e.type === 'relic') {
         sfx.relic();
         toast('relic', e.level > 1 ? e.relic.name + ' grows stronger' : 'Relic found: ' + e.relic.name, e.relic.desc + (e.level > 1 ? ' (level ' + e.level + ')' : ''), 'relic');
@@ -723,6 +732,73 @@
   const camp = () => L.atCamp(S, Date.now());
   const mainCamp = () => L.atMainCamp(S);
   function campGate(full) { if (full ? mainCamp() : camp()) return true; campModal(full); return false; }
+  // ---------- pacing v2: features open by hero level (John, 2026-11-23) ----------
+  const TAB_FEATURE = { camp: 'camp', gear: 'gear', market: 'buy', guild: 'guild', ring: 'ring' };
+  const heroName = () => (L.memberById('you') || { name: 'Your hero' }).name;
+  function lockMsg(id) { const u = L.unlockOf(id); return u.name + ' opens at hero level ' + u.lv + '. ' + heroName() + ' is level ' + L.heroLv(S) + '.'; }
+  function gateUse(id) { if (L.canUse(S, id)) return true; const u = L.unlockOf(id); toast('lock', u.name + ' is still locked', lockMsg(id) + ' Your hero earns XP from every fight.', 'warn'); return false; }
+  function paintTabLocks() { document.querySelectorAll('.tabs [data-tab]').forEach(b => { const f = TAB_FEATURE[b.dataset.tab]; b.classList.toggle('locked', !!(f && S.hero && !L.canUse(S, f))); }); }
+  // The road ahead: every level-gated feature, the next region and the campfire, in one card.
+  function roadHtml(focus) {
+    const hl = L.heroLevel(S), lv = hl.lv, pct = Math.floor(hl.xp / hl.need * 100);
+    const nextR = L.REGION_LV.findIndex((need, r) => need > lv && r * 10 + 1 > S.maxFloorEver);
+    const fu = focus && L.unlockOf(focus);
+    let h = '<div class="road">' + (fu ? '<div class="roadlock">' + icon('lock') + '<div><b>' + esc(fu.name) + ' opens at hero level ' + fu.lv + '</b><small>' + esc(fu.desc) + ' Your hero earns XP from every fight, and more from deeper floors and guardians.</small></div></div>' : '') +
+      '<div class="roadhead"><div><h3>The road ahead</h3><small>' + esc(heroName()) + ' is level <b>' + lv + '</b> &middot; ' + pct + '% to level ' + (lv + 1) + '</small></div></div>' +
+      '<div class="bar roadxp"><i style="width:' + pct + '%"></i></div><ul class="roadlist">' +
+      L.UNLOCKS.map(u => { const on = L.canUse(S, u.id); return '<li class="' + (on ? 'open' : '') + (u.id === focus ? ' focus' : '') + '"><span class="ric">' + icon(on ? u.icon : 'lock') + '</span><div><b>' + esc(u.name) + '</b><small>' + esc(u.desc) + '</small></div><em>' + (on ? 'Open' : 'Level ' + u.lv) + '</em></li>'; }).join('') +
+      '</ul><p class="note small">' + (nextR >= 0 ? 'Floors ' + (nextR * 10 + 1) + ' to ' + (nextR * 10 + 10) + ' open at hero level ' + L.REGION_LV[nextR] + '. ' : '') +
+      'Your campfire holds ' + L.rosterCap(S) + ' companions now; it grows at hero levels ' + L.ROSTER_LV.join(', ') + '. Camp job slots open at levels ' + L.JOB_SLOT_LV.join(', ') + '.</p></div>';
+    return h;
+  }
+  // Region mastery: three goals in each region you have reached.
+  function masteryHtml() {
+    const top = Math.min(L.REGION_LV.length, Math.max(1, Math.ceil(S.maxFloorEver / 10)));
+    let h = '<div class="mastery"><h3 class="sub">Region mastery</h3><p class="note small">Each region has three goals. Every one you finish gives +' + Math.round(L.MASTERY_PER * 100) + '% to its stat for good: ' + L.MASTERY.map(g => g.name.toLowerCase() + ' to ' + g.fx).join(', ') + '.</p><div class="mlist">';
+    for (let r = 0; r < top; r++) {
+      const v = (S.mast || {})[r] || 0, el = Math.min(L.MASTERY_ELITES, (S.mastE || {})[r] || 0), b = L.BIOMES[r] || { name: 'Region ' + (r + 1) };
+      h += '<div class="mrow"><div class="mname"><b>' + esc(b.name) + '</b><small>Floors ' + (r * 10 + 1) + '-' + (r * 10 + 10) + '</small></div><div class="mgoals">' +
+        L.MASTERY.map(g => '<span class="mg' + (v & g.bit ? ' done' : '') + '" data-tip="' + esc(g.desc + ': +' + Math.round(L.MASTERY_PER * 100) + '% ' + g.fx) + '">' + icon(v & g.bit ? 'star' : 'lock') + esc(g.name) + (g.bit === 2 && !(v & 2) ? ' ' + el + '/' + L.MASTERY_ELITES : '') + '</span>').join('') + '</div><em>' + L.masteryStars(S, r) + '/3</em></div>';
+    }
+    return h + '</div><p class="note small">Totals: +' + Math.round(L.masteryVal(S, 'dps') * 100) + '% damage, +' + Math.round(L.masteryVal(S, 'hp') * 100) + '% health, +' + Math.round(L.masteryVal(S, 'gold') * 100) + '% gold.</p></div>';
+  }
+  // A story companion arrives at a full campfire: keep them by dismissing someone for good, add a spot with Sigils, or turn them away.
+  let recruitOpen = false;
+  function openRecruit(confirmId) {
+    const id = S.pendingJoin; if (!id) return;
+    const nm = L.memberById(id); recruitOpen = true; $('modal').dataset.lock = '1';
+    const list = L.companions(S), ups = S.rosterUps || 0, canBuy = ups < L.ROSTER_BUY_MAX;
+    const done = () => { delete $('modal').dataset.lock; recruitOpen = false; closeModal(); save(); try { pushCloud(true); } catch (e) {} updateSeats(true); updateAbilities(true); };
+    if (confirmId) {
+      const m = L.memberById(confirmId);
+      modal('<div class="center"><h2>Dismiss ' + esc(m.name) + ' for good?</h2><p>' + esc(m.name) + ' leaves the Hold and never comes back. Their levels and job go with them; gear they wore returns to your pack. ' + esc(nm.name) + ' takes their place at the fire.</p>' +
+        '<div class="row"><button class="btn ghost" id="rc-back">Go back</button><button class="btn danger" id="rc-yes">Dismiss ' + esc(m.name) + '</button></div></div>', md => {
+          md.querySelector('#rc-back').onclick = () => openRecruit();
+          md.querySelector('#rc-yes').onclick = () => { if (L.acceptRecruit(S, confirmId)) { sfx.relic(); toast(CLASS_ICON[nm.cls] || 'users', nm.name + ' joins you', m.name + ' has left the Hold for good.', 'feat'); } done(); };
+        });
+      return;
+    }
+    modal('<div class="maphead"><div><h2>' + esc(nm.name) + ' wants to join</h2><small>' + esc(nm.title) + ' &middot; ' + L.CLASSES[nm.cls].name + '. Your campfire is full: ' + list.length + ' of ' + L.rosterCap(S) + ' companions.</small></div></div>' +
+      '<p>' + esc(nm.line || nm.bio || '') + '</p><p class="note">To keep ' + esc(nm.name) + ', dismiss someone for good, or add a spot at the fire. If you turn ' + esc(nm.name) + ' away, they will not ask again.</p>' +
+      '<div class="choice">' + list.map(c => { const m = L.memberById(c); return '<button class="pick jpick rdis" data-rdis="' + c + '"><img src="' + SP.spriteURL(m.cls, 2, lookHue(m)) + '" alt=""><b>' + esc(m.name) + '</b><small>Level ' + L.lvl(S, c) + ' ' + L.CLASSES[m.cls].name + (S.party.includes(c) ? ' &middot; in your party' : '') + '</small><em>Dismiss</em></button>'; }).join('') + '</div>' +
+      '<div class="row">' + (canBuy ? '<button class="btn" id="rc-buy">' + sigil + ' Add a spot: ' + fmt(L.ROSTER_COST) + ' ' + TOKEN + '</button>' : '') + '<button class="btn ghost" id="rc-no">Turn ' + esc(nm.name) + ' away</button></div>', md => {
+        md.className = 'sheet wide';
+        md.querySelectorAll('[data-rdis]').forEach(b => b.onclick = () => openRecruit(b.dataset.rdis));
+        md.querySelector('#rc-no').onclick = () => { L.declineRecruit(S); toast('flame', nm.name + ' goes their own way', 'Your campfire stays as it is.', ''); done(); };
+        const by = md.querySelector('#rc-buy'); if (by) by.onclick = async () => { if (await buyRosterSpot()) { L.acceptRecruit(S); sfx.relic(); toast(CLASS_ICON[nm.cls] || 'users', nm.name + ' joins you', 'A new spot by the fire.', 'feat'); done(); } };
+      });
+  }
+  // A campfire spot is a one-time Sigil purchase kept on your account (the wardrobe's owned items r.a, r.b, r.c).
+  const rosterOwned = own => L.ROSTER_ITEMS.filter(k => (own || []).includes(k)).length;
+  function syncRoster(own) { const n = rosterOwned(own); if (n !== (S.rosterUps || 0)) { S.rosterUps = n; save(); updateSeats(true); } }
+  async function buyRosterSpot() {
+    if (!CL || !signedIn()) { toast('lock', 'Sign in first', 'Campfire spots are bought with ' + TOKEN + ' on your account.', 'warn'); return false; }
+    const k = L.ROSTER_ITEMS[S.rosterUps || 0]; if (!k) return false;
+    try {
+      const r = await papi('POST', '/wardrobe', { buy: k });
+      if (prof) { prof.bal = r.bal; prof.own = r.own; } syncRoster(r.own); updatePanel(true); return true;
+    } catch (e) { toast('lock', 'That did not go through', e.code === 'funds' ? 'Not enough ' + TOKEN + '. You need ' + fmt(L.ROSTER_COST) + '.' : e.code === 'owned' ? 'Try again in a moment.' : 'Try again in a moment.', 'warn'); return false; }
+  }
   // Where Descend takes you: the top of the region you climbed up from.
   const backTo = () => Math.min(S.maxFloor, L.regionTop(S.campReturn || S.maxFloor));
   const downLabel = () => backTo() > 1 ? 'Descend to floor ' + backTo() : 'Start fighting';
@@ -915,11 +991,17 @@
     }
     paintHp();
     const bench = S.unlocked.filter(x => !S.party.includes(x));
-    const jobsHtml = '<div class="jobs">' + L.JOBS.map(j => {
+    const nComp = L.companions(S).length, cap = L.rosterCap(S), slots = L.jobSlots(S), usedJobs = Object.keys(S.jobs || {}).filter(k => L.jobFree(S, S.jobs[k])).length;
+    const nextSlot = L.JOB_SLOT_LV.find(x => x > L.heroLv(S));
+    const rosterBar = '<div class="rosterbar"><span>' + icon('flame') + 'Companions <b>' + nComp + ' / ' + cap + '</b></span><small>' + (L.ROSTER_LV.find(x => x > L.heroLv(S)) ? 'One more spot at hero level ' + L.ROSTER_LV.find(x => x > L.heroLv(S)) + '.' : 'Every free spot earned.') + ' When it is full, a new companion means dismissing someone for good.</small>' +
+      ((S.rosterUps || 0) < L.ROSTER_BUY_MAX && CL ? '<button class="btn small ghost" data-rosterbuy>' + sigil + ' +1 spot · ' + fmt(L.ROSTER_COST) + ' ' + TOKEN + '</button>' : '') + '</div>';
+    const jobsHead = L.canUse(S, 'jobs') ? '<div class="jobhead"><b>Camp jobs</b><small>' + usedJobs + ' of ' + slots + ' slots in use' + (nextSlot ? ' &middot; next slot at hero level ' + nextSlot : '') + '</small></div>'
+      : '<div class="lockrow">' + icon('lock') + '<div><b>Camp jobs open at hero level ' + L.unlockOf('jobs').lv + '</b><small>Resting companions will work jobs that help the whole party.</small></div></div>';
+    const jobsHtml = rosterBar + jobsHead + (!L.canUse(S, 'jobs') ? '' : '<div class="jobs">' + L.JOBS.map(j => {
       const id = S.jobs && S.jobs[j.id], on = L.jobFree(S, id), m = on && L.memberById(id);
       return '<button class="job' + (on ? ' on' : '') + '" data-job="' + j.id + '" title="' + esc(j.desc) + '"><span class="jic">' + icon(j.icon) + '</span><b>' + j.name + '</b>' +
         (on ? '<small><img src="' + SP.spriteURL(m.cls, 2, lookHue(m)) + '" alt="">' + esc(m.name) + '</small><em>' + L.jobText(j, L.jobValue(S, j, id)) + '</em>' : '<small class="none">Nobody yet</small><em>' + j.fmt + '</em>') + '</button>';
-    }).join('') + '</div>';
+    }).join('') + '</div>');
     let benchHtml = jobsHtml + bench.map(id => {
       const m = L.memberById(id), job = L.jobOf(S, id);
       const n = buyN() === 'max' ? Math.max(1, L.maxAffordable(S, id)) : buyN(), cost = L.trainCost(S, id, n);
@@ -939,6 +1021,9 @@
     if (t.dataset.autot && !L.passOn(S)) { openPass(); return; }
     if (t.dataset.autot) { const id = t.dataset.autot; S.autoTrain = S.autoTrain || {}; S.autoTrain[id] = !S.autoTrain[id]; if (!S.autoTrain[id]) delete S.autoTrain[id]; sfx.buy(); updateSeats(true); if (S.autoTrain[id]) toast('refresh', 'Auto-train on', L.memberById(id).name + ' will train whenever you have the gold' + (S.party.includes(id) ? '.' : ' and you are at camp.'), ''); return; }
     if (t.id === 'f-auto') { L.autoFormation(S); S.formationManual = false; sfx.buy(); updateSeats(true); updateAbilities(true); toast('shield', 'Party arranged', 'Tank in front, rogue behind it, healers in the middle where they reach everyone, casters at the back.', ''); return; }
+    if (t.dataset.rosterbuy != null) { buyRosterSpot().then(ok => { if (ok) { sfx.relic(); toast('flame', 'A new spot by the fire', 'Your campfire holds ' + L.rosterCap(S) + ' companions now.', 'feat'); } }); return; }
+    if ((t.dataset.unseat || t.dataset.seat) && !gateUse('camp')) return;
+    if ((t.dataset.job || t.dataset.jobfor) && !gateUse('jobs')) return;
     if ((t.dataset.train && !S.party.includes(t.dataset.train)) || t.dataset.unseat || t.dataset.seat || t.dataset.dismiss || t.dataset.job || t.dataset.jobfor) { if (!campGate(true)) return; }
     if (t.dataset.job) { jobModal(t.dataset.job); return; }
     if (t.dataset.jobfor) { jobForModal(t.dataset.jobfor); return; }
@@ -962,6 +1047,7 @@
   };
   ['tab-party', 'tab-camp', 'tab-market'].forEach(id => $(id).addEventListener('click', partyClick));
   // camp jobs: pick who does a job, or which job someone does
+  function jobsFull() { const n = L.JOB_SLOT_LV.find(x => x > L.heroLv(S)); toast('lock', 'Every job slot is taken', 'You can run ' + L.jobSlots(S) + (L.jobSlots(S) === 1 ? ' camp job' : ' camp jobs') + ' at once.' + (n ? ' Another slot opens at hero level ' + n + '.' : '') + ' Clear a job to move someone.', 'warn'); }
   function jobModal(jid) {
     const j = L.JOBS.find(x => x.id === jid), cur = S.jobs && S.jobs[jid];
     const free = S.unlocked.filter(id => L.jobFree(S, id)).sort((a, b) => L.jobValue(S, j, b) - L.jobValue(S, j, a));
@@ -971,7 +1057,7 @@
       '<div class="row">' + (cur && L.jobFree(S, cur) ? '<button class="btn ghost" id="j-clear">Leave the job empty</button>' : '') + '<button class="btn ghost" id="j-close">Close</button></div>', md => {
         md.className = 'sheet wide';
         const done = () => { save(); closeModal(); updateSeats(true); updatePanel(true); };
-        md.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { L.assignJob(S, b.dataset.pick, jid); sfx.buy(); toast(j.icon, L.memberById(b.dataset.pick).name + ' is the ' + j.name, L.jobText(j, L.jobValue(S, j, b.dataset.pick)) + ' while they rest at camp.', 'feat'); done(); });
+        md.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { if (!L.assignJob(S, b.dataset.pick, jid)) return jobsFull(); sfx.buy(); toast(j.icon, L.memberById(b.dataset.pick).name + ' is the ' + j.name, L.jobText(j, L.jobValue(S, j, b.dataset.pick)) + ' while they rest at camp.', 'feat'); done(); });
         const c = md.querySelector('#j-clear'); if (c) c.onclick = () => { L.assignJob(S, cur, null); done(); };
         md.querySelector('#j-x').onclick = closeModal; md.querySelector('#j-close').onclick = closeModal;
       });
@@ -983,7 +1069,7 @@
       '<div class="row">' + (cur ? '<button class="btn ghost" id="j-clear">No job</button>' : '') + '<button class="btn ghost" id="j-close">Close</button></div>', md => {
         md.className = 'sheet wide';
         const done = () => { save(); closeModal(); updateSeats(true); updatePanel(true); };
-        md.querySelectorAll('[data-pj]').forEach(b => b.onclick = () => { const j = L.JOBS.find(x => x.id === b.dataset.pj); L.assignJob(S, id, j.id); sfx.buy(); toast(j.icon, m.name + ' is the ' + j.name, L.jobText(j, L.jobValue(S, j, id)) + ' while they rest at camp.', 'feat'); done(); });
+        md.querySelectorAll('[data-pj]').forEach(b => b.onclick = () => { const j = L.JOBS.find(x => x.id === b.dataset.pj); if (!L.assignJob(S, id, j.id)) return jobsFull(); sfx.buy(); toast(j.icon, m.name + ' is the ' + j.name, L.jobText(j, L.jobValue(S, j, id)) + ' while they rest at camp.', 'feat'); done(); });
         const c = md.querySelector('#j-clear'); if (c) c.onclick = () => { L.assignJob(S, id, null); done(); };
         md.querySelector('#j-x').onclick = closeModal; md.querySelector('#j-close').onclick = closeModal;
       });
@@ -1303,7 +1389,7 @@
       (it.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked. Mass scrap, a full pack and the Loot Goblin all leave it alone' + (w ? ', and Equip best keeps it in its slot' : '') + '. Unlock it to sell, send, salvage or swap it out.</p>' : '') + '</div>', md => {
         const locked = () => { toast('lock', 'This item is locked', 'Unlock it first to sell, send or salvage it.', 'warn'); };
         md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin' + (w ? ', and Equip best leaves it in its slot.' : '.') : L.gearName(it) + ' can be scrapped and sold again.', ''); };
-        const gate = f => () => { if (it.lk) return locked(); if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
+        const gate = f => () => { if (it.lk) return locked(); if (!gateUse('sell')) return; if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
         const en = md.querySelector('#i-ench'); if (en) en.onclick = () => enchantPicker({ dst: uid });
         const ds = md.querySelector('#i-dis'); if (ds) ds.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to disenchant it.', 'warn'); if (w) return toast('flare', 'Take it off first', 'Worn gear cannot be disenchanted.', 'warn'); enchantPicker({ src: uid }); };
         const mg = md.querySelector('#i-merge'); if (mg) mg.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to merge it.', 'warn'); mergePicker(uid); };
@@ -1671,12 +1757,14 @@
     $('embergain').textContent = fmt(e);
     $('kindgain').textContent = L.skillPointsFor(S);
     updateSkills();
-    $('btn-rekindle').disabled = e <= 0;
-    $('rekindlenote').textContent = S.maxFloor < L.REKINDLE_FLOOR ? 'Reach floor ' + L.REKINDLE_FLOOR + ' on this descent to rekindle. You are on floor ' + S.maxFloor + '.'
+    const rk = L.canUse(S, 'rekindle');
+    $('btn-rekindle').disabled = e <= 0 || !rk;
+    $('rekindlenote').textContent = !rk ? 'Rekindling opens at hero level ' + L.unlockOf('rekindle').lv + ', from floor ' + L.REKINDLE_FLOOR + ' or deeper. ' + heroName() + ' is level ' + L.heroLv(S) + '.'
+      : S.maxFloor < L.REKINDLE_FLOOR ? 'Reach floor ' + L.REKINDLE_FLOOR + ' on this descent to rekindle. You are on floor ' + S.maxFloor + '.'
       : 'Deeper floors give more Embers. Most delvers rekindle when progress slows down.';
   }
   $('btn-rekindle').addEventListener('click', () => {
-    const e = L.embersFor(S); if (e <= 0) return;
+    const e = L.embersFor(S); if (e <= 0 || !gateUse('rekindle')) return;
     modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Rekindle now?</h2><p>Gold, floors and training reset to the start. You keep your companions, gear, relics, story and feats, and gain <b style="color:var(--ember)">' + fmt(e) + ' Embers</b> for +' + fmt(e * 4) + '% damage and gold.</p><div class="row" style="justify-content:center"><button class="btn ghost" id="m-no">Not yet</button><button class="btn" id="m-yes">Rekindle</button></div></div>', m => {
       m.querySelector('#m-no').onclick = closeModal;
       m.querySelector('#m-yes').onclick = () => {
@@ -1758,8 +1846,10 @@
   });
   function switchTab(t) {
     tab = t;
+    const f = TAB_FEATURE[t], shut = !!(f && S.hero && !L.canUse(S, f));
     document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-    document.querySelectorAll('.tabbody').forEach(b => b.hidden = b.id !== 'tab-' + t);
+    document.querySelectorAll('.tabbody').forEach(b => b.hidden = b.id !== (shut ? 'tab-locked' : 'tab-' + t));
+    if (shut) $('lockbox').innerHTML = roadHtml(f);
     updatePanel(true);
   }
   const phone = () => matchMedia('(max-width:720px)').matches;
@@ -1773,6 +1863,7 @@
   let lastRelicCount = -1, lastFeatCount = -1, slowTick = 0;
   function updatePanel(force) {
     const now = Date.now();
+    if (force) paintTabLocks();
     $('gold').textContent = fmt(S.gold);
     { const sg = $('sigils'); if (sg) { let bal = typeof prof !== 'undefined' && prof ? prof.bal : null; if (!(bal >= 0)) { bal = null; try { const c = localStorage.getItem('lh_bal'); if (c != null && +c >= 0) bal = +c; } catch (e) {} } const on = bal != null && signedIn(); if (sg.hidden === on) sg.hidden = !on; if (on) { const t = bal.toLocaleString(); if ($('sigilct').textContent !== t) { $('sigilct').textContent = t; try { localStorage.setItem('lh_bal', String(bal)); } catch (e) {} } } } }
     $('dps').textContent = fmt(L.totalDps(S, now));
@@ -1787,6 +1878,7 @@
     if (tab === 'codex') {
       if (cx === 'journal' && force) updateJournal();
       if (cx === 'war' && force) paintWarRoom();
+      if (cx === 'road' && force) $('roadbox').innerHTML = roadHtml() + masteryHtml();
       if (cx === 'relics' && (force || lastRelicCount !== Object.keys(S.relics).length)) updateRelics();
       if (cx === 'stats') { if (force || lastFeatCount !== L.featCount(S)) updateFeats(); updateLedger(); }
     }
@@ -1884,9 +1976,10 @@
     const show = () => {
       const [who, kind, text] = b.lines[i];
       const last = i === b.lines.length - 1;
-      const joined = last && b.join && !replay ? L.memberById(b.join) : null;
+      const joined = last && b.join && !replay && S.unlocked.includes(b.join) ? L.memberById(b.join) : null, waits = last && !replay && b.join && S.pendingJoin === b.join ? L.memberById(b.join) : null;
       modal('<div class="scene-head"><span>Chapter ' + b.ch + '</span><h2>' + esc(b.title) + '</h2></div>' +
         '<div class="line-box"><div class="spk k-' + kind + '">' + icon(SPEAKER_ICON[kind] || 'user') + '</div><div><b>' + esc(who) + '</b><p>' + esc(text) + '</p></div></div>' +
+        (waits ? '<div class="joined">' + icon('flame') + '<span><b>' + esc(waits.name) + '</b> the ' + L.CLASSES[waits.cls].name + ' wants to join, but your campfire is full. You choose next.</span></div>' : '') +
         (joined ? '<div class="joined">' + icon(CLASS_ICON[joined.cls]) + '<span><b>' + esc(joined.name) + '</b> the ' + L.CLASSES[joined.cls].name + ' joins you.' + (S.party.includes(joined.id) ? '' : ' They wait at camp until you make room.') + '</span></div>' : '') +
         '<div class="row" style="justify-content:space-between;align-items:center"><small class="muted">' + (i + 1) + ' / ' + b.lines.length + '</small><button class="btn" id="s-next">' + (last ? (replay ? 'Close' : 'Onward') : 'Continue') + '</button></div>', md => {
           const go = () => { if (last) { delete $('modal').dataset.lock; closeModal(); sceneOpen = false; if (!replay) { save(); updateSeats(true); updateAbilities(true); updateJournal(); } } else { i++; show(); } };
@@ -1896,7 +1989,8 @@
     show();
   }
   function checkStory() {
-    if (sceneOpen || !$('modal').hidden || !S.hero) return;
+    if (sceneOpen || recruitOpen || !$('modal').hidden || !S.hero) return;
+    if (S.pendingJoin) { openRecruit(); return; }
     const b = L.nextStory(S);
     if (b) playScene(b, false);
   }
@@ -2287,6 +2381,7 @@
     try { localStorage.setItem('lh_bal', String(prof.bal)); } catch (e) {}
     if ((prof.pass || 0) !== (S.pass || 0) || (prof.sub || 0) !== (S.sub || 0)) { S.pass = prof.pass || 0; S.sub = prof.sub || 0; save(); updatePanel(true); updateSeats(true); }
     if (!!prof.boh !== !!S.boh) { S.boh = !!prof.boh; save(); updateGear(true); }
+    if (prof.own) syncRoster(prof.own);
     // A verified commander link turns on the hero's Grand War aura.
     const had = JSON.stringify(S.war || null);
     if (prof.wv && prof.wl) { await loadWar(); const c = commander(prof.wl); if (c) S.war = { n: c.n, lv: c.lv | 0, h: c.h.slice(0, 12) }; }
@@ -2903,7 +2998,10 @@
 
   // ---------- chat: Global, Trade and Party ----------
   const CHAT_POLL_OPEN = 5000;
-  const chat = { ch: 'global', leader: null, open: false, msgs: {}, since: {}, timer: 0, me: null, rooms: [], muted: new Set() };
+  const chat = { ch: 'global', leader: null, open: false, msgs: {}, since: {}, timer: 0, me: null, rooms: [], muted: new Set(), dmTo: null, seen: {}, bg: 0, polled: {} };
+  // Unread tracking: the newest message id you have looked at, per channel. Whispers remember it across visits.
+  try { chat.seen.dm = localStorage.getItem('lh_seen_dm') || ''; } catch (e) {}
+  const CHAT_POLL_BG = 20000, WATCH = ['dm', 'global'];
   try { JSON.parse(localStorage.getItem('lanternhold.muted') || '[]').forEach(x => chat.muted.add(x)); } catch (e) {}
   const roomKey = () => chat.ch + (chat.ch === 'party' ? ':' + (chat.leader || 'mine') : '');
   async function chatCall(method, path, body) {
@@ -2913,7 +3011,7 @@
     if (!r.ok) throw Object.assign(new Error(j.error || 'chat'), { status: r.status, code: j.error });
     return j;
   }
-  function chatNote(t, warn) { const n = $('chatnote'); n.textContent = t || 'Be kind. No web links. Ctrl+click an item to link it. Tap a name to mute or report.'; n.classList.toggle('warn', !!warn); }
+  function chatNote(t, warn) { const n = $('chatnote'); n.textContent = t || 'Be kind. No web links. Ctrl+click an item to link it. Tap a name to whisper, mute or report.'; n.classList.toggle('warn', !!warn); }
   // Item links: Ctrl/Cmd+click an item (or use Link in chat) to drop it into the message.
   const ITEM_TOKEN = /\[\[i:(tank|healer|rogue|mage|necro),(weapon|armor|trinket|main|off|head|neck|chest|robe|legs|feet|ring),(common|fine|rare|epic|set|goblin),([a-z]{0,8}),(\d{1,6}),(\d{1,2})\]\]/g;
   // Region set pieces ride in the set field as r plus a letter (ra = the first region).
@@ -2973,9 +3071,45 @@
     if (!S.hero) { log.innerHTML = '<div class="chatempty"><p>Create your hero first.</p></div>'; $('chatform').hidden = true; return; }
     $('chatform').hidden = false;
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-    log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
-      : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : 'Quiet down here. Say hello.') + '</p></div>';
+    paintDmBar();
+    const dm = chat.ch === 'dm', other = m => m.from === chat.me ? { pid: m.to, name: m.toName || 'them' } : { pid: m.from, name: m.name };
+    log.innerHTML = list.length ? list.map(m => dm ? '<div class="msg dm' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-dm="' + esc(other(m).pid) + '" data-dmname="' + esc(other(m).name) + '" title="Whisper back">' + (m.from === chat.me ? '<small class="dmdir">To</small>' + esc(m.toName || '') : '<small class="dmdir">From</small>' + chatName(m)) + '</button><span>' + renderText(m.text) + '</span></div>' : m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
+      : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : chat.ch === 'dm' ? 'No whispers yet. Tap a player’s name in any channel and choose Whisper to message them privately.' : 'Quiet down here. Say hello.') + '</p></div>';
     if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
+  }
+  function mergeMsgs(k, r) {
+    chat.me = r.me;
+    const cur = chat.msgs[k] || [], seen = new Set(cur.map(m => m.id)), add = r.msgs.filter(m => !seen.has(m.id));
+    if (r.msgs.length) { chat.msgs[k] = cur.concat(add).slice(-120); chat.since[k] = chat.msgs[k][chat.msgs[k].length - 1].id; } else chat.msgs[k] = cur;
+    return add;
+  }
+  const viewing = k => chat.open && roomKey() === k && !document.hidden;
+  function markSeen(k) {
+    const l = chat.msgs[k] || []; if (!l.length) return;
+    chat.seen[k] = l[l.length - 1].id; if (k === 'dm') try { localStorage.setItem('lh_seen_dm', chat.seen.dm); } catch (e) {}
+  }
+  const unread = k => (chat.msgs[k] || []).filter(m => m.id > (chat.seen[k] || '') && m.from !== chat.me && m.from !== 'sys' && !chat.muted.has(m.from)).length;
+  function paintUnread() {
+    const n = WATCH.reduce((a, k) => a + unread(k), 0), d = $('chatdot');
+    d.hidden = !n || chat.open; d.textContent = n > 9 ? '9+' : n || '';
+    $('btn-chat').setAttribute('aria-label', n ? 'Open chat, ' + n + ' unread' : 'Open chat');
+    document.querySelectorAll('#chatch [data-ch]').forEach(b => { const k = b.dataset.ch; b.classList.toggle('unread', WATCH.includes(k) && k !== roomKey() && unread(k) > 0); });
+  }
+  // While chat is closed (or on another channel), check Whispers and Global now and then for the unread bubble.
+  async function bgPoll() {
+    clearTimeout(chat.bg);
+    if (CL && signedIn() && S.hero && !document.hidden) {
+      for (const k of WATCH) {
+        if (viewing(k)) continue;
+        try {
+          const first = !chat.polled[k], add = mergeMsgs(k, await chatCall('GET', '/chat?ch=' + k + '&since=' + encodeURIComponent(chat.since[k] || '0')));
+          chat.polled[k] = 1; if (first && k !== 'dm') markSeen(k);
+          if (k === 'dm' && !first) { const w = add.filter(m => m.from !== chat.me && !chat.muted.has(m.from)).pop(); if (w) toast('chat', 'Whisper from ' + w.name, w.text.replace(ITEM_TOKEN, '[item]').slice(0, 90), ''); }
+        } catch (e) { if (k === 'dm' && e.status === 403) { const t = document.querySelector('#chatch [data-ch="dm"]'); if (t) t.hidden = true; } }
+      }
+      paintUnread();
+    }
+    chat.bg = setTimeout(bgPoll, CHAT_POLL_BG);
   }
   async function pollChat() {
     clearTimeout(chat.timer);
@@ -2983,17 +3117,21 @@
     const k = roomKey();
     try {
       const q = '?ch=' + chat.ch + (chat.ch === 'party' && chat.leader ? '&leader=' + chat.leader : '') + '&since=' + encodeURIComponent(chat.since[k] || '0');
-      const r = await chatCall('GET', '/chat' + q);
-      chat.me = r.me;
-      if (r.msgs.length) {
-        const cur = chat.msgs[k] || [], seen = new Set(cur.map(m => m.id));
-        chat.msgs[k] = cur.concat(r.msgs.filter(m => !seen.has(m.id))).slice(-120);
-        chat.since[k] = chat.msgs[k][chat.msgs[k].length - 1].id;
-      } else chat.msgs[k] = chat.msgs[k] || [];
-      if (k === roomKey()) paintChat();
+      mergeMsgs(k, await chatCall('GET', '/chat' + q)); chat.polled[k] = 1;
+      if (k === roomKey()) { paintChat(); if (viewing(k)) markSeen(k); paintUnread(); }
       fetchLooks((chat.msgs[k] || []).map(m => m.from)).then(n => { if (n && k === roomKey()) paintChat(); });
     } catch (e) { if (e.status === 403) { chatNote('You are no longer in that party.', true); } }
     chat.timer = setTimeout(pollChat, CHAT_POLL_OPEN);
+  }
+  function paintDmBar() {
+    const bar = $('dmto'), on = chat.ch === 'dm' && signedIn() && S.hero;
+    bar.hidden = !on; if (!on) return;
+    bar.innerHTML = chat.dmTo ? '<span>Whispering to <b>' + esc(chat.dmTo.name) + '</b></span><button type="button" class="iconbtn" id="dm-clear" aria-label="Stop whispering to ' + esc(chat.dmTo.name) + '">&times;</button>' : '<span>Tap a name to pick who to whisper.</span>';
+  }
+  function whisperTo(pid, name) {
+    if (!pid || pid === chat.me) return;
+    chat.dmTo = { pid, name }; if (!chat.open) openChat(true);
+    setChannel('dm'); setTimeout(() => $('chatin').focus(), 50);
   }
   async function loadRooms() {
     try { const r = await chatCall('GET', '/parties'); chat.me = r.me; chat.rooms = r.parties || []; } catch (e) { chat.rooms = []; }
@@ -3003,12 +3141,12 @@
   }
   function setChannel(ch) {
     chat.ch = ch; document.querySelectorAll('#chatch button').forEach(b => b.classList.toggle('on', b.dataset.ch === ch));
-    $('chatin').placeholder = ch === 'trade' ? 'Looking for, or offering...' : ch === 'banner' ? 'Talk to your banner' : ch === 'party' ? 'Talk to your party' : 'Say something';
+    $('chatin').placeholder = ch === 'dm' ? (chat.dmTo ? 'Whisper to ' + chat.dmTo.name : 'Pick someone to whisper') : ch === 'trade' ? 'Looking for, or offering...' : ch === 'banner' ? 'Talk to your banner' : ch === 'party' ? 'Talk to your party' : 'Say something';
     if (ch === 'party') loadRooms(); else $('chatroom').hidden = true;
     chatNote(); paintChat(); pollChat();
   }
   function openChat(open) {
-    chat.open = open; $('chat').hidden = !open; $('btn-chat').hidden = open; $('chatdot').hidden = true;
+    chat.open = open; $('chat').hidden = !open; $('btn-chat').hidden = open; paintUnread();
     try { localStorage.setItem('lh_chat', open ? '1' : '0'); } catch (e) {}
     if (open) { paintChat(); pollChat(); if (signedIn()) setTimeout(() => $('chatin').focus(), 50); } else clearTimeout(chat.timer);
   }
@@ -3023,29 +3161,34 @@
     $('chatlog').addEventListener('click', e => {
       if (e.target.closest('#chat-in')) { authForm('in'); return; }
       const lk = e.target.closest('[data-link]'); if (lk) { previewItem(lk.dataset.link); return; }
+      const dw = e.target.closest('[data-dm]'); if (dw) { whisperTo(dw.dataset.dm, dw.dataset.dmname); return; }
       const w = e.target.closest('[data-from]'); if (!w || w.dataset.from === chat.me) return;
       const from = w.dataset.from, id = w.dataset.id, name = w.dataset.name;
-      modal('<h2>' + esc(name) + '</h2><p>Mute hides everything this player says, on this device. Report flags this message for review; messages with several reports are hidden for everyone.</p><div class="row"><button class="btn ghost" id="c-mute">Mute ' + esc(name) + '</button><button class="btn danger" id="c-rep">Report message</button><button class="btn ghost" id="c-x">Cancel</button></div>', md => {
+      modal('<h2>' + esc(name) + '</h2><p>Mute hides everything this player says, on this device. Report flags this message for review; messages with several reports are hidden for everyone.</p><div class="row"><button class="btn" id="c-dm">Whisper</button><button class="btn ghost" id="c-mute">Mute ' + esc(name) + '</button><button class="btn danger" id="c-rep">Report message</button><button class="btn ghost" id="c-x">Cancel</button></div>', md => {
         md.querySelector('#c-mute').onclick = () => { chat.muted.add(from); try { localStorage.setItem('lanternhold.muted', JSON.stringify([...chat.muted])); } catch (e) {} closeModal(); paintChat(); toast('lock', 'Muted', 'You won’t see messages from ' + name + '.', ''); };
         md.querySelector('#c-rep').onclick = async () => { closeModal(); try { await chatCall('POST', '/report', { ch: chat.ch, leader: chat.leader || undefined, id }); } catch (e) {} toast('lock', 'Reported', 'Thanks. We’ll keep an eye on it.', ''); };
         md.querySelector('#c-x').onclick = closeModal;
+        md.querySelector('#c-dm').onclick = () => { closeModal(); whisperTo(from, name); };
       });
     });
+    $('dmto').addEventListener('click', e => { if (e.target.closest('#dm-clear')) { chat.dmTo = null; setChannel('dm'); } });
+    setTimeout(bgPoll, 4000);
     $('chatform').addEventListener('submit', async e => {
       e.preventDefault();
       const inp = $('chatin'); let text = inp.value.trim(); if (!text || !S.hero) return;
       for (const l of chat.links) text = text.replace(l.label, l.token);
       text = text.replace(/\[\[(?!i:)/g, '[');
+      if (chat.ch === 'dm' && !chat.dmTo) { chatNote('Tap a player’s name, here or in another channel, to pick who to whisper.', true); return; }
       inp.disabled = true;
       try {
-        await chatCall('POST', '/chat', { ch: chat.ch, leader: chat.leader || undefined, text, name: S.hero.name, cls: S.hero.cls });
+        await chatCall('POST', '/chat', { ch: chat.ch, leader: chat.leader || undefined, to: chat.ch === 'dm' ? chat.dmTo.pid : undefined, text, name: S.hero.name, cls: S.hero.cls });
         inp.value = ''; chat.links = []; chatNote(); pollChat();
       } catch (err) {
-        chatNote({ slow: 'Easy there. One message every few seconds.', links: 'Links aren’t allowed in chat.', name: 'Your hero’s name can’t be used in chat. Start a new hero with a different name.', room: 'You can’t post in that party.' }[err.code] || 'Message not sent. Try again in a moment.', true);
+        chatNote({ slow: 'Easy there. One message every few seconds.', links: 'Links aren’t allowed in chat.', name: 'Your hero’s name can’t be used in chat. Start a new hero with a different name.', room: 'You can’t post in that party.', to: 'That player can’t get whispers right now.' }[err.code] || 'Message not sent. Try again in a moment.', true);
       }
       inp.disabled = false; inp.focus();
     });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && chat.open) pollChat(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (chat.open) pollChat(); bgPoll(); });
   }
   // ---------- map of the Lantern Deep ----------
   // A one-screen world map of the fifteen regions, and a close-up of each region with its ten floors and a dossier.
@@ -3295,7 +3438,7 @@
           const art = stage.querySelector('.rvart'); art.innerHTML = regionSvg(r, base, reached, cur, art.clientHeight / Math.max(1, art.clientWidth));
           dos.innerHTML = dossier(r, base, reached); dos.scrollTop = 0;
         };
-        const travel = f => { closeMap(); if (f !== S.floor) { L.gotoFloor(S, f); S.autoAdvance = f >= S.maxFloor; updateStage(); toast('map', 'Travelled to floor ' + f, L.biomeOf(f).name + (f < S.maxFloor ? '. Descend automatically is off so you stay here. Turn it back on to push deeper.' : '.'), ''); } };
+        const travel = f => { if (f !== S.floor && !gateUse('map')) return; closeMap(); if (f !== S.floor) { L.gotoFloor(S, f); S.autoAdvance = f >= S.maxFloor; updateStage(); toast('map', 'Travelled to floor ' + f, L.biomeOf(f).name + (f < S.maxFloor ? '. Descend automatically is off so you stay here. Turn it back on to push deeper.' : '.'), ''); } };
         const scene = id => { const b = L.STORY.find(q => q.id === id); closeMap(); if (b) playScene(b, true); };
         md.querySelector('#map-x').onclick = closeMap;
         stage.onclick = e => {
@@ -3456,6 +3599,15 @@
         'Each floor has <b>8 monsters</b>. Clear them to go deeper.',
         'Monsters drop <b>gold</b>. Spend it to <b>train</b> your party in the Party tab.',
         'Every <b>25 levels</b> a companion gets a big power jump.']],
+      ['Hero level and unlocks', 'i:star', 'New parts of the game open as your hero levels up. Codex, Progress shows the whole road.', [
+        'Level <b>3</b>: Gear. <b>5</b>: the Campfire. <b>8</b>: map travel and buying on the Market. <b>10</b>: camp jobs.',
+        '<b>12</b>: the Players Guild. <b>15</b>: the Ember Ring. <b>18</b>: selling and the Sigil exchange. <b>20</b>: rekindling. <b>25</b>: world boss and job sets.',
+        'Each region past the first needs a hero level to enter: floors 11+ at 3, 21+ at 6, 31+ at 9, then 12, 15, 18, 20, 22, 25 and up.',
+        'Until then your party keeps working the region it is in. Hero XP grows with depth, and guardians give the most.']],
+      ['Region mastery', 'i:map', 'Every region has three goals. Each one finished is +1% for good.', [
+        '<b>Guardian</b>: beat the region\'s last guardian (+1% damage).',
+        '<b>Warbands</b>: defeat 20 alliance elites in the region (+1% health).',
+        '<b>Relic gear</b>: find a piece of the region\'s set (+1% gold).']],
       ['While you are away', 'i:refresh', 'The game keeps earning when you close it.', [
         'You earn <b>a quarter</b> of your usual gold for up to <b>8 hours</b>.',
         '<b>Night Watch</b> (Skills tab) stretches that up to 3 days.',
@@ -3592,7 +3744,10 @@
         '<b>Main camp</b> (floor 1): swap companions, recruit, train camp companions and change gear. <b>Descend</b> restarts you at the top of the region you left, so floor 99 becomes 91.',
         '<b>Campfire Draught</b>: a field camp for 60 seconds. Change your party\'s gear and keep your floor. No companion swaps.',
         'The party rests and heals at either. Training party members works anywhere.']],
-      ['Camp jobs', 'i:hammer', 'Resting companions can take a job that helps the whole party.', [
+      ['The campfire roster', 'i:users', 'Your campfire holds 4 companions, plus one more at hero levels 10, 20 and 30.', [
+        'When a new companion arrives and the fire is full, dismiss someone for good to keep them, or turn them away.',
+        'Up to 3 more spots can be added for ' + L.ROSTER_COST + ' Sigils each. They are yours for good.']],
+      ['Camp jobs', 'i:hammer', 'Opens at hero level 10 with one job slot; one more slot at levels 15, 20, 25, 30 and 35.', [
         '<b>Forager</b>: gear drops. <b>Runesmith</b>: damage. <b>Herbalist</b>: healing.',
         '<b>Armorer</b>: health. <b>Prospector</b>: gold. <b>Lamplighter</b>: lantern oil.',
         'Grows with level; <b>+50%</b> when the job suits their class. A <i>Hard worker</i> trait adds more.']],
@@ -3612,9 +3767,10 @@
         'Three branches of four skills. The fourth teaches a new ability (keys 6 to 8).',
         'Kindling also buys pack space, extra rings and a second trinket slot.',
         'Reset the tree free at camp. Change class at camp for 15 Kindling.']],
-      ['Rekindling', 'i:lantern', 'From floor 50, start again from floor 1 for permanent Embers.', [
+      ['Rekindling', 'i:lantern', 'At hero level 20, from floor 75 or deeper, start again from floor 1 for permanent Embers.', [
         'Each <b>Ember</b> adds 4% damage and gold forever.',
         'Companions, gear, relics and your character stay; levels reset.',
+        'Embers count from floor 60, so a deeper descent pays far more. Your hero keeps their level.',
         'Rekindle when progress slows down.']],
       ['Story, journal and map', 'i:book', 'The story unfolds as you descend.', [
         'Replay scenes in the <b>Journal</b>.',
@@ -3689,9 +3845,20 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 63, date: 'November 23, 2026', title: 'Why we fight', items: [
+    { v: 65, date: 'November 23, 2026', title: 'Why we fight', items: [
       'A new opening for Lanternhold: the Shattered Reach, the Nyx Rift, the five who answer the call, and why we fight.',
       'It plays once on your first visit. Tap to move through it or skip it any time, and watch it again from Settings.'] },
+    { v: 64, date: 'November 23, 2026', title: 'A slower, deeper descent', items: [
+      'Lanternhold is now paced to be savored, not rushed. New parts of the game open as your hero levels up: Gear at 3, the Campfire at 5, map travel and market buying at 8, camp jobs at 10, the Players Guild at 12, the Ember Ring at 15, selling and the Sigil exchange at 18, rekindling at 20, and the world boss and job sets at 25.',
+      'Each new region needs a hero level to enter. Until then your party keeps working the region it is in. Hero XP needs more per level, and deeper floors and guardians give the most.',
+      'Region mastery: every region has three goals (beat its guardian, defeat 20 alliance elites, find a piece of its set). Each one finished is +1% damage, health or gold for good. See Codex, Progress.',
+      'Your campfire now holds 4 companions, plus one at hero levels 10, 20 and 30. When a new companion arrives and it is full, dismiss someone for good or turn them away. Up to 3 more spots for 300 Sigils each.',
+      'Camp jobs start with one slot and gain one at levels 15, 20, 25, 30 and 35.',
+      'Rekindling now needs hero level 20 and floor 75, and Embers count from floor 60, so a deep descent pays far more than a quick one.',
+      'Nothing you already have is taken away: your hero keeps their level, every floor you reached stays open, companions over the new limit stay, and features you already use stay unlocked.'] },
+    { v: 63, date: 'November 23, 2026', title: 'Whispers and unread messages', items: [
+      'New: whispers. Tap a player’s name in any chat channel and choose Whisper to message them privately. Your conversations live in the new Whispers tab, and tapping a name there whispers back.',
+      'The chat button now shows a red bubble with how many new messages are waiting in Global and Whispers, and a new whisper pops up a notice even while chat is closed.'] },
     { v: 62, date: 'November 23, 2026', title: 'Music for the Deep', items: [
       'Lanternhold now has its own soundtrack: eight original pieces, from the Hearthfire Waltz at camp to the Ember Ring battle theme and a quiet piano nocturne for late watches.',
       'Tap the note button at the top to open the player. Skip forward or back, pick any track, shuffle, set the volume or mute. Your choices are remembered on this device.',
@@ -4035,6 +4202,7 @@
   function sigilsView() {
     let h = '<div class="sigex"><div class="sigbal">' + sigil + '<span>You have <b>' + (prof ? prof.bal.toLocaleString() : '…') + '</b> ' + TOKEN + '</span><button class="btn small ghost" id="s-get">Get Sigils</button></div>';
     if (!S.boh) h += '<div class="sigbal boh">' + icon('bag') + '<span><b>Bag of Holding</b>: an endless pack, bought once for ' + fmt(L.BOH_COST) + ' ' + TOKEN + '.</span><button class="btn small ghost" id="s-boh">See it</button></div>';
+    if (!L.canUse(S, 'sell')) return h + '<div class="lockrow">' + icon('lock') + '<div><b>The Sigil exchange opens at hero level ' + L.unlockOf('sell').lv + '</b><small>' + esc(lockMsg('sell')) + ' Sigils from the store work any time.</small></div></div></div>';
     if (trade.msg) h += '<p class="note">' + esc(trade.msg) + '</p>';
     const x = trade.sig;
     if (x) {
@@ -4358,6 +4526,7 @@
     if (h !== wb.key) { wb.key = h; el.innerHTML = h; el.hidden = !h; el.classList.toggle('on', !!inA); }
   }
   function openBoss() {
+    if (!gateUse('boss')) return;
     const x = wbState(), st = wb.st, ph = L.wbPhase(x.total), pct = Math.floor(ph.into / ph.need * 100);
     const top = st && st.w.id === x.w.id ? st.top : [];
     const rank = x.me && x.me.score > 0 ? top.findIndex(t => t.score <= x.me.score) + 1 : 0;
@@ -4378,6 +4547,7 @@
     });
   }
   function joinAssault() {
+    if (!gateUse('boss')) return;
     const x = wbState();
     if (!x.live || x.ready > 0 || !signedIn()) return openBoss();
     if (L.resting(S, Date.now())) { toast('flame', 'Your party is resting', 'Head back into the deep first, then join the assault.', 'warn'); return; }
@@ -4739,6 +4909,7 @@
       const r = await papi('GET', '/wardrobe');
       if (!wardOK) { wardOK = true; try { updateGear(true); } catch (e) {} }
       if (prof) { prof.bal = r.bal; prof.own = r.own; }
+      syncRoster(r.own);
       const was = JSON.stringify(S.wd || {}); S.wd = r.wd || {};
       if (JSON.stringify(S.wd) !== was) { save(); wardRefresh(); }
       return r;

@@ -1,4 +1,4 @@
-/* lh-build 202611232147 */
+/* lh-build 202611232148 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -8,10 +8,11 @@
   const BOSS_EVERY = 5;
   const BASE_LANTERN = 30;
   const COST_GROWTH = Math.pow(1.07, 0.4);
-  const REKINDLE_FLOOR = 50;
+  const REKINDLE_FLOOR = 75;
   const PARTY_SIZE = 5;
   const REVIVE_TIME = 15;
   const RETRY_AFTER = 75;
+  const FOE_GAP = 0.75;  // seconds before the next foe steps up, so an overpowered party cannot chain hundreds of kills a second
 
   // ---------- classes ----------
   const CLASSES = {
@@ -327,7 +328,7 @@
       foe: null, lantern: 0, foeSwing: 0,
       stats: { kills: 0, bossKills: 0, clicks: 0, chests: 0, goldEarned: 0, rekindles: 0, playTime: 0, crits: 0, wipes: 0, revives: 0 },
       settings: { sound: true, buy: 1, notation: 'short' },
-      lastSeen: Date.now(), created: Date.now(),
+      lastSeen: Date.now(), created: Date.now(), pace: 2, grand: {}, mast: {}, mastE: {}, gone: {}, pendingJoin: null, rosterUps: 0,
     };
   }
 
@@ -383,9 +384,9 @@
 
   function maxHpOf(s, id) {
     const m = memberById(id);
-    return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + EMBER_HP * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp') * (1 + campBonus(s, 'hp')) * (1 + sk(s, 'php') + (id === 'you' ? sk(s, 'hp') : 0)));
+    return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + masteryVal(s, 'hp')) * (1 + EMBER_HP * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp') * (1 + campBonus(s, 'hp')) * (1 + sk(s, 'php') + (id === 'you' ? sk(s, 'hp') : 0)));
   }
-  function partyMult(s) { return emberMult(s) * (1 + kup(s, 'edge')) * (1 + FEAT_PER * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')) * (1 + sk(s, 'pdps')); }
+  function partyMult(s) { return emberMult(s) * (1 + masteryVal(s, 'dps')) * (1 + kup(s, 'edge')) * (1 + FEAT_PER * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')) * (1 + sk(s, 'pdps')); }
   function memberDps(s, id, now) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id), c = CLASSES[m.cls];
@@ -408,7 +409,7 @@
     return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0));
   }
   function clickDamage(s, now) { return (1 + totalDps(s, now) * 0.05) * (1 + relicVal(s, 'whet')); }
-  function goldMult(s) { return emberMult(s) * (1 + gearGold(s)) * (1 + kup(s, 'purse')) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
+  function goldMult(s) { return emberMult(s) * (1 + masteryVal(s, 'gold')) * (1 + gearGold(s)) * (1 + kup(s, 'purse')) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
   function critChance(s) { return 0.04 + relicVal(s, 'dice') + sk(s, 'crit'); }
   function lanternTime(s) { return BASE_LANTERN + kup(s, 'oil') + relicVal(s, 'lamp') + campBonus(s, 'lamp') + sk(s, 'lantern'); }
   function chestChance(s) { return 0.03 + relicVal(s, 'moth') + sk(s, 'chest'); }
@@ -522,7 +523,11 @@
   ];
   const STAT_CLASS = { tank: ['str', 'con'], healer: ['wis', 'cha'], rogue: ['dex', 'lck'], mage: ['int', 'wis'], necro: ['int', 'con'] };
   const STAT_BASE = 10, STAT_AFFINITY = 1.5, STAT_MAX = 99;
-  const xpNeed = lv => Math.round(12 * lv * lv + 20);
+  // Hero XP (pacing v2, John 2026-11-23): steeper, so hero level paces the unlock ladder over weeks, not hours.
+  // Fitted so a steady player reaches level 10 in about 8 hours of play, 20 in about 50 and 40 in about 300 (Act One's end).
+  const XP_A = 330, XP_POW = 2.27;
+  const xpNeed = lv => Math.round(XP_A * Math.pow(lv, XP_POW) * Math.pow(Math.min(1, lv / 10), 1.5) + 40);
+  const xpNeedOld = lv => Math.round(12 * lv * lv + 20);
   function heroLevel(s) {
     // Heroes from before the character sheet start with XP for half their past fights.
     if (s.hxp == null && s.hero) s.hxp = Math.floor(((s.stats && s.stats.kills) || 0) * (1 + (s.maxFloorEver || 1) / 25) * 0.5);
@@ -541,6 +546,89 @@
   }
   const RESPEC_COST = 50; // Sigils, paid on the server before the client calls resetStats
   function resetStats(s) { s.attr = {}; return true; }
+
+  // ---------- Pacing: hero-level unlocks, region gates, campfire roster, region mastery (John, 2026-11-23) ----------
+  // Features open by hero level, which carries over through rekindles, so each one is a goal to build toward.
+  const UNLOCKS = [
+    { id: 'gear',     lv: 3,  name: 'Gear',              icon: 'bag',    desc: 'Equip the weapons and armor monsters drop.' },
+    { id: 'camp',     lv: 5,  name: 'The Campfire',      icon: 'flame',  desc: 'Rest companions at camp, swap your party and train who stays behind.' },
+    { id: 'map',      lv: 8,  name: 'Map travel',        icon: 'map',    desc: 'Travel back to any floor you have reached from the Map of the Deep.' },
+    { id: 'buy',      lv: 8,  name: 'Market: buying',    icon: 'coin',   desc: 'Buy gear other players have listed.' },
+    { id: 'jobs',     lv: 10, name: 'Camp jobs',         icon: 'hammer', desc: 'Put resting companions to work. One job to start, one more every 5 levels.' },
+    { id: 'guild',    lv: 12, name: 'Players Guild',     icon: 'crown',  desc: 'Recruit other players\u2019 heroes into your party.' },
+    { id: 'ring',     lv: 15, name: 'The Ember Ring',    icon: 'sword',  desc: 'Duel other players\u2019 parties for Laurels.' },
+    { id: 'sell',     lv: 18, name: 'Market: selling',   icon: 'coin',   desc: 'Sell and send gear, and trade on the Sigil exchange.' },
+    { id: 'rekindle', lv: 20, name: 'Rekindling',        icon: 'star',   desc: 'Start a new descent from floor ' + REKINDLE_FLOOR + ' or deeper for Embers and Kindling.' },
+    { id: 'boss',     lv: 25, name: 'World boss',        icon: 'skull',  desc: 'Join the weekend assaults on the shared world boss.' },
+    { id: 'jset',     lv: 25, name: 'Job sets',          icon: 'hammer', desc: 'Guardians and chests start dropping job set pieces.' },
+  ];
+  const JOB_SLOT_LV = [10, 15, 20, 25, 30, 35];
+  // The hero level needed to go past each region's guardian into the next one (floors 1-10, 11-20, ...).
+  const REGION_LV = [1, 3, 6, 9, 12, 15, 18, 20, 22, 25, 28, 31, 34, 37, 40];
+  const ROSTER_BASE = 4, ROSTER_LV = [10, 20, 30], ROSTER_BUY_MAX = 3, ROSTER_COST = 300;
+  const ROSTER_ITEMS = ['r.a', 'r.b', 'r.c'];  // one-time Sigil purchases on the wardrobe route
+  const heroLv = s => s.hero ? heroLevel(s).lv : 1;
+  const unlockOf = id => UNLOCKS.find(u => u.id === id);
+  function canUse(s, id) { const u = unlockOf(id); return !u || !!(s.grand && s.grand[id]) || heroLv(s) >= u.lv; }
+  const nextUnlock = s => UNLOCKS.find(u => !canUse(s, u.id)) || null;
+  function newUnlocks(s, before, after) { return UNLOCKS.filter(u => u.lv > before && u.lv <= after && !(s.grand && s.grand[u.id])); }
+  function jobSlots(s) { const lv = heroLv(s); return Math.max((s.grand && s.grand.jslots) || 0, JOB_SLOT_LV.filter(x => lv >= x).length); }
+  const regionNo = f => Math.min(REGION_LV.length - 1, Math.floor((Math.max(1, f) - 1) / 10));
+  // 0 when floor f is open; otherwise the hero level it needs. Floors you have already reached stay open.
+  function regionNeed(s, f) { if (f <= (s.maxFloorEver || 1)) return 0; const need = REGION_LV[regionNo(f)] || 0; return heroLv(s) >= need ? 0 : need; }
+  const companions = s => s.unlocked.filter(id => id !== 'you');
+  function rosterCap(s) { const lv = heroLv(s); return ROSTER_BASE + ROSTER_LV.filter(x => lv >= x).length + Math.min(ROSTER_BUY_MAX, s.rosterUps || 0); }
+  // Story recruits wait here when the campfire is full: keep them by dismissing someone for good, or turn them away.
+  function dismissCompanion(s, id) {
+    if (!id || id === 'you' || !s.unlocked.includes(id)) return false;
+    s.unlocked = s.unlocked.filter(x => x !== id);
+    s.party = s.party.map(x => x === id ? null : x);
+    if (s.jobs) for (const k in s.jobs) if (s.jobs[k] === id) delete s.jobs[k];
+    if (s.autoTrain) delete s.autoTrain[id];
+    delete s.gear[id]; delete s.hp[id]; delete s.down[id]; delete s.levels[id];
+    s.gone = s.gone || {}; s.gone[id] = Date.now();
+    return true;
+  }
+  function acceptRecruit(s, dismissId) {
+    const id = s.pendingJoin; if (!id) return false;
+    if (companions(s).length >= rosterCap(s) && !dismissCompanion(s, dismissId)) return false;
+    s.pendingJoin = null; return recruit(s, id);
+  }
+  function declineRecruit(s) { const id = s.pendingJoin; if (!id) return false; s.gone = s.gone || {}; s.gone[id] = Date.now(); s.pendingJoin = null; return true; }
+  // Region mastery: three goals in every region, each a small permanent bonus.
+  const MASTERY_ELITES = 20, MASTERY_PER = 0.01;
+  const MASTERY = [
+    { bit: 1, k: 'dps',  name: 'Guardian', desc: 'Beat the region\u2019s guardian', fx: 'party damage' },
+    { bit: 2, k: 'hp',   name: 'Warbands', desc: 'Defeat ' + MASTERY_ELITES + ' alliance elites in the region', fx: 'party health' },
+    { bit: 4, k: 'gold', name: 'Relic gear', desc: 'Find a piece of the region\u2019s set', fx: 'gold' },
+  ];
+  function masteryMark(s, r, bit, events) {
+    s.mast = s.mast || {}; const had = s.mast[r] || 0; if (had & bit) return;
+    s.mast[r] = had | bit; events && events.push({ type: 'mastery', region: r, goal: MASTERY.find(m => m.bit === bit) });
+  }
+  function masteryStars(s, r) { const v = (s.mast || {})[r] || 0; return (v & 1 ? 1 : 0) + (v & 2 ? 1 : 0) + (v & 4 ? 1 : 0); }
+  function masteryVal(s, k) { const g = MASTERY.find(m => m.k === k); if (!g) return 0; let n = 0; for (const r in (s.mast || {})) if (s.mast[r] & g.bit) n++; return n * MASTERY_PER; }
+  // Saves from before pacing v2 keep their hero level, the features they have already used and their mastery so far.
+  function paceMigrate(s) {
+    if (s.pace >= 2) return;
+    if (s.hero && s.hxp != null) {
+      let lv = 1, x = s.hxp; while (x >= xpNeedOld(lv)) { x -= xpNeedOld(lv); lv++; }
+      let t = 0; for (let i = 1; i < lv; i++) t += xpNeed(i);
+      s.hxp = t + Math.floor(x / xpNeedOld(lv) * xpNeed(lv));
+    }
+    const g = s.grand = s.grand || {};
+    if (s.bag.length || Object.keys(s.gear).some(id => Object.keys(s.gear[id] || {}).length)) g.gear = 1;
+    if (companions(s).some(id => !s.party.includes(id)) || s.maxFloorEver > 10) g.camp = 1;
+    if (s.maxFloorEver > 10) g.map = 1;
+    const nj = Object.keys(s.jobs || {}).length; if (nj) { g.jobs = 1; g.jslots = nj; }
+    if ((s.guests || []).length) g.guild = 1;
+    if ((s.stats && s.stats.rekindles) || s.embers > 0) g.rekindle = 1;
+    if (s.bag.some(it => it.jset)) g.jset = 1;
+    s.mast = s.mast || {};
+    for (let r = 0; r < REGION_LV.length; r++) if (s.maxFloorEver > r * 10 + 10) s.mast[r] = (s.mast[r] || 0) | 1;
+    for (const it of s.bag) if (it.rset != null && it.rset < REGION_LV.length) s.mast[it.rset] = (s.mast[it.rset] || 0) | 4;
+    s.pace = 2;
+  }
   function statVal(s, key) {
     const c = heroCls(s), pri = STAT_CLASS[c] || [];
     let t = 0;
@@ -553,7 +641,7 @@
     const before = heroLevel(s).lv;
     s.hxp += base * (1 + sk(s, 'xp'));
     const after = heroLevel(s).lv;
-    if (after > before && events) events.push({ type: 'herolevel', lv: after, pts: pointsFor(after) - pointsFor(before) });
+    if (after > before && events) events.push({ type: 'herolevel', lv: after, from: before, pts: pointsFor(after) - pointsFor(before) });
   }
   // Total of one effect from your hero's tree, Grand War aura and character stats. It only counts while your hero is in the party.
   // Tonics from the Quartermaster: small timed buffs, one of each at a time; drinking again adds time up to an hour.
@@ -714,13 +802,13 @@
   // Items in the pack. Gear someone is wearing lives on them, not in the pack.
   function packCount(s) { let n = 0; for (const it of s.bag) if (!wearer(s, it.uid)) n++; return n; }
   function resetSkills(s) { s.kindling = (s.kindling || 0) + skillSpent(s); s.skills = {}; }
-  // Kindling earned by rekindling now: 2 at floor 50, plus 1 for every 10 floors deeper.
+  // Kindling earned by rekindling: 2 at the rekindle floor (75), plus 1 for every 10 floors deeper.
   function skillPointsFor(s) { return s.maxFloor < REKINDLE_FLOOR ? 0 : 2 + Math.floor((s.maxFloor - REKINDLE_FLOOR) / 10); }
 
   function embersFor(s) {
     const f = s.maxFloor;
     if (f < REKINDLE_FLOOR) return 0;
-    return Math.floor(Math.pow(f - 40, 1.25) / 10 * (1 + relicVal(s, 'heart')));
+    return Math.floor(Math.pow(f - 60, 1.25) / 10 * (1 + relicVal(s, 'heart')));
   }
 
 
@@ -893,8 +981,8 @@
     let it = null;
     const rk = foe.boss ? 'boss' : foe.chest ? 'chest' : foe.elite ? 'elite' : foe.pack ? 'pack' : 'foe';
     if (!foe.goblin && r() < RSET_DROP[rk] * loot) it = rollRegionSet(s, f, r);
-    if (it) s.lore['rset_' + it.rset] = Date.now();
-    else if (f >= 20 && (foe.boss ? r() < 0.03 * loot : foe.chest ? r() < 0.008 * loot : false)) it = rollJobSet(s, f, r);
+    if (it) { s.lore['rset_' + it.rset] = Date.now(); if (it.rset < REGION_LV.length) masteryMark(s, it.rset, 4, events); }
+    else if (f >= 20 && canUse(s, 'jset') && (foe.boss ? r() < 0.03 * loot : foe.chest ? r() < 0.008 * loot : false)) it = rollJobSet(s, f, r);
     else if (foe.boss) {
       if (f >= 15 && r() < 0.06 * loot) it = rollGear(s, f, { set: true }, r);
       else if (r() < 0.6 * loot) it = rollGear(s, f, { boost: 1 }, r);
@@ -1395,7 +1483,8 @@
     s.jobs = s.jobs || {};
     for (const k in s.jobs) if (s.jobs[k] === id) delete s.jobs[k];
     if (!jobId) return true;
-    if (!JOBS.some(j => j.id === jobId) || !jobFree(s, id)) return false;
+    if (!JOBS.some(j => j.id === jobId) || !jobFree(s, id) || !canUse(s, 'jobs')) return false;
+    if (!s.jobs[jobId] && Object.keys(s.jobs).length >= jobSlots(s)) return false;
     s.jobs[jobId] = id; return true;
   }
   const jobText = (job, v) => job.stat === 'lamp' ? '+' + v.toFixed(1) + 's ' + job.fmt : '+' + Math.round(v * 100) + '% ' + job.fmt;
@@ -1582,6 +1671,7 @@
       if (dmg < foe.hp) { foe.hp -= dmg; drain(s, dmg); return; }
       amount -= foe.hp / mult; drain(s, foe.hp);
       killFoe(s, now, rng, events);
+      if (s.foeGap > (now || Date.now())) return;
       if (s.foe && s.foe.boss) return;
     }
   }
@@ -1631,7 +1721,7 @@
     const foe = s.foe, f = s.floor;
     let g = foeGold(f, foe.boss) * goldMult(s);
     if (foe.chest) { g *= 10 * (1 + relicVal(s, 'tooth')); s.stats.chests++; }
-    if (foe.elite) { g *= 3; unlockLore(s, 'war_' + foe.side, events); }
+    if (foe.elite) { g *= 3; unlockLore(s, 'war_' + foe.side, events); const rn = regionNo(f); s.mastE = s.mastE || {}; s.mastE[rn] = (s.mastE[rn] || 0) + 1; if (s.mastE[rn] >= MASTERY_ELITES) masteryMark(s, rn, 2, events); }
     if (foe.pack) { g *= foe.pack * PACK_GOLD * (1 + sk(s, 'spoils')); s.stats.packs = (s.stats.packs || 0) + 1; s.stats.kills += foe.pack - 1; }
     if (foe.goblin) {
       g *= GOBLIN_GOLD; s.stats.goblins = (s.stats.goblins || 0) + 1;
@@ -1647,10 +1737,11 @@
     if (foe.boss && f % 10 === 0) unlockLore(s, 'g' + (Math.floor((f - 1) / 10) % BIOMES.length), events);
     dropGear(s, foe, rng, events);
     dropSigils(s, foe, rng, events);
-    s.foe = null; s.foeSwing = 0;
+    s.foe = null; s.foeSwing = 0; if (!foe.goblin) s.foeGap = (now || Date.now()) + FOE_GAP * 1000;
     if (foe.boss) {
       s.stats.bossKills++;
-      const firstClear = f >= s.maxFloorEver - 1;
+      if (f % 10 === 0) masteryMark(s, regionNo(f), 1, events);
+      const firstClear = f >= s.maxFloorEver - 1 && !regionNeed(s, f + 1);
       const chance = f < 10 ? 0 : (firstClear ? 0.35 : 0.03);
       const r = rng || Math.random;
       if (r() < chance) {
@@ -1670,6 +1761,14 @@
     if (s.floor >= ACT_ONE_END && !actTwoOpen()) {
       if (s.floor >= s.maxFloor) { s.maxFloor = Math.max(s.maxFloor, ACT_ONE_END + 1); if (s.maxFloor > s.maxFloorEver) { s.maxFloorEver = s.maxFloor; events && events.push({ type: 'newfloor', floor: s.maxFloor }); } }
       s.lantern = 0; s.foeIdx = 0; healParty(s, 0.3, true); events && events.push({ type: 'sealed' });
+      return;
+    }
+    // The next region opens at a hero level (pacing v2). Until then the party keeps working this one.
+    const need = regionNeed(s, s.floor + 1);
+    if (need && (s.autoAdvance || boss)) {
+      s.lantern = 0; s.foeIdx = 0; healParty(s, 0.3, true);
+      events && events.push({ type: 'regionlock', need, floor: s.floor + 1 });
+      if (boss) s.floor = Math.max(1, s.floor - 1);
       return;
     }
     if (s.floor >= s.maxFloor) {
@@ -1817,6 +1916,7 @@
     for (const id of s.party) if (id && s.down[id] && s.down[id] <= now) { delete s.down[id]; s.hp[id] = maxHpOf(s, id) * 0.4; }
     s.minions = s.minions.filter(m => m.until > now && m.hp > 0);
     if (!alive(s).length) return; // nobody to fight
+    if ((s.foeGap || 0) > now) return; // the next foe is still on its way
     if (!s.foe) { s.foe = makeFoe(s, rng); if (s.foe.pack) events && events.push({ type: 'pack', n: s.foe.pack, name: s.foe.name }); }
     if (s.retryAt && !s.autoAdvance && now >= s.retryAt) { s.autoAdvance = true; s.retryAt = 0; events && events.push({ type: 'retry' }); }
     if (s.foe.goblin) {
@@ -1862,6 +1962,7 @@
 
   function strike(s, now, rng, events, auto) {
     if (resting(s, now)) return 0;
+    if ((s.foeGap || 0) > (now || Date.now())) return 0;
     if (!s.foe) s.foe = makeFoe(s, rng);
     let dmg = clickDamage(s, now);
     const crit = (rng || Math.random)() < critChance(s);
@@ -1874,7 +1975,7 @@
 
   function rekindle(s) {
     const e = embersFor(s);
-    if (e <= 0) return 0;
+    if (e <= 0 || !canUse(s, 'rekindle')) return 0;
     s.kindling = (s.kindling || 0) + skillPointsFor(s);
     s.embers += e; s.stats.rekindles++;
     s.gold = 0; s.floor = 1; s.foeIdx = 0; s.maxFloor = 1; s.foe = null; s.lantern = 0; s.campReturn = 0; s.campUntil = 0;
@@ -1887,11 +1988,12 @@
 
   // Story: returns the next beat to show (and applies it), or null.
   function nextStory(s) {
+    if (s.pendingJoin) return null; // the story waits while a recruit stands at a full campfire
     for (const b of STORY) {
       if (s.story.seen[b.id]) continue;
       if (!b.when(s)) return null; // beats play in order
       s.story.seen[b.id] = Date.now();
-      if (b.join) recruit(s, b.join);
+      if (b.join && !s.unlocked.includes(b.join) && !(s.gone && s.gone[b.join])) { if (companions(s).length >= rosterCap(s)) s.pendingJoin = b.join; else recruit(s, b.join); }
       for (const id of STORY_LORE[b.id] || []) if (!s.lore[id]) s.lore[id] = Date.now();
       if (b.id === 'end') s.lore.g7 = Date.now();
       return b;
@@ -1968,11 +2070,14 @@
     const OLD = { weapon: 'main', armor: 'chest', trinket: 'neck' };
     for (const id in s.gear) for (const k in OLD) if (s.gear[id][k]) { s.gear[id][OLD[k]] = s.gear[id][k]; delete s.gear[id][k]; } s.lore = Object.assign({ hold: 1 }, o.lore || {});
     registerHero(s);
+    s.pace = o.pace || 0; s.grand = o.grand || {}; s.mast = o.mast || {}; s.mastE = o.mastE || {}; s.gone = o.gone || {}; s.rosterUps = o.rosterUps || 0;
+    paceMigrate(s);
     for (const id of s.party) if (id && (s.hp[id] == null || s.hp[id] <= 0)) s.hp[id] = maxHpOf(s, id);
     return s;
   }
 
   const api = {
+    UNLOCKS, JOB_SLOT_LV, REGION_LV, ROSTER_BASE, ROSTER_LV, ROSTER_BUY_MAX, ROSTER_COST, ROSTER_ITEMS, MASTERY, MASTERY_ELITES, MASTERY_PER, heroLv, unlockOf, canUse, nextUnlock, newUnlocks, jobSlots, regionNo, regionNeed, companions, rosterCap, dismissCompanion, acceptRecruit, declineRecruit, masteryStars, masteryVal, paceMigrate,
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, atMainCamp, regionTop, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, TRAIT_FX, CAMP_TRAITS, traitsOf, traitState, traitVal, traitText, campTrait, tonicById, tonicLeft, tonicVal, drinkTonic,
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,

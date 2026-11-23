@@ -39,7 +39,7 @@ Resources:
       VerificationMessageTemplate:
         DefaultEmailOption: CONFIRM_WITH_CODE
         EmailSubject: Your Lanternhold code
-        EmailMessage: 'Your Lanternhold code is {####}. Enter it in the game to finish. If you did not ask for this, you can ignore this email.'
+        EmailMessage: 'Your Lanternhold code is {####}. Enter it in the game to finish. If you asked for more than one code, only the code in the newest email works. If you did not ask for this, you can ignore this email.'
       UserPoolTags:
         app: lanternhold
       LambdaConfig:

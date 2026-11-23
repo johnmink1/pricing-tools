@@ -460,7 +460,7 @@
   function classTag(cls) { return '<span class="ctag c-' + cls + '">' + L.CLASSES[cls].name + '</span>'; }
   function portrait(id) {
     const m = L.memberById(id);
-    return '<div class="ic c-' + m.cls + (m.player ? ' player' : '') + '" data-prof="' + id + '" role="button" tabindex="0" title="About ' + esc(m.name) + '">' + icon(CLASS_ICON[m.cls]) + '</div>';
+    return '<div class="ic c-' + m.cls + (m.player ? ' player' : '') + '" data-prof="' + id + '" role="button" tabindex="0" title="About ' + esc(m.name) + '"><img src="' + SP.spriteURL(m.cls, 2, m.hue || 0) + '" alt=""></div>';
   }
   function memberStatsLine(id, now) {
     const m = L.memberById(id), L_ = L.lvl(S, id);
@@ -500,12 +500,14 @@
       html += '<div class="seat' + (down ? ' down' : '') + (m.player ? ' mine' : '') + '"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span>' + mv + portrait(id) +
         '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
         '<div class="lv">' + (down ? 'Fallen. Back up in ' + Math.ceil((down - now) / 1000) + 's' : memberStatsLine(id, now)) + '</div>' +
-        '<div class="hpbar"><i data-hp="' + id + '"></i></div></div>' + btn +
-        (id !== 'you' && !guest ? '<button class="mini x" data-unseat="' + i + '" title="Send to the campfire" aria-label="Send to the campfire">&times;</button>' : '') + '</div>';
+        '<div class="hpbar"><i data-hp="' + id + '"></i></div></div><div class="acts">' + btn +
+        (id !== 'you' && !guest ? '<button class="rest" data-unseat="' + i + '" title="Send ' + esc(m.name) + ' to the campfire to free this seat">To campfire</button>' : '') + '</div></div>';
     }
     if (html !== seatsHtml) {
       box.innerHTML = html; seatsHtml = html;
-      $('fnotes').innerHTML = L.formationNotes(S).map(n => '<li class="' + (n.warn ? 'warn' : 'ok') + '">' + esc(n.text) + '</li>').join('') + '<li class="tip">Healers heal less the farther they stand from who they heal. Some monsters ambush from behind and hit the rear first; a tank at the back guards it.</li>';
+      const fns = L.formationNotes(S), nw = fns.filter(n => n.warn).length;
+      $('fsum').innerHTML = nw ? 'Formation tips: <b>' + nw + (nw === 1 ? ' warning' : ' warnings') + '</b>' : 'Formation tips: looking good';
+      $('fnotes').innerHTML = fns.map(n => '<li class="' + (n.warn ? 'warn' : 'ok') + '">' + esc(n.text) + '</li>').join('') + '<li class="tip">Healers heal less the farther they stand from who they heal. Some monsters ambush from behind and hit the rear first; a tank at the back guards it.</li>';
     }
     paintHp();
     const bench = S.unlocked.filter(x => !S.party.includes(x));
@@ -561,7 +563,7 @@
       h += '<ol class="steps"><li><b>Sign in</b> with a free account.</li><li>Press <b>Browse the guild</b> to see players’ heroes.</li><li>Press <b>Recruit</b> to put one in an empty seat.</li></ol>' +
         '<button class="btn small" id="b-signin">Sign in to recruit</button>';
     } else {
-      h += (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note warnline">All five seats are full. Press &times; on a companion to send them to the campfire and make room.</p>') +
+      h += (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note">Your party is full. When you recruit, you choose who steps out.</p>') +
         '<button class="btn small" id="b-find">' + (boardList ? 'Show other heroes' : 'Browse the guild') + '</button>';
       if (boardMsg) h += '<p class="note">' + esc(boardMsg) + '</p>';
       if (boardList) h += '<div class="board">' + boardList.map(g => '<div class="seat bench"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div><div class="info"><div class="nm">' + esc(g.name) + ' ' + classTag(g.cls) + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
@@ -578,11 +580,23 @@
   }
   async function recruitPlayer(gid) {
     const g = (boardList || []).find(x => x.id === gid); if (!g) return;
-    if (!S.party.includes(null)) { toast('user', 'No empty seat', 'Send a companion to the campfire first, then recruit.', 'warn'); return; }
-    L.addGuest(S, { id: 'p_' + g.id, name: g.name, cls: g.cls, level: g.level });
-    try { await api('POST', { heroId: g.id }, '/recruit'); } catch (e) {}
-    toast('user', g.name + ' joins your party', 'A ' + L.CLASSES[g.cls].name + ' at level ' + g.level + '.', 'feat');
-    updateSeats(true); updateAbilities(true); paintBoard();
+    const join = async () => {
+      L.addGuest(S, { id: 'p_' + g.id, name: g.name, cls: g.cls, level: g.level });
+      try { await api('POST', { heroId: g.id }, '/recruit'); } catch (e) {}
+      sfx.buy(); toast('users', g.name + ' joins your party', 'A ' + L.CLASSES[g.cls].name + ' at level ' + g.level + '.', 'feat');
+      updateSeats(true); updateAbilities(true); paintBoard();
+    };
+    if (S.party.includes(null)) return join();
+    modal('<h2>Make room for ' + esc(g.name) + '</h2><p>Your party is full. Who should step out? Story companions go back to the campfire, and players’ heroes are dismissed.</p><div class="choice">' +
+      S.party.map((x, i) => x === 'you' || !x ? '' : '<button class="pick" data-out="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', level ' + L.lvl(S, x) + (L.isGuest(S, x) ? ' &middot; player' : '') + '</small></button>').join('') +
+      '</div><div class="row"><button class="btn ghost" id="m-cancel">Cancel</button></div>', md => {
+        md.querySelectorAll('[data-out]').forEach(b => b.onclick = () => {
+          const i = +b.dataset.out, x = S.party[i];
+          if (L.isGuest(S, x)) L.dismissGuest(S, x); else L.unseat(S, i);
+          closeModal(); join();
+        });
+        md.querySelector('#m-cancel').onclick = closeModal;
+      });
   }
 
   // ---------- abilities bar ----------
@@ -621,7 +635,7 @@
   }
   function itemChip(it, extra, cls) {
     const w = L.wearer(S, it.uid);
-    return '<div class="item r-' + it.rar + (cls ? ' ' + cls : '') + '" data-item="' + it.uid + '" role="button" tabindex="0">' + icon(SLOT_ICON[it.slot]) + '<span><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.SLOT_NAME[it.slot] + ' &middot; ' + itemEffect(it) + (w ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(w).name) + '</i>' : '') + '</small></span>' + (extra || '') + '</div>';
+    return '<div class="item r-' + it.rar + (cls ? ' ' + cls : '') + '" data-item="' + it.uid + '" role="button" tabindex="0"><img class="iimg sm" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt=""><span><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.SLOT_NAME[it.slot] + ' &middot; ' + itemEffect(it) + (w ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(w).name) + '</i>' : '') + '</small></span>' + (extra || '') + '</div>';
   }
   // How an item compares to what this member wears in that slot, in gear percent.
   function compareTag(it, id) {
@@ -640,33 +654,48 @@
     if (!force && key === gearKey) return; gearKey = key;
     $('gearwho').innerHTML = who.map(id => {
       const m = L.memberById(id), n = Object.keys(L.betterFor(S, id)).length;
-      return '<button class="whochip c-' + m.cls + (id === gearWho ? ' on' : '') + '" data-who="' + id + '">' + icon(CLASS_ICON[m.cls]) + '<span>' + esc(m.name) + '</span>' + (n ? '<em title="Better gear in your pack">' + n + '</em>' : '') + '</button>';
+      return '<button class="whochip c-' + m.cls + (id === gearWho ? ' on' : '') + '" data-who="' + id + '"><img src="' + SP.spriteURL(m.cls, 2, m.hue || 0) + '" alt=""><span>' + esc(m.name) + '</span>' + (n ? '<em title="Better gear in your pack">' + n + '</em>' : '') + '</button>';
     }).join('');
     const m = L.memberById(gearWho), g = S.gear[gearWho] || {}, cname = L.CLASSES[m.cls].name;
     const set = L.SETS.find(x => x.cls === m.cls), sc = L.setCount(S, gearWho, set.id);
     const better = L.betterFor(S, gearWho), nb = Object.keys(better).length;
-    let h = '<div class="gearhead">' + portrait(gearWho) + '<div><b>' + esc(m.name) + '</b> ' + classTag(m.cls) + '<small>Can wear <b>' + cname + '</b> gear only. Tap any piece for details.</small></div>' +
-      '<button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
-    h += L.SLOTS.map(sl => {
+    const slotTile = sl => {
       const it = g[sl] && L.itemOf(S, g[sl]);
-      const hint = better[sl] ? '<span class="cmp up">Upgrade in pack</span>' : '';
-      return '<div class="slot"><span class="slab">' + L.SLOT_NAME[sl] + '</span>' + (it ? itemChip(it, hint) : '<div class="item none">' + icon(SLOT_ICON[sl]) + '<span><b>Empty</b><small>' + (better[sl] ? 'You have one in your pack.' : 'No ' + cname.toLowerCase() + ' ' + L.SLOT_NAME[sl].toLowerCase() + ' found yet.') + '</small></span>' + hint + '</div>') + '</div>';
-    }).join('') + '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span>' + sc + '/3</span><small>' + cname + ' set. 2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>';
+      const up = better[sl] ? '<i class="upb" title="Better one in your pack">&#9650;</i>' : '';
+      if (!it) return '<div class="dslot ds-' + sl + ' empty" title="Empty ' + L.SLOT_NAME[sl].toLowerCase() + ' slot"><div class="tile ghost"><img class="iimg" src="' + SP.itemIcon(m.cls, sl, 'common') + '" alt="">' + up + '</div><span>' + L.SLOT_NAME[sl] + '</span></div>';
+      return '<div class="dslot ds-' + sl + '"><div class="tile r-' + it.rar + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + up + '</div><span>' + L.SLOT_NAME[sl] + '</span></div>';
+    };
+    // totals from worn gear
+    let dmg = 0, hp = 0, heal = 0;
+    for (const sl of L.SLOTS) { const it = g[sl] && L.itemOf(S, g[sl]); if (!it) continue; const p = L.gearPct(it);
+      if (sl === 'weapon') { dmg += p; if (it.cls === 'healer') heal += p; } else if (sl === 'armor') hp += p; else if (it.cls === 'healer') { heal += p; hp += p / 2; } else { dmg += p / 2; hp += p / 2; } }
+    const pc = v => '+' + Math.round(v * 100) + '%';
+    const totals = [m.cls === 'healer' ? ['Healing', heal] : ['Damage', dmg], ['Health', hp]].map(([k, v]) => '<div><small>' + k + '</small><b>' + pc(v) + '</b></div>').join('');
+    let h = '<div class="doll">' + slotTile('weapon') +
+      '<div class="dfig" data-prof="' + gearWho + '" role="button" tabindex="0" title="About ' + esc(m.name) + '"><img src="' + SP.spriteURL(m.cls, 5, m.hue || 0) + '" alt=""><b>' + esc(m.name) + '</b>' + classTag(m.cls) + '</div>' +
+      slotTile('armor') + slotTile('trinket') +
+      '<div class="dstats">' + totals + '</div></div>' +
+      '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>' +
+      '<div class="dollbar"><small>' + cname + ' gear only. Tap a piece for details.</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
     $('bagcount').textContent = S.bag.length + '/' + L.GEAR_CAP;
+    const tile = (it, dim) => {
+      const w = L.wearer(S, it.uid), fit = it.cls === m.cls;
+      const cur = fit && (S.gear[gearWho] || {})[it.slot], ci = cur && L.itemOf(S, cur);
+      const d = fit && !w ? Math.round((L.gearPct(it) - (ci ? L.gearPct(ci) : 0)) * 100) : 0;
+      return '<div class="tile r-' + it.rar + (dim ? ' dim' : '') + (w ? ' worn' : '') + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + ' (' + itemEffect(it) + ')' + (w ? ', worn by ' + esc(L.memberById(w).name) : '') + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' +
+        (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (d > 0 ? '<i class="upb">&#9650;</i>' : '') + (w ? '<i class="wb" title="Worn">' + esc(L.memberById(w).name.charAt(0)) + '</i>' : '') + '</div>';
+    };
     const fits = S.bag.filter(it => it.cls === m.cls).sort((a, b) => L.gearPct(b) - L.gearPct(a));
     const others = S.bag.filter(it => it.cls !== m.cls);
     let bh = '<h4 class="packh">Fits ' + esc(m.name) + ' <em>' + fits.length + '</em></h4>';
-    bh += fits.length ? fits.map(it => {
-      const mine = L.wearer(S, it.uid) === gearWho;
-      return itemChip(it, compareTag(it, gearWho) + (mine ? '' : '<button class="btn small" data-equip="' + it.uid + '">Equip</button>'), mine ? 'mine' : '');
-    }).join('') : '<p class="note">No ' + cname.toLowerCase() + ' gear in your pack yet.</p>';
+    bh += fits.length ? '<div class="grid">' + fits.map(it => tile(it)).join('') + '</div>' : '<p class="note">No ' + cname.toLowerCase() + ' gear in your pack yet.</p>';
     if (others.length) {
-      bh += '<details class="others"><summary>Other classes <em>' + others.length + '</em> <small>Gear for the rest of your roster. Pick that companion above to equip it.</small></summary>';
+      bh += '<details class="others"><summary>Other classes <em>' + others.length + '</em></summary>';
       for (const c of L.CLASS_ORDER) {
         const list = others.filter(it => it.cls === c); if (!list.length) continue;
         const owners = who.filter(id => L.memberById(id).cls === c).map(id => esc(L.memberById(id).name));
-        bh += '<div class="ogroup"><span class="slab">' + L.CLASSES[c].name + ' gear' + (owners.length ? ' &middot; for ' + owners.join(', ') : ' &middot; nobody can wear this yet') + '</span>' + list.map(it => itemChip(it, '', 'dim')).join('') + '</div>';
+        bh += '<div class="ogroup"><span class="slab">' + L.CLASSES[c].name + (owners.length ? ' &middot; ' + owners.join(', ') : ' &middot; nobody can wear this yet') + '</span><div class="grid">' + list.sort((a, b) => L.gearPct(b) - L.gearPct(a)).map(it => tile(it, true)).join('') + '</div></div>';
       }
       bh += '</details>';
     }
@@ -679,7 +708,7 @@
     const w = e.target.closest('[data-who]'); if (w) { gearWho = w.dataset.who; updateGear(true); return; }
     const eq = e.target.closest('[data-equip]'); if (eq) { if (L.equip(S, gearWho, eq.dataset.equip)) { sfx.buy(); updateGear(true); updateSeats(true); } return; }
     if (e.target.closest('#g-best')) { const n = L.equipBest(S, gearWho); if (n) { sfx.buy(); toast('gear-armor', 'Best gear on', n + (n === 1 ? ' piece' : ' pieces') + ' equipped on ' + L.memberById(gearWho).name + '.', ''); updateGear(true); updateSeats(true); } return; }
-    if (e.target.closest('.gearhead .ic')) { profileModal(gearWho); return; }
+    if (e.target.closest('.dfig')) { profileModal(gearWho); return; }
     const it = e.target.closest('[data-item]'); if (it) { if ((e.ctrlKey || e.metaKey) && linkItem(L.itemOf(S, it.dataset.item))) return; itemModal(it.dataset.item); }
   });
   ['tab-gear', 'tab-party'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof]')) { e.preventDefault(); e.target.click(); } }));
@@ -690,7 +719,7 @@
     const set = it.set && L.SETS.find(x => x.id === it.set);
     const fits = m.cls === it.cls;
     const cost = L.upgradeCost(it), maxed = it.up >= L.UP_MAX;
-    modal('<div class="itemhead r-' + it.rar + '">' + icon(SLOT_ICON[it.slot]) + '<div><h2>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</h2><small>' + L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + L.CLASSES[it.cls].name + ' only &middot; found on floor ' + it.ilvl + '</small></div></div>' +
+    modal('<div class="itemhead r-' + it.rar + '"><div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt=""></div><div><h2>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</h2><small>' + L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + L.CLASSES[it.cls].name + ' only &middot; found on floor ' + it.ilvl + '</small></div></div>' +
       '<p class="effect">' + itemEffect(it) + '</p>' +
       (set ? '<div class="setinfo on"><b>' + set.name + '</b><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
       (w ? '<p>Worn by ' + esc(L.memberById(w).name) + '.</p>' : fits ? '<p>' + compareTag(it, gearWho) + ' than what ' + esc(m.name) + ' wears now.</p>' : '') +
@@ -852,7 +881,12 @@
     document.querySelectorAll('.tabbody').forEach(b => b.hidden = b.id !== 'tab-' + t);
     updatePanel(true);
   }
-  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+  const phone = () => matchMedia('(max-width:720px)').matches;
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.go === 'arena') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    switchTab(b.dataset.tab);
+    if (phone()) { const p = document.querySelector('.panel'); p && window.scrollTo({ top: p.getBoundingClientRect().top + window.scrollY - 8, behavior: 'smooth' }); }
+  }));
 
   // ---------- header & stage ----------
   let lastRelicCount = -1, lastFeatCount = -1, slowTick = 0;
@@ -1294,7 +1328,7 @@
   function previewItem(tok) {
     ITEM_TOKEN.lastIndex = 0; const m = ITEM_TOKEN.exec(tok), it = m && itemFromToken(m); if (!it) return;
     const set = it.set && L.SETS.find(x => x.id === it.set), rar = L.RARITY.find(r => r.id === it.rar);
-    modal('<div class="itemhead r-' + it.rar + '">' + icon(SLOT_ICON[it.slot]) + '<div><h2>' + esc(itemLabel(it)) + '</h2><small>' + rar.name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + L.CLASSES[it.cls].name + ' only &middot; found on floor ' + it.ilvl + '</small></div></div>' +
+    modal('<div class="itemhead r-' + it.rar + '"><div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt=""></div><div><h2>' + esc(itemLabel(it)) + '</h2><small>' + rar.name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + L.CLASSES[it.cls].name + ' only &middot; found on floor ' + it.ilvl + '</small></div></div>' +
       '<p class="effect">' + itemEffect(it) + '</p>' +
       (set ? '<div class="setinfo on"><b>' + set.name + '</b><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
       '<p class="note">A preview of an item linked in chat. Viewing it does not add it to your pack.</p><div class="row"><button class="btn ghost" id="lp-x">Close</button></div>', md => { md.querySelector('#lp-x').onclick = closeModal; });
@@ -1479,7 +1513,7 @@
     { id: 'abil', title: 'Abilities', text: 'Each class has a special move. They fire by themselves, or press keys 1 to 5 (or tap them) to use one right when you need it.', target: '#abilities', ready: () => true },
     { id: 'order', title: 'Marching order', text: 'The top of this list stands at the front. Keep your tank up front, healers in the middle so they reach everyone, and watch the back for ambushes.', target: '.formhead', tab: 'party', ready: () => S.party.filter(Boolean).length >= 2 },
     { id: 'boss', title: 'Guardians', text: 'Every fifth floor has a guardian. Beat it before the lantern oil runs out, or your party falls back to train and try again.', target: '#lanternwrap', ready: () => S.foe && S.foe.boss },
-    { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor and trinkets. Open Gear to put them on. Each piece fits one class, and green tags show upgrades.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
+    { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor and trinkets. Open Gear to put them on. Each piece fits one class, and a green arrow marks an upgrade.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
     { id: 'map', title: 'Map of the Deep', text: 'See how far you have come, which guardians you have beaten, and travel back to any floor you have reached.', target: '#btn-map', ready: () => S.maxFloorEver >= 8 },
     { id: 'end', title: 'You are ready', text: 'That is the basics. The story will introduce new companions as you descend. Open the Guide (the ? at the top) any time for the details.', target: '#btn-guide', ready: () => true },
   ];
@@ -1528,10 +1562,10 @@
     ['Your party and classes', '<p>You lead a party of five. You meet companions in the story; tap any portrait to read about them.</p><ul><li><b>Tank</b>: takes the hits. Shield Wall cuts damage by 70%.</li><li><b>Healer</b>: keeps everyone standing. Lantern Hymn heals the party and lifts a fallen ally.</li><li><b>Rogue</b>: the most damage, and dodges a quarter of attacks. Backstab hits for 12 seconds of damage at once.</li><li><b>Mage</b>: Ember Storm quadruples damage for a few seconds. Save it for guardians.</li><li><b>Necromancer</b>: raises skeletons that fight and soak up blows, and heals the party as it hits.</li></ul><p>Abilities fire by themselves. Turn that off under the arena and press 1 to 5 to time them yourself.</p>'],
     ['Marching order', '<p>The Party list is your marching order. The top member stands at the front, nearest the monster. Use the arrows to move people, or Auto-arrange.</p><ul><li>A <b>tank</b> in the front two draws the attacks. Without one, whoever is in front gets hit most.</li><li>Heals get <b>15% weaker per step</b> between healer and patient, so healers belong in the middle.</li><li>Some monsters <b>ambush</b> from behind and hit the rear member hard. A tank at the back guards against it.</li></ul><p>The notes under the list tell you how your current order is doing.</p>'],
     ['Monsters and guardians', '<p>Monsters hit back. If your whole party falls, it retreats a floor, rests, and tries again in a little over a minute. Use that time to train and check gear.</p><p>Every 5th floor has a <b>guardian</b>. You must beat it before the lantern oil runs out. Guardians drop better gear and, from floor 10, sometimes a relic.</p><p>Soldiers from the Grand War alliances (marked with their banner) are tougher than normal monsters and drop more.</p>'],
-    ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and goes in a weapon, armor or trinket slot.</p><p>In the Gear tab, pick a companion to see what fits them. Green tags mean an upgrade, and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
+    ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and goes in a weapon, armor or trinket slot.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten and where you are. Tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 25 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
-    ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or &times; on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
+    ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
     ['Multiplayer and chat', '<p>With a free account your progress is saved online and works on any device.</p><p>Once you sign in, your hero appears on a board where other players can recruit it, and you earn gold each time. You can recruit their heroes too. Player heroes are stronger than story companions.</p><p><b>Chat</b> (the speech bubble) has Global, Trade and Party channels. Ctrl+click an item to link it. Tap a name to mute or report. No web links, and be kind.</p>'],
     ['Controls', '<ul><li><b>Tap the arena, Space or Enter</b>: strike</li><li><b>1 to 5</b>: use an ability</li><li><b>Ctrl+click an item</b>: link it in chat</li><li><b>Arrows on the floor header</b>: move between floors you have reached</li></ul>'],
   ];
@@ -1549,6 +1583,13 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 8, date: 'November 22, 2026', title: 'A cleaner look', items: [
+      'New gear screen: see each companion holding their gear, with weapon, armor and trinket slots and your pack laid out as an inventory grid.',
+      'Hand-drawn pixel icons for every weapon, armor and trinket, framed in their rarity colour.',
+      'Party portraits now show each companion’s pixel art.',
+      'Easier to swap companions: every seat has a To campfire button, and recruiting with a full party asks who steps out.',
+      'Tabs have icons, and on phones they sit in a bar along the bottom of the screen.',
+      'Formation tips fold away until you want them.'] },
     { v: 7, date: 'November 22, 2026', title: 'Campfire and Players Guild', items: [
       'Every game is now multiplayer. Your progress is untouched.',
       'The Campfire: story companions rest here. Bring them along whenever you like, and see who joins next.',

@@ -185,7 +185,11 @@ const n = (i, k, d) => i && i[k] ? +i[k].N : d;
 const js = (i, k) => { try { return i && i[k] ? JSON.parse(i[k].S) : null; } catch (e) { return null; } };
 const row = i => ({ id: i.pid.S, n: i.n.S, c: i.c.S, sd: i.sd.S, lv: n(i, 'lv', 1), m: n(i, 'm', 0), v: n(i, 'v', 0), k: (i.k ? i.k.S : '0.0.0.0.0').split('.').map(Number),
   r: n(i, 'r', START), pk: n(i, 'pk', START), w: n(i, 'w', 0), l: n(i, 'l', 0), dw: n(i, 'dw', 0), dl: n(i, 'dl', 0), ll: n(i, 'll', 0), et: n(i, 'et', 0), fd: i.fd ? i.fd.S : '',
-  sk: js(i, 'sk') || {}, lo: js(i, 'lo') });
+  sk: js(i, 'sk') || {}, lo: js(i, 'lo'), rp: js(i, 'rp') || {} });
+// Repeat duels (John): fighting the same hero again within a day pays less each time, then nothing.
+// rc (per foe, for the client): [duels in the last day, when a rematch pays something again].
+const REP = [1, .5, .25, 0], REPW = 864e5;
+const reps = (x, now) => { const o = {}; for (const k in x.rp) { const t = x.rp[k].filter(v => now - v < REPW); if (t.length) o[k] = t; } return o; };
 const pub = x => ({ id: x.id, n: x.n, c: x.c, sd: x.sd, lv: x.lv, r: x.r, w: x.w, l: x.l, k: x.k, s: stats(x), lo: loadout(x), sk: owned(x) });
 const MATCH = { beats: BEATS, adv: ADV, why: WHY, nature: NATURE };
 const SKILLS = SK.map(s => ({ id: s.id, c: s.c, k: s.k, n: s.n, fx: s.fx, v: s.v, cd: s.cd || 0 }));
@@ -197,7 +201,7 @@ exports.handler = async (e) => {
   let b = {}; try { b = JSON.parse(e.isBase64Encoded ? Buffer.from(e.body || '', 'base64').toString() : e.body || '{}'); } catch (x) { return res(400, { error: 1 }); }
   const get = async (t, p) => (await db.send(new D.GetItemCommand({ TableName: t, Key: K(p), ConsistentRead: true }))).Item;
   const up = (p, x, v, c) => db.send(new D.UpdateItemCommand(Object.assign({ TableName: T, Key: K(p), UpdateExpression: x, ExpressionAttributeValues: v, ReturnValues: 'ALL_NEW' }, c ? { ConditionExpression: c } : {})));
-  const mine = x => x && Object.assign(pub(x), { pk: x.pk, dw: x.dw, dl: x.dl, ll: x.ll, en: Math.max(0, EMAX - Math.ceil(Math.max(0, x.et - now) / EINT)), et: x.et });
+  const mine = x => { if (!x) return x; const rp = reps(x, now), rc = {}; for (const k in rp) { const t = rp[k].slice().sort((x, y) => x - y); rc[k] = [t.length, t[Math.max(0, t.length - REP.length + 1)] + REPW]; } return Object.assign(pub(x), { pk: x.pk, dw: x.dw, dl: x.dl, ll: x.ll, en: Math.max(0, EMAX - Math.ceil(Math.max(0, x.et - now) / EINT)), et: x.et, rc, rep: REP }); };
   try {
     if (rk === 'GET /arena') {
       const all = [];
@@ -252,13 +256,16 @@ exports.handler = async (e) => {
       let s = crypto.randomBytes(4).readUInt32LE(0);
       const rnd = () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
       const d = duel(my, fo, rnd), w = d.win ? 1 : 0, ex = 1 / (1 + Math.pow(10, (fo.r - my.r) / 400));
-      const dr = Math.round(32 * (w - ex)), fr = Math.round(16 * (w - ex)), day = new Date(now).toISOString().slice(0, 10), fw = w && my.fd !== day;
+      // Repeat duels against the same hero within a day: full, half, a quarter, then nothing (rating and Laurels, both sides).
+      const rp = reps(my, now), seen = (rp[id] || []).length, q = REP[Math.min(seen, REP.length - 1)];
+      rp[id] = (rp[id] || []).concat(now); const ks = Object.keys(rp).sort((x, y) => Math.max(...rp[y]) - Math.max(...rp[x])).slice(0, 40), rp2 = {}; ks.forEach(k => rp2[k] = rp[k]);
+      const dr = Math.round(32 * (w - ex) * q), fr = Math.round(16 * (w - ex) * q), day = new Date(now).toISOString().slice(0, 10), fw = w && q > 0 && my.fd !== day;
       // Laurels are a grind on purpose (John): a win is 8, up to 12 against a stronger hero, a loss 3, the day's first win +10.
-      const ll = w ? 8 + Math.min(4, Math.max(0, Math.round((fo.r - my.r) / 50))) + (fw ? 10 : 0) : 3;
-      const a = await up(me, 'SET r = :r, pk = :pk, et = :et, fd = :fd ADD ' + (w ? 'w' : 'l') + ' :one, ll :ll',
-        { ':r': N(Math.max(0, my.r + dr)), ':pk': N(Math.max(my.pk, my.r + dr)), ':et': N(Math.max(my.et, now) + EINT), ':fd': S(fw ? day : my.fd || '-'), ':one': N(1), ':ll': N(ll), ':o': N(my.et) }, 'et = :o OR attribute_not_exists(et)');
-      await up(id, 'SET r = :r ADD ' + (w ? 'dl :one' : 'dw :one, ll :d'), Object.assign({ ':r': N(Math.max(0, fo.r - fr)), ':one': N(1) }, w ? {} : { ':d': N(2) }));
-      return res(200, { win: !!w, log: d.log, first: d.first, dr, ll, fw: !!fw, a: pub(my), b: pub(fo), me: mine(row(a.Attributes)) });
+      const ll = Math.round((w ? 8 + Math.min(4, Math.max(0, Math.round((fo.r - my.r) / 50))) : 3) * q) + (fw ? 10 : 0), dl = Math.round(2 * q);
+      const a = await up(me, 'SET r = :r, pk = :pk, et = :et, fd = :fd, rp = :rp ADD ' + (w ? 'w' : 'l') + ' :one, ll :ll',
+        { ':r': N(Math.max(0, my.r + dr)), ':pk': N(Math.max(my.pk, my.r + dr)), ':et': N(Math.max(my.et, now) + EINT), ':fd': S(fw ? day : my.fd || '-'), ':rp': S(JSON.stringify(rp2)), ':one': N(1), ':ll': N(ll), ':o': N(my.et) }, 'et = :o OR attribute_not_exists(et)');
+      await up(id, 'SET r = :r ADD ' + (w ? 'dl :one' : 'dw :one, ll :d'), Object.assign({ ':r': N(Math.max(0, fo.r - fr)), ':one': N(1) }, w ? {} : { ':d': N(dl) }));
+      return res(200, { win: !!w, log: d.log, first: d.first, dr, ll, fw: !!fw, q, a: pub(my), b: pub(fo), me: mine(row(a.Attributes)) });
     }
   } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'state' }); throw x; }
   return res(404, { error: 1 });

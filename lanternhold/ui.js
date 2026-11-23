@@ -1,4 +1,4 @@
-/* lh-build 202611231911 */
+/* lh-build 202611231956 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -3675,8 +3675,8 @@
       'Your loadout also defends while you are away, so build it with care. Every class starts with its first ability for free.',
       'Fixed: world boss assaults said the server could not record them. Every assault now counts toward the shared health bar.'] },
     { v: 57, date: 'November 23, 2026', title: 'The Wardrobe', items: [
-      'New: <b>the Wardrobe</b>. Dress any hero in your company in one of nine outfits, from Emberforged and Hoarfrost to the Riftborn and Lanternsworn regalia with their own auras. Buy an outfit once and every hero can wear it.',
-      'New <b>lantern styles</b>: Moonlit, Marsh Wisp, Rosefire, Riftglass, Sunforged, Soulflame and Starless. Your lantern hangs beside your lead hero and colours the light around your party.',
+      'New: the Wardrobe. Dress any hero in your company in one of nine outfits, from Emberforged and Hoarfrost to the Riftborn and Lanternsworn regalia with their own auras. Buy an outfit once and every hero can wear it.',
+      'New lantern styles: Moonlit, Marsh Wisp, Rosefire, Riftglass, Sunforged, Soulflame and Starless. Your lantern hangs beside your lead hero and colours the light around your party.',
       'Other players see your hero’s outfit in the Players Guild, as a recruited guest and in the Ember Ring. Your name color and title now show in chat too.',
       'Looks only, bought with Sigils. Nothing in the Wardrobe changes your party’s power. Open it from the Gear tab, your portrait, or the Quartermaster.'] },
     { v: 55, date: 'November 23, 2026', title: 'Region sets and the Goblin’s Sack', items: [
@@ -4641,6 +4641,7 @@
   document.querySelectorAll('.tabs [data-tab="ring"]').forEach(b => b.addEventListener('click', () => { paintRing(); loadRing(); }));
   // Keep the challenge timer fresh while the tab is open.
   setInterval(() => { if (typeof tab !== 'undefined' && tab === 'ring' && !document.hidden && !$('modal').dataset.lock) { const a = document.activeElement; if (!a || !$('ringbox') || !$('ringbox').contains(a)) paintRing(); } }, 30000);
+
   // ---------- the Wardrobe: outfits and lantern styles ----------
   // Looks only: nothing here changes power. Bought with Sigils on the server (infra/lambda/looks.js);
   // keep ids and prices in step with its CAT. The art lives in vector.js (OUTFITS, LANTERNS).

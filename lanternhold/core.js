@@ -1,4 +1,4 @@
-/* lh-build 202611232000 */
+/* lh-build 202611232013 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -951,14 +951,19 @@
   function equip(s, id, uid, pos) {
     const it = itemOf(s, uid); if (!it) return false;
     const m = memberById(id); if (!m || m.guest || m.cls !== it.cls || !canWear(s, id, it)) return false;
-    const open = openPos(s, id).filter(p => fitsPos(it.slot, p));
-    if (pos && !open.includes(pos)) return false;
     const g = s.gear[id] = s.gear[id] || {};
+    const held = p => slotLocked(s, id, p) && g[p] !== uid;
+    const open = openPos(s, id).filter(p => fitsPos(it.slot, p));
+    if (pos && (!open.includes(pos) || held(pos))) return false;
     if (!pos) {
       const cur = wornAt(s, uid); if (cur && cur[0] === id) return true;
-      pos = open.find(p => !g[p]) || open.slice().sort((a, b) => gearPct(itemOf(s, g[a])) - gearPct(itemOf(s, g[b])))[0];
+      const free = open.filter(p => !held(p));
+      pos = free.find(p => !g[p]) || free.sort((a, b) => gearPct(itemOf(s, g[a])) - gearPct(itemOf(s, g[b])))[0];
     }
     if (!pos) return false;
+    if (it.slot === 'robe' && held('legs')) return false;
+    if (it.slot === 'legs' && robeOn(s, id) && held('chest')) return false;
+    const was = wornAt(s, uid); if (it.lk && was && was[0] !== id) return false;
     const before = maxHpOf(s, id);
     const prev = wornAt(s, uid); if (prev) delete s.gear[prev[0]][prev[1]];
     g[pos] = uid;
@@ -1084,10 +1089,13 @@
   // Locked items are kept out of every bulk action: mass scrap, auto-sell on a full pack, and the Loot Goblin.
   function toggleLock(s, uid) { const it = itemOf(s, uid); if (!it) return false; if (it.lk) delete it.lk; else it.lk = 1; return !!it.lk; }
   // The best kit a member could wear from their own gear and unworn pack items: { pos: item }.
+  // A worn item that is locked holds its slot: Equip best leaves it alone.
+  function slotLocked(s, id, p) { const u = s.gear[id] && s.gear[id][p], it = u && itemOf(s, u); return !!(it && it.lk); }
+  function lockedSlots(s, id) { return openPos(s, id).filter(p => slotLocked(s, id, p)).length; }
   function bestKit(s, id) {
     const m = memberById(id); if (!m || m.guest) return {};
-    const pool = s.bag.filter(it => it.cls === m.cls && canWear(s, id, it) && (!wearer(s, it.uid) || wearer(s, it.uid) === id));
-    const open = openPos(s, id), kit = {}, job = jobFree(s, id) && jobOf(s, id), jid = job && job.id;
+    const pool = s.bag.filter(it => it.cls === m.cls && canWear(s, id, it) && (!wearer(s, it.uid) || (wearer(s, it.uid) === id && !it.lk)));
+    const open = openPos(s, id).filter(p => !slotLocked(s, id, p)), kit = {}, job = jobFree(s, id) && jobOf(s, id), jid = job && job.id;
     // a companion working a camp job keeps gear that helps that job
     const score = it => itemScore(it) + (jid && (it.jset === jid || (it.aff && it.aff.j === jid)) ? 10 : 0);
     const top = (type, n) => pool.filter(it => it.slot === type).sort((a, b) => score(b) - score(a)).slice(0, n);
@@ -1100,8 +1108,12 @@
       for (const p of ps) if (!kit[p] && rest.length) kit[p] = rest.shift();
     }
     const robe = top('robe', 1)[0], chest = top('chest', 1)[0], legs = top('legs', 1)[0];
-    const split = (chest ? score(chest) : 0) + (legs ? score(legs) : 0);
-    if (robe && score(robe) > split) kit.chest = robe; else { if (chest) kit.chest = chest; if (legs) kit.legs = legs; }
+    const lc = slotLocked(s, id, 'chest'), ll = slotLocked(s, id, 'legs');
+    if (!lc && !ll) {
+      const split = (chest ? score(chest) : 0) + (legs ? score(legs) : 0);
+      if (robe && score(robe) > split) kit.chest = robe; else { if (chest) kit.chest = chest; if (legs) kit.legs = legs; }
+    } else if (!lc) { if (chest) kit.chest = chest; }
+    else if (!ll && !robeOn(s, id)) { if (legs) kit.legs = legs; }
     return kit;
   }
   // Positions where the best kit differs from what is worn now.
@@ -1953,7 +1965,7 @@
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, atMainCamp, regionTop, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, TRAIT_FX, CAMP_TRAITS, traitsOf, traitState, traitVal, traitText, campTrait, tonicById, tonicLeft, tonicVal, drinkTonic,
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
-    VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
+    VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,

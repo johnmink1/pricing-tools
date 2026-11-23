@@ -1,4 +1,4 @@
-/* lh-build 202611232000 */
+/* lh-build 202611232013 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1202,7 +1202,7 @@
       const it = g[sl] && L.itemOf(S, g[sl]);
       const up = better[sl] ? '<i class="upb" title="Better one in your pack">&#9650;</i>' : '';
       if (!it) return '<div class="dslot ds-' + sl + ' empty" title="Choose a ' + name.toLowerCase() + '"><div class="tile ghost" data-pos="' + sl + '" role="button" tabindex="0"><img class="iimg" src="' + SP.itemIcon(m.cls, type, 'common') + '" alt="">' + up + '</div><span>' + name + '</span></div>';
-      return '<div class="dslot ds-' + sl + '"><div class="tile r-' + it.rar + '" data-pos="' + sl + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + up + '</div><span>' + name + '</span></div>';
+      return '<div class="dslot ds-' + sl + '"><div class="tile r-' + it.rar + (it.lk ? ' held' : '') + '" data-pos="' + sl + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (it.lk ? '<i class="lkb" title="Locked in this slot">' + icon('lock') + '</i>' : up) + '</div><span>' + name + '</span></div>';
     };
     // totals from worn gear
     const dmg = L.gearPctOf(S, gearWho, 'dps'), hp = L.gearPctOf(S, gearWho, 'hp');
@@ -1216,7 +1216,7 @@
       '<div class="drings">' + ['ring1', 'ring2', 'ring3', 'ring4', 'ring5'].map(slotTile).join('') + '</div></div>' +
       '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>' +
       Object.entries(L.rsetCounts(S, gearWho)).map(([i, n]) => '<div class="setinfo rset' + (n >= 2 ? ' on' : '') + '"><b>' + L.REGION_SETS[i].name + '</b> <span class="pips">' + [0, 1, 2, 3].map(k => '<i class="' + (k < n ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + rsetTwoText(+i) + '. 4 pieces: ' + rsetFourText(+i) + '.</small></div>').join('') +
-      '<div class="dollbar"><small>' + cname + ' gear only. Tap a slot to change it. Worn gear stays on the character, not in the pack.</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
+      '<div class="dollbar"><small>' + cname + ' gear only. Tap a slot to change it. Worn gear stays on the character, not in the pack.' + (L.lockedSlots(S, gearWho) ? ' Locked slots keep their piece when you use Equip best.' : '') + '</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
     { const pn = $('packn'); if (pn) pn.textContent = L.packCount(S); }
     paintPackCap();
@@ -1249,7 +1249,7 @@
     const w = e.target.closest('[data-who]'); if (w) { gearWho = w.dataset.who; updateGear(true); return; }
     if (e.target.closest('[data-equip],#g-best') && !campGate()) return;
     const eq = e.target.closest('[data-equip]'); if (eq) { if (L.equip(S, gearWho, eq.dataset.equip)) { sfx.buy(); updateGear(true); updateSeats(true); } return; }
-    if (e.target.closest('#g-best')) { const n = L.equipBest(S, gearWho); if (n) { sfx.buy(); toast('gear-armor', 'Best gear on', n + (n === 1 ? ' piece' : ' pieces') + ' equipped on ' + L.memberById(gearWho).name + '.', ''); updateGear(true); updateSeats(true); } return; }
+    if (e.target.closest('#g-best')) { const n = L.equipBest(S, gearWho), k = L.lockedSlots(S, gearWho); if (n) { sfx.buy(); toast('gear-armor', 'Best gear on', n + (n === 1 ? ' piece' : ' pieces') + ' equipped on ' + L.memberById(gearWho).name + '.' + (k ? ' Skipped ' + k + ' locked ' + (k === 1 ? 'slot' : 'slots') + '.' : ''), ''); updateGear(true); updateSeats(true); } return; }
     const ul = e.target.closest('[data-unlock]'); if (ul) { unlockModal(gearWho, ul.dataset.unlock); return; }
     const ps = e.target.closest('[data-pos]'); if (ps) { slotPicker(gearWho, ps.dataset.pos); return; }
     if (e.target.closest('#g-ward')) { openWardrobe('k', gearWho); return; }
@@ -1300,9 +1300,9 @@
       (CL ? (bound(it) ? '' : tool('i-mkt', 'coin', 'Sell', it.lk ? 'off' : '') + tool('i-send', 'users', 'Send', it.lk ? 'off' : '')) + tool('i-link', 'chat', 'Link') : '') +
       tool('i-sell', 'flame', 'Salvage ' + fmt(L.salvageValue(it)), 'danger' + (it.lk ? ' off' : '')) + '</div>' +
       (bound(it) ? '<p class="note ibound">' + icon('lock') + 'Bound to your Hold. It cannot be sold on the market or sent by mail.</p>' : '') +
-      (it.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked. Mass scrap, a full pack and the Loot Goblin all leave it alone. Unlock it to sell, send or salvage.</p>' : '') + '</div>', md => {
+      (it.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked. Mass scrap, a full pack and the Loot Goblin all leave it alone' + (w ? ', and Equip best keeps it in its slot' : '') + '. Unlock it to sell, send, salvage or swap it out.</p>' : '') + '</div>', md => {
         const locked = () => { toast('lock', 'This item is locked', 'Unlock it first to sell, send or salvage it.', 'warn'); };
-        md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin.' : L.gearName(it) + ' can be scrapped and sold again.', ''); };
+        md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin' + (w ? ', and Equip best leaves it in its slot.' : '.') : L.gearName(it) + ' can be scrapped and sold again.', ''); };
         const gate = f => () => { if (it.lk) return locked(); if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
         const en = md.querySelector('#i-ench'); if (en) en.onclick = () => enchantPicker({ dst: uid });
         const ds = md.querySelector('#i-dis'); if (ds) ds.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to disenchant it.', 'warn'); if (w) return toast('flare', 'Take it off first', 'Worn gear cannot be disenchanted.', 'warn'); enchantPicker({ src: uid }); };
@@ -1311,7 +1311,7 @@
         const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
         const lk = md.querySelector('#i-link'); if (lk) lk.onclick = () => { closeModal(); linkItem(it); };
         const re = () => { updateGear(true); updateSeats(true); itemModal(uid); };
-        const on = md.querySelector('#i-on'); if (on) on.onclick = () => { if (!campGate()) return; L.equip(S, gearWho, uid); sfx.buy(); re(); };
+        const on = md.querySelector('#i-on'); if (on) on.onclick = () => { if (!campGate()) return; if (!L.equip(S, gearWho, uid)) return toast('lock', 'Slot is locked', 'Every slot this fits holds a locked piece, or this piece is locked on someone else. Unlock it first.', 'warn'); sfx.buy(); re(); };
         const off = md.querySelector('#i-off'); if (off) off.onclick = () => { if (!campGate()) return; L.unequip(S, w, L.wornPos(S, uid)); re(); };
         const up = md.querySelector('#i-up'); if (up) up.onclick = () => { if (!campGate()) return; if (L.upgrade(S, uid)) { sfx.relic(); re(); } };
         const sv = md.querySelector('#i-sell');
@@ -1427,14 +1427,16 @@
     const list = S.bag.filter(it => it.cls === m.cls && L.fitsPos(it.slot, pos) && it.uid !== (cur && cur.uid))
       .map(it => ({ it, d: Math.round((L.itemScore(it) - (it.slot === 'robe' ? L.replaces(S, id, it).reduce((a, x) => a + L.itemScore(x), 0) : curScore)) * 100), ok: L.canWear(S, id, it), w: L.wearer(S, it.uid) }))
       .sort((a, b) => (b.ok - a.ok) || (b.d - a.d));
+    const held = !!(cur && cur.lk) || (pos === 'legs' && robeNow && robeNow.lk);
     const row = x => {
       const it = x.it, wn = x.w ? L.memberById(x.w).name : '';
-      const tag = !x.ok ? '<span class="cmp down">Needs level ' + L.reqLevel(it) + '</span>' : x.d > 0 ? '<span class="cmp up">&#9650; ' + x.d + '%</span>' : x.d < 0 ? '<span class="cmp down">&#9660; ' + (-x.d) + '%</span>' : '<span class="cmp eq">Same</span>';
+      if (x.ok && (held || (it.lk && x.w && x.w !== id) || (it.slot === 'robe' && L.slotLocked(S, id, 'legs')))) x.ok = false, x.lockd = true;
+      const tag = x.lockd ? '<span class="cmp down">' + icon('lock') + 'Locked</span>' : !x.ok ? '<span class="cmp down">Needs level ' + L.reqLevel(it) + '</span>' : x.d > 0 ? '<span class="cmp up">&#9650; ' + x.d + '%</span>' : x.d < 0 ? '<span class="cmp down">&#9660; ' + (-x.d) + '%</span>' : '<span class="cmp eq">Same</span>';
       return '<div class="pkrow r-' + it.rar + (x.ok ? '' : ' no') + '"><div class="tile r-' + it.rar + '" data-info="' + it.uid + '" role="button" tabindex="0" title="Details"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
         '<span class="pkt"><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it) + (wn ? ' &middot; <i class="worn">worn by ' + esc(wn) + '</i>' : '') + '</small></span>' + tag +
         '<button class="btn small" data-pick="' + it.uid + '"' + (x.ok ? '' : ' disabled') + '>Equip</button></div>';
     };
-    const head = cur ? '<div class="pkcur"><small>Wearing now</small><div class="pkrow r-' + cur.rar + '"><div class="tile r-' + cur.rar + '" data-info="' + cur.uid + '" role="button" tabindex="0"><img class="iimg" src="' + SP.itemIcon(cur.cls, cur.slot, cur.rar) + '" alt="">' + (cur.up ? '<i class="upn">+' + cur.up + '</i>' : '') + '</div><span class="pkt"><b>' + esc(L.gearName(cur)) + (cur.up ? ' +' + cur.up : '') + '</b><small>' + itemEffect(cur) + '</small></span><button class="btn small ghost" id="pk-info">Details</button><button class="btn small ghost" id="pk-off">Take off</button></div></div>'
+    const head = cur ? '<div class="pkcur"><small>Wearing now</small><div class="pkrow r-' + cur.rar + '"><div class="tile r-' + cur.rar + '" data-info="' + cur.uid + '" role="button" tabindex="0"><img class="iimg" src="' + SP.itemIcon(cur.cls, cur.slot, cur.rar) + '" alt="">' + (cur.up ? '<i class="upn">+' + cur.up + '</i>' : '') + '</div><span class="pkt"><b>' + esc(L.gearName(cur)) + (cur.up ? ' +' + cur.up : '') + '</b><small>' + itemEffect(cur) + '</small></span><button class="btn small ghost' + (cur.lk ? ' on' : '') + '" id="pk-lk" title="' + (cur.lk ? 'Unlock this slot' : 'Lock it in this slot') + '">' + icon('lock') + (cur.lk ? 'Unlock' : 'Lock') + '</button><button class="btn small ghost" id="pk-info">Details</button><button class="btn small ghost" id="pk-off"' + (cur.lk ? ' disabled' : '') + '>Take off</button></div>' + (cur.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked in this slot. Equip best leaves it alone, and it is safe from scrap and the Loot Goblin. Unlock it to swap it out.</p>' : '') + '</div>'
       : robeNow ? '<p class="note">' + esc(L.gearName(robeNow)) + ' covers the legs. Leggings here will take the robe off.</p>' : '';
     modal('<div class="picker"><div class="maphead"><div><h2>' + esc(m.name) + '’s ' + name.toLowerCase() + '</h2><small>' + (camp() ? 'Pick a piece to wear here.' : 'You can look now. Changing gear happens at camp.') + '</small></div><button class="iconbtn" id="pk-x" aria-label="Close">&times;</button></div>' + head +
       (list.length ? '<div class="pklist">' + list.map(row).join('') + '</div>' : '<p class="note">No ' + L.CLASSES[m.cls].name.toLowerCase() + ' ' + (type === 'chest' ? 'chest pieces or robes' : name.toLowerCase().replace(/ \d$/, '') + 's') + ' in your pack' + (cur ? ' to swap in' : '') + ' yet. They drop from monsters, chests and guardians, and you can buy them on the Market.</p>') + '</div>', md => {
@@ -1442,9 +1444,10 @@
       md.querySelector('#pk-x').onclick = closeModal;
       const off = md.querySelector('#pk-off'); if (off) off.onclick = () => { if (!campGate()) return; L.unequip(S, id, pos); sfx.buy(); re(); slotPicker(id, pos); };
       const inf = md.querySelector('#pk-info'); if (inf) inf.onclick = () => itemModal(cur.uid);
+      const lk = md.querySelector('#pk-lk'); if (lk) lk.onclick = () => { const on = L.toggleLock(S, cur.uid); sfx.buy(); save(); re(); slotPicker(id, pos); toast('lock', on ? 'Slot locked' : 'Slot unlocked', on ? L.gearName(cur) + ' stays on ' + m.name + '. Equip best will skip this slot.' : 'Equip best can swap ' + L.gearName(cur) + ' out again.', ''); };
       md.querySelector('.picker').onclick = e => {
         const pk = e.target.closest('[data-pick]');
-        if (pk) { if (!campGate()) return; const w = L.wearer(S, pk.dataset.pick); if (w) L.unequip(S, w, L.wornPos(S, pk.dataset.pick)); if (L.equip(S, id, pk.dataset.pick, pos)) { sfx.buy(); re(); closeModal(); toast('gear-armor', 'Equipped', L.gearName(L.itemOf(S, pk.dataset.pick)) + ' on ' + m.name + '.', ''); } else re(); return; }
+        if (pk) { if (!campGate() || pk.disabled) return; const w = L.wearer(S, pk.dataset.pick); if (w) L.unequip(S, w, L.wornPos(S, pk.dataset.pick)); if (L.equip(S, id, pk.dataset.pick, pos)) { sfx.buy(); re(); closeModal(); toast('gear-armor', 'Equipped', L.gearName(L.itemOf(S, pk.dataset.pick)) + ' on ' + m.name + '.', ''); } else re(); return; }
         const t = e.target.closest('[data-info]'); if (t) itemModal(t.dataset.info);
       };
     });
@@ -3517,7 +3520,8 @@
     { id: 'gear', name: 'Gear and loot', icon: 'gear-armor', topics: [
       ['Locking items', 'i:lock', 'Tap an item in your pack and choose Lock to protect it.', [
         'Locked items show a small padlock and are skipped by <b>Mass scrap</b>, auto-selling when your pack is full, and the <b>Loot Goblin</b>.',
-        'You can still equip and upgrade a locked item. Unlock it to sell, send or salvage it.']],
+        'You can still equip and upgrade a locked item. Unlock it to sell, send or salvage it.',
+        'Lock a piece someone is wearing to hold it in that slot. Tap the slot and choose Lock. <b>Equip best</b> then skips that slot, and the slot shows a padlock.']],
       ['Merging items', 'i:relic', 'Merge two copies of the same item into one at +1.', [
         'Open an item and choose <b>Merge</b> when you own another copy. The result is one upgrade above the higher of the two, up to +' + L.UP_MAX + '.',
         '<b>Mass merge</b> in the Gear tab pairs up spare copies (never worn or locked ones) up to the level you pick, and shows the expected losses first.',
@@ -3669,9 +3673,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 59, date: 'November 23, 2026', title: 'Fair fights in the Ember Ring', items: [
+    { v: 60, date: 'November 23, 2026', title: 'Fair fights in the Ember Ring', items: [
       'Duelling the same hero again within a day now pays less each time: full rewards, then half, then a quarter, then nothing. This covers rating and Laurels for both heroes.',
       'Challenger cards show when a rematch pays less, and when it will pay in full again.'] },
+    { v: 59, date: 'November 23, 2026', title: 'Lock gear in its slot', items: [
+      'New: lock a piece someone is wearing to keep it in that slot. Tap the slot on the Gear tab and choose Lock, or lock it from its item card.',
+      'Equip best now skips locked slots and tells you how many it skipped. Locked slots show a padlock, and a locked piece is still safe from scrap and the Loot Goblin.'] },
     { v: 58, date: 'November 23, 2026', title: 'The Ember Ring: abilities, counters and Ring skills', items: [
       'Heroes now fight with their class abilities in duels: Shield Bash stuns, Mend heals, Backstab and Fireball burst, Life Drain steals health, and more.',
       'Every class has the edge on two classes and is countered by two others. Challenger cards show who has the edge, and what each foe brings.',

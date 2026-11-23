@@ -36,6 +36,12 @@ Resources:
         - Name: email
           Required: true
           Mutable: true
+      # Sign-in codes go out through Amazon SES from born2gamellc.com (approved by John 2026-11-23).
+      # The SES identity is verified with DKIM and a bounce.born2gamellc.com MAIL FROM; its policy lets Cognito send.
+      EmailConfiguration:
+        EmailSendingAccount: DEVELOPER
+        SourceArn: !Sub 'arn:aws:ses:us-east-1:${AWS::AccountId}:identity/born2gamellc.com'
+        From: 'Lanternhold <no-reply@born2gamellc.com>'
       VerificationMessageTemplate:
         DefaultEmailOption: CONFIRM_WITH_CODE
         EmailSubject: Your Lanternhold code

@@ -1,4 +1,4 @@
-/* lh-build 202611232124 */
+/* lh-build 202611232147 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1970,6 +1970,7 @@
         '<p class="setnote">Pick tracks, set the volume or mute from the <button class="linkbtn" id="s-musicpanel">music player</button> (the note button at the top).</p>' : '') +
       '<p style="margin-top:16px">Your progress saves automatically in this browser. Copy a backup to move it to another device.</p>' +
       '<div class="row"><button class="btn ghost" id="s-export">Copy backup</button><button class="btn ghost" id="s-import">Load backup</button><button class="btn danger" id="s-reset">Erase progress</button></div>' +
+      '<div class="row"><button class="btn ghost" id="s-intro">Watch the intro</button></div>' +
       '<div id="s-extra"></div>' +
       (window.LH_SUPPORT_URL ? '<p style="margin-top:16px">Lanternhold is free with no ads. If you enjoy it, you can <a style="color:var(--gold)" target="_blank" rel="noopener" href="' + window.LH_SUPPORT_URL + '">buy the developer a coffee</a>. Thank you.</p>' : '') +
       '<p class="credits">Lanternhold &middot; A Grand War game by Born 2 Game, LLC. &copy; 2026 Born 2 Game, LLC. Made with care, no ads, no tracking.</p>' +
@@ -1980,6 +1981,7 @@
           m.querySelector('#s-musicpanel').onclick = () => { closeModal(); LHMusic.open(); };
         }
         m.querySelector('#s-close').onclick = () => { save(); closeModal(); };
+        m.querySelector('#s-intro').onclick = () => { save(); closeModal(); if (window.LHIntro) LHIntro.play(); };
         m.querySelector('#s-export').onclick = () => {
           save(); const code = btoa(unescape(encodeURIComponent(localStorage.getItem(SAVE_KEY) || '')));
           m.querySelector('#s-extra').innerHTML = '<p>Your backup code:</p><textarea readonly></textarea>';
@@ -3339,7 +3341,7 @@
     return head.indexOf('lh-build ' + b) >= 0;
   }
   async function allFresh(b) {
-    for (const f of ['./', 'ui.js', 'core.js', 'sprites.js', 'vector.js', 'music.js', 'style.css']) if (!(await hasMark(f, b))) return false;
+    for (const f of ['./', 'ui.js', 'core.js', 'sprites.js', 'vector.js', 'music.js', 'intro.js', 'style.css']) if (!(await hasMark(f, b))) return false;
     return true;
   }
   async function loadBuild(b) {
@@ -3687,6 +3689,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 63, date: 'November 23, 2026', title: 'Why we fight', items: [
+      'A new opening for Lanternhold: the Shattered Reach, the Nyx Rift, the five who answer the call, and why we fight.',
+      'It plays once on your first visit. Tap to move through it or skip it any time, and watch it again from Settings.'] },
     { v: 62, date: 'November 23, 2026', title: 'Music for the Deep', items: [
       'Lanternhold now has its own soundtrack: eight original pieces, from the Hearthfire Waltz at camp to the Ember Ring battle theme and a quiet piano nocturne for late watches.',
       'Tap the note button at the top to open the player. Skip forward or back, pick any track, shuffle, set the volume or mute. Your choices are remembered on this device.',

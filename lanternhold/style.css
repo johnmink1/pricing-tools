@@ -1,4 +1,4 @@
-/* lh-build 202611232218 */
+/* lh-build 202611232221 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1855,6 +1855,27 @@ body.resting .taptip{display:none}
 .dmto[hidden]{display:none}.dmto b{color:#c4b5fd}.dmto .iconbtn{width:24px;height:24px;font-size:16px}
 .msg.dm .who{color:#c4b5fd}.msg.dm span{color:#ddd6fe}
 .dmdir{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}
+/* ---------- war banners (Wardrobe) ---------- */
+.ban{display:block;overflow:visible}
+.ringhead{position:relative}
+.ringhead.hasban{padding-right:78px}
+.rhban{position:absolute;right:14px;top:-2px;width:52px;height:78px;pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.55))}
+.rhban .ban,.pfban .ban,.wdban .ban{width:100%;height:100%}
+.rffig{position:relative}
+.rffig .rfban{position:absolute;left:1px;top:-3px;width:20px;height:30px;z-index:0;opacity:.95}
+.rffig .ringspr{position:relative;z-index:1}
+.ringtop li{position:relative}
+.ringtop li .tban{position:absolute;left:-4px;top:-5px;width:12px;height:18px}
+.msg .who .chatban{display:inline-block;width:11px;height:16px;vertical-align:-3px;margin-right:4px}
+.pfcard.hasban{padding-right:64px}
+.pfban{position:absolute;right:12px;top:-2px;width:40px;height:60px;pointer-events:none;filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))}
+.gboard .gban{position:absolute;left:6px;top:-3px;width:18px;height:27px;z-index:1}
+.gboard.hasgb{position:relative;padding-left:30px}
+.wdban{position:absolute;left:12%;bottom:24px;width:62px;height:93px;z-index:0;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
+.wdbn .ban{width:44px;height:66px}
+.nobn{display:grid;place-items:center;width:44px;height:66px;border:1px dashed var(--line2);border-radius:6px;color:var(--muted);font-size:11px}
+.wdbuy.banner .ban{width:84px;height:126px}
+@media (max-width:560px){.wdban{left:8%;bottom:18px;width:44px;height:66px}.rhban{width:40px;height:60px;right:10px}.ringhead.hasban{padding-right:58px}}
 /* the Nexus Guardian (click-rhythm brake) */
 .tag.nexus{background:#1e0f3a;color:#e6d2ff;border-color:#7a4ae0;box-shadow:0 0 10px #7a3cff55}
 .bar.lantern.nexus i{background:linear-gradient(180deg,#e6d2ff,#8a5af0)}

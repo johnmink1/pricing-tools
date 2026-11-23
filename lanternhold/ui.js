@@ -819,7 +819,7 @@
   async function recruitPlayer(gid) {
     const g = (boardList || []).find(x => x.id === gid); if (!g) return;
     const join = async () => {
-      L.addGuest(S, { id: 'p_' + g.id, name: g.name, cls: g.cls, level: g.level });
+      L.addGuest(S, { id: 'p_' + g.id, name: g.name, cls: g.cls, side: g.side, level: g.level });
       const gg = (S.guests || []).find(x => x.id === 'p_' + g.id); if (gg) { gg.pf = g.pf || null; gg.w = g.w || ''; }
       try { await api('POST', { heroId: g.id }, '/recruit'); } catch (e) {}
       sfx.buy(); toast('users', g.name + ' joins your party', 'A ' + L.CLASSES[g.cls].name + ' at level ' + g.level + '.', 'feat');
@@ -2062,6 +2062,16 @@
   }
   $('quests').addEventListener('click', openQuests);
   setInterval(() => { paintQuests(); claimFound(); }, 5000); setTimeout(paintQuests, 500);
+  // ---------- Banner kin: party members under your banner amplify its perk ----------
+  function paintKin() {
+    const el = $('kinline'); if (!el || !S.hero) return;
+    const d = L.SIDES[S.hero.side], n = L.bannerKin(S);
+    if (!d || S.hero.side === 'unsworn' && !n) { el.hidden = true; return; }
+    el.hidden = false; el.style.setProperty('--side', d.color);
+    el.innerHTML = n ? '<b>Banner kin ×' + n + '</b>: ' + n + (n === 1 ? ' ally marches' : ' allies march') + ' under ' + esc(d.name) + ', so your banner perk (' + esc(d.perk) + ') is <b>' + Math.round(L.KIN_AMP * n * 100) + '% stronger</b>.'
+      : 'Recruit companions or players who fly the banner of <b>' + esc(d.name) + '</b>. Each one makes your banner perk (' + esc(d.perk) + ') 40% stronger.';
+  }
+  setInterval(paintKin, 2000); setTimeout(paintKin, 600);
   // ---------- server resets and the admin tab ----------
   // A server wipe bumps a public "epoch". Saves started before it reset to a new game.
   const EPOCH_KEY = 'lanternhold.epoch';
@@ -2290,7 +2300,7 @@
     $('chatform').hidden = false;
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
     log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + esc(m.name) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
-      : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : 'Quiet down here. Say hello.') + '</p></div>';
+      : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : 'Quiet down here. Say hello.') + '</p></div>';
     if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
   }
   async function pollChat() {
@@ -2318,7 +2328,7 @@
   }
   function setChannel(ch) {
     chat.ch = ch; document.querySelectorAll('#chatch button').forEach(b => b.classList.toggle('on', b.dataset.ch === ch));
-    $('chatin').placeholder = ch === 'trade' ? 'Looking for, or offering...' : ch === 'party' ? 'Talk to your party' : 'Say something';
+    $('chatin').placeholder = ch === 'trade' ? 'Looking for, or offering...' : ch === 'banner' ? 'Talk to your banner' : ch === 'party' ? 'Talk to your party' : 'Say something';
     if (ch === 'party') loadRooms(); else $('chatroom').hidden = true;
     chatNote(); paintChat(); pollChat();
   }
@@ -2756,6 +2766,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 28, date: 'November 23, 2026', title: 'Fly your banner', items: [
+      'New Banner chat: talk only with heroes who fly the same banner as you. Find it next to Global in the chat.',
+      'Banner kin: every party member who marches under your banner makes your banner perk 40% stronger. A full party of kin more than doubles it. Players you recruited before today need to be recruited again to count.'] },
     { v: 27, date: 'November 23, 2026', title: 'Daily quests and Sigils in the deep', items: [
       'New: daily quests. Three quests a day, the same for every hero. Each one pays 1 Sigil, and finishing all three pays 2 more. Tap the quest counter at the top of the screen.',
       'Treasure chests and guardians can now hold 1 to 3 Sigils. It is rare: about 0.05% per chest and 0.1% per guardian to start.',

@@ -1102,3 +1102,7 @@ body.resting .arena{cursor:default}
 .aurah small{color:var(--muted);font-size:12px}
 .aura ul{margin:6px 0 0;padding-left:18px;color:var(--text);font-size:13px}
 .aura li{margin:2px 0}
+.stat.sigils{color:var(--violet);cursor:pointer;font:inherit;font-weight:800;font-size:18px}
+.stat.sigils:hover{border-color:var(--violet)}
+.stat.sigils svg{filter:drop-shadow(0 0 4px rgba(232,121,249,.5))}
+@media (max-width:560px){.stat.sigils{font-size:15px}}

@@ -16,6 +16,7 @@ exports.handler = async (e) => {
   let b = {};
   if (e.body) { try { b = JSON.parse(e.isBase64Encoded ? Buffer.from(e.body, 'base64').toString() : e.body); } catch (x) { return res(400, { error: 'bad json' }); } }
   if (rk === 'PUT /hero') {
+    // rf: the channel tag (?ref=) the player first arrived with, kept once, to count players per channel.
     const name = String(b.name || '').trim();
     if (!/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(name) || BAD.test(name.replace(/[^a-z]/gi, ''))) return res(400, { error: 'name' });
     if (!CLS.includes(b.cls)) return res(400, { error: 'class' });
@@ -25,10 +26,10 @@ exports.handler = async (e) => {
     let r;
     try {
       r = await db.send(new UpdateItemCommand({ TableName: T, Key: { pid: { S: me } },
-        UpdateExpression: 'SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z, u = :u',
+        UpdateExpression: 'SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z, u = :u, rf = if_not_exists(rf, :r)',
         ConditionExpression: 'attribute_not_exists(ban)',
         ExpressionAttributeNames: { '#n': 'name' },
-        ExpressionAttributeValues: { ':n': { S: name }, ':c': { S: b.cls }, ':l': { N: String(level) }, ':f': { N: String(floor) }, ':s': { S: side }, ':t': { N: String(Date.now()) }, ':z': { N: '0' }, ':u': { S: cl.sub } },
+        ExpressionAttributeValues: { ':n': { S: name }, ':c': { S: b.cls }, ':l': { N: String(level) }, ':f': { N: String(floor) }, ':s': { S: side }, ':t': { N: String(Date.now()) }, ':z': { N: '0' }, ':u': { S: cl.sub }, ':r': { S: /^[a-z0-9_-]{1,24}$/.test(b.ref) ? b.ref : '-' } },
         ReturnValues: 'UPDATED_OLD' }));
     } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(403, { error: 'banned' }); throw x; }
     // A brand-new hero is announced in Global chat with their alliance.

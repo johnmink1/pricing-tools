@@ -1661,7 +1661,8 @@
   // Publish your hero to the board; owners earn gold whenever someone recruits them.
   async function publishHero() {
     try {
-      const r = await api('PUT', { name: S.hero.name, cls: S.hero.cls, side: S.hero.side, level: L.lvl(S, 'you'), floor: S.maxFloorEver }, '/hero');
+      let ref = ''; try { ref = localStorage.getItem('lh_ref') || ''; } catch (e) {}
+      const r = await api('PUT', { name: S.hero.name, cls: S.hero.cls, side: S.hero.side, level: L.lvl(S, 'you'), floor: S.maxFloorEver, ref }, '/hero');
       if (!prof) loadProfile();
       const n = r && r.recruits;
       if (n > 0) {
@@ -1961,7 +1962,7 @@
   const WIX = 'https://www.wixapis.com', WIX_APP = 'd9d54315-ca58-47e4-9e15-b661ae7e141d', WIX_KEY = 'lh_wix';
   const PACKS = [['7c5854d4-49f8-4244-8ec3-6c27caaa6e59', 500, '$4.99', ''], ['57d4ee44-c741-4616-96ff-9350734b19da', 1100, '$9.99', '10% bonus'],
     ['c19c183a-a27a-4918-8d3c-f94e684fb2d8', 2400, '$19.99', '20% bonus'], ['27c5a9e9-b7fb-48d9-90c8-a450b85e083a', 6500, '$49.99', 'Best value']];
-  const homeUrl = () => location.origin + '/lanternhold/';
+  const homeUrl = () => location.origin + location.pathname.replace(/[^/]*$/, '');
   const wixGet = () => { try { return JSON.parse(localStorage.getItem(WIX_KEY) || 'null'); } catch (e) { return null; } };
   const wixPut = w => { try { w ? localStorage.setItem(WIX_KEY, JSON.stringify(w)) : localStorage.removeItem(WIX_KEY); } catch (e) {} };
   async function wixPost(path, body, tok) {

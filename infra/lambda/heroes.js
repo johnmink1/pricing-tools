@@ -20,11 +20,15 @@ exports.handler = async (e) => {
     const floor = Math.max(1, Math.min(100000, Math.floor(Number(b.floor) || 1)));
     const level = Math.max(1, Math.min(50 + floor * 8, Math.floor(Number(b.level) || 1)));
     const side = SIDES.includes(b.side) ? b.side : 'unsworn';
-    const r = await db.send(new UpdateItemCommand({ TableName: T, Key: { pid: { S: me } },
-      UpdateExpression: 'SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z',
-      ExpressionAttributeNames: { '#n': 'name' },
-      ExpressionAttributeValues: { ':n': { S: name }, ':c': { S: b.cls }, ':l': { N: String(level) }, ':f': { N: String(floor) }, ':s': { S: side }, ':t': { N: String(Date.now()) }, ':z': { N: '0' } },
-      ReturnValues: 'UPDATED_OLD' }));
+    let r;
+    try {
+      r = await db.send(new UpdateItemCommand({ TableName: T, Key: { pid: { S: me } },
+        UpdateExpression: 'SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z, u = :u',
+        ConditionExpression: 'attribute_not_exists(ban)',
+        ExpressionAttributeNames: { '#n': 'name' },
+        ExpressionAttributeValues: { ':n': { S: name }, ':c': { S: b.cls }, ':l': { N: String(level) }, ':f': { N: String(floor) }, ':s': { S: side }, ':t': { N: String(Date.now()) }, ':z': { N: '0' }, ':u': { S: cl.sub } },
+        ReturnValues: 'UPDATED_OLD' }));
+    } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(403, { error: 'banned' }); throw x; }
     const old = r.Attributes && r.Attributes.recruits;
     return res(200, { ok: true, id: me, recruits: old ? Number(old.N) : 0 });
   }

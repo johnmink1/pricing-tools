@@ -871,6 +871,7 @@
   }
   // Away from camp you only see the party you brought down; the campfire roster stays hidden.
   const gearOwners = () => { const inCamp = camp(); return S.unlocked.filter(id => { const m = L.memberById(id); return m && !m.guest && (inCamp || S.party.includes(id)); }); };
+  let whoRestOpen = false;
   function updateGear(force) {
     const who = gearOwners();
     if (!who.includes(gearWho)) gearWho = who[0];
@@ -878,10 +879,14 @@
     if (!gearWho) return;
     const key = gearWho + '|' + camp() + '|' + S.party.join() + '|' + S.bag.length + '|' + JSON.stringify(S.gear) + '|' + S.bag.map(x => x.up).join('') + '|' + S.unlocked.length + '|' + Math.floor(S.gold);
     if (!force && key === gearKey) return; gearKey = key;
-    $('gearwho').innerHTML = who.map(id => {
-      const m = L.memberById(id), n = Object.keys(L.betterFor(S, id)).length;
-      return '<button class="whochip c-' + m.cls + (id === gearWho ? ' on' : '') + '" data-who="' + id + '"><img src="' + SP.spriteURL(m.cls, 2, m.hue || 0) + '" alt=""><span>' + esc(m.name) + '</span>' + (n ? '<em title="Better gear in your pack">' + n + '</em>' : '') + '</button>';
-    }).join('');
+    { const chip = id => {
+        const m = L.memberById(id), n = Object.keys(L.betterFor(S, id)).length;
+        return '<button class="whochip c-' + m.cls + (id === gearWho ? ' on' : '') + '" data-who="' + id + '"><img src="' + SP.spriteURL(m.cls, 2, m.hue || 0) + '" alt=""><span>' + esc(m.name) + '</span>' + (n ? '<em title="Better gear in your pack">' + n + '</em>' : '') + '</button>';
+      };
+      const inParty = S.party.filter(id => id && who.includes(id)), rest = who.filter(id => !inParty.includes(id));
+      $('gearwho').innerHTML = '<div class="whogroup"><small>Your party</small><div>' + inParty.map(chip).join('') + '</div></div>' +
+        (rest.length ? '<details class="whogroup rest"' + (rest.includes(gearWho) || whoRestOpen ? ' open' : '') + '><summary>At the campfire <em>' + rest.length + '</em></summary><div>' + rest.map(chip).join('') + '</div></details>' : '');
+      const dt = $('gearwho').querySelector('details'); if (dt) dt.ontoggle = () => { whoRestOpen = dt.open; }; }
     const m = L.memberById(gearWho), g = S.gear[gearWho] || {}, cname = L.CLASSES[m.cls].name;
     const set = L.SETS.find(x => x.cls === m.cls), sc = L.setCount(S, gearWho, set.id);
     const better = L.betterFor(S, gearWho), nb = Object.keys(better).length;
@@ -1538,6 +1543,7 @@
   }
   function paintAccount() {
     try { if (chat.open) { paintChat(); pollChat(); } } catch (e) {}
+    paintAdminTab();
     const b = $('btn-account'); if (!b) return;
     if (signedIn()) { b.innerHTML = '<span class="avatar">' + ((sess.email || '?')[0].toUpperCase()) + '</span>'; b.setAttribute('aria-label', 'Account'); b.title = 'Signed in. Progress syncs.'; }
     else { b.innerHTML = icon('user') + '<span>Sign in</span>'; b.setAttribute('aria-label', 'Sign in'); b.title = 'Sign in to sync your progress'; }
@@ -1644,6 +1650,87 @@
   // ---------- support link ----------
   if (window.LH_SUPPORT_URL) { const a = $('support'); a.href = window.LH_SUPPORT_URL; a.hidden = false; a.title = 'Buy the developer a coffee'; }
 
+  // ---------- server resets and the admin tab ----------
+  // A server wipe bumps a public "epoch". Saves started before it reset to a new game.
+  const EPOCH_KEY = 'lanternhold.epoch';
+  async function checkEpoch() {
+    if (!CL) return;
+    try {
+      const r = await fetch(CL.api.replace(/\/$/, '') + '/epoch'); if (!r.ok) return;
+      const ep = Number((await r.json()).epoch) || 0;
+      let seen = 0; try { seen = Number(localStorage.getItem(EPOCH_KEY)) || 0; } catch (e) {}
+      if (!ep || ep <= seen || (S.created || 0) >= ep) return;
+      try { localStorage.removeItem(SAVE_KEY); localStorage.setItem(EPOCH_KEY, String(ep)); localStorage.setItem('lanternhold.wiped', '1'); } catch (e) {}
+      S = L.newState(); location.reload();
+    } catch (e) {}
+  }
+  function wipedNotice() {
+    let w = null; try { w = localStorage.getItem('lanternhold.wiped'); localStorage.removeItem('lanternhold.wiped'); } catch (e) {}
+    if (w) setTimeout(() => toast('flame', 'A fresh start', 'The Deep has been reset for everyone. Every delver starts again from the top of the stair.', 'feat'), 1500);
+  }
+  function isAdmin() { return !!(sess && sess.id && String(claims(sess.id)['cognito:groups'] || '').includes('admins')); }
+  async function adminApi(method, path, body) {
+    const tok = await idToken(); if (!tok) throw new Error('Sign in first.');
+    const r = await fetch(CL.api.replace(/\/$/, '') + path, { method, headers: { Authorization: tok, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(r.status === 403 ? 'This account is not an admin.' : j.error === 'self' ? 'You cannot ban yourself.' : j.error === 'player' ? 'That player has not played since bans were added, so their account cannot be found yet.' : 'The server said no (' + r.status + ').');
+    return j;
+  }
+  let adminList = null, adminQ = '', adminBusy = false;
+  function paintAdminTab() { const t = $('tabadmin'); if (t) t.hidden = !isAdmin(); }
+  async function loadAdmin() {
+    $('adminbox').innerHTML = '<p class="note">Loading players…</p>';
+    try { adminList = await adminApi('GET', '/admin/players'); } catch (e) { $('adminbox').innerHTML = '<p class="note">' + esc(e.message) + '</p>'; return; }
+    paintAdmin();
+  }
+  function paintAdmin() {
+    if (!adminList) return;
+    const ago = t => { if (!t) return 'never'; const m = Math.floor((Date.now() - t) / 6e4); return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + ' d ago'; };
+    const q = adminQ.toLowerCase(), list = adminList.players.filter(p => !q || p.name.toLowerCase().includes(q));
+    const on = adminList.players.filter(p => p.on).length, banned = adminList.players.filter(p => p.banned).length;
+    $('adminbox').innerHTML =
+      '<div class="adm-stats"><div><small>Players</small><b>' + adminList.players.length + '</b></div><div><small>Online now</small><b>' + on + '</b></div><div><small>Banned</small><b>' + banned + '</b></div><div><small>Last wipe</small><b>' + (adminList.epoch ? new Date(adminList.epoch).toLocaleDateString() : 'never') + '</b></div></div>' +
+      '<div class="adm-bar"><input id="adm-q" type="search" placeholder="Find a player by name" value="' + esc(adminQ) + '"><button class="btn small ghost" id="adm-re">Refresh</button></div>' +
+      '<div class="adm-list">' + (list.length ? list.map(p => '<div class="adm-row' + (p.banned ? ' banned' : '') + '"><span class="adm-n"><b>' + esc(p.name || 'Unnamed') + '</b>' + (p.cls ? ' ' + classTag(p.cls) : '') + '<small>' + (p.banned ? 'Banned' : (p.on ? '<span class="online">Online now</span> &middot; ' : 'Seen ' + ago(p.seen) + ' &middot; ') + 'level ' + p.level + ', floor ' + p.floor) + '</small></span>' +
+        (p.banned ? '<button class="btn small ghost" data-unban="' + p.id + '">Unban</button>' : '<button class="btn small danger" data-ban="' + p.id + '"' + (p.canBan ? '' : ' disabled title="They need to play once more before they can be banned"') + '>Ban</button>') + '</div>').join('') : '<p class="note">No players match.</p>') + '</div>' +
+      '<div class="adm-danger"><h3 class="sub">Wipe the server</h3><p class="note">Deletes every cloud save, every hero on the guild board and every market listing and letter. Everyone, signed in or not, starts over from a new game the next time they open Lanternhold. Bans stay in place. This cannot be undone.</p><button class="btn danger" id="adm-wipe">Wipe the server…</button></div>';
+  }
+  $('tab-admin').addEventListener('input', e => { if (e.target.id === 'adm-q') { adminQ = e.target.value; const pos = e.target.selectionStart; paintAdmin(); const q = $('adm-q'); q.focus(); q.setSelectionRange(pos, pos); } });
+  $('tab-admin').addEventListener('click', async e => {
+    if (adminBusy) return;
+    if (e.target.closest('#adm-re')) { loadAdmin(); return; }
+    const bn = e.target.closest('[data-ban]'), ub = e.target.closest('[data-unban]');
+    if (bn || ub) {
+      const p = adminList.players.find(x => x.id === (bn || ub).dataset[bn ? 'ban' : 'unban']); if (!p) return;
+      modal('<div class="center"><h2>' + (bn ? 'Ban ' : 'Unban ') + esc(p.name) + '?</h2><p>' + (bn ? 'Their account is switched off and signed out everywhere within the hour. Their hero leaves the guild board and their market listings come down. You can unban them later.' : 'Their account works again and they can sign back in.') + '</p><div class="row"><button class="btn ghost" id="a-no">Cancel</button><button class="btn' + (bn ? ' danger' : '') + '" id="a-yes">' + (bn ? 'Ban player' : 'Unban player') + '</button></div></div>', md => {
+        md.querySelector('#a-no').onclick = closeModal;
+        md.querySelector('#a-yes').onclick = async () => {
+          adminBusy = true; md.querySelector('#a-yes').disabled = true;
+          try { const r = await adminApi('POST', bn ? '/admin/ban' : '/admin/unban', { id: p.id }); closeModal(); toast('lock', bn ? p.name + ' is banned' : p.name + ' is unbanned', bn ? (r.listings ? r.listings + ' market listings taken down.' : 'They had no market listings.') : 'They can sign in again.', 'feat'); }
+          catch (x) { closeModal(); toast('lock', 'That did not work', x.message, 'warn'); }
+          adminBusy = false; loadAdmin();
+        };
+      });
+      return;
+    }
+    if (e.target.closest('#adm-wipe')) {
+      modal('<div class="center"><h2>Wipe the server?</h2><p>Every player loses their progress and starts again from a new game. Cloud saves, guild heroes, market listings and letters are deleted for good.</p><p>Type <b>WIPE</b> to confirm.</p><input id="a-conf" class="adm-conf" autocomplete="off" spellcheck="false"><div class="row"><button class="btn ghost" id="a-no">Cancel</button><button class="btn danger" id="a-yes" disabled>Wipe everything</button></div></div>', md => {
+        const inp = md.querySelector('#a-conf'), yes = md.querySelector('#a-yes');
+        inp.oninput = () => { yes.disabled = inp.value.trim() !== 'WIPE'; };
+        md.querySelector('#a-no').onclick = closeModal;
+        yes.onclick = async () => {
+          adminBusy = true; yes.disabled = true; yes.textContent = 'Wiping…';
+          try {
+            const r = await adminApi('POST', '/admin/wipe', { confirm: 'WIPE' });
+            closeModal(); toast('flame', 'Server wiped', r.saves + ' saves, ' + r.heroes + ' heroes and ' + r.trade + ' market records deleted. Your own game resets now.', 'feat');
+            setTimeout(() => { try { localStorage.removeItem(SAVE_KEY); localStorage.setItem('lanternhold.wiped', '1'); } catch (x) {} S = L.newState(); location.reload(); }, 2500);
+          } catch (x) { closeModal(); toast('lock', 'The wipe did not run', x.message, 'warn'); }
+          adminBusy = false;
+        };
+      });
+    }
+  });
+  document.querySelector('.tabs [data-tab="admin"]').addEventListener('click', () => loadAdmin());
 
   // ---------- chat: Global, Trade and Party ----------
   const CHAT_POLL_OPEN = 5000;
@@ -2292,6 +2379,7 @@
     setTimeout(() => { if (signedIn()) loadMail(true); }, 4000);
   }
   // ---------- boot ----------
+  checkEpoch(); wipedNotice(); paintAdminTab(); if (signedIn()) idToken().then(paintAdminTab);
   resize();
   window.addEventListener('resize', resize);
   syncBuySeg();

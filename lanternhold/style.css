@@ -837,3 +837,27 @@ body.resting .arena{cursor:default}
 .picker .pkrow .btn{flex:none}
 .doll .tile[data-pos]{cursor:pointer}
 @media (max-width:420px){.picker .pkrow{flex-wrap:wrap}.picker .pkt{flex-basis:calc(100% - 60px)}}
+/* admin tab */
+.adm-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 12px}
+.adm-stats div{background:#1a130e;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.adm-stats small{display:block;color:var(--muted);font-size:12px}
+.adm-stats b{font-size:18px}
+.adm-bar{display:flex;gap:8px;margin-bottom:8px}
+.adm-bar input{flex:1;min-width:0;background:#120d0a;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit}
+.adm-list{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:auto}
+.adm-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:#1a130e;border:1px solid var(--line)}
+.adm-row.banned{opacity:.65}
+.adm-n{flex:1;min-width:0}
+.adm-n small{display:block;color:var(--muted);font-size:12px}
+.adm-danger{margin-top:18px;padding:12px;border:1px solid #6b2a20;border-radius:12px;background:#1f0f0b}
+.adm-conf{display:block;margin:8px auto 14px;width:160px;text-align:center;font:800 18px/1 inherit;letter-spacing:.2em;background:#120d0a;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px}
+@media (max-width:520px){.adm-stats{grid-template-columns:repeat(2,1fr)}}
+/* gear tab: party first, campfire roster folded away */
+.whoseg{flex-direction:column;gap:8px}
+.whogroup>small,.whogroup>summary{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:0 2px 5px;letter-spacing:.03em;text-transform:uppercase}
+.whogroup>summary{cursor:pointer;list-style:none}
+.whogroup>summary::-webkit-details-marker{display:none}
+.whogroup>summary::before{content:'\25B8';display:inline-block;margin-right:6px;transition:transform .15s}
+.whogroup[open]>summary::before{transform:rotate(90deg)}
+.whogroup>summary em{font-style:normal;color:var(--dim)}
+.whogroup>div{display:flex;flex-wrap:wrap;gap:6px}

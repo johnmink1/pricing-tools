@@ -1,4 +1,4 @@
-/* lh-build 202611231727 */
+/* lh-build 202611231911 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -408,7 +408,7 @@
     return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0));
   }
   function clickDamage(s, now) { return (1 + totalDps(s, now) * 0.05) * (1 + relicVal(s, 'whet')); }
-  function goldMult(s) { return emberMult(s) * (1 + kup(s, 'purse')) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
+  function goldMult(s) { return emberMult(s) * (1 + gearGold(s)) * (1 + kup(s, 'purse')) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
   function critChance(s) { return 0.04 + relicVal(s, 'dice') + sk(s, 'crit'); }
   function lanternTime(s) { return BASE_LANTERN + kup(s, 'oil') + relicVal(s, 'lamp') + campBonus(s, 'lamp') + sk(s, 'lantern'); }
   function chestChance(s) { return 0.03 + relicVal(s, 'moth') + sk(s, 'chest'); }
@@ -759,7 +759,45 @@
     { id: 'rare',   name: 'Rare',   pct: 0.14, w: 10, prefix: 'Runed ' },
     { id: 'epic',   name: 'Epic',   pct: 0.24, w: 2,  prefix: 'Lantern-blessed ' },
     { id: 'set',    name: 'Set',    pct: 0.18, w: 0,  prefix: '' },
+    { id: 'goblin', name: 'Goblin', pct: 0.26, w: 0,  prefix: '' },
   ];
+  // Region sets (John, 2026-11-23): every region of the Deep drops its own four-piece armor set, for any class.
+  // Pieces only drop on that region's floors and only rarely (guardians are the best bet), so a full set is a long
+  // grind. Bonuses are flat percentages that never fall behind item level, so a finished set lasts through rekindles.
+  // Region pieces are bound to the Hold: they cannot be sold or sent. Stored on the item as rset (region index).
+  // k is the two-piece stat: dps, hp, heal (healing for healers, health for everyone else) or gold (whole party).
+  const REGION_SETS = [
+    { word: 'Wickwarden',   name: 'The Wickwarden’s Watch',  k: 'gold', lore: 'Worn by the cellar-keepers who trimmed the first lantern’s wick.' },
+    { word: 'Mosswater',    name: 'Mosswater Shroud',          k: 'hp',   lore: 'Grave-cloth that never quite dries, and never quite tears.' },
+    { word: 'Glowcap',      name: 'Glowcap Regalia',           k: 'heal', lore: 'Spun from the fungus that sings. It still hums, softly, when someone is hurt.' },
+    { word: 'Saltbone',     name: 'Saltbone Bulwark',          k: 'hp',   lore: 'Plates cut from the bones of the galleries, cured hard in brine.' },
+    { word: 'Cinderforged', name: 'Cinderforged Panoply',      k: 'dps',  lore: 'Hammered on Furnace-Heart’s own anvil. It runs warm in any cold.' },
+    { word: 'Brinechoir',   name: 'Brinechoir Vestments',      k: 'heal', lore: 'The Sunken Bishop’s choir wore these. They still smell of the tide.' },
+    { word: 'Rootbound',    name: 'Rootbound Bark',            k: 'hp',   lore: 'Grown, not made, from the Root Mother’s sweeter years.' },
+    { word: 'Starless',     name: 'Starless Raiment',          k: 'dps',  lore: 'Cut from the dark of the Vault. Light slides off it.' },
+    { word: 'Glasswrought', name: 'Glasswrought Mail',         k: 'dps',  lore: 'Prism-scale armor from the Glass Regent’s court. It throws rainbows when struck.' },
+    { word: 'Ironvow',      name: 'Ironvow Plate',             k: 'hp',   lore: 'Marshal Ironvow’s guard swore never to retreat. The plate remembers.' },
+    { word: 'Sluicewarden', name: 'Sluicewarden Garb',         k: 'heal', lore: 'Waders and oilcloth from the keepers of the Weeping Aqueduct.' },
+    { word: 'Marrowgrove',  name: 'Marrowgrove Harvest',       k: 'gold', lore: 'The Orchard Keeper paid her pickers in bone-white silver. Some of it is sewn in here.' },
+    { word: 'Stormglass',   name: 'Stormglass Array',          k: 'dps',  lore: 'Charged crystal set in brass. Hair stands on end near it.' },
+    { word: 'Warhost',      name: 'Warhost Trappings',         k: 'dps',  lore: 'Three banners stitched into one coat. Every alliance claims it was theirs first.' },
+    { word: 'Lampmother',   name: 'The Lampmother’s Embrace',  k: 'hp',   lore: 'What she wore at the Threshold, before the lantern was lit.' },
+  ];
+  const RSET_SLOTS = ['head', 'chest', 'legs', 'feet'];
+  const RSET_PIECE = {
+    plate:   { head: 'Helm', chest: 'Hauberk',  legs: 'Greaves',   feet: 'Sabatons' },
+    leather: { head: 'Hood', chest: 'Jerkin',   legs: 'Breeches',  feet: 'Boots' },
+    cloth:   { head: 'Cowl', chest: 'Vestment', legs: 'Leggings',  feet: 'Slippers' },
+  };
+  const rsetPiece = it => RSET_PIECE[it.cls === 'tank' ? 'plate' : it.cls === 'rogue' ? 'leather' : 'cloth'][it.slot];
+  // Two-piece and four-piece bonuses grow with the region's depth. They multiply the wearer's gear bonus.
+  const rsetTwo = i => Math.round((REGION_SETS[i].k === 'gold' ? 15 : 8) + i) / 100;
+  const rsetFour = i => Math.round(15 + 2 * i) / 100;
+  const RSET_PCT = 0.22;
+  const regionIndex = f => Math.floor((f - 1) / 10) % BIOMES.length;
+  const regionSetAt = f => { const i = regionIndex(f); return i < REGION_SETS.length ? i : -1; };
+  // Loot Goblin brag item: a tiny chance on every goblin kill. Party-wide gold find while worn.
+  const GOBLIN_SACK_CHANCE = 0.0005, GOBLIN_SACK_GOLD = 0.15;
   const SETS = [
     { id: 'vigil',  cls: 'tank',   name: "Gravewarden's Vigil", pieces: { main: 'Vigil Hammer', chest: 'Vigil Mail', neck: 'Vigil Lantern' },
       two: '+20% health', three: 'Shield Wall lasts twice as long', lore: 'Forged for the first Gravewarden, who swore no one would be left behind in the dark.' },
@@ -786,7 +824,7 @@
   const AFFIX_CHANCE = { fine: 0.02, rare: 0.06, epic: 0.15 };
   const GEAR_CAP = 40, BAG_STEP = 10, BAG_UPS_MAX = 6;
   let uidSeq = 0;
-  const gearPct = it => RARITY.find(r => r.id === it.rar).pct * (1 + 0.03 * it.ilvl) * (1 + 0.2 * it.up);
+  const gearPct = it => (it.rset != null ? RSET_PCT : RARITY.find(r => r.id === it.rar).pct) * (1 + 0.03 * it.ilvl) * (1 + 0.2 * it.up);
   // What an item adds, as [label, fraction] pairs.
   function itemStats(it) {
     const p = gearPct(it), w = weightOf(it), out = [];
@@ -796,6 +834,8 @@
   }
   const itemScore = it => { const w = weightOf(it); return gearPct(it) * (w.dps + w.hp); };
   function gearName(it) {
+    if (it.rar === 'goblin') return 'Loot Goblin’s Sack';
+    if (it.rset != null && REGION_SETS[it.rset]) return REGION_SETS[it.rset].word + ' ' + rsetPiece(it);
     if (it.jset) return JOB_SETS[it.jset].pieces[it.slot];
     if (it.set) return SETS.find(x => x.id === it.set).pieces[it.slot];
     return RARITY.find(r => r.id === it.rar).prefix + BASES[it.cls][it.slot];
@@ -825,6 +865,17 @@
     return rollEnch(it, r);
   }
   const JOB_KEYS = Object.keys(JOB_SETS);
+  function rollRegionSet(s, f, r) {
+    const i = regionSetAt(f); if (i < 0) return null;
+    const classes = Array.from(new Set(s.party.filter(Boolean).map(id => memberById(id).cls)));
+    const cls = classes.length ? classes[Math.floor(r() * classes.length)] : CLASS_ORDER[Math.floor(r() * 5)];
+    return rollEnch({ uid: Date.now().toString(36) + (uidSeq++), cls, slot: RSET_SLOTS[Math.floor(r() * 4)], rar: 'set', rset: i, ilvl: f, up: 0 }, r);
+  }
+  function rollGoblinSack(s, f, r) {
+    return rollEnch({ uid: Date.now().toString(36) + (uidSeq++), cls: heroCls(s) || (s.party.filter(Boolean).map(id => memberById(id).cls)[0]) || 'rogue', slot: 'neck', rar: 'goblin', gob: 1, ilvl: f, up: 0 }, r);
+  }
+  // Region set drop odds, before Loot bonuses.
+  const RSET_DROP = { boss: 0.025, chest: 0.006, elite: 0.0015, pack: 0.0004, foe: 0.00005 };
   function rollJobSet(s, f, r) {
     const classes = Array.from(new Set(s.party.filter(Boolean).map(id => memberById(id).cls)));
     const cls = classes.length ? classes[Math.floor(r() * classes.length)] : CLASS_ORDER[Math.floor(r() * 5)];
@@ -840,7 +891,10 @@
   function dropGear(s, foe, rng, events) {
     const r = rng || Math.random, f = s.floor, loot = 1 + campBonus(s, 'loot') + sk(s, 'loot');
     let it = null;
-    if (f >= 20 && (foe.boss ? r() < 0.03 * loot : foe.chest ? r() < 0.008 * loot : false)) it = rollJobSet(s, f, r);
+    const rk = foe.boss ? 'boss' : foe.chest ? 'chest' : foe.elite ? 'elite' : foe.pack ? 'pack' : 'foe';
+    if (!foe.goblin && r() < RSET_DROP[rk] * loot) it = rollRegionSet(s, f, r);
+    if (it) s.lore['rset_' + it.rset] = Date.now();
+    else if (f >= 20 && (foe.boss ? r() < 0.03 * loot : foe.chest ? r() < 0.008 * loot : false)) it = rollJobSet(s, f, r);
     else if (foe.boss) {
       if (f >= 15 && r() < 0.06 * loot) it = rollGear(s, f, { set: true }, r);
       else if (r() < 0.6 * loot) it = rollGear(s, f, { boost: 1 }, r);
@@ -861,7 +915,7 @@
     }
     s.bag.push(it);
     if (it.set) { s.lore['set_' + it.set] = Date.now(); }
-    events && events.push({ type: 'loot', item: it });
+    events && events.push({ type: it.rset != null ? 'rset' : 'loot', item: it });
   }
   // Auto-scrap (John, 2026-11-23): drops of the ticked rarities are scrapped on pickup for gold and Dust.
   // Set and job-set pieces are always kept, and so is anything that would beat what a companion wears
@@ -877,7 +931,7 @@
   }
   function autoScrapHit(s, it) {
     const a = s.autoScrap;
-    if (!a || !a.on || !a.r || !a.r.includes(it.rar) || it.set || it.jset || it.rar === 'set') return false;
+    if (!a || !a.on || !a.r || !a.r.includes(it.rar) || it.set || it.jset || it.rset != null || it.rar === 'set' || it.rar === 'goblin') return false;
     return !!a.up || !isUpgrade(s, it);
   }
   function equipped(s, id) { return (s.gear[id] || {}); }
@@ -932,7 +986,7 @@
   }
   const salvageValue = it => foeGold(Math.max(1, it.ilvl), false) * 3 * (1 + RARITY.findIndex(r => r.id === it.rar)) * (1 + it.up);
   // Dust (John, 2026-11-23): scrapping gear also gives Dust, more for rarer and deeper pieces. Moving an enchant costs Dust.
-  const DUST = { common: 1, fine: 3, rare: 8, epic: 20, set: 15 };
+  const DUST = { common: 1, fine: 3, rare: 8, epic: 20, set: 15, goblin: 60 };
   const dustValue = it => Math.max(1, Math.round((DUST[it.rar] || 1) * (1 + it.ilvl / 25) * (1 + 0.25 * (it.up || 0))));
   const enchCost = x => 5 * x.t * x.t;
   function salvage(s, uid) {
@@ -957,11 +1011,11 @@
     h: { name: 'Wick',    k: 'lantern', v: 0.3,    cap: 10,   fmt: 's',   what: 'lantern time' },
   };
   const ENCH_KEYS = Object.keys(ENCH), ENCH_MAX = 4;
-  const SOCK_BASE = { common: 0, fine: 1, rare: 2, epic: 3, set: 2 }, ENCH_FILL = { common: 0.3, fine: 0.4, rare: 0.5, epic: 0.7, set: 0.5 };
+  const SOCK_BASE = { common: 0, fine: 1, rare: 2, epic: 3, set: 2, goblin: 3 }, ENCH_FILL = { common: 0.3, fine: 0.4, rare: 0.5, epic: 0.7, set: 0.5, goblin: 0.8 };
   const sockets = it => Math.min(ENCH_MAX, (SOCK_BASE[it.rar] || 0) + (it.ilvl >= 30 ? 1 : 0) + (it.ilvl >= 80 ? 1 : 0));
   const enchList = it => { const o = [], e = it && it.en || ''; for (let i = 0; i + 1 < e.length; i += 2) if (ENCH[e[i]]) o.push({ id: e[i], t: +e[i + 1] }); return o; };
   const enchStr = l => l.map(x => x.id + x.t).join('');
-  const enchTierMax = it => Math.min(9, 1 + Math.floor(it.ilvl / 12) + (it.rar === 'epic' || it.rar === 'set' ? 1 : 0));
+  const enchTierMax = it => Math.min(9, 1 + Math.floor(it.ilvl / 12) + (it.rar === 'epic' || it.rar === 'set' || it.rar === 'goblin' ? 1 : 0));
   function rollEnch(it, r) {
     let e = ''; const n = sockets(it), tm = enchTierMax(it);
     for (let i = 0; i < n; i++) if (r() < (ENCH_FILL[it.rar] || 0)) e += ENCH_KEYS[Math.floor(r() * ENCH_KEYS.length)] + (1 + Math.floor(r() * tm));
@@ -995,7 +1049,7 @@
   // Merging (John, 2026-11-23): two copies of the same item fuse into one a level higher (+1), keeping the higher
   // item level and the better camp-job affix. Every merge can fail and destroy BOTH pieces. The risk climbs with the
   // level you are merging up to; your hero's Luck and Intelligence points shave it down (by up to half).
-  const mergeKey = it => [it.cls, it.slot, it.rar, it.set || '', it.jset || ''].join('|');
+  const mergeKey = it => [it.cls, it.slot, it.rar, it.set || '', it.jset || '', it.rset != null ? it.rset : ''].join('|');
   const mergeable = (a, b) => !!a && !!b && a !== b && mergeKey(a) === mergeKey(b) && Math.max(a.up, b.up) < UP_MAX;
   function mergeRisk(s, a, b) {
     const to = Math.max(a.up, b.up) + 1, base = Math.min(0.9, 0.08 + 0.06 * (to - 1));
@@ -1063,6 +1117,34 @@
     const set = SETS.find(x => x.cls === m.cls); if (!set) return 0;
     return setCount(s, id, set.id);
   }
+  // Region set pieces worn by one member: { regionIndex: count }.
+  function rsetCounts(s, id) {
+    const g = equipped(s, id), out = {};
+    for (const p in g) { const it = itemOf(s, g[p]); if (it && it.rset != null) out[it.rset] = (out[it.rset] || 0) + 1; }
+    return out;
+  }
+  // Region set bonus for one member and stat, as a fraction.
+  function rsetBonus(s, id, kind) {
+    const c = rsetCounts(s, id), cls = memberById(id).cls; let v = 0;
+    for (const i in c) {
+      const n = c[i], k = REGION_SETS[i] && REGION_SETS[i].k; if (!k || n < 2) continue;
+      const two = rsetTwo(+i);
+      if (k === kind || (k === 'heal' && kind === 'hp' && cls !== 'healer')) v += two;
+      if (n >= 4 && (kind === 'dps' || kind === 'hp' || (kind === 'heal' && cls === 'healer'))) v += rsetFour(+i);
+    }
+    return v;
+  }
+  // Party-wide gold find from worn gear: gold region sets and the Loot Goblin's Sack.
+  function gearGold(s) {
+    let v = 0;
+    for (const id of s.party) {
+      if (!id || isGuest(s, id)) continue;
+      const g = equipped(s, id), c = {};
+      for (const p in g) { const it = itemOf(s, g[p]); if (!it) continue; if (it.gob) v += GOBLIN_SACK_GOLD; if (it.rset != null) c[it.rset] = (c[it.rset] || 0) + 1; }
+      for (const i in c) if (c[i] >= 2 && REGION_SETS[i] && REGION_SETS[i].k === 'gold') v += rsetTwo(+i);
+    }
+    return v;
+  }
   // Total gear bonus for one stat, as a fraction (0.5 = +50%).
   function gearPctOf(s, id, kind) {
     const g = equipped(s, id), robe = robeOn(s, id); let pct = 0;
@@ -1082,7 +1164,8 @@
       if (kind === 'heal' && cls === 'healer') pct += 0.25;
       if (kind === 'dps' && cls === 'mage') pct += 0.25;
     }
-    return 1 + pct;
+    // Region set bonuses multiply the whole gear bonus, so they keep their worth at any depth.
+    return (1 + pct) * (1 + rsetBonus(s, id, kind));
   }
   // ---------- Kindling ----------
   // Earned only by rekindling. Spent on the skill tree, bag space and extra gear slots.
@@ -1532,6 +1615,7 @@
       const back = foe.goblin === 2 && s.goblin && s.goblin.item;
       if (back) { s.bag.push(back); s.goblin = null; }
       events && events.push({ type: 'goblinkill', item: back || null });
+      if ((rng || Math.random)() < GOBLIN_SACK_CHANCE) { const sack = rollGoblinSack(s, f, rng || Math.random); s.bag.push(sack); s.stats.sacks = (s.stats.sacks || 0) + 1; events && events.push({ type: 'goblinsack', item: sack }); }
     }
     s.gold += g; s.stats.goldEarned += g; s.stats.kills++;
     gainXp(s, foe, events);
@@ -1872,7 +1956,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

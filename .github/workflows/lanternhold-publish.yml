@@ -6,7 +6,7 @@ name: Publish Lanternhold
 on:
   push:
     branches: [main]
-    paths: ['lanternhold/**']
+    paths: ['lanternhold/**', 'lanternhold-wiki/**']
   workflow_dispatch:
 jobs:
   dispatch:

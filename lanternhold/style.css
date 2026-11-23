@@ -1,4 +1,4 @@
-/* lh-build 202611231727 */
+/* lh-build 202611231911 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1337,7 +1337,7 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 .chat{height:440px}
 @media (max-width:720px){.chatfab{bottom:calc(76px + env(safe-area-inset-bottom));right:12px;padding:9px 13px 9px 10px}.chatfab span{display:none}.chat{bottom:calc(66px + env(safe-area-inset-bottom));height:60vh}}
 .campbar>div{min-width:120px}.campbar .btn.small{padding:6px 10px}
-#toasts{bottom:76px}@media (max-width:560px){#toasts{bottom:136px}}
+#toasts{bottom:76px}@media (min-width:721px) and (max-width:560px){#toasts{bottom:136px}}
 /* players online */
 .onlinect{display:flex;align-items:center;gap:6px;margin-left:4px;padding:5px 11px 5px 9px;border-radius:999px;border:1px solid #1f3a2a;background:#0b1712;color:#bff0cf;font:700 14px var(--body);cursor:pointer;font-variant-numeric:tabular-nums}
 .onlinect[hidden]{display:none}
@@ -1660,6 +1660,71 @@ body.resting .taptip{display:none}
 /* first run: returning players sign in before making a hero */
 .haveacct{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px 0 14px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:var(--bg2);color:var(--muted);font-size:14px}
 .haveacct span{font-weight:600;color:var(--text)}
+/* region sets and the Loot Goblin's Sack */
+.r-goblin{--rc:#7dff6a}
+.ilink.r-goblin{--rc:#7dff6a}
+.toast.loot.goblin{border-color:#7dff6a;box-shadow:0 0 0 1px rgba(125,255,106,.35),0 12px 30px rgba(0,0,0,.5)}
+.tile.r-goblin{box-shadow:0 0 0 1px rgba(125,255,106,.5),0 0 14px rgba(125,255,106,.35)}
+.iset.rset b{color:#f2c14e}
+.iset.gobset b{color:#7dff6a}
+.setinfo.rset .pips i.on{background:#f2c14e}
+.note.ibound{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:13px}
+.note.ibound svg{width:14px;height:14px}
+/* ---- phone cleanup (John, 2026-11-23): nothing hides behind the bottom nav, the chat button or toasts ---- */
+@media (max-width:720px){
+  main.layout{padding-bottom:calc(132px + env(safe-area-inset-bottom))}
+  .chatfab{bottom:calc(74px + env(safe-area-inset-bottom));right:10px;width:46px;height:46px;padding:0;justify-content:center;border-radius:50%}
+  .chatfab small{display:none}
+  .chatfab svg{width:21px;height:21px}
+  #toasts{top:calc(8px + env(safe-area-inset-top));bottom:auto;left:10px;right:10px;width:auto}
+  .toast{pointer-events:auto;padding:8px 12px;font-size:13.5px;gap:10px;background:#151a24f7}
+  .toast svg{width:22px;height:22px}
+  .toast small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+}
+.cgrid{grid-template-columns:minmax(0,1fr)}.codexseg button{min-width:0;padding-left:6px;padding-right:6px}
+@media (max-width:720px){.ctx small{white-space:normal;overflow:visible;text-overflow:clip}}
+/* ---------- the Wardrobe ---------- */
+.wdstage{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:4px;height:190px;margin:4px 0 10px;border-radius:16px;border:1px solid var(--line2);overflow:hidden;
+  background:radial-gradient(ellipse 60% 55% at 50% 88%,rgba(var(--lg,255,180,90),.28),transparent 70%),linear-gradient(180deg,#0b1220,#04070d)}
+.wdstage::after{content:"";position:absolute;left:18%;right:18%;bottom:20px;height:10px;border-radius:50%;background:rgba(0,0,0,.55);filter:blur(3px)}
+.wdstage.ln-moon{--lg:170,200,255}.wdstage.ln-wisp{--lg:140,240,140}.wdstage.ln-rose{--lg:255,140,180}.wdstage.ln-rift{--lg:180,130,255}
+.wdstage.ln-sun{--lg:255,236,160}.wdstage.ln-soul{--lg:120,255,225}.wdstage.ln-void{--lg:140,150,255}
+.wdfig{position:relative;z-index:1;margin-bottom:22px}
+.wdfig img{display:block;height:150px;width:auto;filter:drop-shadow(0 6px 8px rgba(0,0,0,.6))}
+.wdlamp{position:relative;z-index:1;height:58px;width:auto;margin:0 0 70px -6px;animation:wdsway 3.2s ease-in-out infinite;transform-origin:50% 0}
+@keyframes wdsway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+.wdcap{position:absolute;left:12px;top:10px;z-index:2;display:flex;flex-direction:column;gap:2px;text-align:left}
+.wdcap b{font-size:15px}.wdcap small{font-size:12px;color:var(--muted)}
+.wdwho{margin-bottom:10px}
+.wdgrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+.wdcos img{height:64px;width:auto;filter:drop-shadow(0 3px 3px rgba(0,0,0,.5))}
+.wdcos img.lamp{height:52px}
+.wdcos.rare{background:linear-gradient(180deg,rgba(245,194,66,.08),var(--bg2) 60%)}
+.wdcos.rare b{color:var(--gold)}
+.wdbuy{display:flex;justify-content:center;align-items:flex-end;gap:2px;margin:4px 0 8px}
+.wdbuy img{height:92px;width:auto;filter:drop-shadow(0 4px 5px rgba(0,0,0,.55))}
+.wdbuy.lamp img{height:110px}
+.wdbtn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--panel2);color:var(--text);font:600 12.5px/1 var(--body);cursor:pointer}
+.wdbtn:hover{border-color:var(--gold);color:var(--gold)}
+.wdbtn svg{width:13px;height:13px}
+.wardad{display:flex;align-items:center;gap:12px;width:100%;margin:12px 0 4px;padding:10px 14px;border-radius:14px;border:1px solid rgba(245,194,66,.35);
+  background:linear-gradient(100deg,rgba(245,194,66,.1),rgba(122,60,255,.08));color:var(--text);text-align:left;cursor:pointer}
+.wardad:hover{border-color:var(--gold)}
+.wafigs{display:flex;align-items:flex-end;flex:none}
+.wafigs img{height:52px;width:auto;margin-right:-8px}
+.wafigs img.lamp{height:30px;margin:0 0 4px 6px}
+.watext{display:flex;flex-direction:column;gap:3px}
+.watext b{font-size:14px;color:var(--gold)}.watext small{font-size:12.5px;color:var(--muted)}
+.row.left{justify-content:flex-start}
+.pfava .ic.dressed{background:radial-gradient(circle at 50% 70%,#1a2438,#0a101c)}
+.pfava .ic.dressed img{height:44px;width:auto}
+.pfava.sm .ic.dressed img{height:32px}
+.msg .who .ctitle{margin-left:5px;font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.wdwho{display:flex;flex-wrap:wrap;gap:6px}
+.wdwho .whochip{width:auto;flex:none;padding:5px 11px 5px 7px;font-size:13px}
+@media (max-width:560px){.wdstage{height:160px}.wdfig img{height:124px}.wdlamp{height:46px;margin-bottom:58px}.wdgrid{grid-template-columns:repeat(3,1fr)}.wdcos img{height:52px}.wdbuy img{height:64px}}
+@media (max-width:560px){.wdstage{justify-content:flex-end;padding-right:9%}.wdcap{max-width:46%}}
+.msg .who .nc-gold{color:#f5c242}.msg .who .nc-violet{color:#e879f9}.msg .who .nc-ember{color:#ff8a3d}.msg .who .nc-frost{color:#9fd6ec}.msg .who .nc-verdant{color:#8fcf6a}.msg .who .nc-rift{color:transparent}
 /* Ember Ring: matchups, skills, loadout */
 .mu{display:inline-flex;align-items:center;gap:4px;font-weight:700;font-size:12px}
 .mu svg{width:12px;height:12px}

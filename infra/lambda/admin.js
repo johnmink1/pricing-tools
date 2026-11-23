@@ -35,10 +35,11 @@ exports.handler = async (e) => {
   const rk = e.routeKey;
   if (rk === 'GET /epoch') return res(200, { epoch: await getEpoch() });
   if (rk === 'GET /leaderboard') {
-    const top = (await scanAll(HEROES)).filter(i => i.name && i.fl && !i.ban)
+    const all = await scanAll(HEROES), online = all.filter(i => i.name && !i.ban && i.seen && Date.now() - i.seen.N < 18e4).length;
+    const top = all.filter(i => i.name && i.fl && !i.ban)
       .map(i => ({ name: i.name.S, cls: i.cls.S, level: +i.lv.N, floor: +i.fl.N, side: i.sd ? i.sd.S : 'unsworn' }))
       .sort((a, c) => c.floor - a.floor || c.level - a.level).slice(0, 50);
-    return { statusCode: 200, headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60' }, body: JSON.stringify({ top }) };
+    return { statusCode: 200, headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60' }, body: JSON.stringify({ top, online }) };
   }
   const cl = e.requestContext.authorizer && e.requestContext.authorizer.jwt && e.requestContext.authorizer.jwt.claims;
   if (!cl || !String(cl['cognito:groups'] || '').includes('admins')) return res(403, { error: 'admin only' });

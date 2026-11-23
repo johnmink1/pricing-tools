@@ -1617,6 +1617,13 @@
     if (S.maxFloor >= g.floor) { if (S.floor !== g.floor) { L.gotoFloor(S, g.floor); S.campReturn = 0; updateStage(); toast('map', 'Floor ' + g.floor, 'Find the Loot Goblin and bring him down.', ''); } }
     else toast('map', 'Keep descending', 'Reach floor ' + g.floor + ' and the goblin will show himself.', '');
   });
+  // ---------- players online (heroes seen in the last 3 minutes) ----------
+  async function loadOnline() {
+    if (!CL || document.hidden) return;
+    try { const r = await fetch(CL.api.replace(/\/$/, '') + '/leaderboard'); if (!r.ok) return; const j = await r.json(); if (typeof j.online !== 'number') return; $('onlinect').textContent = Math.max(j.online, signedIn() && S.hero ? 1 : 0).toLocaleString('en-US'); $('online').hidden = false; } catch (e) {}
+  }
+  $('online').addEventListener('click', () => switchTab('guild'));
+  setTimeout(loadOnline, 2000); setInterval(loadOnline, 60000);
   // ---------- settings ----------
   $('btn-settings').addEventListener('click', openSettings);
   function openSettings() {
@@ -3186,6 +3193,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 39, date: 'November 23, 2026', title: 'Players online', items: [
+      'A green counter next to the Lanternhold name shows how many players are online right now. Tap it to see heroes in the Guild.'] },
     { v: 38, date: 'November 23, 2026', title: 'Clearer store and the Lanternholder membership', items: [
       'Sigil packs are plain one-time purchases. You pay once, nothing renews, and the checkout no longer shows a duration.',
       'New: Lanternholder, a $4.99 monthly membership. While it is active you get Auto-train, 10 extra bag slots and 4 more hours of offline earnings, with no Sigils to spend.',

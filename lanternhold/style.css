@@ -1331,3 +1331,12 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 @media (max-width:720px){.chatfab{bottom:calc(76px + env(safe-area-inset-bottom));right:12px;padding:9px 13px 9px 10px}.chatfab span{display:none}.chat{bottom:calc(66px + env(safe-area-inset-bottom));height:60vh}}
 .campbar>div{min-width:120px}.campbar .btn.small{padding:6px 10px}
 #toasts{bottom:76px}@media (max-width:560px){#toasts{bottom:136px}}
+/* players online */
+.onlinect{display:flex;align-items:center;gap:6px;margin-left:4px;padding:5px 11px 5px 9px;border-radius:999px;border:1px solid #1f3a2a;background:#0b1712;color:#bff0cf;font:700 14px var(--body);cursor:pointer;font-variant-numeric:tabular-nums}
+.onlinect[hidden]{display:none}
+.onlinect i{width:8px;height:8px;border-radius:50%;background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.18);animation:onpulse 2.4s ease-in-out infinite}
+.onlinect small{color:#7fb894;font-weight:500;font-size:12.5px}
+.onlinect:hover{border-color:#3ddc84}
+@keyframes onpulse{50%{box-shadow:0 0 0 6px rgba(61,220,132,0)}}
+@media (prefers-reduced-motion:reduce){.onlinect i{animation:none}}
+@media (max-width:560px){.onlinect{padding:4px 9px 4px 7px;font-size:13px}.onlinect small{display:none}}

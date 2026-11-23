@@ -1,4 +1,4 @@
-/* lh-build 202611231414 */
+/* lh-build 202611231429 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -846,7 +846,7 @@
     if (!it) return;
     if (packCount(s) >= bagCap(s)) {
       // full bag: the lowest value common item gets sold automatically
-      const worst = s.bag.filter(x => x.rar === 'common' && !wearer(s, x.uid)).sort((a, b) => gearPct(a) - gearPct(b))[0];
+      const worst = s.bag.filter(x => x.rar === 'common' && !x.lk && !wearer(s, x.uid)).sort((a, b) => gearPct(a) - gearPct(b))[0];
       if (worst && gearPct(worst) < gearPct(it)) { s.bag = s.bag.filter(x => x !== worst); s.gold += salvageValue(worst); }
       else { s.gold += salvageValue(it); events && events.push({ type: 'autosell', item: it }); return; }
     }
@@ -906,11 +906,13 @@
   }
   const salvageValue = it => foeGold(Math.max(1, it.ilvl), false) * 3 * (1 + RARITY.findIndex(r => r.id === it.rar)) * (1 + it.up);
   function salvage(s, uid) {
-    const it = itemOf(s, uid); if (!it) return 0;
+    const it = itemOf(s, uid); if (!it || it.lk) return 0;
     const w = wornAt(s, uid); if (w) delete s.gear[w[0]][w[1]];
     s.bag = s.bag.filter(x => x !== it);
     const v = salvageValue(it); s.gold += v; return v;
   }
+  // Locked items are kept out of every bulk action: mass scrap, auto-sell on a full pack, and the Loot Goblin.
+  function toggleLock(s, uid) { const it = itemOf(s, uid); if (!it) return false; if (it.lk) delete it.lk; else it.lk = 1; return !!it.lk; }
   // The best kit a member could wear from their own gear and unworn pack items: { pos: item }.
   function bestKit(s, id) {
     const m = memberById(id); if (!m || m.guest) return {};
@@ -1257,7 +1259,7 @@
     if (s.wb && s.wb.until > (s.clock || Date.now())) return wbFoe(s);
     if (!boss) {
       if (s.goblin && s.goblin.item && f >= s.goblin.floor) return goblinFoe(s, true);
-      if (!s.goblin && f >= GOBLIN_FLOOR && r() < GOBLIN_CHANCE && s.bag.some(it => !wearer(s, it.uid))) return goblinFoe(s, false);
+      if (!s.goblin && f >= GOBLIN_FLOOR && r() < GOBLIN_CHANCE && s.bag.some(it => !it.lk && !wearer(s, it.uid))) return goblinFoe(s, false);
     }
     const chest = !boss && r() < chestChance(s);
     const b = biomeOf(f);
@@ -1292,7 +1294,7 @@
   }
   // Picks what the goblin grabs: any unworn item, better ones more likely.
   function goblinGrab(s, r) {
-    const pool = s.bag.filter(it => !wearer(s, it.uid)); if (!pool.length) return null;
+    const pool = s.bag.filter(it => !it.lk && !wearer(s, it.uid)); if (!pool.length) return null;
     const w = pool.map(it => 1 + 2 * Math.max(0, RARITY.findIndex(x => x.id === it.rar)));
     let x = r() * w.reduce((a, b) => a + b, 0);
     for (let i = 0; i < pool.length; i++) { x -= w[i]; if (x <= 0) return pool[i]; }
@@ -1752,7 +1754,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

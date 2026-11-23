@@ -1,4 +1,4 @@
-/* lh-build 202611231414 */
+/* lh-build 202611231429 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1048,7 +1048,7 @@
     if (!who.includes(gearWho)) gearWho = who[0];
     $('gearcount').textContent = L.packCount(S) || '';
     if (!gearWho) return;
-    const key = gearWho + '|' + camp() + '|' + S.party.join() + '|' + S.bag.length + '|' + JSON.stringify(S.gear) + '|' + S.bag.map(x => x.up).join('') + '|' + S.unlocked.length + '|' + Math.floor(S.gold);
+    const key = gearWho + '|' + camp() + '|' + S.party.join() + '|' + S.bag.length + '|' + JSON.stringify(S.gear) + '|' + S.bag.map(x => x.up + (x.lk ? 'L' : '')).join('') + '|' + S.unlocked.length + '|' + Math.floor(S.gold);
     if (!force && key === gearKey) return; gearKey = key;
     { const chip = id => {
         const m = L.memberById(id), n = Object.keys(L.betterFor(S, id)).length;
@@ -1093,7 +1093,7 @@
       const w = L.wearer(S, it.uid), fit = it.cls === m.cls;
       const d = fit && !w ? Math.round((L.itemScore(it) - L.replaces(S, gearWho, it).reduce((a, x) => a + L.itemScore(x), 0)) * 100) : 0;
       return '<div class="tile r-' + it.rar + (dim ? ' dim' : '') + (w ? ' worn' : '') + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + ' (' + itemEffect(it) + ')' + (w ? ', worn by ' + esc(L.memberById(w).name) : '') + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' +
-        '<i class="lvb' + (fit && !L.canWear(S, gearWho, it) ? ' no' : '') + '" title="Needs level ' + L.reqLevel(it) + '">Lv ' + L.reqLevel(it) + '</i>' + (it.aff || it.jset ? '<i class="affb" title="Helps a camp job"></i>' : '') + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (d > 0 && L.canWear(S, gearWho, it) ? '<i class="upb">&#9650;</i>' : '') + (w ? '<i class="wb" title="Worn">' + esc(L.memberById(w).name.charAt(0)) + '</i>' : '') + '</div>';
+        '<i class="lvb' + (fit && !L.canWear(S, gearWho, it) ? ' no' : '') + '" title="Needs level ' + L.reqLevel(it) + '">Lv ' + L.reqLevel(it) + '</i>' + (it.aff || it.jset ? '<i class="affb" title="Helps a camp job"></i>' : '') + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (d > 0 && L.canWear(S, gearWho, it) ? '<i class="upb">&#9650;</i>' : '') + (w ? '<i class="wb" title="Worn">' + esc(L.memberById(w).name.charAt(0)) + '</i>' : '') + (it.lk ? '<i class="lkb" title="Locked">' + icon('lock') + '</i>' : '') + '</div>';
     };
     const pack = S.bag.filter(it => !L.wearer(S, it.uid));
     const fits = pack.filter(it => it.cls === m.cls).sort((a, b) => L.gearPct(b) - L.gearPct(a));
@@ -1158,9 +1158,13 @@
       (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? (L.canWear(S, gearWho, it) ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>' + esc(m.name) + ' needs level ' + L.reqLevel(it) + '</button>') : '<button class="btn" disabled>No ' + L.CLASSES[it.cls].name + ' in your roster yet</button>') +
       (maxed ? '<button class="btn ghost" disabled>Fully upgraded</button>' : '<button class="btn ghost iup" id="i-up"' + (cost > S.gold ? ' disabled' : '') + '><span>Upgrade to +' + (it.up + 1) + '</span><small>' + icon('coin') + fmt(cost) + ' &middot; ' + Object.entries(nextStats).map(([k, v]) => k.toLowerCase() + ' ' + pc(v)).join(', ') + '</small></button>') +
       '</div><div class="itools">' +
-      (CL ? tool('i-mkt', 'coin', 'Sell') + tool('i-send', 'users', 'Send') + tool('i-link', 'chat', 'Link') : '') +
-      tool('i-sell', 'flame', 'Salvage ' + fmt(L.salvageValue(it)), 'danger') + '</div></div>', md => {
-        const gate = f => () => { if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
+      tool('i-lk', 'lock', it.lk ? 'Unlock' : 'Lock', it.lk ? 'on' : '') +
+      (CL ? tool('i-mkt', 'coin', 'Sell', it.lk ? 'off' : '') + tool('i-send', 'users', 'Send', it.lk ? 'off' : '') + tool('i-link', 'chat', 'Link') : '') +
+      tool('i-sell', 'flame', 'Salvage ' + fmt(L.salvageValue(it)), 'danger' + (it.lk ? ' off' : '')) + '</div>' +
+      (it.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked. Mass scrap, a full pack and the Loot Goblin all leave it alone. Unlock it to sell, send or salvage.</p>' : '') + '</div>', md => {
+        const locked = () => { toast('lock', 'This item is locked', 'Unlock it first to sell, send or salvage it.', 'warn'); };
+        md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin.' : L.gearName(it) + ' can be scrapped and sold again.', ''); };
+        const gate = f => () => { if (it.lk) return locked(); if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
         const mk = md.querySelector('#i-mkt'); if (mk) mk.onclick = gate(sellItem);
         const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
         const lk = md.querySelector('#i-link'); if (lk) lk.onclick = () => { closeModal(); linkItem(it); };
@@ -1170,6 +1174,7 @@
         const up = md.querySelector('#i-up'); if (up) up.onclick = () => { if (!campGate()) return; if (L.upgrade(S, uid)) { sfx.relic(); re(); } };
         const sv = md.querySelector('#i-sell');
         sv.onclick = () => {
+          if (it.lk) return locked();
           if (!sv.classList.contains('confirm') && (it.rar === 'epic' || it.rar === 'set' || it.up || w)) { sv.classList.add('confirm'); sv.querySelector('span').textContent = 'Tap again to salvage'; return; }
           const v = L.salvage(S, uid); sfx.coin(); closeModal(); updateGear(true); updateSeats(true); toast('coin', 'Salvaged', '+' + fmt(v) + ' gold', '');
         };
@@ -1296,13 +1301,13 @@
       for (const it of S.bag) { const k = it.cls + it.slot; if (!top[k] || L.gearPct(it) > L.gearPct(top[k])) top[k] = it; }
       Object.values(top).forEach(it => best.add(it.uid));
     }
-    return S.bag.filter(it => scrapOpts[it.rar] && !L.wearer(S, it.uid) && !best.has(it.uid) && !(scrapOpts.keepUp && it.up > 0));
+    return S.bag.filter(it => scrapOpts[it.rar] && !it.lk && !L.wearer(S, it.uid) && !best.has(it.uid) && !(scrapOpts.keepUp && it.up > 0));
   }
   function openScrap() {
     const draw = () => {
       const list = scrapList(), gold = list.reduce((a, it) => a + L.salvageValue(it), 0);
       const chk = (k, label, sub) => '<label class="chk"><input type="checkbox" data-opt="' + k + '"' + (scrapOpts[k] ? ' checked' : '') + '><span><b>' + label + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></label>';
-      modal('<h2>Mass scrap</h2><p>Salvage many pieces at once for gold. Gear someone is wearing is never scrapped.</p>' +
+      modal('<h2>Mass scrap</h2><p>Salvage many pieces at once for gold. Gear someone is wearing and items you have locked are never scrapped.' + (S.bag.some(x => x.lk) ? ' You have <b>' + S.bag.filter(x => x.lk).length + '</b> locked.' : '') + '</p>' +
         '<div class="scrapgrid">' + L.RARITY.map(r => chk(r.id, '<span class="r-' + r.id + '" style="color:var(--rc)">' + r.name + '</span>', S.bag.filter(x => x.rar === r.id && !L.wearer(S, x.uid)).length + ' unworn')).join('') + '</div>' +
         chk('keepBest', 'Keep the best of each kind', 'Saves your strongest spare piece for every class and slot.') +
         chk('keepUp', 'Keep upgraded pieces', 'Anything you have spent gold upgrading stays.') +
@@ -3142,6 +3147,9 @@
         'Keys <b>1 to 5</b> use them; <b>6 to 8</b> are specializations from the skill tree.']],
     ] },
     { id: 'gear', name: 'Gear and loot', icon: 'gear-armor', topics: [
+      ['Locking items', 'i:lock', 'Tap an item in your pack and choose Lock to protect it.', [
+        'Locked items show a small padlock and are skipped by <b>Mass scrap</b>, auto-selling when your pack is full, and the <b>Loot Goblin</b>.',
+        'You can still equip and upgrade a locked item. Unlock it to sell, send or salvage it.']],
       ['Gear basics', 's:chest', 'Gear drops from monsters, chests and guardians. Each piece fits one class and slot.', [
         'Slots: main hand, offhand, helmet, trinket, chest, legs, feet, ring. Robes cover chest and legs.',
         'Change gear at <b>camp</b>. <b>Equip best</b> does it in one tap.',
@@ -3248,6 +3256,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 41, date: 'November 23, 2026', title: 'Lock your favorite gear', items: [
+      'Tap any item in your pack and choose Lock. A small padlock shows on its tile.',
+      'Locked items are never touched by Mass scrap, auto-selling when your pack is full, or the Loot Goblin.',
+      'You can still equip and upgrade them. Unlock an item when you want to sell, send or salvage it.'] },
     { v: 40, date: 'November 23, 2026', title: 'World boss weekends', items: [
       'A giant of void crystal, the Rift Colossus, has broken through beneath the Hold. Every signed-in player fights the same boss and fills one shared health bar.',
       'Tap the purple bar on the stage to join a two-minute assault. You can go again every 15 minutes. Strike and use your abilities for more damage.',

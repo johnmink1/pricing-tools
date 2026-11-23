@@ -1,4 +1,4 @@
-/* lh-build 202611231643 */
+/* lh-build 202611231734 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1337,7 +1337,7 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 .chat{height:440px}
 @media (max-width:720px){.chatfab{bottom:calc(76px + env(safe-area-inset-bottom));right:12px;padding:9px 13px 9px 10px}.chatfab span{display:none}.chat{bottom:calc(66px + env(safe-area-inset-bottom));height:60vh}}
 .campbar>div{min-width:120px}.campbar .btn.small{padding:6px 10px}
-#toasts{bottom:76px}@media (max-width:560px){#toasts{bottom:136px}}
+#toasts{bottom:76px}@media (min-width:721px) and (max-width:560px){#toasts{bottom:136px}}
 /* players online */
 .onlinect{display:flex;align-items:center;gap:6px;margin-left:4px;padding:5px 11px 5px 9px;border-radius:999px;border:1px solid #1f3a2a;background:#0b1712;color:#bff0cf;font:700 14px var(--body);cursor:pointer;font-variant-numeric:tabular-nums}
 .onlinect[hidden]{display:none}
@@ -1660,6 +1660,29 @@ body.resting .taptip{display:none}
 /* first run: returning players sign in before making a hero */
 .haveacct{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px 0 14px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:var(--bg2);color:var(--muted);font-size:14px}
 .haveacct span{font-weight:600;color:var(--text)}
+/* region sets and the Loot Goblin's Sack */
+.r-goblin{--rc:#7dff6a}
+.ilink.r-goblin{--rc:#7dff6a}
+.toast.loot.goblin{border-color:#7dff6a;box-shadow:0 0 0 1px rgba(125,255,106,.35),0 12px 30px rgba(0,0,0,.5)}
+.tile.r-goblin{box-shadow:0 0 0 1px rgba(125,255,106,.5),0 0 14px rgba(125,255,106,.35)}
+.iset.rset b{color:#f2c14e}
+.iset.gobset b{color:#7dff6a}
+.setinfo.rset .pips i.on{background:#f2c14e}
+.note.ibound{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:13px}
+.note.ibound svg{width:14px;height:14px}
+/* ---- phone cleanup (John, 2026-11-23): nothing hides behind the bottom nav, the chat button or toasts ---- */
+@media (max-width:720px){
+  main.layout{padding-bottom:calc(132px + env(safe-area-inset-bottom))}
+  .chatfab{bottom:calc(74px + env(safe-area-inset-bottom));right:10px;width:46px;height:46px;padding:0;justify-content:center;border-radius:50%}
+  .chatfab small{display:none}
+  .chatfab svg{width:21px;height:21px}
+  #toasts{top:calc(8px + env(safe-area-inset-top));bottom:auto;left:10px;right:10px;width:auto}
+  .toast{pointer-events:auto;padding:8px 12px;font-size:13.5px;gap:10px;background:#151a24f7}
+  .toast svg{width:22px;height:22px}
+  .toast small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+}
+.cgrid{grid-template-columns:minmax(0,1fr)}.codexseg button{min-width:0;padding-left:6px;padding-right:6px}
+@media (max-width:720px){.ctx small{white-space:normal;overflow:visible;text-overflow:clip}}
 /* ---------- the Wardrobe ---------- */
 .wdstage{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:4px;height:190px;margin:4px 0 10px;border-radius:16px;border:1px solid var(--line2);overflow:hidden;
   background:radial-gradient(ellipse 60% 55% at 50% 88%,rgba(var(--lg,255,180,90),.28),transparent 70%),linear-gradient(180deg,#0b1220,#04070d)}

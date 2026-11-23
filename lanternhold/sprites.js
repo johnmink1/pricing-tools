@@ -1,4 +1,4 @@
-/* lh-build 202611231643 */
+/* lh-build 202611231734 */
 /* Lanternhold pixel sprites. Each sprite is a grid of palette keys; '.' is empty. */
 (function (root) {
   'use strict';
@@ -553,7 +553,7 @@
   ITEM_SHAPE.weapon = ITEM_SHAPE.main; ITEM_SHAPE.armor = ITEM_SHAPE.chest; ITEM_SHAPE.trinket = ITEM_SHAPE.neck;
   const KIND = { main: 'weapon', weapon: 'weapon', neck: 'trinket', trinket: 'trinket', ring: 'trinket' };
   const CLS_CLOTH = { tank: ['#8fa3b5', '#c9d6e0', '#5b6b7a'], healer: ['#5f9a54', '#8fcf6a', '#3a6234'], rogue: ['#4a4258', '#6e6484', '#2a2533'], mage: ['#b8443a', '#ee7a5a', '#7a2a1f'], necro: ['#5a3a7a', '#8a6aa8', '#2e1f40'] };
-  const RAR_COL = { common: '#d8cfb8', fine: '#8fcf6a', rare: '#6cc4e8', epic: '#c78bff', set: '#f2c14e' };
+  const RAR_COL = { common: '#d8cfb8', fine: '#8fcf6a', rare: '#6cc4e8', epic: '#c78bff', set: '#f2c14e', goblin: '#7dff6a' };
   const iconCache = {};
   function itemIcon(cls, slot, rar, scale) {
     scale = scale || 4;

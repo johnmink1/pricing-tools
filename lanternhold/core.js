@@ -362,7 +362,7 @@
   function nextMilestone(lvl) { return MILESTONES.find(t => t > lvl) || null; }
 
   const lvl = (s, id) => { if (isGuest(s, id)) { const g = s.guests.find(x => x.id === id); return g ? g.level : 0; } return s.levels[id] || 0; };
-  function costDiscount(s) { return Math.min(0.25, relicVal(s, 'ledger')); }
+  function costDiscount(s) { return Math.min(0.25, relicVal(s, 'ledger')) + Math.min(0.15, campTrait(s, 'train')); }
   function memberBaseCost(m) { return m.id === 'you' ? 8 : TIER[m.tier].cost * (1 + CLASS_ORDER.indexOf(m.cls) * 0.6); }
   function trainCost(s, id, n) {
     const m = memberById(id), L = lvl(s, id), r = COST_GROWTH;
@@ -583,7 +583,76 @@
     s.items[id]--; s.tonic = s.tonic || {};
     s.tonic[id] = Math.max(now, s.tonic[id] || 0) + t.min * 60000; return true;
   }
-  function sk(s, key) { return skBase(s, key) + tonicVal(s, key); }
+  // ---------- Companion traits ----------
+  // Every story companion rolls three traits the first time they join (kept for good):
+  //   a position trait (works while they march in one seat), a kinship trait (works while a given class is in the party),
+  //   and a camp trait (works while they rest at the campfire). Rolls have three grades; values stay small.
+  const TRAIT_FX = {
+    pdps:  { n: 'party damage',  lo: 0.04, hi: 0.10 },
+    php:   { n: 'party health',  lo: 0.04, hi: 0.10 },
+    pheal: { n: 'healing',       lo: 0.05, hi: 0.12 },
+    crit:  { n: 'crit chance',   lo: 0.01, hi: 0.03 },
+    gold:  { n: 'gold',          lo: 0.04, hi: 0.10 },
+    loot:  { n: 'gear drops',    lo: 0.04, hi: 0.10 },
+  };
+  const CAMP_TRAITS = {
+    job:   { n: 'to their camp job', lo: 0.15, hi: 0.40 },
+    train: { n: 'off training costs', lo: 0.02, hi: 0.05 },
+    gold:  { n: 'gold',               lo: 0.03, hi: 0.06 },
+    rest:  { n: 'faster healing at camp', lo: 0.20, hi: 0.50 },
+  };
+  const TRAIT_GRADE = ['Common', 'Fine', 'Rare'];
+  const POS_TRAIT_NAME = ['Vanguard', 'Shieldmate', 'Anchor', 'Flanker', 'Rearguard'];
+  const KIN_TRAIT_NAME = { tank: 'Shield-sworn', healer: 'Mercy-bound', rogue: 'Knife-friend', mage: 'Spell-touched', necro: 'Bone-kin' };
+  const CAMP_TRAIT_NAME = { job: 'Hard worker', train: 'Drillmaster', gold: 'Haggler', rest: 'Fire-tender' };
+  function rollTrait(table, keys, r) {
+    const k = keys[Math.floor(r() * keys.length)], g = r() < 0.6 ? 0 : r() < 0.75 ? 1 : 2, t = table[k];
+    const v = t.lo + (t.hi - t.lo) * ((g + r()) / 3);
+    return { k, g, v: Math.round(v * 1000) / 1000 };
+  }
+  function traitsOf(s, id, r) {
+    if (!id || id === 'you' || isGuest(s, id) || !s.unlocked.includes(id)) return null;
+    s.traits = s.traits || {};
+    if (!s.traits[id]) {
+      r = r || Math.random;
+      const m = memberById(id);
+      const pos = Object.assign(rollTrait(TRAIT_FX, Object.keys(TRAIT_FX), r), { at: Math.floor(r() * PARTY_SIZE) });
+      const kin = Object.assign(rollTrait(TRAIT_FX, Object.keys(TRAIT_FX), r), { cls: CLASS_ORDER[Math.floor(r() * CLASS_ORDER.length)] });
+      // healers get healing kinship, everyone else something they can use
+      if (kin.k === 'pheal' && m.cls !== 'healer' && r() < 0.5) kin.k = 'php';
+      s.traits[id] = { pos, kin, camp: rollTrait(CAMP_TRAITS, Object.keys(CAMP_TRAITS), r) };
+    }
+    return s.traits[id];
+  }
+  // Is each trait working right now?
+  function traitState(s, id) {
+    const t = traitsOf(s, id); if (!t) return null;
+    const i = s.party.indexOf(id), seated = i >= 0;
+    const kinOn = seated && s.party.some(x => x && x !== id && memberById(x).cls === t.kin.cls);
+    return { t, pos: seated && i === t.pos.at, kin: kinOn, camp: !seated };
+  }
+  function traitVal(s, key) {
+    if (!s.traits) return 0;
+    let v = 0;
+    for (const id of s.unlocked) {
+      const t = s.traits[id]; if (!t) continue;
+      const i = s.party.indexOf(id);
+      if (i >= 0) {
+        if (t.pos.k === key && i === t.pos.at) v += t.pos.v;
+        if (t.kin.k === key && s.party.some(x => x && x !== id && memberById(x) && memberById(x).cls === t.kin.cls)) v += t.kin.v;
+      } else if (key === 'gold' && t.camp.k === 'gold') v += t.camp.v;
+    }
+    return v;
+  }
+  // Camp traits that are not plain stats: training discount (party-wide) and job output / rest speed (own).
+  function campTrait(s, k) { let v = 0; if (!s.traits) return 0; for (const id of s.unlocked) { const t = s.traits[id]; if (t && t.camp.k === k && !s.party.includes(id)) v += t.camp.v; } return v; }
+  function traitText(kind, t) {
+    const fx = (kind === 'camp' ? CAMP_TRAITS : TRAIT_FX)[t.k], pct = t.k === 'crit' ? '+' + (t.v * 100).toFixed(1) + '% ' : '+' + Math.round(t.v * 100) + '% ';
+    if (kind === 'pos') return { name: POS_TRAIT_NAME[t.at], when: 'In the ' + POS_NAME[t.at].toLowerCase() + ' seat', fx: pct + fx.n, grade: TRAIT_GRADE[t.g] };
+    if (kind === 'kin') return { name: KIN_TRAIT_NAME[t.cls], when: 'With a ' + CLASSES[t.cls].name.toLowerCase() + ' in the party', fx: pct + fx.n, grade: TRAIT_GRADE[t.g] };
+    return { name: CAMP_TRAIT_NAME[t.k], when: 'Resting at camp', fx: (t.k === 'train' ? Math.round(t.v * 100) + '% ' : pct) + fx.n, grade: TRAIT_GRADE[t.g] };
+  }
+  function sk(s, key) { return skBase(s, key) + tonicVal(s, key) + traitVal(s, key); }
   function skBase(s, key) {
     if (!s.party.includes('you')) return 0;
     if (!s.skills) return auraVal(s, key) + statVal(s, key);
@@ -1085,7 +1154,8 @@
   const jobSetCount = (s, id, jid) => { const g = equipped(s, id); let n = 0; for (const p in g) { const it = itemOf(s, g[p]); if (it && it.jset === jid) n++; } return n; };
   function jobValue(s, job, id) {
     const m = memberById(id); if (!m) return 0;
-    return job.base * Math.sqrt(Math.max(1, lvl(s, id))) * (m.cls === job.aff ? 1.5 : 1) * (1 + (m.tier || 0)) * (1 + jobGear(s, id, job.id));
+    const tr = s.traits && s.traits[id] && s.traits[id].camp.k === 'job' ? s.traits[id].camp.v : 0;
+    return job.base * Math.sqrt(Math.max(1, lvl(s, id))) * (m.cls === job.aff ? 1.5 : 1) * (1 + (m.tier || 0)) * (1 + jobGear(s, id, job.id)) * (1 + tr);
   }
   const jobFree = (s, id) => id && id !== 'you' && s.unlocked.includes(id) && !s.party.includes(id) && !isGuest(s, id);
   function campBonus(s, stat) {
@@ -1437,8 +1507,9 @@
   const resting = (s, now) => !!((s.campReturn && s.floor <= CAMP_FLOOR) || s.campUntil > now);
   function tick(s, dt, now, rng, events) {
     s.stats.playTime += dt;
+    if (s.unlocked.length && !(s.traits && s.unlocked.every(id => s.traits[id]))) for (const id of s.unlocked) traitsOf(s, id);
     if (resting(s, now)) {
-      for (const id of s.party) if (id) { delete s.down[id]; const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + mx * 0.25 * dt); }
+      for (const id of s.party) if (id) { delete s.down[id]; const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + mx * 0.25 * (1 + campTrait(s, 'rest')) * dt); }
       s.minions = []; s.lantern = 0;
       return;
     }
@@ -1587,7 +1658,7 @@
     s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.tonic = o.tonic || {}; s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
     // Skill trees arrived after some players had already rekindled: 2 points for each past rekindle.
     s.kup = o.kup || {}; s.autoTrain = o.autoTrain || {}; s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
-    s.bagUps = o.bagUps || 0; s.boh = !!o.boh; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0;
+    s.bagUps = o.bagUps || 0; s.boh = !!o.boh; s.traits = o.traits || {}; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0;
     if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
     s.bag = (o.bag || []).map(normItem); s.gear = o.gear || {};
     const OLD = { weapon: 'main', armor: 'chest', trinket: 'neck' };
@@ -1599,7 +1670,7 @@
 
   const api = {
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
-    CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, tonicById, tonicLeft, tonicVal, drinkTonic,
+    CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, TRAIT_FX, CAMP_TRAITS, traitsOf, traitState, traitVal, traitText, campTrait, tonicById, tonicLeft, tonicVal, drinkTonic,
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,

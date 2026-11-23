@@ -12,29 +12,14 @@ const wix = async (path, tok) => {
   if (!r.ok) throw Object.assign(new Error('wix ' + r.status), { st: r.status });
   return r.json();
 };
-// Mercy's Blessing: every $10, 5 food items or toy given to the Grand War's Mercy Corps adds 2 hours for all
-// players, up to 7 days ahead. GET /mercy (public) reads the war site's totals and keeps the clock in the wallets table.
-let mercy = null, mercyAt = 0;
-async function getMercy() {
-  if (mercy && Date.now() - mercyAt < 3e5) return mercy;
-  const m = await fetch('https://war.born2gamellc.com/api/mercy.json').then(x => x.json()), f = m.food || {}, t = m.toys || {};
-  const pts = Math.floor((m.total || 0) / 10) + Math.floor((f.items || 0) / 5) + Math.floor((f.dollars || 0) / 10) + (t.items || 0) + Math.floor((t.dollars || 0) / 10);
-  const now = Date.now(), K = { userId: S('#mercy') }, r = (await db.send(new D.GetItemCommand({ TableName: W, Key: K }))).Item;
-  const old = r ? +r.pts.N : -1, was = r ? +r.until.N : 0;
-  let until = was, at = r ? +r.at.N : 0;
-  if (!r) { until = now + 864e5; at = now; }
-  else if (pts > old) { until = Math.min(Math.max(now, was) + (pts - old) * 72e5, now + 6048e5); at = now; }
-  if (pts !== old) {
-    try {
-      await db.send(new D.UpdateItemCommand({ TableName: W, Key: K, UpdateExpression: 'SET pts = :p, #u = :u, #a = :a', ConditionExpression: r ? 'pts = :o' : 'attribute_not_exists(userId)',
-        ExpressionAttributeNames: { '#u': 'until', '#a': 'at' }, ExpressionAttributeValues: Object.assign({ ':p': N(pts), ':u': N(until), ':a': N(at) }, r ? { ':o': r.pts } : {}) }));
-    } catch (x) { if (x.name !== 'ConditionalCheckFailedException') throw x; return { until: was, at }; }
-  }
-  mercy = { until, at, pts }; mercyAt = now;
-  return mercy;
-}
+// Lantern Surge: each credited pack lights a shared buff for every player (+25% gold and XP), 30 minutes per
+// 500 Sigils, added to the time left and capped at 24 hours ahead. The clock is '#surge' in the wallets table.
+const SK = { userId: S('#surge') };
 exports.handler = async (e) => {
-  if (e.routeKey === 'GET /mercy') { try { return Object.assign(res(200, await getMercy()), { headers: { 'cache-control': 'public, max-age=120' } }); } catch (x) { return res(502, { error: 'mercy' }); } }
+  if (e.routeKey === 'GET /surge') {
+    const r = (await db.send(new D.GetItemCommand({ TableName: W, Key: SK }))).Item;
+    return Object.assign(res(200, { until: r ? +r.until.N : 0, at: r ? +r.at.N : 0 }), { headers: { 'cache-control': 'public, max-age=30' } });
+  }
   const cl = e.requestContext.authorizer && e.requestContext.authorizer.jwt && e.requestContext.authorizer.jwt.claims;
   if (!cl || !cl.sub) return res(401, { error: 1 });
   if (e.routeKey !== 'POST /store/sync') return res(404, { error: 1 });
@@ -63,6 +48,11 @@ exports.handler = async (e) => {
           ExpressionAttributeValues: { ':g': N(100), ':n': N(n), ':o': { SS: ['f.plain'] } } } }] }));
       added += n;
     } catch (x) { if (x.name !== 'TransactionCanceledException') throw x; }
+  }
+  if (added) {
+    const now = Date.now(), r = (await db.send(new D.GetItemCommand({ TableName: W, Key: SK }))).Item;
+    const until = Math.min(Math.max(now, r ? +r.until.N : 0) + added * 3600, now + 864e5);
+    await db.send(new D.PutItemCommand({ TableName: W, Item: { userId: S('#surge'), until: N(until), at: N(now) } }));
   }
   // Lanternholder: the recurring monthly plan. Its perks last to the end of the paid cycle plus a day of grace,
   // and each sync (the game runs one on every load) moves that date with the renewals.

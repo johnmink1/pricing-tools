@@ -1,4 +1,4 @@
-/* lh-build 202611231532 */
+/* lh-build 202611231542 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2287,7 +2287,7 @@
         S.sub = r.sub || 0; if (prof) prof.sub = S.sub; save(); updatePanel(true); updateSeats(true);
         if (fresh) { sfx.buy(); toast('star', 'Welcome, Lanternholder', 'Auto-train, 10 extra bag slots and 4 more hours away are on for as long as your membership is active. Thank you!', 'feat'); }
       }
-      if (r.added) { sfx.buy(); toast('star', '+' + r.added.toLocaleString() + ' ' + TOKEN, 'Your store purchase is in your wallet. Thank you for supporting Lanternhold!', 'feat'); }
+      if (r.added) { sfx.buy(); toast('star', '+' + r.added.toLocaleString() + ' ' + TOKEN, 'Your store purchase is in your wallet, and it lit a Lantern Surge for every player. Thank you for supporting Lanternhold!', 'feat'); loadSurge(true); }
       else if (loud) toast('star', 'All caught up', 'No new store purchases on ' + r.name + '. A new purchase can take a minute to show.', '');
     } catch (e) {
       if (e.code === 'taken') { wixPut(null); toast('lock', 'Store account already linked', 'That Born 2 Game account is linked to another hero. Sign in to the game as that hero to use it.', 'warn'); }
@@ -2331,6 +2331,7 @@
     modal('<div class="maphead"><div><h2>Get ' + TOKEN + '</h2><small>Looks for your profile, speed-ups, or sell them to other players for gold.</small></div><button class="iconbtn" id="gs-x" aria-label="Close">&times;</button></div>' +
       '<div class="shopsec"><h3>Sigil packs <span class="tag once">One-time purchase</span></h3><p class="shopsub">Pay once and the ' + TOKEN + ' are yours. Not a subscription: nothing renews and you are never charged again.</p></div>' +
       '<div class="packs">' + tiles + '</div>' +
+      '<p class="note surgenote">Every pack also lights a <b>Lantern Surge</b> for all players: +25% gold and XP, 30 minutes per 500 ' + TOKEN + '.</p>' +
       '<div class="shopsec subbox"><h3>Lanternholder <span class="tag renew">Monthly subscription</span></h3>' +
       '<p class="shopsub">' + SUB_PRICE + ' a month for the automation perks, on for as long as you stay a member.</p>' +
       '<ul class="passfx"><li><b>Auto-train</b><span>Every character trains themselves whenever you have the gold.</span></li>' +
@@ -2389,6 +2390,28 @@
       '<p class="note">Each $10 given, 5 food items or toy donated to the Mercy Corps adds 2 hours for everyone, up to 7 days ahead. The Corps raises money for Extra Life, food for a local pantry and toys for a children’s hospital.</p>' +
       '<div class="row"><a class="btn" href="https://war.born2gamellc.com/" target="_blank" rel="noopener">Give to the Mercy Corps</a><button class="btn ghost" id="mb-ok">Close</button></div>', md => { md.querySelector('#mb-x').onclick = closeModal; md.querySelector('#mb-ok').onclick = closeModal; });
   });
+  // ---------- Lantern Surge: every Sigil pack bought lights +25% gold and XP for all players ----------
+  const surgeLeft = () => { const ms = (S.surge || 0) - Date.now(); if (ms <= 0) return ''; const h = Math.floor(ms / 36e5), m = Math.ceil((ms % 36e5) / 6e4); return h >= 1 ? h + 'h' + (m < 60 && m > 0 ? ' ' + m + 'm' : '') : Math.max(1, m) + 'm'; };
+  function paintSurge() { const b = $('surge'); if (!b) return; const t = surgeLeft(); if (b.hidden === !!t) b.hidden = !t; if (t) $('surgect').textContent = t; }
+  async function loadSurge(mine) {
+    if (!CL) return;
+    try {
+      const r = await fetch(CL.api.replace(/\/$/, '') + '/surge', { cache: 'no-store' }); if (!r.ok) return;
+      const m = await r.json(), fresh = m.at && m.at !== S.surgeAt && m.until > Date.now();
+      S.surge = m.until; S.surgeAt = m.at; save();
+      if (fresh && !mine) { sfx.relic(); toast('star', 'Lantern Surge!', 'A fellow lantern-bearer just bought Sigils, and every hero gets +25% gold and +25% XP for ' + surgeLeft() + '. Thank them in chat!', 'feat'); }
+      paintSurge(); updatePanel(true);
+    } catch (e) {}
+  }
+  if ($('surge')) $('surge').addEventListener('click', () => {
+    const fx = L.SURGE_FX;
+    modal('<div class="maphead"><div><h2>Lantern Surge</h2><small>Lit by players who support the game. Shared by every hero.</small></div><button class="iconbtn" id="su-x" aria-label="Close">&times;</button></div>' +
+      '<p>Whenever someone buys a Sigil pack, the Hold’s great lantern flares and every hero shares the light. The surge has <b>' + (surgeLeft() || 'no time') + '</b> left.</p>' +
+      '<ul class="mercyfx surgefx"><li>+' + fx.gold * 100 + '% gold</li><li>+' + fx.xp * 100 + '% hero XP</li></ul>' +
+      '<p class="note">Each pack adds time for everyone: 30 minutes for 500 Sigils, about an hour for 1,100, over two hours for 2,400 and six and a half hours for 6,500, up to a day ahead. It never changes combat power.</p>' +
+      '<div class="row"><button class="btn" id="su-get">Get ' + TOKEN + '</button><button class="btn ghost" id="su-ok">Close</button></div>', md => { md.querySelector('#su-x').onclick = closeModal; md.querySelector('#su-ok').onclick = closeModal; md.querySelector('#su-get').onclick = () => getSigils(); });
+  });
+  setTimeout(loadSurge, 3000); setInterval(loadSurge, 12e4); setInterval(paintSurge, 3e4);
   // Fetch the Sigil balance as soon as the game opens (the cached last value shows until it arrives).
   if (CL && signedIn()) loadProfile();
   setTimeout(loadMercy, 2500); setInterval(loadMercy, 3e5); setInterval(paintMercy, 3e4);
@@ -3400,7 +3423,8 @@
         '<b>Bag of Holding</b> (6,500, once): an endless pack.',
         '<b>Speed-up tonics</b> and Campfire Draughts. Profile frames, titles and colors.',
         'Buy packs with <b>Get Sigils</b> after signing in with your Born 2 Game store account. Packs are one-time purchases and never renew.',
-        '<b>Lanternholder</b> ($4.99 a month, renews until you cancel): the Lantern Pass perks for as long as you are a member.']],
+        '<b>Lanternholder</b> ($4.99 a month, renews until you cancel): the Lantern Pass perks for as long as you are a member.',
+        'Every pack bought lights a <b>Lantern Surge</b> for all players: +25% gold and XP.']],
       ['Mercy’s Blessing', 'i:cross', 'Real donations to the Grand War’s Mercy Corps bless every player.', [
         '<b>+10% gold</b>, <b>+10% health</b>, <b>+20% healing</b> while it burns.',
         'Each $10, 5 food items or toy adds 2 hours, up to 7 days.']],
@@ -3451,6 +3475,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 50, date: 'November 23, 2026', title: 'Lantern Surge', items: [
+      'New: Lantern Surge. Whenever any player buys a Sigil pack, every hero in the game gets +25% gold and +25% XP.',
+      'Each pack adds time for everyone: 30 minutes for 500 Sigils, up to six and a half hours for 6,500, stacking up to a day ahead.',
+      'A lightning chip in the top bar shows how long the surge has left. Tap it for details.'] },
     { v: 49, date: 'November 23, 2026', title: 'The Ember Ring: a longer climb', items: [
       'Ringwarden gear is now something to earn over time. A win pays 8 Laurels (up to 12 against a stronger hero), and a loss still pays 3.',
       'The first win each day adds 10 more, and your hero earns 2 for every challenger it beats while you are away.',

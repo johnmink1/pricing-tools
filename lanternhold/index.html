@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- lh-build 202611232013 -->
+<!-- lh-build 202611232146 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -51,7 +51,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611232013">
+<link rel="stylesheet" href="style.css?v=202611232146">
 </head>
 <body>
 <div id="app">
@@ -75,6 +75,7 @@
     <button class="updatebtn" id="btn-update" hidden><svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span>Update ready</span></button>
             <button class="account" id="btn-account" hidden aria-label="Sign in"></button>
     <a class="iconbtn" id="btn-discord" href="https://discord.gg/6G7E7rhGFu" target="_blank" rel="noopener" aria-label="Discord" data-tip="Join the Grand War Discord: player chat, bug reports and ideas"><svg viewBox="0 0 24 24"><use href="#i-discord"/></svg></a>
+    <button class="iconbtn musbtn" id="btn-music" aria-label="Music" aria-expanded="false" data-tip="Music: change tracks, volume and mute"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 18.5a3 3 0 1 1-2-2.83V5.6l12-2.4v12.3a3 3 0 1 1-2-2.83V7.4l-8 1.6z"/></svg></button>
     <button class="iconbtn" id="btn-guide" aria-label="Guide" data-tip="Guide: how everything works"><svg viewBox="0 0 24 24"><use href="#i-help"/></svg></button>
     <button class="iconbtn" id="btn-settings" aria-label="Settings" data-tip="Settings"><svg viewBox="0 0 24 24"><use href="#i-gear"/></svg></button>
   </header>
@@ -218,11 +219,12 @@
   <button class="chatfab" id="btn-chat" hidden aria-label="Open chat"><svg viewBox="0 0 24 24"><use href="#i-chat"/></svg><span>Chat</span><small id="chatpeek"></small><i id="chatdot" hidden></i></button>
   <aside class="chat" id="chat" hidden aria-label="Chat">
     <div class="chattitle"><b>Chat</b><button class="iconbtn" id="chatmin" aria-label="Minimize chat" title="Minimize"><svg viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>
-    <div class="chathead"><div class="seg" id="chatch"><button data-ch="global" class="on">Global</button><button data-ch="banner">Banner</button><button data-ch="trade">Trade</button><button data-ch="party">Party</button></div></div>
+    <div class="chathead"><div class="seg" id="chatch"><button data-ch="global" class="on">Global</button><button data-ch="banner">Banner</button><button data-ch="trade">Trade</button><button data-ch="party">Party</button><button data-ch="dm">Whispers</button></div></div>
     <select id="chatroom" hidden aria-label="Which party"></select>
     <div class="chatlog" id="chatlog" aria-live="polite"></div>
+    <div class="dmto" id="dmto" hidden></div>
     <form class="chatform" id="chatform" autocomplete="off"><input id="chatin" maxlength="200" placeholder="Say something" aria-label="Message"><button class="btn small" type="submit">Send</button></form>
-    <small class="chatnote" id="chatnote">Be kind. No web links. Ctrl+click an item to link it. Tap a name to mute or report.</small>
+    <small class="chatnote" id="chatnote">Be kind. No web links. Ctrl+click an item to link it. Tap a name to whisper, mute or report.</small>
   </aside>
   <div id="toasts" aria-live="polite"></div>
 </div>
@@ -276,11 +278,12 @@
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
 <div class="tip" id="tip" role="tooltip" hidden></div>
-<script>window.LH_BUILD = "202611232013";</script>
+<script>window.LH_BUILD = "202611232146";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611232013"></script>
-<script src="sprites.js?v=202611232013"></script>
-<script src="vector.js?v=202611232013"></script>
-<script src="ui.js?v=202611232013"></script>
+<script src="music.js?v=202611232146"></script>
+<script src="core.js?v=202611232146"></script>
+<script src="sprites.js?v=202611232146"></script>
+<script src="vector.js?v=202611232146"></script>
+<script src="ui.js?v=202611232146"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* lh-build 202611232013 */
+/* lh-build 202611232146 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1693,15 +1693,23 @@
     const a = S.autoScrap;
     const draw = () => {
       const rows = L.RARITY.filter(r => r.id !== 'set' && r.id !== 'goblin').map(r => {
-        const n = S.bag.filter(x => x.rar === r.id).length;
+        const n = S.bag.filter(x => x.rar === r.id && !L.wearer(S, x.uid)).length;
         return '<label class="aschip r-' + r.id + '"><input type="checkbox" data-r="' + r.id + '"' + (a.r.includes(r.id) ? ' checked' : '') + '><span class="gem"></span><b>' + r.name + '</b><small>' + n + ' in pack</small></label>';
       }).join('');
-      modal('<div class="asbox"><h2>Auto-scrap</h2><p class="note">Scrap new drops of the rarities you tick the moment they are found, for gold and Dust. They never take up pack space.</p>' +
+      modal('<div class="asbox"><h2>Auto-scrap</h2><p class="note">Scrap new drops of the rarities you tick the moment they are found, for gold and Dust. They never take up pack space. Drops that someone in your party can wear right now and that beat their gear are kept.</p>' +
         '<label class="asmaster"><span class="sw' + (a.on ? ' on' : '') + '"><i></i></span><input type="checkbox" id="as-on"' + (a.on ? ' checked' : '') + '><b>Auto-scrap is ' + (a.on ? 'on' : 'off') + '</b></label>' +
         '<div class="asgrid' + (a.on ? '' : ' off') + '">' + rows + '</div>' +
         '<label class="chk"><input type="checkbox" id="as-up"' + (a.up ? ' checked' : '') + '><span><b>Scrap upgrades too</b><small>Off by default, so a drop that beats what a companion wears is always kept.</small></span></label>' +
-        '<p class="asnote">Set pieces and job set pieces are always kept. Auto-scrap only touches new drops, never what is already in your pack.</p>' +
+        (() => { const l = a.on ? L.autoScrapPack(S) : [], g = l.reduce((t, it) => t + L.salvageValue(it), 0), d = l.reduce((t, it) => t + L.dustValue(it), 0);
+          return '<div class="aspack' + (l.length ? ' on' : '') + '"><div><b>' + (l.length ? l.length + (l.length === 1 ? ' piece' : ' pieces') + ' already in your pack match' + (l.length === 1 ? 'es' : '') : 'Nothing in your pack matches') + '</b><small>' + (l.length ? 'Auto-scrap only catches new drops. Scrap these now for ' + fmt(g) + ' gold and ' + fmt(d) + ' Dust.' : a.on ? 'Your pack is already clear of these rarities.' : 'Turn auto-scrap on to clear matching pieces you already carry.') + '</small></div>' +
+            (l.length ? '<button class="btn danger small" id="as-now">Scrap ' + l.length + ' now</button>' : '') + '</div>'; })() +
+        '<p class="asnote">Set pieces, job set pieces, region sets, locked and worn gear are always kept, and so is the best spare piece for each party member’s slot.</p>' +
         '<div class="row"><button class="btn" id="as-x">Done</button></div></div>', md => {
+          const now = md.querySelector('#as-now'); if (now) now.onclick = () => {
+            const l = L.autoScrapPack(S); let g = 0, d = 0; for (const it of l) { d += L.dustValue(it); g += L.salvage(S, it.uid); }
+            sfx.coin(); updateGear(true); save(); draw();
+            toast('coin', 'Scrapped ' + l.length + (l.length === 1 ? ' piece' : ' pieces'), '+' + fmt(g) + ' gold, +' + fmt(d) + ' Dust', 'feat');
+          };
           md.querySelector('#as-on').onchange = e => { a.on = e.target.checked; save(); paintPackCap(); draw(); };
           md.querySelector('#as-up').onchange = e => { a.up = e.target.checked; save(); };
           md.querySelectorAll('[data-r]').forEach(c => c.onchange = () => {
@@ -2052,6 +2060,8 @@
   function openSettings() {
     modal('<h2>Settings</h2>' +
       '<label class="setrow"><span>Sound effects</span><input type="checkbox" id="s-sound"' + (S.settings.sound ? ' checked' : '') + '></label>' +
+      (window.LHMusic ? '<label class="setrow"><span>Music</span><input type="checkbox" id="s-music"' + (LHMusic.on() ? ' checked' : '') + '></label>' +
+        '<p class="setnote">Pick tracks, set the volume or mute from the <button class="linkbtn" id="s-musicpanel">music player</button> (the note button at the top).</p>' : '') +
       '<p style="margin-top:16px">Your progress saves automatically in this browser. Copy a backup to move it to another device.</p>' +
       '<div class="row"><button class="btn ghost" id="s-export">Copy backup</button><button class="btn ghost" id="s-import">Load backup</button><button class="btn danger" id="s-reset">Erase progress</button></div>' +
       '<div id="s-extra"></div>' +
@@ -2059,6 +2069,10 @@
       '<p class="credits">Lanternhold &middot; A Grand War game by Born 2 Game, LLC. &copy; 2026 Born 2 Game, LLC. Made with care, no ads, no tracking.</p>' +
       '<div class="row"><button class="btn" id="s-close">Done</button></div>', m => {
         m.querySelector('#s-sound').onchange = e => { S.settings.sound = e.target.checked; };
+        if (window.LHMusic) {
+          m.querySelector('#s-music').onchange = e => LHMusic.setOn(e.target.checked);
+          m.querySelector('#s-musicpanel').onclick = () => { closeModal(); LHMusic.open(); };
+        }
         m.querySelector('#s-close').onclick = () => { save(); closeModal(); };
         m.querySelector('#s-export').onclick = () => {
           save(); const code = btoa(unescape(encodeURIComponent(localStorage.getItem(SAVE_KEY) || '')));
@@ -2982,7 +2996,10 @@
 
   // ---------- chat: Global, Trade and Party ----------
   const CHAT_POLL_OPEN = 5000;
-  const chat = { ch: 'global', leader: null, open: false, msgs: {}, since: {}, timer: 0, me: null, rooms: [], muted: new Set() };
+  const chat = { ch: 'global', leader: null, open: false, msgs: {}, since: {}, timer: 0, me: null, rooms: [], muted: new Set(), dmTo: null, seen: {}, bg: 0, polled: {} };
+  // Unread tracking: the newest message id you have looked at, per channel. Whispers remember it across visits.
+  try { chat.seen.dm = localStorage.getItem('lh_seen_dm') || ''; } catch (e) {}
+  const CHAT_POLL_BG = 20000, WATCH = ['dm', 'global'];
   try { JSON.parse(localStorage.getItem('lanternhold.muted') || '[]').forEach(x => chat.muted.add(x)); } catch (e) {}
   const roomKey = () => chat.ch + (chat.ch === 'party' ? ':' + (chat.leader || 'mine') : '');
   async function chatCall(method, path, body) {
@@ -2992,7 +3009,7 @@
     if (!r.ok) throw Object.assign(new Error(j.error || 'chat'), { status: r.status, code: j.error });
     return j;
   }
-  function chatNote(t, warn) { const n = $('chatnote'); n.textContent = t || 'Be kind. No web links. Ctrl+click an item to link it. Tap a name to mute or report.'; n.classList.toggle('warn', !!warn); }
+  function chatNote(t, warn) { const n = $('chatnote'); n.textContent = t || 'Be kind. No web links. Ctrl+click an item to link it. Tap a name to whisper, mute or report.'; n.classList.toggle('warn', !!warn); }
   // Item links: Ctrl/Cmd+click an item (or use Link in chat) to drop it into the message.
   const ITEM_TOKEN = /\[\[i:(tank|healer|rogue|mage|necro),(weapon|armor|trinket|main|off|head|neck|chest|robe|legs|feet|ring),(common|fine|rare|epic|set|goblin),([a-z]{0,8}),(\d{1,6}),(\d{1,2})\]\]/g;
   // Region set pieces ride in the set field as r plus a letter (ra = the first region).
@@ -3052,9 +3069,45 @@
     if (!S.hero) { log.innerHTML = '<div class="chatempty"><p>Create your hero first.</p></div>'; $('chatform').hidden = true; return; }
     $('chatform').hidden = false;
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-    log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
-      : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : 'Quiet down here. Say hello.') + '</p></div>';
+    paintDmBar();
+    const dm = chat.ch === 'dm', other = m => m.from === chat.me ? { pid: m.to, name: m.toName || 'them' } : { pid: m.from, name: m.name };
+    log.innerHTML = list.length ? list.map(m => dm ? '<div class="msg dm' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-dm="' + esc(other(m).pid) + '" data-dmname="' + esc(other(m).name) + '" title="Whisper back">' + (m.from === chat.me ? '<small class="dmdir">To</small>' + esc(m.toName || '') : '<small class="dmdir">From</small>' + chatName(m)) + '</button><span>' + renderText(m.text) + '</span></div>' : m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
+      : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : chat.ch === 'dm' ? 'No whispers yet. Tap a player’s name in any channel and choose Whisper to message them privately.' : 'Quiet down here. Say hello.') + '</p></div>';
     if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
+  }
+  function mergeMsgs(k, r) {
+    chat.me = r.me;
+    const cur = chat.msgs[k] || [], seen = new Set(cur.map(m => m.id)), add = r.msgs.filter(m => !seen.has(m.id));
+    if (r.msgs.length) { chat.msgs[k] = cur.concat(add).slice(-120); chat.since[k] = chat.msgs[k][chat.msgs[k].length - 1].id; } else chat.msgs[k] = cur;
+    return add;
+  }
+  const viewing = k => chat.open && roomKey() === k && !document.hidden;
+  function markSeen(k) {
+    const l = chat.msgs[k] || []; if (!l.length) return;
+    chat.seen[k] = l[l.length - 1].id; if (k === 'dm') try { localStorage.setItem('lh_seen_dm', chat.seen.dm); } catch (e) {}
+  }
+  const unread = k => (chat.msgs[k] || []).filter(m => m.id > (chat.seen[k] || '') && m.from !== chat.me && m.from !== 'sys' && !chat.muted.has(m.from)).length;
+  function paintUnread() {
+    const n = WATCH.reduce((a, k) => a + unread(k), 0), d = $('chatdot');
+    d.hidden = !n || chat.open; d.textContent = n > 9 ? '9+' : n || '';
+    $('btn-chat').setAttribute('aria-label', n ? 'Open chat, ' + n + ' unread' : 'Open chat');
+    document.querySelectorAll('#chatch [data-ch]').forEach(b => { const k = b.dataset.ch; b.classList.toggle('unread', WATCH.includes(k) && k !== roomKey() && unread(k) > 0); });
+  }
+  // While chat is closed (or on another channel), check Whispers and Global now and then for the unread bubble.
+  async function bgPoll() {
+    clearTimeout(chat.bg);
+    if (CL && signedIn() && S.hero && !document.hidden) {
+      for (const k of WATCH) {
+        if (viewing(k)) continue;
+        try {
+          const first = !chat.polled[k], add = mergeMsgs(k, await chatCall('GET', '/chat?ch=' + k + '&since=' + encodeURIComponent(chat.since[k] || '0')));
+          chat.polled[k] = 1; if (first && k !== 'dm') markSeen(k);
+          if (k === 'dm' && !first) { const w = add.filter(m => m.from !== chat.me && !chat.muted.has(m.from)).pop(); if (w) toast('chat', 'Whisper from ' + w.name, w.text.replace(ITEM_TOKEN, '[item]').slice(0, 90), ''); }
+        } catch (e) { if (k === 'dm' && e.status === 403) { const t = document.querySelector('#chatch [data-ch="dm"]'); if (t) t.hidden = true; } }
+      }
+      paintUnread();
+    }
+    chat.bg = setTimeout(bgPoll, CHAT_POLL_BG);
   }
   async function pollChat() {
     clearTimeout(chat.timer);
@@ -3062,17 +3115,21 @@
     const k = roomKey();
     try {
       const q = '?ch=' + chat.ch + (chat.ch === 'party' && chat.leader ? '&leader=' + chat.leader : '') + '&since=' + encodeURIComponent(chat.since[k] || '0');
-      const r = await chatCall('GET', '/chat' + q);
-      chat.me = r.me;
-      if (r.msgs.length) {
-        const cur = chat.msgs[k] || [], seen = new Set(cur.map(m => m.id));
-        chat.msgs[k] = cur.concat(r.msgs.filter(m => !seen.has(m.id))).slice(-120);
-        chat.since[k] = chat.msgs[k][chat.msgs[k].length - 1].id;
-      } else chat.msgs[k] = chat.msgs[k] || [];
-      if (k === roomKey()) paintChat();
+      mergeMsgs(k, await chatCall('GET', '/chat' + q)); chat.polled[k] = 1;
+      if (k === roomKey()) { paintChat(); if (viewing(k)) markSeen(k); paintUnread(); }
       fetchLooks((chat.msgs[k] || []).map(m => m.from)).then(n => { if (n && k === roomKey()) paintChat(); });
     } catch (e) { if (e.status === 403) { chatNote('You are no longer in that party.', true); } }
     chat.timer = setTimeout(pollChat, CHAT_POLL_OPEN);
+  }
+  function paintDmBar() {
+    const bar = $('dmto'), on = chat.ch === 'dm' && signedIn() && S.hero;
+    bar.hidden = !on; if (!on) return;
+    bar.innerHTML = chat.dmTo ? '<span>Whispering to <b>' + esc(chat.dmTo.name) + '</b></span><button type="button" class="iconbtn" id="dm-clear" aria-label="Stop whispering to ' + esc(chat.dmTo.name) + '">&times;</button>' : '<span>Tap a name to pick who to whisper.</span>';
+  }
+  function whisperTo(pid, name) {
+    if (!pid || pid === chat.me) return;
+    chat.dmTo = { pid, name }; if (!chat.open) openChat(true);
+    setChannel('dm'); setTimeout(() => $('chatin').focus(), 50);
   }
   async function loadRooms() {
     try { const r = await chatCall('GET', '/parties'); chat.me = r.me; chat.rooms = r.parties || []; } catch (e) { chat.rooms = []; }
@@ -3082,12 +3139,12 @@
   }
   function setChannel(ch) {
     chat.ch = ch; document.querySelectorAll('#chatch button').forEach(b => b.classList.toggle('on', b.dataset.ch === ch));
-    $('chatin').placeholder = ch === 'trade' ? 'Looking for, or offering...' : ch === 'banner' ? 'Talk to your banner' : ch === 'party' ? 'Talk to your party' : 'Say something';
+    $('chatin').placeholder = ch === 'dm' ? (chat.dmTo ? 'Whisper to ' + chat.dmTo.name : 'Pick someone to whisper') : ch === 'trade' ? 'Looking for, or offering...' : ch === 'banner' ? 'Talk to your banner' : ch === 'party' ? 'Talk to your party' : 'Say something';
     if (ch === 'party') loadRooms(); else $('chatroom').hidden = true;
     chatNote(); paintChat(); pollChat();
   }
   function openChat(open) {
-    chat.open = open; $('chat').hidden = !open; $('btn-chat').hidden = open; $('chatdot').hidden = true;
+    chat.open = open; $('chat').hidden = !open; $('btn-chat').hidden = open; paintUnread();
     try { localStorage.setItem('lh_chat', open ? '1' : '0'); } catch (e) {}
     if (open) { paintChat(); pollChat(); if (signedIn()) setTimeout(() => $('chatin').focus(), 50); } else clearTimeout(chat.timer);
   }
@@ -3102,29 +3159,34 @@
     $('chatlog').addEventListener('click', e => {
       if (e.target.closest('#chat-in')) { authForm('in'); return; }
       const lk = e.target.closest('[data-link]'); if (lk) { previewItem(lk.dataset.link); return; }
+      const dw = e.target.closest('[data-dm]'); if (dw) { whisperTo(dw.dataset.dm, dw.dataset.dmname); return; }
       const w = e.target.closest('[data-from]'); if (!w || w.dataset.from === chat.me) return;
       const from = w.dataset.from, id = w.dataset.id, name = w.dataset.name;
-      modal('<h2>' + esc(name) + '</h2><p>Mute hides everything this player says, on this device. Report flags this message for review; messages with several reports are hidden for everyone.</p><div class="row"><button class="btn ghost" id="c-mute">Mute ' + esc(name) + '</button><button class="btn danger" id="c-rep">Report message</button><button class="btn ghost" id="c-x">Cancel</button></div>', md => {
+      modal('<h2>' + esc(name) + '</h2><p>Mute hides everything this player says, on this device. Report flags this message for review; messages with several reports are hidden for everyone.</p><div class="row"><button class="btn" id="c-dm">Whisper</button><button class="btn ghost" id="c-mute">Mute ' + esc(name) + '</button><button class="btn danger" id="c-rep">Report message</button><button class="btn ghost" id="c-x">Cancel</button></div>', md => {
         md.querySelector('#c-mute').onclick = () => { chat.muted.add(from); try { localStorage.setItem('lanternhold.muted', JSON.stringify([...chat.muted])); } catch (e) {} closeModal(); paintChat(); toast('lock', 'Muted', 'You won’t see messages from ' + name + '.', ''); };
         md.querySelector('#c-rep').onclick = async () => { closeModal(); try { await chatCall('POST', '/report', { ch: chat.ch, leader: chat.leader || undefined, id }); } catch (e) {} toast('lock', 'Reported', 'Thanks. We’ll keep an eye on it.', ''); };
         md.querySelector('#c-x').onclick = closeModal;
+        md.querySelector('#c-dm').onclick = () => { closeModal(); whisperTo(from, name); };
       });
     });
+    $('dmto').addEventListener('click', e => { if (e.target.closest('#dm-clear')) { chat.dmTo = null; setChannel('dm'); } });
+    setTimeout(bgPoll, 4000);
     $('chatform').addEventListener('submit', async e => {
       e.preventDefault();
       const inp = $('chatin'); let text = inp.value.trim(); if (!text || !S.hero) return;
       for (const l of chat.links) text = text.replace(l.label, l.token);
       text = text.replace(/\[\[(?!i:)/g, '[');
+      if (chat.ch === 'dm' && !chat.dmTo) { chatNote('Tap a player’s name, here or in another channel, to pick who to whisper.', true); return; }
       inp.disabled = true;
       try {
-        await chatCall('POST', '/chat', { ch: chat.ch, leader: chat.leader || undefined, text, name: S.hero.name, cls: S.hero.cls });
+        await chatCall('POST', '/chat', { ch: chat.ch, leader: chat.leader || undefined, to: chat.ch === 'dm' ? chat.dmTo.pid : undefined, text, name: S.hero.name, cls: S.hero.cls });
         inp.value = ''; chat.links = []; chatNote(); pollChat();
       } catch (err) {
-        chatNote({ slow: 'Easy there. One message every few seconds.', links: 'Links aren’t allowed in chat.', name: 'Your hero’s name can’t be used in chat. Start a new hero with a different name.', room: 'You can’t post in that party.' }[err.code] || 'Message not sent. Try again in a moment.', true);
+        chatNote({ slow: 'Easy there. One message every few seconds.', links: 'Links aren’t allowed in chat.', name: 'Your hero’s name can’t be used in chat. Start a new hero with a different name.', room: 'You can’t post in that party.', to: 'That player can’t get whispers right now.' }[err.code] || 'Message not sent. Try again in a moment.', true);
       }
       inp.disabled = false; inp.focus();
     });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && chat.open) pollChat(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (chat.open) pollChat(); bgPoll(); });
   }
   // ---------- map of the Lantern Deep ----------
   // A one-screen world map of the fifteen regions, and a close-up of each region with its ten floors and a dossier.
@@ -3420,7 +3482,7 @@
     return head.indexOf('lh-build ' + b) >= 0;
   }
   async function allFresh(b) {
-    for (const f of ['./', 'ui.js', 'core.js', 'sprites.js', 'vector.js', 'style.css']) if (!(await hasMark(f, b))) return false;
+    for (const f of ['./', 'ui.js', 'core.js', 'sprites.js', 'vector.js', 'music.js', 'style.css']) if (!(await hasMark(f, b))) return false;
     return true;
   }
   async function loadBuild(b) {
@@ -3781,7 +3843,7 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 63, date: 'November 23, 2026', title: 'A slower, deeper descent', items: [
+    { v: 64, date: 'November 23, 2026', title: 'A slower, deeper descent', items: [
       'Lanternhold is now paced to be savored, not rushed. New parts of the game open as your hero levels up: Gear at 3, the Campfire at 5, map travel and market buying at 8, camp jobs at 10, the Players Guild at 12, the Ember Ring at 15, selling and the Sigil exchange at 18, rekindling at 20, and the world boss and job sets at 25.',
       'Each new region needs a hero level to enter. Until then your party keeps working the region it is in. Hero XP needs more per level, and deeper floors and guardians give the most.',
       'Region mastery: every region has three goals (beat its guardian, defeat 20 alliance elites, find a piece of its set). Each one finished is +1% damage, health or gold for good. See Codex, Progress.',
@@ -3789,6 +3851,16 @@
       'Camp jobs start with one slot and gain one at levels 15, 20, 25, 30 and 35.',
       'Rekindling now needs hero level 20 and floor 75, and Embers count from floor 60, so a deep descent pays far more than a quick one.',
       'Nothing you already have is taken away: your hero keeps their level, every floor you reached stays open, companions over the new limit stay, and features you already use stay unlocked.'] },
+    { v: 63, date: 'November 23, 2026', title: 'Whispers and unread messages', items: [
+      'New: whispers. Tap a player’s name in any chat channel and choose Whisper to message them privately. Your conversations live in the new Whispers tab, and tapping a name there whispers back.',
+      'The chat button now shows a red bubble with how many new messages are waiting in Global and Whispers, and a new whisper pops up a notice even while chat is closed.'] },
+    { v: 62, date: 'November 23, 2026', title: 'Music for the Deep', items: [
+      'Lanternhold now has its own soundtrack: eight original pieces, from the Hearthfire Waltz at camp to the Ember Ring battle theme and a quiet piano nocturne for late watches.',
+      'Tap the note button at the top to open the player. Skip forward or back, pick any track, shuffle, set the volume or mute. Your choices are remembered on this device.',
+      'Music starts on your first tap and streams one track at a time, so it stays light on phones. You can turn it off in Settings too.'] },
+    { v: 61, date: 'November 23, 2026', title: 'Auto-scrap fixed', items: [
+      'Fixed: auto-scrap kept most drops. It treated anything a benched companion, or a hero not yet high enough level, might someday wear as an upgrade. Now only a piece someone in your party can wear right now, and that beats their gear, is kept.',
+      'New: the Auto-scrap window shows how many pieces already in your pack match your settings, with a button to scrap them all at once. Locked and worn gear, sets and each party member’s best spare piece are kept.'] },
     { v: 60, date: 'November 23, 2026', title: 'Fair fights in the Ember Ring', items: [
       'Duelling the same hero again within a day now pays less each time: full rewards, then half, then a quarter, then nothing. This covers rating and Laurels for both heroes.',
       'Challenger cards show when a rematch pays less, and when it will pay in full again.'] },
@@ -4774,6 +4846,7 @@
   document.querySelectorAll('.tabs [data-tab="ring"]').forEach(b => b.addEventListener('click', () => { paintRing(); loadRing(); }));
   // Keep the challenge timer fresh while the tab is open.
   setInterval(() => { if (typeof tab !== 'undefined' && tab === 'ring' && !document.hidden && !$('modal').dataset.lock) { const a = document.activeElement; if (!a || !$('ringbox') || !$('ringbox').contains(a)) paintRing(); } }, 30000);
+
   // ---------- the Wardrobe: outfits and lantern styles ----------
   // Looks only: nothing here changes power. Bought with Sigils on the server (infra/lambda/looks.js);
   // keep ids and prices in step with its CAT. The art lives in vector.js (OUTFITS, LANTERNS).

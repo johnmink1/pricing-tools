@@ -1,0 +1,16 @@
+Lanternhold Original Score
+Copyright (c) 2026 Born 2 Game, LLC. All rights reserved.
+
+All eight tracks are original compositions written for Lanternhold (with AI assistance, as hand-written
+scores in lanternhold-music/ in the source repository). No samples, loops or melodies from other works.
+Rendered with FluidSynth using the MuseScore General SoundFont (MIT License, (c) S. Christian Collins
+and MuseScore contributors), which permits commercial use of rendered audio.
+
+1 Banners at Dawn            main theme
+2 Hearthfire Waltz           camp
+3 Road to the Shattered Reach adventure
+4 Market of Many Lanterns    market
+5 Beneath the Lantern Deep   dungeon
+6 The Lost Lantern Tavern    tavern jig
+7 Ember Ring                 battle
+8 Starlit Watch              night

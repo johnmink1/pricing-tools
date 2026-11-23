@@ -18,7 +18,7 @@ function win(t) {
 }
 // Phases broken: phase k needs HP1 * 2^(k-1) more.
 const phases = t => { let k = 0, need = HP1; while (t >= need && k < 30) { t -= need; need *= 2; k++; } return k; };
-const all = async id => (await db.send(new D.QueryCommand({ TableName: T, KeyConditionExpression: 'w = :w', ExpressionAttributeValues: { ':w': S(id) } }))).Items || [];
+const all = async id => (await db.send(new D.QueryCommand({ TableName: T, KeyConditionExpression: 'w=:w', ExpressionAttributeValues: { ':w': S(id) } }))).Items || [];
 const row = async (id, s) => (await db.send(new D.GetItemCommand({ TableName: T, Key: { w: S(id), s: S(s) }, ConsistentRead: true }))).Item;
 const mine = i => i ? { score: +i.score.N, last: +(i.last || N(0)).N, cl: !!i.cl } : { score: 0, last: 0, cl: false };
 exports.handler = async (e) => {
@@ -35,12 +35,15 @@ exports.handler = async (e) => {
   }
   if (e.routeKey === 'POST /boss/hit') {
     if (!live) return res(409, { error: 'closed' });
-    const sc = Math.max(0, Math.min(CAP, Math.round((+b.score || 0) * 10) / 10));
+    let sc = Math.max(0, Math.min(CAP, Math.round((+b.score || 0) * 10) / 10));
+    // The Nexus check, server side: strike gaps (ms) that are too fast or machine-even lose the strikes' share.
+    const iv = [].concat(b.iv || []).slice(0, 3e3).map(Number).filter(x => x < 1e3), n = iv.length, m = iv.reduce((a, x) => a + x, 0) / n;
+    if (n > 99 && (m < 60 || iv.reduce((a, x) => a + (x - m) ** 2, 0) / n * 625 < m * m)) sc = Math.max(0, sc - (+b.ck || 0));
     const h = (await db.send(new D.GetItemCommand({ TableName: H, Key: { pid: S(me) } }))).Item;
     if (!h || !h.name || h.ban) return res(403, { error: 'hero' });
     try {
-      await db.send(new D.UpdateItemCommand({ TableName: T, Key: { w: S(w.id), s: S(me) }, UpdateExpression: 'SET #l = :t, nm = :n, c = :c ADD score :s',
-        ConditionExpression: 'attribute_not_exists(#l) OR #l < :cut', ExpressionAttributeNames: { '#l': 'last' },
+      await db.send(new D.UpdateItemCommand({ TableName: T, Key: { w: S(w.id), s: S(me) }, UpdateExpression: 'SET #l=:t,nm=:n,c=:c ADD score :s',
+        ConditionExpression: 'attribute_not_exists(#l) OR #l<:cut', ExpressionAttributeNames: { '#l': 'last' },
         ExpressionAttributeValues: { ':t': N(now), ':n': h.name, ':c': h.cls, ':s': N(sc), ':cut': N(now - COOL + 5000) } }));
     } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(429, { error: 'cool' }); throw x; }
     const g = await db.send(new D.UpdateItemCommand({ TableName: T, Key: { w: S(w.id), s: S('#') }, UpdateExpression: 'ADD #t :s', ExpressionAttributeNames: { '#t': 'total' }, ExpressionAttributeValues: { ':s': N(sc) }, ReturnValues: 'ALL_NEW' }));
@@ -54,9 +57,9 @@ exports.handler = async (e) => {
     if (!rank || !(+my.score.N > 0)) return res(404, { error: 'none' });
     const ph = phases(g ? +g.total.N : 0), sig = 3 + Math.min(5, ph) + (rank <= 3 ? 5 : 0);
     try {
-      await db.send(new D.UpdateItemCommand({ TableName: T, Key: { w: S(id), s: S(me) }, UpdateExpression: 'SET cl = :t', ConditionExpression: 'attribute_not_exists(cl)', ExpressionAttributeValues: { ':t': N(now) } }));
+      await db.send(new D.UpdateItemCommand({ TableName: T, Key: { w: S(id), s: S(me) }, UpdateExpression: 'SET cl=:t', ConditionExpression: 'attribute_not_exists(cl)', ExpressionAttributeValues: { ':t': N(now) } }));
     } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'claimed' }); throw x; }
-    const r = await db.send(new D.UpdateItemCommand({ TableName: W, Key: { userId: S(cl.sub) }, UpdateExpression: 'SET bal = if_not_exists(bal, :g) + :a', ExpressionAttributeValues: { ':g': N(100), ':a': N(sig) }, ReturnValues: 'UPDATED_NEW' }));
+    const r = await db.send(new D.UpdateItemCommand({ TableName: W, Key: { userId: S(cl.sub) }, UpdateExpression: 'SET bal=if_not_exists(bal,:g)+:a', ExpressionAttributeValues: { ':g': N(100), ':a': N(sig) }, ReturnValues: 'UPDATED_NEW' }));
     return res(200, { ok: true, sig, bal: +r.Attributes.bal.N, rank, n: ps.length, phases: ph, score: +my.score.N });
   }
   return res(404, { error: 1 });

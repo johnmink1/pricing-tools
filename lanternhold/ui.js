@@ -1921,7 +1921,7 @@
     if (!CL || !signedIn()) return null;
     try { prof = await papi('GET', '/profile'); } catch (e) { return prof; }
     try { localStorage.setItem('lh_bal', String(prof.bal)); } catch (e) {}
-    if ((prof.pass || 0) !== (S.pass || 0) || (prof.sub || 0) !== (S.sub || 0)) { S.pass = prof.pass || 0; S.sub = prof.sub || 0; save(); updatePanel(true); updateSeats(true); }
+    if ((prof.pass || 0) !== (S.pass || 0)) { S.pass = prof.pass || 0; save(); updatePanel(true); }
     if (!!prof.boh !== !!S.boh) { S.boh = !!prof.boh; save(); updateGear(true); }
     // A verified commander link turns on the hero's Grand War aura.
     const had = JSON.stringify(S.war || null);
@@ -2004,8 +2004,7 @@
     modal('<div class="maphead"><div><h2>Your profile</h2><small>Looks only. Nothing here changes your party’s power.</small></div><button class="iconbtn" id="pe-x" aria-label="Close">&times;</button></div>' +
       '<div class="pfwrap">' + looksCard(me) + '</div>' +
       '<div class="pfbal"><span>' + sigil + '<b>' + prof.bal + '</b> ' + TOKEN + '</span><button class="btn small ghost" id="pe-get">Get Sigils</button></div>' +
-      (subOn() ? '<div class="pfbal pass"><span>Lanternholder: <b>active</b>, renews ' + subDate() + '</span><button class="btn small ghost" id="pe-pass">Perks</button></div>' :
-        '<div class="pfbal pass"><span>Lantern Pass: <b>' + (passLeft() || 'none') + '</b></span><button class="btn small ghost" id="pe-pass">' + (passLeft() ? 'Extend' : 'Get the pass') + '</button></div>') +
+      '<div class="pfbal pass"><span>Lantern Pass: <b>' + (passLeft() || 'none') + '</b></span><button class="btn small ghost" id="pe-pass">' + (passLeft() ? 'Extend' : 'Get the pass') + '</button></div>' +
       '<div class="pfbal pass"><span>Bag of Holding: <b>' + (S.boh ? 'owned' : 'none') + '</b></span>' + (S.boh ? '' : '<button class="btn small ghost" id="pe-boh">See it</button>') + '</div>' +
       '<div class="seg pfseg">' + tabs + '</div><div class="pfbody">' + body + '</div>' +
       '<div class="row"><button class="btn ghost" id="pe-cancel">Cancel</button><button class="btn" id="pe-save">Save profile</button></div>', md => {
@@ -2046,10 +2045,6 @@
   const WIX = 'https://www.wixapis.com', WIX_APP = 'd9d54315-ca58-47e4-9e15-b661ae7e141d', WIX_KEY = 'lh_wix';
   const PACKS = [['7c5854d4-49f8-4244-8ec3-6c27caaa6e59', 500, '$4.99', ''], ['57d4ee44-c741-4616-96ff-9350734b19da', 1100, '$9.99', '10% bonus'],
     ['c19c183a-a27a-4918-8d3c-f94e684fb2d8', 2400, '$19.99', '20% bonus'], ['27c5a9e9-b7fb-48d9-90c8-a450b85e083a', 6500, '$49.99', 'Best value']];
-  // Lanternholder: the one recurring plan. $4.99 a month until the player cancels in their store account.
-  const SUB_PLAN = '36118cbb-d4f6-48ce-be59-65a2b9b82a13', SUB_PRICE = '$4.99', SUB_MANAGE = 'https://www.born2gamellc.com/account/my-subscriptions';
-  const subOn = () => S.sub > Date.now();
-  const subDate = () => new Date(S.sub - 864e5).toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
   const homeUrl = () => location.origin + location.pathname.replace(/[^/]*$/, '');
   const wixGet = () => { try { return JSON.parse(localStorage.getItem(WIX_KEY) || 'null'); } catch (e) { return null; } };
   const wixPut = w => { try { w ? localStorage.setItem(WIX_KEY, JSON.stringify(w)) : localStorage.removeItem(WIX_KEY); } catch (e) {} };
@@ -2094,11 +2089,6 @@
       const r = await papi('POST', '/store/sync', { token: tok });
       const w = wixGet(); if (w) { w.n = r.name; wixPut(w); }
       if (prof) prof.bal = r.bal;
-      if (r.sub !== undefined && (r.sub || 0) !== (S.sub || 0)) {
-        const fresh = r.sub > Date.now() && !(S.sub > Date.now());
-        S.sub = r.sub || 0; if (prof) prof.sub = S.sub; save(); updatePanel(true); updateSeats(true);
-        if (fresh) { sfx.buy(); toast('star', 'Welcome, Lanternholder', 'Auto-train, 10 extra bag slots and 4 more hours away are on for as long as your membership is active. Thank you!', 'feat'); }
-      }
       if (r.added) { sfx.buy(); toast('star', '+' + r.added.toLocaleString() + ' ' + TOKEN, 'Your store purchase is in your wallet. Thank you for supporting Lanternhold!', 'feat'); }
       else if (loud) toast('star', 'All caught up', 'No new store purchases on ' + r.name + '. A new purchase can take a minute to show.', '');
     } catch (e) {
@@ -2138,29 +2128,21 @@
   }
   function getSigils(back) {
     back = typeof back === 'function' ? back : closeModal;
-    const w = wixGet(), linked = !!(w && (w.a || w.r)), member = subOn();
+    const w = wixGet(), linked = !!(w && (w.a || w.r));
     const tiles = PACKS.map(p => '<button class="pack" data-pack="' + p[0] + '">' + sigil + '<b>' + p[1].toLocaleString() + '</b><small>' + TOKEN + '</small>' + (p[3] ? '<em>' + p[3] + '</em>' : '') + '<span>' + p[2] + '</span></button>').join('');
-    modal('<div class="maphead"><div><h2>Get ' + TOKEN + '</h2><small>Looks for your profile, speed-ups, or sell them to other players for gold.</small></div><button class="iconbtn" id="gs-x" aria-label="Close">&times;</button></div>' +
-      '<div class="shopsec"><h3>Sigil packs <span class="tag once">One-time purchase</span></h3><p class="shopsub">Pay once and the ' + TOKEN + ' are yours. Not a subscription: nothing renews and you are never charged again.</p></div>' +
+    modal('<div class="maphead"><div><h2>Get ' + TOKEN + '</h2><small>Looks for your profile, or sell them to other players for gold.</small></div><button class="iconbtn" id="gs-x" aria-label="Close">&times;</button></div>' +
       '<div class="packs">' + tiles + '</div>' +
-      '<div class="shopsec subbox"><h3>Lanternholder <span class="tag renew">Monthly subscription</span></h3>' +
-      '<p class="shopsub">' + SUB_PRICE + ' a month for the automation perks, on for as long as you stay a member.</p>' +
-      '<ul class="passfx"><li><b>Auto-train</b><span>Every character trains themselves whenever you have the gold.</span></li>' +
-      '<li><b>+' + L.PASS_BAG + ' bag slots</b><span>More room for loot between trips to the forge.</span></li>' +
-      '<li><b>+' + L.PASS_OFFLINE / 3600 + ' hours away</b><span>Your party keeps earning offline for longer.</span></li></ul>' +
-      (member ? '<p class="passstate">You are a Lanternholder. Your membership renews on <b>' + subDate() + '</b>.</p><div class="row"><a class="btn ghost" href="' + SUB_MANAGE + '" target="_blank" rel="noopener">Manage or cancel</a></div>'
-        : '<div class="row"><button class="btn" id="gs-sub">Subscribe for ' + SUB_PRICE + ' / month</button></div>') +
-      '<p class="note renewnote"><b>This renews automatically.</b> You are charged ' + SUB_PRICE + ' every month until you cancel. Cancel any time under My Subscriptions in your Born 2 Game account; the perks stay on until the end of the month you paid for.</p></div>' +
       (!signedIn() ? '<p class="note">Sign in to the game first so we know which hero gets the ' + TOKEN + '.</p>' :
         linked ? '<div class="storelink"><span>Store account: <b>' + esc(w.n || 'linked') + '</b></span><button class="btn small ghost" id="gs-sync">Check for purchases</button><button class="btn small ghost" id="gs-out">Unlink</button></div>' :
-        '<div class="storelink"><span>Packs and memberships are sold in the Born 2 Game store. Sign in there once and every purchase lands on this hero.</span><button class="btn small" id="gs-in">Sign in with Born 2 Game</button></div>') +
+        '<div class="storelink"><span>Packs are sold in the Born 2 Game store. Sign in there once and every pack you buy lands on this hero.</span><button class="btn small" id="gs-in">Sign in with Born 2 Game</button></div>') +
       '<p class="note">Payment is handled by the Born 2 Game store at born2gamellc.com. Every account also starts with 100 ' + TOKEN + ', and the team hands more out at Grand War events.</p>' +
       '<div class="row"><button class="btn ghost" id="gs-ok">Back</button></div>', md => {
         md.querySelector('#gs-x').onclick = closeModal; md.querySelector('#gs-ok').onclick = () => back();
         const go = async (b, f) => { b.disabled = true; try { await f(); } catch (e) { b.disabled = false; toast('lock', 'Could not reach the store', 'Check your connection and try again.', 'warn'); } };
-        const need = () => { if (signedIn()) return true; toast('user', 'Sign in first', 'Make a free game account so your purchase has a home.', 'warn'); return false; };
-        md.querySelectorAll('[data-pack]').forEach(b => b.onclick = () => { if (need()) go(b, () => buyPack(b.dataset.pack)); });
-        const sb = md.querySelector('#gs-sub'); if (sb) sb.onclick = () => { if (need()) go(sb, () => buyPack(SUB_PLAN)); };
+        md.querySelectorAll('[data-pack]').forEach(b => b.onclick = () => {
+          if (!signedIn()) { toast('user', 'Sign in first', 'Make a free game account so your ' + TOKEN + ' have a home.', 'warn'); return; }
+          go(b, () => buyPack(b.dataset.pack));
+        });
         const i = md.querySelector('#gs-in'); if (i) i.onclick = () => go(i, storeSignIn);
         const sy = md.querySelector('#gs-sync'); if (sy) sy.onclick = async () => { sy.disabled = true; await storeSync(true); getSigils(back); };
         const o = md.querySelector('#gs-out'); if (o) o.onclick = () => { wixPut(null); toast('user', 'Store account unlinked', 'This device no longer checks it for purchases.', ''); getSigils(back); };
@@ -2214,10 +2196,8 @@
       '<ul class="passfx"><li><b>Auto-train</b><span>The Auto button under each Train button: characters train themselves whenever you have the gold.</span></li>' +
       '<li><b>+' + L.PASS_BAG + ' bag slots</b><span>More room for loot between trips to the forge.</span></li>' +
       '<li><b>+' + L.PASS_OFFLINE / 3600 + ' hours away</b><span>Your party keeps earning offline for longer.</span></li></ul>' +
-      (subOn() ? '<p class="passstate">You are a <b>Lanternholder</b>: these perks are on while your membership is active (renews ' + subDate() + ').</p>' : '') +
       '<p class="passstate">' + (left ? (trial ? 'Your free trial has <b>' + left + '</b> left.' : 'Your pass has <b>' + left + '</b> left. Buying again adds 30 days.') : 'You do not have a pass right now.') + '</p>' +
       (!signedIn() ? '<p class="note">Sign in to the game to buy a pass with ' + TOKEN + '.</p>' : '') +
-      (subOn() ? '' : '<p class="note">Prefer not to top up every month? The <b>Lanternholder</b> membership (' + SUB_PRICE + ' a month, renews until you cancel) keeps these perks on. Find it under Get ' + TOKEN + '.</p>') +
       '<div class="row"><button class="btn ghost" id="lp-no">Not now</button>' + (signedIn() ? (can ? '<button class="btn" id="lp-buy">' + sigil + ' ' + L.PASS_COST + ' ' + TOKEN + ' for 30 days</button>' : '<button class="btn" id="lp-get">Get ' + TOKEN + '</button>') : '') + '</div>', md => {
         md.querySelector('#lp-x').onclick = closeModal; md.querySelector('#lp-no').onclick = closeModal;
         const g = md.querySelector('#lp-get'); if (g) g.onclick = () => getSigils(openPass);
@@ -3148,8 +3128,7 @@
         '<b>Lantern Pass</b> (500, 30 days): Auto-train, +10 bag slots, +4 h away. Free 3-day trial.',
         '<b>Bag of Holding</b> (6,500, once): an endless pack.',
         '<b>Speed-up tonics</b> and Campfire Draughts. Profile frames, titles and colors.',
-        'Buy packs with <b>Get Sigils</b> after signing in with your Born 2 Game store account. Packs are one-time purchases and never renew.',
-        '<b>Lanternholder</b> ($4.99 a month, renews until you cancel): the Lantern Pass perks for as long as you are a member.']],
+        'Buy packs with <b>Get Sigils</b> after signing in with your Born 2 Game store account.']],
       ['Mercy’s Blessing', 'i:cross', 'Real donations to the Grand War’s Mercy Corps bless every player.', [
         '<b>+10% gold</b>, <b>+10% health</b>, <b>+20% healing</b> while it burns.',
         'Each $10, 5 food items or toy adds 2 hours, up to 7 days.']],

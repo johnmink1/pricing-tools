@@ -1084,6 +1084,7 @@
     location.reload();
   }
   function paintAccount() {
+    try { if (chat.open) { paintChat(); pollChat(); } } catch (e) {}
     const b = $('btn-account'); if (!b) return;
     if (signedIn()) { b.innerHTML = '<span class="avatar">' + ((sess.email || '?')[0].toUpperCase()) + '</span>'; b.setAttribute('aria-label', 'Account'); b.title = 'Signed in. Progress syncs.'; }
     else { b.innerHTML = icon('user') + '<span>Sign in</span>'; b.setAttribute('aria-label', 'Sign in'); b.title = 'Sign in to sync your progress'; }
@@ -1190,6 +1191,93 @@
   // ---------- support link ----------
   if (window.LH_SUPPORT_URL) { const a = $('support'); a.href = window.LH_SUPPORT_URL; a.hidden = false; a.title = 'Buy the developer a coffee'; }
 
+
+  // ---------- chat: Global, Trade and Party ----------
+  const CHAT_POLL_OPEN = 5000;
+  const chat = { ch: 'global', leader: null, open: false, msgs: {}, since: {}, timer: 0, me: null, rooms: [], muted: new Set() };
+  try { JSON.parse(localStorage.getItem('lanternhold.muted') || '[]').forEach(x => chat.muted.add(x)); } catch (e) {}
+  const roomKey = () => chat.ch + (chat.ch === 'party' ? ':' + (chat.leader || 'mine') : '');
+  async function chatCall(method, path, body) {
+    const tok = await idToken(); if (!tok) throw Object.assign(new Error('signed out'), { status: 401 });
+    const r = await fetch(CL.api.replace(/\/$/, '') + path, { method, headers: { Authorization: tok, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(j.error || 'chat'), { status: r.status, code: j.error });
+    return j;
+  }
+  function chatNote(t, warn) { const n = $('chatnote'); n.textContent = t || 'Be kind. No links. Tap a name to mute or report.'; n.classList.toggle('warn', !!warn); }
+  function paintChat() {
+    const log = $('chatlog'), k = roomKey(), list = (chat.msgs[k] || []).filter(m => !chat.muted.has(m.from));
+    if (!signedIn()) { log.innerHTML = '<div class="chatempty"><p>Sign in to chat with other delvers.</p><button class="btn small" id="chat-in">Sign in</button></div>'; $('chatform').hidden = true; return; }
+    if (!S.hero) { log.innerHTML = '<div class="chatempty"><p>Create your hero first.</p></div>'; $('chatform').hidden = true; return; }
+    $('chatform').hidden = false;
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    log.innerHTML = list.length ? list.map(m => '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + esc(m.name) + '</button><span>' + esc(m.text) + '</span></div>').join('')
+      : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : 'Quiet down here. Say hello.') + '</p></div>';
+    if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
+  }
+  async function pollChat() {
+    clearTimeout(chat.timer);
+    if (!chat.open || !signedIn() || !S.hero || document.hidden) { if (chat.open) chat.timer = setTimeout(pollChat, CHAT_POLL_OPEN); return; }
+    const k = roomKey();
+    try {
+      const q = '?ch=' + chat.ch + (chat.ch === 'party' && chat.leader ? '&leader=' + chat.leader : '') + '&since=' + encodeURIComponent(chat.since[k] || '0');
+      const r = await chatCall('GET', '/chat' + q);
+      chat.me = r.me;
+      if (r.msgs.length) {
+        const cur = chat.msgs[k] || [], seen = new Set(cur.map(m => m.id));
+        chat.msgs[k] = cur.concat(r.msgs.filter(m => !seen.has(m.id))).slice(-120);
+        chat.since[k] = chat.msgs[k][chat.msgs[k].length - 1].id;
+      } else chat.msgs[k] = chat.msgs[k] || [];
+      if (k === roomKey()) paintChat();
+    } catch (e) { if (e.status === 403) { chatNote('You are no longer in that party.', true); } }
+    chat.timer = setTimeout(pollChat, CHAT_POLL_OPEN);
+  }
+  async function loadRooms() {
+    try { const r = await chatCall('GET', '/parties'); chat.me = r.me; chat.rooms = r.parties || []; } catch (e) { chat.rooms = []; }
+    const sel = $('chatroom');
+    sel.innerHTML = '<option value="">My party</option>' + chat.rooms.map(p => '<option value="' + esc(p.leader) + '">' + esc(p.name) + '’s party</option>').join('');
+    sel.value = chat.leader || ''; sel.hidden = chat.ch !== 'party' || !chat.rooms.length;
+  }
+  function setChannel(ch) {
+    chat.ch = ch; document.querySelectorAll('#chatch button').forEach(b => b.classList.toggle('on', b.dataset.ch === ch));
+    $('chatin').placeholder = ch === 'trade' ? 'Looking for, or offering...' : ch === 'party' ? 'Talk to your party' : 'Say something';
+    if (ch === 'party') loadRooms(); else $('chatroom').hidden = true;
+    chatNote(); paintChat(); pollChat();
+  }
+  function openChat(open) {
+    chat.open = open; $('chat').hidden = !open; $('chatdot').hidden = true;
+    if (open) { paintChat(); pollChat(); if (signedIn()) setTimeout(() => $('chatin').focus(), 50); } else clearTimeout(chat.timer);
+  }
+  if (CL) {
+    $('btn-chat').hidden = false;
+    $('btn-chat').addEventListener('click', () => openChat($('chat').hidden));
+    $('chatx').addEventListener('click', () => openChat(false));
+    $('chatch').addEventListener('click', e => { const b = e.target.closest('[data-ch]'); if (b) setChannel(b.dataset.ch); });
+    $('chatroom').addEventListener('change', e => { chat.leader = e.target.value || null; paintChat(); pollChat(); });
+    $('chatlog').addEventListener('click', e => {
+      if (e.target.closest('#chat-in')) { authForm('in'); return; }
+      const w = e.target.closest('[data-from]'); if (!w || w.dataset.from === chat.me) return;
+      const from = w.dataset.from, id = w.dataset.id, name = w.dataset.name;
+      modal('<h2>' + esc(name) + '</h2><p>Mute hides everything this player says, on this device. Report flags this message for review; messages with several reports are hidden for everyone.</p><div class="row"><button class="btn ghost" id="c-mute">Mute ' + esc(name) + '</button><button class="btn danger" id="c-rep">Report message</button><button class="btn ghost" id="c-x">Cancel</button></div>', md => {
+        md.querySelector('#c-mute').onclick = () => { chat.muted.add(from); try { localStorage.setItem('lanternhold.muted', JSON.stringify([...chat.muted])); } catch (e) {} closeModal(); paintChat(); toast('lock', 'Muted', 'You won’t see messages from ' + name + '.', ''); };
+        md.querySelector('#c-rep').onclick = async () => { closeModal(); try { await chatCall('POST', '/report', { ch: chat.ch, leader: chat.leader || undefined, id }); } catch (e) {} toast('lock', 'Reported', 'Thanks. We’ll keep an eye on it.', ''); };
+        md.querySelector('#c-x').onclick = closeModal;
+      });
+    });
+    $('chatform').addEventListener('submit', async e => {
+      e.preventDefault();
+      const inp = $('chatin'), text = inp.value.trim(); if (!text || !S.hero) return;
+      inp.disabled = true;
+      try {
+        await chatCall('POST', '/chat', { ch: chat.ch, leader: chat.leader || undefined, text, name: S.hero.name, cls: S.hero.cls });
+        inp.value = ''; chatNote(); pollChat();
+      } catch (err) {
+        chatNote({ slow: 'Easy there. One message every few seconds.', links: 'Links aren’t allowed in chat.', name: 'Your hero’s name can’t be used in chat. Start a new hero with a different name.', room: 'You can’t post in that party.' }[err.code] || 'Message not sent. Try again in a moment.', true);
+      }
+      inp.disabled = false; inp.focus();
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && chat.open) pollChat(); });
+  }
   // ---------- boot ----------
   resize();
   window.addEventListener('resize', resize);

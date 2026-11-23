@@ -193,55 +193,71 @@ Resources:
           TABLE: !Ref HeroesTable
       Code:
         ZipFile: |
-          const { DynamoDBClient, UpdateItemCommand, ScanCommand } = require('@aws-sdk/client-dynamodb');
-          const crypto = require('crypto');
-          const db = new DynamoDBClient({});
-          const T = process.env.TABLE;
-          const CLS = ['tank', 'healer', 'rogue', 'mage', 'necro'];
-          const SIDES = ['covenant', 'radiant', 'tide', 'mercy', 'unsworn'];
-          const BAD = /(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn)/i;
-          const res = (c, b) => ({ statusCode: c, headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
-          const pidOf = sub => crypto.createHash('sha256').update('lh:' + sub).digest('hex').slice(0, 16);
-          exports.handler = async (e) => {
-            const cl = e.requestContext.authorizer && e.requestContext.authorizer.jwt && e.requestContext.authorizer.jwt.claims;
-            if (!cl || !cl.sub) return res(401, { error: 'not signed in' });
-            const me = pidOf(cl.sub), rk = e.routeKey;
-            let b = {};
-            if (e.body) { try { b = JSON.parse(e.isBase64Encoded ? Buffer.from(e.body, 'base64').toString() : e.body); } catch (x) { return res(400, { error: 'bad json' }); } }
-            if (rk === 'PUT /hero') {
-              const name = String(b.name || '').trim();
-              if (!/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(name) || BAD.test(name.replace(/[^a-z]/gi, ''))) return res(400, { error: 'name' });
-              if (!CLS.includes(b.cls)) return res(400, { error: 'class' });
-              const floor = Math.max(1, Math.min(100000, Math.floor(Number(b.floor) || 1)));
-              const level = Math.max(1, Math.min(50 + floor * 8, Math.floor(Number(b.level) || 1)));
-              const side = SIDES.includes(b.side) ? b.side : 'unsworn';
-              const r = await db.send(new UpdateItemCommand({ TableName: T, Key: { pid: { S: me } },
-                UpdateExpression: 'SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z',
-                ExpressionAttributeNames: { '#n': 'name' },
-                ExpressionAttributeValues: { ':n': { S: name }, ':c': { S: b.cls }, ':l': { N: String(level) }, ':f': { N: String(floor) }, ':s': { S: side }, ':t': { N: String(Date.now()) }, ':z': { N: '0' } },
-                ReturnValues: 'UPDATED_OLD' }));
-              const old = r.Attributes && r.Attributes.recruits;
-              return res(200, { ok: true, id: me, recruits: old ? Number(old.N) : 0 });
-            }
-            if (rk === 'GET /heroes') {
-              const r = await db.send(new ScanCommand({ TableName: T, Limit: 300 }));
-              const cut = Date.now() - 30 * 864e5;
-              let list = (r.Items || []).filter(i => i.pid.S !== me && Number(i.seen.N) > cut)
-                .map(i => ({ id: i.pid.S, name: i.name.S, cls: i.cls.S, level: Number(i.lv.N), floor: Number(i.fl.N), side: i.sd ? i.sd.S : 'unsworn' }));
-              for (let k = list.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [list[k], list[j]] = [list[j], list[k]]; }
-              return res(200, { heroes: list.slice(0, 8) });
-            }
-            if (rk === 'POST /recruit') {
-              const id = String(b.heroId || '');
-              if (!/^[0-9a-f]{16}$/.test(id) || id === me) return res(400, { error: 'hero' });
-              try {
-                await db.send(new UpdateItemCommand({ TableName: T, Key: { pid: { S: id } }, UpdateExpression: 'ADD recruits :one',
-                  ConditionExpression: 'attribute_exists(pid)', ExpressionAttributeValues: { ':one': { N: '1' } } }));
-              } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(404, { error: 'no hero' }); throw x; }
-              return res(200, { ok: true });
-            }
-            return res(404, { error: 'not found' });
-          };
+          // built from infra/lambda/heroes.js by infra/build.py
+          const{DynamoDBClient:b,UpdateItemCommand:m,ScanCommand:f}=require("@aws-sdk/client-dynamodb"),S=require("crypto"),d=new b({}),l=process.env.TABLE,N=["tank","healer","rogue","mage","necro"],w=["covenant","radiant","tide","mercy","unsworn"],x=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn)/i,n=(t,c)=>({statusCode:t,headers:{"content-type":"application/json"},body:JSON.stringify(c)}),y=t=>S.createHash("sha256").update("lh:"+t).digest("hex").slice(0,16);exports.handler=async t=>{const c=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!c||!c.sub)return n(401,{error:"not signed in"});const a=y(c.sub),p=t.routeKey;let s={};if(t.body)try{s=JSON.parse(t.isBase64Encoded?Buffer.from(t.body,"base64").toString():t.body)}catch{return n(400,{error:"bad json"})}if(p==="PUT /hero"){const r=String(s.name||"").trim();if(!/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(r)||x.test(r.replace(/[^a-z]/gi,"")))return n(400,{error:"name"});if(!N.includes(s.cls))return n(400,{error:"class"});const i=Math.max(1,Math.min(1e5,Math.floor(Number(s.floor)||1))),o=Math.max(1,Math.min(50+i*8,Math.floor(Number(s.level)||1))),e=w.includes(s.side)?s.side:"unsworn",u=await d.send(new m({TableName:l,Key:{pid:{S:a}},UpdateExpression:"SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z",ExpressionAttributeNames:{"#n":"name"},ExpressionAttributeValues:{":n":{S:r},":c":{S:s.cls},":l":{N:String(o)},":f":{N:String(i)},":s":{S:e},":t":{N:String(Date.now())},":z":{N:"0"}},ReturnValues:"UPDATED_OLD"})),h=u.Attributes&&u.Attributes.recruits;return n(200,{ok:!0,id:a,recruits:h?Number(h.N):0})}if(p==="GET /heroes"){const r=await d.send(new f({TableName:l,Limit:300})),i=Date.now()-30*864e5;let o=(r.Items||[]).filter(e=>e.pid.S!==a&&e.name&&e.seen&&Number(e.seen.N)>i).map(e=>({id:e.pid.S,name:e.name.S,cls:e.cls.S,level:Number(e.lv.N),floor:Number(e.fl.N),side:e.sd?e.sd.S:"unsworn"}));for(let e=o.length-1;e>0;e--){const u=Math.floor(Math.random()*(e+1));[o[e],o[u]]=[o[u],o[e]]}return n(200,{heroes:o.slice(0,8)})}if(p==="POST /recruit"){const r=String(s.heroId||"");if(!/^[0-9a-f]{16}$/.test(r)||r===a)return n(400,{error:"hero"});try{await d.send(new m({TableName:l,Key:{pid:{S:r}},UpdateExpression:"ADD recruits :one",ConditionExpression:"attribute_exists(pid)",ExpressionAttributeValues:{":one":{N:"1"}}}))}catch(i){if(i.name==="ConditionalCheckFailedException")return n(404,{error:"no hero"});throw i}return await d.send(new m({TableName:l,Key:{pid:{S:r}},UpdateExpression:"ADD pin :me",ExpressionAttributeValues:{":me":{SS:[a]}}})),await d.send(new m({TableName:l,Key:{pid:{S:a}},UpdateExpression:"ADD inv :id",ExpressionAttributeValues:{":id":{SS:[r]}}})),n(200,{ok:!0})}return n(404,{error:"not found"})};
+
+  ChatTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: lanternhold-chat
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: app
+          Value: lanternhold
+
+  ChatFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: chat-table
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:Query, dynamodb:PutItem, dynamodb:UpdateItem]
+                Resource: !GetAtt ChatTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource: !GetAtt HeroesTable.Arn
+
+  ChatFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-chat
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 5
+      Role: !GetAtt ChatFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE: !Ref ChatTable
+          HEROES: !Ref HeroesTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/chat.js by infra/build.py
+          const m=require("@aws-sdk/client-dynamodb"),g=require("crypto"),d=new m.DynamoDBClient({}),f=process.env.TABLE,x=process.env.HEROES,S=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn|retard)/gi,k=/(https?:|www\.|\.(com|net|org|gg|io|ly|xyz)\b|discord)/i,s=(e,i)=>({statusCode:e,headers:{"content-type":"application/json"},body:JSON.stringify(i)}),E=e=>g.createHash("sha256").update("lh:"+e).digest("hex").slice(0,16),r=e=>({S:String(e)}),w=e=>({N:String(e)});async function I(e,i){if(e===i)return!0;const t=await d.send(new m.GetItemCommand({TableName:x,Key:{pid:r(i)},ProjectionExpression:"inv"}));return!!(t.Item&&t.Item.inv&&t.Item.inv.SS.includes(e))}async function y(e,i){const t=i.ch;if(t==="global"||t==="trade")return t;if(t==="party"){const p=/^[0-9a-f]{16}$/.test(i.leader||"")?i.leader:e;return await I(e,p)?"party#"+p:null}return null}exports.handler=async e=>{const i=e.requestContext.authorizer&&e.requestContext.authorizer.jwt&&e.requestContext.authorizer.jwt.claims;if(!i||!i.sub)return s(401,{error:"auth"});const t=E(i.sub),p=e.routeKey,b=e.queryStringParameters||{};let c={};if(e.body)try{c=JSON.parse(e.isBase64Encoded?Buffer.from(e.body,"base64").toString():e.body)}catch{return s(400,{error:"json"})}if(p==="GET /chat"){const n=await y(t,b);if(!n)return s(403,{error:"room"});const o=await d.send(new m.QueryCommand({TableName:f,KeyConditionExpression:"pk = :p AND sk > :s",ExpressionAttributeValues:{":p":r(n),":s":r(b.since||"0")},ScanIndexForward:!1,Limit:60}));return s(200,{me:t,msgs:(o.Items||[]).filter(a=>!a.hid).reverse().map(a=>({id:a.sk.S,from:a.from.S,name:a.name.S,cls:a.cls.S,text:a.text.S}))})}if(p==="POST /chat"){const n=await y(t,c);if(!n)return s(403,{error:"room"});let o=String(c.text||"").replace(/[\u0000-\u001f\u007f​-‏‪-‮]/g,"").replace(/\s+/g," ").trim().slice(0,200);const a=String(c.name||"").trim();if(!o)return s(400,{error:"empty"});if(!/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(a)||S.test(a.replace(/[^a-z]/gi,"")))return s(400,{error:"name"});if(S.lastIndex=0,k.test(o))return s(400,{error:"links"});o=o.replace(S,h=>"*".repeat(h.length));const u=Date.now();try{await d.send(new m.PutItemCommand({TableName:f,Item:{pk:r("rate#"+t),sk:r("0"),t:w(u),ttl:w(Math.floor(u/1e3)+3600)},ConditionExpression:"attribute_not_exists(t) OR t < :c",ExpressionAttributeValues:{":c":w(u-3e3)}}))}catch(h){if(h.name==="ConditionalCheckFailedException")return s(429,{error:"slow"});throw h}const l=u.toString(36).padStart(9,"0")+g.randomBytes(3).toString("hex");return await d.send(new m.PutItemCommand({TableName:f,Item:{pk:r(n),sk:r(l),from:r(t),name:r(a),cls:r(/^(tank|healer|rogue|mage|necro)$/.test(c.cls)?c.cls:"rogue"),text:r(o),ttl:w(Math.floor(u/1e3)+7*86400)}})),s(200,{ok:!0,id:l})}if(p==="POST /report"){const n=await y(t,c);if(!n||!/^[0-9a-z]{15}$/.test(c.id||""))return s(400,{error:"bad"});try{(await d.send(new m.UpdateItemCommand({TableName:f,Key:{pk:r(n),sk:r(c.id)},UpdateExpression:"ADD rep :m",ConditionExpression:"attribute_exists(sk)",ExpressionAttributeValues:{":m":{SS:[t]}},ReturnValues:"ALL_NEW"}))).Attributes.rep.SS.length>=3&&await d.send(new m.UpdateItemCommand({TableName:f,Key:{pk:r(n),sk:r(c.id)},UpdateExpression:"SET hid = :t",ExpressionAttributeValues:{":t":{BOOL:!0}}}))}catch(o){if(o.name!=="ConditionalCheckFailedException")throw o}return s(200,{ok:!0})}if(p==="GET /parties"){const n=await d.send(new m.GetItemCommand({TableName:x,Key:{pid:r(t)},ProjectionExpression:"pin"})),o=(n.Item&&n.Item.pin?n.Item.pin.SS:[]).slice(0,20),a=[];for(const u of o){const l=await d.send(new m.GetItemCommand({TableName:x,Key:{pid:r(u)},ProjectionExpression:"#n",ExpressionAttributeNames:{"#n":"name"}}));l.Item&&l.Item.name&&a.push({leader:u,name:l.Item.name.S})}return s(200,{me:t,parties:a})}return s(404,{error:"route"})};
 
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
@@ -360,6 +376,58 @@ Resources:
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref HeroFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  ChatIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ChatFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  ChatGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /chat
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ChatIntegration}'
+
+  ChatPostRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /chat
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ChatIntegration}'
+
+  ChatReportRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /report
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ChatIntegration}'
+
+  ChatPartiesRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /parties
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ChatIntegration}'
+
+  ChatInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ChatFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
 

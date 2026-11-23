@@ -1,4 +1,4 @@
-/* lh-build 202611231725 */
+/* lh-build 202611231735 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1683,3 +1683,45 @@ body.resting .taptip{display:none}
 }
 .cgrid{grid-template-columns:minmax(0,1fr)}.codexseg button{min-width:0;padding-left:6px;padding-right:6px}
 @media (max-width:720px){.ctx small{white-space:normal;overflow:visible;text-overflow:clip}}
+/* ---------- the Wardrobe ---------- */
+.wdstage{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:4px;height:190px;margin:4px 0 10px;border-radius:16px;border:1px solid var(--line2);overflow:hidden;
+  background:radial-gradient(ellipse 60% 55% at 50% 88%,rgba(var(--lg,255,180,90),.28),transparent 70%),linear-gradient(180deg,#0b1220,#04070d)}
+.wdstage::after{content:"";position:absolute;left:18%;right:18%;bottom:20px;height:10px;border-radius:50%;background:rgba(0,0,0,.55);filter:blur(3px)}
+.wdstage.ln-moon{--lg:170,200,255}.wdstage.ln-wisp{--lg:140,240,140}.wdstage.ln-rose{--lg:255,140,180}.wdstage.ln-rift{--lg:180,130,255}
+.wdstage.ln-sun{--lg:255,236,160}.wdstage.ln-soul{--lg:120,255,225}.wdstage.ln-void{--lg:140,150,255}
+.wdfig{position:relative;z-index:1;margin-bottom:22px}
+.wdfig img{display:block;height:150px;width:auto;filter:drop-shadow(0 6px 8px rgba(0,0,0,.6))}
+.wdlamp{position:relative;z-index:1;height:58px;width:auto;margin:0 0 70px -6px;animation:wdsway 3.2s ease-in-out infinite;transform-origin:50% 0}
+@keyframes wdsway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+.wdcap{position:absolute;left:12px;top:10px;z-index:2;display:flex;flex-direction:column;gap:2px;text-align:left}
+.wdcap b{font-size:15px}.wdcap small{font-size:12px;color:var(--muted)}
+.wdwho{margin-bottom:10px}
+.wdgrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+.wdcos img{height:64px;width:auto;filter:drop-shadow(0 3px 3px rgba(0,0,0,.5))}
+.wdcos img.lamp{height:52px}
+.wdcos.rare{background:linear-gradient(180deg,rgba(245,194,66,.08),var(--bg2) 60%)}
+.wdcos.rare b{color:var(--gold)}
+.wdbuy{display:flex;justify-content:center;align-items:flex-end;gap:2px;margin:4px 0 8px}
+.wdbuy img{height:92px;width:auto;filter:drop-shadow(0 4px 5px rgba(0,0,0,.55))}
+.wdbuy.lamp img{height:110px}
+.wdbtn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--panel2);color:var(--text);font:600 12.5px/1 var(--body);cursor:pointer}
+.wdbtn:hover{border-color:var(--gold);color:var(--gold)}
+.wdbtn svg{width:13px;height:13px}
+.wardad{display:flex;align-items:center;gap:12px;width:100%;margin:12px 0 4px;padding:10px 14px;border-radius:14px;border:1px solid rgba(245,194,66,.35);
+  background:linear-gradient(100deg,rgba(245,194,66,.1),rgba(122,60,255,.08));color:var(--text);text-align:left;cursor:pointer}
+.wardad:hover{border-color:var(--gold)}
+.wafigs{display:flex;align-items:flex-end;flex:none}
+.wafigs img{height:52px;width:auto;margin-right:-8px}
+.wafigs img.lamp{height:30px;margin:0 0 4px 6px}
+.watext{display:flex;flex-direction:column;gap:3px}
+.watext b{font-size:14px;color:var(--gold)}.watext small{font-size:12.5px;color:var(--muted)}
+.row.left{justify-content:flex-start}
+.pfava .ic.dressed{background:radial-gradient(circle at 50% 70%,#1a2438,#0a101c)}
+.pfava .ic.dressed img{height:44px;width:auto}
+.pfava.sm .ic.dressed img{height:32px}
+.msg .who .ctitle{margin-left:5px;font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.wdwho{display:flex;flex-wrap:wrap;gap:6px}
+.wdwho .whochip{width:auto;flex:none;padding:5px 11px 5px 7px;font-size:13px}
+@media (max-width:560px){.wdstage{height:160px}.wdfig img{height:124px}.wdlamp{height:46px;margin-bottom:58px}.wdgrid{grid-template-columns:repeat(3,1fr)}.wdcos img{height:52px}.wdbuy img{height:64px}}
+@media (max-width:560px){.wdstage{justify-content:flex-end;padding-right:9%}.wdcap{max-width:46%}}
+.msg .who .nc-gold{color:#f5c242}.msg .who .nc-violet{color:#e879f9}.msg .who .nc-ember{color:#ff8a3d}.msg .who .nc-frost{color:#9fd6ec}.msg .who .nc-verdant{color:#8fcf6a}.msg .who .nc-rift{color:transparent}

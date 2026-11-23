@@ -213,7 +213,7 @@ Resources:
       Code:
         ZipFile: |
           // built from infra/lambda/heroes.js by infra/build.py
-          const{DynamoDBClient:w,UpdateItemCommand:h,ScanCommand:N,PutItemCommand:x}=require("@aws-sdk/client-dynamodb"),f=require("crypto"),l=new w({}),m=process.env.TABLE,b=process.env.CHAT,g={covenant:"the Iron Covenant",radiant:"the Radiant Ascendancy",tide:"the Devouring Tide",mercy:"the Mercy Corps",unsworn:"the Unsworn"},y={tank:"tank",healer:"healer",rogue:"rogue",mage:"mage",necro:"necromancer"},E=["tank","healer","rogue","mage","necro"],A=["covenant","radiant","tide","mercy","unsworn"],C=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn)/i,o=(r,c)=>({statusCode:r,headers:{"content-type":"application/json"},body:JSON.stringify(c)}),D=r=>f.createHash("sha256").update("lh:"+r).digest("hex").slice(0,16);exports.handler=async r=>{const c=r.requestContext.authorizer&&r.requestContext.authorizer.jwt&&r.requestContext.authorizer.jwt.claims;if(!c||!c.sub)return o(401,{error:"not signed in"});const u=D(c.sub),p=r.routeKey;let n={};if(r.body)try{n=JSON.parse(r.isBase64Encoded?Buffer.from(r.body,"base64").toString():r.body)}catch{return o(400,{error:"bad json"})}if(p==="PUT /hero"){const t=String(n.name||"").trim();if(!/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(t)||C.test(t.replace(/[^a-z]/gi,"")))return o(400,{error:"name"});if(!E.includes(n.cls))return o(400,{error:"class"});const i=Math.max(1,Math.min(1e5,Math.floor(Number(n.floor)||1))),a=Math.max(1,Math.min(50+i*8,Math.floor(Number(n.level)||1))),e=A.includes(n.side)?n.side:"unsworn";let s;try{s=await l.send(new h({TableName:m,Key:{pid:{S:u}},UpdateExpression:"SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z, u = :u, rf = if_not_exists(rf, :r)",ConditionExpression:"attribute_not_exists(ban)",ExpressionAttributeNames:{"#n":"name"},ExpressionAttributeValues:{":n":{S:t},":c":{S:n.cls},":l":{N:String(a)},":f":{N:String(i)},":s":{S:e},":t":{N:String(Date.now())},":z":{N:"0"},":u":{S:c.sub},":r":{S:/^[a-z0-9_-]{1,24}$/.test(n.ref)?n.ref:"-"}},ReturnValues:"UPDATED_OLD"}))}catch(d){if(d.name==="ConditionalCheckFailedException")return o(403,{error:"banned"});throw d}if(b&&!(s.Attributes&&s.Attributes.name)){const d=Date.now();try{await l.send(new x({TableName:b,Item:{pk:{S:"global"},sk:{S:d.toString(36).padStart(9,"0")+f.randomBytes(3).toString("hex")},from:{S:"sys"},name:{S:"Lanternhold"},cls:{S:"sys-"+e},text:{S:t+" took up the lantern for "+g[e]+" as a "+y[n.cls]+". Welcome to the deep!"},ttl:{N:String(Math.floor(d/1e3)+7*86400)}}}))}catch{}}const S=s.Attributes&&s.Attributes.recruits;return o(200,{ok:!0,id:u,recruits:S?Number(S.N):0})}if(p==="GET /heroes"){const t=await l.send(new N({TableName:m,Limit:300})),i=Date.now()-30*864e5;let a=(t.Items||[]).filter(e=>e.pid.S!==u&&e.name&&e.seen&&Number(e.seen.N)>i).map(e=>({id:e.pid.S,name:e.name.S,cls:e.cls.S,level:Number(e.lv.N),floor:Number(e.fl.N),side:e.sd?e.sd.S:"unsworn",on:Date.now()-Number(e.seen.N)<18e4,pf:e.pf?JSON.parse(e.pf.S):null,w:e.wv&&e.wv.N==="1"?e.wl.S:""}));for(let e=a.length-1;e>0;e--){const s=Math.floor(Math.random()*(e+1));[a[e],a[s]]=[a[s],a[e]]}return a.sort((e,s)=>s.on-e.on),o(200,{heroes:a.slice(0,10)})}if(p==="POST /recruit"){const t=String(n.heroId||"");if(!/^[0-9a-f]{16}$/.test(t)||t===u)return o(400,{error:"hero"});try{await l.send(new h({TableName:m,Key:{pid:{S:t}},UpdateExpression:"ADD recruits :one",ConditionExpression:"attribute_exists(pid)",ExpressionAttributeValues:{":one":{N:"1"}}}))}catch(i){if(i.name==="ConditionalCheckFailedException")return o(404,{error:"no hero"});throw i}return await l.send(new h({TableName:m,Key:{pid:{S:t}},UpdateExpression:"ADD pin :me",ExpressionAttributeValues:{":me":{SS:[u]}}})),await l.send(new h({TableName:m,Key:{pid:{S:u}},UpdateExpression:"ADD inv :id",ExpressionAttributeValues:{":id":{SS:[t]}}})),o(200,{ok:!0})}return o(404,{error:"not found"})};
+          const{DynamoDBClient:w,UpdateItemCommand:p,ScanCommand:N,PutItemCommand:x}=require("@aws-sdk/client-dynamodb"),f=require("crypto"),l=new w({}),m=process.env.TABLE,b=process.env.CHAT,g={covenant:"the Iron Covenant",radiant:"the Radiant Ascendancy",tide:"the Devouring Tide",mercy:"the Mercy Corps",unsworn:"the Unsworn"},y={tank:"tank",healer:"healer",rogue:"rogue",mage:"mage",necro:"necromancer"},E=["tank","healer","rogue","mage","necro"],A=["covenant","radiant","tide","mercy","unsworn"],C=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn)/i,o=(r,c)=>({statusCode:r,headers:{"content-type":"application/json"},body:JSON.stringify(c)}),D=r=>f.createHash("sha256").update("lh:"+r).digest("hex").slice(0,16);exports.handler=async r=>{const c=r.requestContext.authorizer&&r.requestContext.authorizer.jwt&&r.requestContext.authorizer.jwt.claims;if(!c||!c.sub)return o(401,{error:"not signed in"});const u=D(c.sub),h=r.routeKey;let n={};if(r.body)try{n=JSON.parse(r.isBase64Encoded?Buffer.from(r.body,"base64").toString():r.body)}catch{return o(400,{error:"bad json"})}if(h==="PUT /hero"){const t=String(n.name||"").trim();if(!/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(t)||C.test(t.replace(/[^a-z]/gi,"")))return o(400,{error:"name"});if(!E.includes(n.cls))return o(400,{error:"class"});const i=Math.max(1,Math.min(1e5,Math.floor(Number(n.floor)||1))),a=Math.max(1,Math.min(50+i*8,Math.floor(Number(n.level)||1))),e=A.includes(n.side)?n.side:"unsworn";let s;try{s=await l.send(new p({TableName:m,Key:{pid:{S:u}},UpdateExpression:"SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z, u = :u, rf = if_not_exists(rf, :r)",ConditionExpression:"attribute_not_exists(ban)",ExpressionAttributeNames:{"#n":"name"},ExpressionAttributeValues:{":n":{S:t},":c":{S:n.cls},":l":{N:String(a)},":f":{N:String(i)},":s":{S:e},":t":{N:String(Date.now())},":z":{N:"0"},":u":{S:c.sub},":r":{S:/^[a-z0-9_-]{1,24}$/.test(n.ref)?n.ref:"-"}},ReturnValues:"UPDATED_OLD"}))}catch(d){if(d.name==="ConditionalCheckFailedException")return o(403,{error:"banned"});throw d}if(b&&!(s.Attributes&&s.Attributes.name)){const d=Date.now();try{await l.send(new x({TableName:b,Item:{pk:{S:"global"},sk:{S:d.toString(36).padStart(9,"0")+f.randomBytes(3).toString("hex")},from:{S:"sys"},name:{S:"Lanternhold"},cls:{S:"sys-"+e},text:{S:t+" took up the lantern for "+g[e]+" as a "+y[n.cls]+". Welcome to the deep!"},ttl:{N:String(Math.floor(d/1e3)+7*86400)}}}))}catch{}}const S=s.Attributes&&s.Attributes.recruits;return o(200,{ok:!0,id:u,recruits:S?Number(S.N):0})}if(h==="GET /heroes"){const t=await l.send(new N({TableName:m,Limit:300})),i=Date.now()-30*864e5;let a=(t.Items||[]).filter(e=>e.pid.S!==u&&e.name&&e.seen&&Number(e.seen.N)>i).map(e=>({id:e.pid.S,name:e.name.S,cls:e.cls.S,level:Number(e.lv.N),floor:Number(e.fl.N),side:e.sd?e.sd.S:"unsworn",on:Date.now()-Number(e.seen.N)<18e4,pf:e.pf?JSON.parse(e.pf.S):null,wd:e.wd?JSON.parse(e.wd.S):null,w:e.wv&&e.wv.N==="1"?e.wl.S:""}));for(let e=a.length-1;e>0;e--){const s=Math.floor(Math.random()*(e+1));[a[e],a[s]]=[a[s],a[e]]}return a.sort((e,s)=>s.on-e.on),o(200,{heroes:a.slice(0,10)})}if(h==="POST /recruit"){const t=String(n.heroId||"");if(!/^[0-9a-f]{16}$/.test(t)||t===u)return o(400,{error:"hero"});try{await l.send(new p({TableName:m,Key:{pid:{S:t}},UpdateExpression:"ADD recruits :one",ConditionExpression:"attribute_exists(pid)",ExpressionAttributeValues:{":one":{N:"1"}}}))}catch(i){if(i.name==="ConditionalCheckFailedException")return o(404,{error:"no hero"});throw i}return await l.send(new p({TableName:m,Key:{pid:{S:t}},UpdateExpression:"ADD pin :me",ExpressionAttributeValues:{":me":{SS:[u]}}})),await l.send(new p({TableName:m,Key:{pid:{S:u}},UpdateExpression:"ADD inv :id",ExpressionAttributeValues:{":id":{SS:[t]}}})),o(200,{ok:!0})}return o(404,{error:"not found"})};
 
   ChatTable:
     Type: AWS::DynamoDB::Table
@@ -1671,6 +1671,87 @@ Resources:
       AuthorizationType: JWT
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub 'integrations/${WardenIntegration}'
+
+  LooksFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: tables
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:UpdateItem, dynamodb:BatchGetItem]
+                Resource: [!GetAtt HeroesTable.Arn, !GetAtt WalletsTable.Arn]
+
+  LooksFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-looks
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 10
+      Role: !GetAtt LooksFunctionRole.Arn
+      Environment:
+        Variables:
+          HEROES: !Ref HeroesTable
+          WALLETS: !Ref WalletsTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/looks.js by infra/build.py
+          const u=require("@aws-sdk/client-dynamodb"),A=require("crypto"),b=new u.DynamoDBClient({}),{HEROES:y,WALLETS:k}=process.env,N=Object.fromEntries("k.none0 k.ember250 k.frost250 k.wild250 k.dusk250 k.ivory300 k.obsidian400 k.gilded600 k.rift800 k.sworn1200 l.ember0 l.moon150 l.wisp150 l.rose150 l.rift300 l.sun400 l.soul500 l.void600".split(" ").map(e=>{const r=e.match(/^(.+?)(\d+)$/);return[r[1],+r[2]]})),n=(e,r)=>({statusCode:e,headers:{"content-type":"application/json"},body:JSON.stringify(r)}),m=e=>({S:String(e)}),O=/^[0-9a-f]{16}$/,j=/^([a-z]{2,10}|[0-9a-f]{16})$/,D=e=>A.createHash("sha256").update("lh:"+e).digest("hex").slice(0,16),E=(e,r)=>{try{return e?JSON.parse(e.S):r}catch{return r}};exports.handler=async e=>{const r=e.requestContext.authorizer&&e.requestContext.authorizer.jwt&&e.requestContext.authorizer.jwt.claims;if(!r||!r.sub)return n(401,{error:"auth"});const l=e.routeKey,C=D(r.sub),f={userId:m(r.sub)},T=e.queryStringParameters||{};let a={};try{a=JSON.parse(e.isBase64Encoded?Buffer.from(e.body||"","base64").toString():e.body||"{}")}catch{return n(400,{error:"json"})}if(l==="GET /looks"){const t=[...new Set(String(T.ids||"").split(","))].filter(s=>O.test(s)).slice(0,40),i={};if(t.length){const s=await b.send(new u.BatchGetItemCommand({RequestItems:{[y]:{Keys:t.map(o=>({pid:m(o)})),ProjectionExpression:"pid, pf, wd"}}}));for(const o of s.Responses[y]||[]){const p=E(o.pf,{}),c=E(o.wd,{});i[o.pid.S]={c:p.c||"",t:p.t||"",k:(c.k||{}).you||"",l:c.l||""}}}return Object.assign(n(200,{l:i}),{headers:{"content-type":"application/json","cache-control":"private, max-age=60"}})}const S=async()=>(await b.send(new u.UpdateItemCommand({TableName:k,Key:f,ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = if_not_exists(bal, :g), own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":{N:"100"},":o":{SS:["f.plain"]}}}))).Attributes,h=t=>b.send(new u.UpdateItemCommand({TableName:y,Key:{pid:m(C)},UpdateExpression:"SET wd = :w",ConditionExpression:"attribute_exists(pid) AND attribute_not_exists(ban)",ExpressionAttributeValues:{":w":t}})).catch(()=>0),x=t=>n(200,{bal:+t.bal.N,own:t.own.SS,wd:E(t.wd,{})});try{if(l==="GET /wardrobe"){const t=await S();return t.wd&&await h(t.wd),x(t)}if(l==="POST /wardrobe"&&a.buy){const t=String(a.buy),i=N[t];if(!i)return n(400,{error:"item"});const s=await S();return s.own.SS.includes(t)?n(409,{error:"owned"}):+s.bal.N<i?n(409,{error:"funds"}):x((await b.send(new u.UpdateItemCommand({TableName:k,Key:f,ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = bal - :p ADD own :s",ConditionExpression:"bal >= :p AND NOT contains(own, :i)",ExpressionAttributeValues:{":p":{N:String(i)},":s":{SS:[t]},":i":m(t)}}))).Attributes)}if(l==="POST /wardrobe"){const t=await S(),i=new Set(t.own.SS),s=d=>N[d]===0||i.has(d),o={},p=a.k&&typeof a.k=="object"?a.k:{};for(const d of Object.keys(p).slice(0,24)){const w=String(p[d]||"");if(!j.test(d)||w&&!s("k."+w))return n(400,{error:"item"});w&&w!=="none"&&(o[d]=w)}const c=String(a.l||"");if(c&&!s("l."+c))return n(400,{error:"item"});const g=m(JSON.stringify({k:o,l:c}));return await b.send(new u.UpdateItemCommand({TableName:k,Key:f,UpdateExpression:"SET wd = :w",ExpressionAttributeValues:{":w":g}})),await h(g),n(200,{ok:!0,wd:{k:o,l:c}})}}catch(t){if(t.name==="ConditionalCheckFailedException")return n(409,{error:"state"});throw t}return n(404,{error:"not found"})};
+
+  LooksIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt LooksFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  LooksInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LooksFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  LooksGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /looks
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${LooksIntegration}'
+
+  WardrobeGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /wardrobe
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${LooksIntegration}'
+
+  WardrobePostRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /wardrobe
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${LooksIntegration}'
 
 Outputs:
   GameConfig:

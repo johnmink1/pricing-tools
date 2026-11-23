@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Lanternhold player accounts and cloud saves. Serverless and pay-per-use:
+  Cognito (email sign-in), an HTTP API, one small Lambda and a DynamoDB table.
+  Costs nothing at small scale (Cognito free up to 10,000 monthly players).
+
+Parameters:
+  GameOrigin:
+    Type: String
+    Default: https://tools.born2develop.com
+    Description: Website address the game is served from (for CORS).
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: lanternhold-players
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: false
+          RequireUppercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_CODE
+        EmailSubject: Your Lanternhold code
+        EmailMessage: 'Your Lanternhold code is {####}. Enter it in the game to finish. If you did not ask for this, you can ignore this email.'
+      UserPoolTags:
+        app: lanternhold
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: lanternhold-web
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 365
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+  SavesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: lanternhold-saves
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      Tags:
+        - Key: app
+          Value: lanternhold
+
+  SaveFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: saves-table
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem]
+                Resource: !GetAtt SavesTable.Arn
+
+  SaveFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-save
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 5
+      Role: !GetAtt SaveFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE: !Ref SavesTable
+      Code:
+        ZipFile: |
+          const { DynamoDBClient, GetItemCommand, PutItemCommand, DeleteItemCommand } = require('@aws-sdk/client-dynamodb');
+          const db = new DynamoDBClient({});
+          const TABLE = process.env.TABLE;
+          const res = (code, body) => ({ statusCode: code, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+          exports.handler = async (event) => {
+            const sub = event.requestContext && event.requestContext.authorizer && event.requestContext.authorizer.jwt && event.requestContext.authorizer.jwt.claims.sub;
+            if (!sub) return res(401, { error: 'not signed in' });
+            const method = event.requestContext.http.method;
+            const Key = { userId: { S: sub } };
+            if (method === 'GET') {
+              const r = await db.send(new GetItemCommand({ TableName: TABLE, Key }));
+              if (!r.Item) return res(404, { error: 'no save' });
+              return res(200, { data: r.Item.data.S, updated: Number(r.Item.updated.N) });
+            }
+            if (method === 'PUT') {
+              let body = event.body || '';
+              if (event.isBase64Encoded) body = Buffer.from(body, 'base64').toString('utf8');
+              if (body.length > 300000) return res(413, { error: 'save too large' });
+              let parsed; try { parsed = JSON.parse(body); } catch (e) { return res(400, { error: 'bad json' }); }
+              if (typeof parsed.data !== 'string') return res(400, { error: 'missing data' });
+              const now = Date.now();
+              await db.send(new PutItemCommand({ TableName: TABLE, Item: { userId: { S: sub }, data: { S: parsed.data }, updated: { N: String(now) }, floor: { N: String(Number(parsed.floor) || 0) } } }));
+              return res(200, { ok: true, updated: now });
+            }
+            if (method === 'DELETE') {
+              await db.send(new DeleteItemCommand({ TableName: TABLE, Key }));
+              return res(200, { ok: true });
+            }
+            return res(405, { error: 'method not allowed' });
+          };
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: lanternhold-api
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref GameOrigin
+          - http://localhost:8765
+        AllowMethods: [GET, PUT, DELETE, OPTIONS]
+        AllowHeaders: [authorization, content-type]
+        MaxAge: 86400
+
+  JwtAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref HttpApi
+      Name: cognito
+      AuthorizerType: JWT
+      IdentitySource: ['$request.header.Authorization']
+      JwtConfiguration:
+        Audience: [!Ref UserPoolClient]
+        Issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}'
+
+  SaveIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt SaveFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  GetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /save
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${SaveIntegration}'
+
+  PutRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PUT /save
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${SaveIntegration}'
+
+  DeleteRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /save
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${SaveIntegration}'
+
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+
+  ApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SaveFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/save'
+
+Outputs:
+  GameConfig:
+    Description: Paste this line into Lanternhold's index.html (or send it to Claude).
+    Value: !Sub 'window.LH_CLOUD = { region: "${AWS::Region}", clientId: "${UserPoolClient}", api: "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com" };'

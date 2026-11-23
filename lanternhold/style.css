@@ -37,8 +37,17 @@ svg{display:block}
 .account svg{width:20px;height:20px;color:var(--muted)}
 .account .avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 40% 35%,#ffe39a,#c8952a);color:#3a2206;font-weight:800;font-size:15px}
 .account:has(.avatar){padding:0 6px}
-.gbtn{display:flex;align-items:center;gap:10px;background:#fff;color:#1f1f1f;box-shadow:0 2px 0 #9a9a9a}
-.gbtn svg{width:20px;height:20px}
+.auth{display:grid;gap:10px}
+.auth h2{margin-bottom:2px}
+.auth p{margin:0 0 4px}
+.auth input{width:100%;background:var(--bg2);color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;font:inherit;font-size:16px}
+.auth input:focus{outline:none;border-color:var(--accent)}
+.auth .err{min-height:20px;color:#ff9c88;font-size:14px}
+.auth .err.ok{color:var(--good)}
+.auth .links{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.link{background:none;border:0;padding:4px 0;color:var(--accent);font-weight:700;font-size:14px}
+.link:hover{text-decoration:underline}
+.credits a{color:var(--muted)}
 .choice{display:grid;gap:10px;margin-top:6px}
 .pick{text-align:left;background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:14px 16px}
 .pick:hover{border-color:var(--accent)}

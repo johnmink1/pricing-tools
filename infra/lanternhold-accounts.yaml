@@ -109,7 +109,7 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem]
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem]
                 Resource: !GetAtt SavesTable.Arn
 
   SaveFunction:
@@ -126,7 +126,7 @@ Resources:
           TABLE: !Ref SavesTable
       Code:
         ZipFile: |
-          const { DynamoDBClient, GetItemCommand, PutItemCommand, DeleteItemCommand } = require('@aws-sdk/client-dynamodb');
+          const { DynamoDBClient, GetItemCommand, UpdateItemCommand, DeleteItemCommand } = require('@aws-sdk/client-dynamodb');
           const db = new DynamoDBClient({});
           const TABLE = process.env.TABLE;
           const res = (code, body) => ({ statusCode: code, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -138,7 +138,8 @@ Resources:
             if (method === 'GET') {
               const r = await db.send(new GetItemCommand({ TableName: TABLE, Key }));
               if (!r.Item) return res(404, { error: 'no save' });
-              return res(200, { data: r.Item.data.S, updated: Number(r.Item.updated.N) });
+              // rst: an admin reset this player; games created before it start over
+              return res(200, { data: r.Item.data.S, updated: Number(r.Item.updated.N), rst: r.Item.rst ? Number(r.Item.rst.N) : 0 });
             }
             if (method === 'PUT') {
               let body = event.body || '';
@@ -147,7 +148,16 @@ Resources:
               let parsed; try { parsed = JSON.parse(body); } catch (e) { return res(400, { error: 'bad json' }); }
               if (typeof parsed.data !== 'string') return res(400, { error: 'missing data' });
               const now = Date.now();
-              await db.send(new PutItemCommand({ TableName: TABLE, Item: { userId: { S: sub }, data: { S: parsed.data }, updated: { N: String(now) }, floor: { N: String(Number(parsed.floor) || 0) } } }));
+              // UpdateItem keeps an admin reset stamp (rst); saves from games created before it are refused
+              try {
+                await db.send(new UpdateItemCommand({ TableName: TABLE, Key, UpdateExpression: 'SET #d = :d, updated = :u, floor = :f',
+                  ConditionExpression: 'attribute_not_exists(rst) OR rst <= :c', ExpressionAttributeNames: { '#d': 'data' },
+                  ExpressionAttributeValues: { ':d': { S: parsed.data }, ':u': { N: String(now) }, ':f': { N: String(Number(parsed.floor) || 0) }, ':c': { N: String(Number(parsed.created) || 0) } } }));
+              } catch (e) {
+                if (e.name !== 'ConditionalCheckFailedException') throw e;
+                const r = await db.send(new GetItemCommand({ TableName: TABLE, Key }));
+                return res(409, { error: 'reset', rst: Number(r.Item.rst.N) });
+              }
               return res(200, { ok: true, updated: now });
             }
             if (method === 'DELETE') {
@@ -723,7 +733,7 @@ Resources:
       Code:
         ZipFile: |
           // built from infra/lambda/admin.js by infra/build.py
-          const l=require("@aws-sdk/client-dynamodb"),f=require("@aws-sdk/client-cognito-identity-provider"),d=new l.DynamoDBClient({}),y=new f.CognitoIdentityProviderClient({}),{SAVES:S,HEROES:w,TRADE:b,POOL:I}=process.env,m=(s,o)=>({statusCode:s,headers:{"content-type":"application/json"},body:JSON.stringify(o)}),c=s=>({S:String(s)});async function k(){const s=await d.send(new l.GetItemCommand({TableName:S,Key:{userId:c("#epoch")}}));return s.Item?Number(s.Item.updated.N):0}async function h(s,o){const u=[];let i;do{const a=await d.send(new l.ScanCommand({TableName:s,ExclusiveStartKey:i}));for(const t of a.Items||[])(!o||!o(t))&&u.push(t);i=a.LastEvaluatedKey}while(i);return u}async function C(s,o,u){const i=await h(s,u);for(let a=0;a<i.length;a+=25){let t={[s]:i.slice(a,a+25).map(e=>({DeleteRequest:{Key:Object.fromEntries(o.map(n=>[n,e[n]]))}}))};for(let e=0;e<6&&t&&Object.keys(t).length;e++)t=(await d.send(new l.BatchWriteItemCommand({RequestItems:t}))).UnprocessedItems,t&&Object.keys(t).length&&await new Promise(r=>setTimeout(r,200*(e+1)))}return i.length}exports.handler=async s=>{const o=s.routeKey;if(o==="GET /epoch")return m(200,{epoch:await k()});if(o==="GET /leaderboard"){const a=await h(w),t=a.filter(n=>n.name&&!n.ban&&n.seen&&Date.now()-n.seen.N<18e4).length,e=a.filter(n=>n.name&&n.fl&&!n.ban).map(n=>({name:n.name.S,cls:n.cls.S,level:+n.lv.N,floor:+n.fl.N,side:n.sd?n.sd.S:"unsworn"})).sort((n,r)=>r.floor-n.floor||r.level-n.level).slice(0,50);return{statusCode:200,headers:{"content-type":"application/json","cache-control":"public, max-age=60"},body:JSON.stringify({top:e,online:t})}}const u=s.requestContext.authorizer&&s.requestContext.authorizer.jwt&&s.requestContext.authorizer.jwt.claims;if(!u||!String(u["cognito:groups"]||"").includes("admins"))return m(403,{error:"admin only"});let i={};if(s.body)try{i=JSON.parse(s.isBase64Encoded?Buffer.from(s.body,"base64").toString():s.body)}catch{return m(400,{error:"bad json"})}if(o==="GET /admin/players"){const a=Date.now(),t=(await h(w)).map(e=>({id:e.pid.S,name:e.name?e.name.S:e.bn?e.bn.S:"",cls:e.cls?e.cls.S:"",level:e.lv?+e.lv.N:0,floor:e.fl?+e.fl.N:0,seen:e.seen?+e.seen.N:0,on:e.seen?a-e.seen.N<18e4:!1,banned:!!e.ban,canBan:!!e.u})).sort((e,n)=>n.seen-e.seen);return m(200,{players:t,epoch:await k()})}if(o==="POST /admin/wipe"){if(i.confirm!=="WIPE")return m(400,{error:"confirm"});const a=await C(S,["userId"],r=>r.userId.S==="#epoch"),t=await C(w,["pid"],r=>!!r.ban),e=await C(b,["pk","sk"]),n=Date.now();return await d.send(new l.PutItemCommand({TableName:S,Item:{userId:c("#epoch"),data:c(""),updated:{N:String(n)}}})),m(200,{ok:!0,epoch:n,saves:a,heroes:t,trade:e})}if(o==="POST /admin/ban"||o==="POST /admin/unban"){const a=String(i.id||"");if(!/^[0-9a-f]{16}$/.test(a))return m(400,{error:"id"});const t=await d.send(new l.GetItemCommand({TableName:w,Key:{pid:c(a)}}));if(!t.Item||!t.Item.u)return m(404,{error:"player"});const e=t.Item.u.S;if(e===u.sub)return m(400,{error:"self"});if(o==="POST /admin/unban")return await y.send(new f.AdminEnableUserCommand({UserPoolId:I,Username:e})),await d.send(new l.UpdateItemCommand({TableName:w,Key:{pid:c(a)},UpdateExpression:"REMOVE ban"})),m(200,{ok:!0});await y.send(new f.AdminDisableUserCommand({UserPoolId:I,Username:e})),await y.send(new f.AdminUserGlobalSignOutCommand({UserPoolId:I,Username:e}));const n=t.Item.name?t.Item.name.S:t.Item.bn?t.Item.bn.S:"";await d.send(new l.PutItemCommand({TableName:w,Item:{pid:c(a),u:c(e),bn:c(n),ban:{N:String(Date.now())}}}));let r,N=0;do{const E=await d.send(new l.QueryCommand({TableName:b,KeyConditionExpression:"pk = :p",ExpressionAttributeValues:{":p":c("sell#"+a)},ExclusiveStartKey:r}));for(const p of E.Items||[]){const g=p.cls?p.cls.S:"";await d.send(new l.DeleteItemCommand({TableName:b,Key:{pk:p.pk,sk:p.sk}})),g&&await d.send(new l.DeleteItemCommand({TableName:b,Key:{pk:c("mkt#"+g),sk:p.sk}})),N++}r=E.LastEvaluatedKey}while(r);return m(200,{ok:!0,listings:N})}return m(404,{error:"not found"})};
+          const l=require("@aws-sdk/client-dynamodb"),f=require("@aws-sdk/client-cognito-identity-provider"),m=new l.DynamoDBClient({}),w=new f.CognitoIdentityProviderClient({}),{SAVES:g,HEROES:p,TRADE:y,POOL:S}=process.env,r=(t,o)=>({statusCode:t,headers:{"content-type":"application/json"},body:JSON.stringify(o)}),d=t=>({S:String(t)});async function E(){const t=await m.send(new l.GetItemCommand({TableName:g,Key:{userId:d("#epoch")}}));return t.Item?Number(t.Item.updated.N):0}async function h(t,o){const i=[];let c;do{const a=await m.send(new l.ScanCommand({TableName:t,ExclusiveStartKey:c}));for(const s of a.Items||[])(!o||!o(s))&&i.push(s);c=a.LastEvaluatedKey}while(c);return i}exports.handler=async t=>{const o=t.routeKey;if(o==="GET /epoch")return r(200,{epoch:await E()});if(o==="GET /leaderboard"){const a=await h(p),s=a.filter(n=>n.name&&!n.ban&&n.seen&&Date.now()-n.seen.N<18e4).length,e=a.filter(n=>n.name&&n.fl&&!n.ban).map(n=>({name:n.name.S,cls:n.cls.S,level:+n.lv.N,floor:+n.fl.N,side:n.sd?n.sd.S:"unsworn"})).sort((n,u)=>u.floor-n.floor||u.level-n.level).slice(0,50);return{statusCode:200,headers:{"content-type":"application/json","cache-control":"public, max-age=60"},body:JSON.stringify({top:e,online:s})}}const i=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!i||!String(i["cognito:groups"]||"").includes("admins"))return r(403,{error:"admin only"});let c={};if(t.body)try{c=JSON.parse(t.isBase64Encoded?Buffer.from(t.body,"base64").toString():t.body)}catch{return r(400,{error:"bad json"})}if(o==="GET /admin/players"){const a=Date.now(),s=(await h(p)).map(e=>({id:e.pid.S,name:e.name?e.name.S:e.bn?e.bn.S:"",cls:e.cls?e.cls.S:"",level:e.lv?+e.lv.N:0,floor:e.fl?+e.fl.N:0,seen:e.seen?+e.seen.N:0,on:e.seen?a-e.seen.N<18e4:!1,banned:!!e.ban,canBan:!!e.u})).sort((e,n)=>n.seen-e.seen);return r(200,{players:s,epoch:await E()})}if(o==="POST /admin/ban"||o==="POST /admin/unban"){const a=String(c.id||"");if(!/^[0-9a-f]{16}$/.test(a))return r(400,{error:"id"});const s=await m.send(new l.GetItemCommand({TableName:p,Key:{pid:d(a)}}));if(!s.Item||!s.Item.u)return r(404,{error:"player"});const e=s.Item.u.S;if(e===i.sub)return r(400,{error:"self"});if(o==="POST /admin/unban")return await w.send(new f.AdminEnableUserCommand({UserPoolId:S,Username:e})),await m.send(new l.UpdateItemCommand({TableName:p,Key:{pid:d(a)},UpdateExpression:"REMOVE ban"})),r(200,{ok:!0});await w.send(new f.AdminDisableUserCommand({UserPoolId:S,Username:e})),await w.send(new f.AdminUserGlobalSignOutCommand({UserPoolId:S,Username:e}));const n=s.Item.name?s.Item.name.S:s.Item.bn?s.Item.bn.S:"";await m.send(new l.PutItemCommand({TableName:p,Item:{pid:d(a),u:d(e),bn:d(n),ban:{N:String(Date.now())}}}));let u,I=0;do{const C=await m.send(new l.QueryCommand({TableName:y,KeyConditionExpression:"pk = :p",ExpressionAttributeValues:{":p":d("sell#"+a)},ExclusiveStartKey:u}));for(const b of C.Items||[]){const N=b.cls?b.cls.S:"";await m.send(new l.DeleteItemCommand({TableName:y,Key:{pk:b.pk,sk:b.sk}})),N&&await m.send(new l.DeleteItemCommand({TableName:y,Key:{pk:d("mkt#"+N),sk:b.sk}})),I++}u=C.LastEvaluatedKey}while(u);return r(200,{ok:!0,listings:I})}return r(404,{error:"not found"})};
 
   AdminIntegration:
     Type: AWS::ApiGatewayV2::Integration
@@ -766,7 +776,7 @@ Resources:
       RouteKey: POST /admin/wipe
       AuthorizationType: JWT
       AuthorizerId: !Ref JwtAuthorizer
-      Target: !Sub 'integrations/${AdminIntegration}'
+      Target: !Sub 'integrations/${ResetIntegration}'
 
   AdminBanRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -791,6 +801,84 @@ Resources:
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref AdminFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  # Server wipe and single-player reset (John, 2026-11-23). Admins only; every run leaves an audit# row in the trade table.
+  ResetFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: reset
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:Scan, dynamodb:Query, dynamodb:BatchWriteItem]
+                Resource: [!GetAtt SavesTable.Arn, !GetAtt HeroesTable.Arn, !GetAtt TradeTable.Arn, !GetAtt WalletsTable.Arn, !GetAtt ArenaTable.Arn, !GetAtt BossTable.Arn]
+
+  ResetFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-reset
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 29
+      Role: !GetAtt ResetFunctionRole.Arn
+      Environment:
+        Variables:
+          SAVES: !Ref SavesTable
+          HEROES: !Ref HeroesTable
+          TRADE: !Ref TradeTable
+          WALLETS: !Ref WalletsTable
+          ARENA: !Ref ArenaTable
+          BOSS: !Ref BossTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/reset.js by infra/build.py
+          const l=require("@aws-sdk/client-dynamodb"),A=require("crypto"),L=new l.DynamoDBClient({}),{SAVES:h,HEROES:C,TRADE:b,WALLETS:K,ARENA:O,BOSS:v}=process.env,w=(e,t)=>({statusCode:e,headers:{"content-type":"application/json"},body:JSON.stringify(t)}),a=e=>({S:String(e)}),f=e=>({N:String(e)}),c=e=>L.send(e);async function P(e){const t=[];let i;do{const n=await c(new l.QueryCommand({TableName:b,KeyConditionExpression:"pk = :p",ExpressionAttributeValues:{":p":a(e)},ExclusiveStartKey:i}));t.push(...n.Items||[]),i=n.LastEvaluatedKey}while(i);return t}const g=(e,t)=>c(new l.DeleteItemCommand({TableName:e,Key:t}));async function I(e,t){const i=await P(e);for(const n of i){await g(b,{pk:n.pk,sk:n.sk});const r=t&&t(n);r&&await g(b,{pk:a(r),sk:n.sk})}return i.length}async function E(e,t,i){const n=[];let r;do{const s=await c(new l.ScanCommand({TableName:e,ExclusiveStartKey:r}));for(const m of s.Items||[])i(m)||n.push(m);r=s.LastEvaluatedKey}while(r);for(let s=0;s<n.length;s+=25){let m={[e]:n.slice(s,s+25).map(d=>({DeleteRequest:{Key:Object.fromEntries(t.map(p=>[p,d[p]]))}}))};for(let d=0;d<6&&m&&Object.keys(m).length;d++)m=(await c(new l.BatchWriteItemCommand({RequestItems:m}))).UnprocessedItems,m&&Object.keys(m).length&&await new Promise(p=>setTimeout(p,200*(d+1)))}return n.length}const q=(e,t,i)=>c(new l.PutItemCommand({TableName:b,Item:{pk:a("audit#"),sk:a(t.toString(36)+A.randomBytes(3).toString("hex")),at:f(t),by:a(e.email||e.sub),ttl:f(Math.floor(t/1e3)+365*86400),...i}}));exports.handler=async e=>{const t=e.requestContext.authorizer&&e.requestContext.authorizer.jwt&&e.requestContext.authorizer.jwt.claims;if(!t||!String(t["cognito:groups"]||"").includes("admins"))return w(403,{error:"admin only"});if(e.routeKey==="GET /admin/audit"){const o=await c(new l.QueryCommand({TableName:b,KeyConditionExpression:"pk = :p",ExpressionAttributeValues:{":p":a("audit#")},ScanIndexForward:!1,Limit:20}));return w(200,{log:(o.Items||[]).map(u=>({at:+u.at.N,by:u.by.S,act:u.act.S,name:u.name?u.name.S:"",sigils:!!u.sig,self:!!u.self}))})}let i={};try{i=JSON.parse(e.isBase64Encoded?Buffer.from(e.body||"","base64").toString():e.body||"{}")}catch{return w(400,{error:"json"})}const n=Date.now();if(e.routeKey==="POST /admin/wipe"){if(i.confirm!=="WIPE")return w(400,{error:"confirm"});const o=await E(h,["userId"],S=>S.userId.S==="#epoch"),u=await E(C,["pid"],S=>!!S.ban),y=await E(b,["pk","sk"],S=>/^(audit|wix|wixord|sig|sigsell)#/.test(S.pk.S));return await c(new l.PutItemCommand({TableName:h,Item:{userId:a("#epoch"),data:a(""),updated:f(n)}})),await q(t,n,{act:a("wipe")}),w(200,{ok:!0,epoch:n,saves:o,heroes:u,trade:y})}const r=String(i.id||"");if(!/^[0-9a-f]{16}$/.test(r))return w(400,{error:"id"});const s=(await c(new l.GetItemCommand({TableName:C,Key:{pid:a(r)}}))).Item;if(!s||!s.u)return w(404,{error:"player"});const m=s.name?s.name.S:s.bn?s.bn.S:"",d=s.u.S,p=i.sigils===!0,N=d===t.sub;if(!m||String(i.name||"").trim().toLowerCase()!==m.toLowerCase())return w(400,{error:"name"});await c(new l.PutItemCommand({TableName:h,Item:{userId:a(d),data:a(""),updated:f(n),floor:f(0),rst:f(n)}}));const x={pid:a(r),u:s.u,bn:a(m)};for(const o of["ban","wl","wv"])s[o]&&(x[o]=s[o]);await c(new l.PutItemCommand({TableName:C,Item:x}));const T={listings:await I("sell#"+r,o=>o.cls&&"mkt#"+o.cls.S),letters:await I("inbox#"+r)+await I("out#"+r)};await g(O,{pid:a(r)});let k;do{const o=await c(new l.ScanCommand({TableName:v,FilterExpression:"s = :p",ExpressionAttributeValues:{":p":a(r)},ExclusiveStartKey:k}));for(const u of o.Items||[])await g(v,{w:u.w,s:u.s});k=o.LastEvaluatedKey}while(k);if(p){T.sigilListings=await I("sigsell#"+r,()=>"sig#");const o=(await c(new l.GetItemCommand({TableName:K,Key:{userId:a(d)}}))).Item;if(o){const u={userId:a(d)};for(const y of["wl","wv"])o[y]&&(u[y]=o[y]);await c(new l.PutItemCommand({TableName:K,Item:u}))}}return await q(t,n,{act:a("reset"),pid:a(r),name:a(m),...p&&{sig:f(1)},...N&&{self:f(1)}}),w(200,{ok:!0,name:m,self:N,sigils:p,...T})};
+
+  ResetIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ResetFunction.Arn
+      PayloadFormatVersion: '2.0'
+      TimeoutInMillis: 29000
+
+  ResetPlayerRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /admin/reset
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ResetIntegration}'
+
+  ResetAuditRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /admin/audit
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ResetIntegration}'
+
+  ResetInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ResetFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
 

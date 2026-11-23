@@ -1,4 +1,4 @@
-/* lh-build 202611232148 */
+/* lh-build 202611232204 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -928,6 +928,10 @@ body.resting .arena{cursor:default}
 .adm-row.banned{opacity:.65}
 .adm-n{flex:1;min-width:0}
 .adm-n small{display:block;color:var(--muted);font-size:12px}
+.adm-conf.wide{width:min(260px,100%);letter-spacing:.04em}
+.adm-chk{display:flex;gap:10px;align-items:flex-start;text-align:left;margin:10px 0;padding:10px 12px;border:1px solid #5a2a2a;border-radius:10px;background:#1a0f10;font-size:13px;line-height:1.4;cursor:pointer}
+.adm-chk input{margin-top:2px;flex:none;accent-color:#d9534f}
+@media (max-width:560px){.adm-row{flex-wrap:wrap}.adm-n{flex-basis:100%}}
 .adm-danger{margin-top:18px;padding:12px;border:1px solid #283e63;border-radius:12px;background:#0c131e}
 .adm-conf{display:block;margin:8px auto 14px;width:160px;text-align:center;font:800 18px/1 inherit;letter-spacing:.2em;background:#0a0d12;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px}
 @media (max-width:520px){.adm-stats{grid-template-columns:repeat(2,1fr)}}

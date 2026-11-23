@@ -1446,7 +1446,7 @@
   function updatePanel(force) {
     const now = Date.now();
     $('gold').textContent = fmt(S.gold);
-    { const sg = $('sigils'); if (sg) { const on = !!(typeof prof !== 'undefined' && prof && signedIn()); if (sg.hidden === on) sg.hidden = !on; if (on) $('sigilct').textContent = prof.bal.toLocaleString(); } }
+    { const sg = $('sigils'); if (sg) { let bal = typeof prof !== 'undefined' && prof ? prof.bal : null; if (bal == null) { try { const c = localStorage.getItem('lh_bal'); if (c != null) bal = +c; } catch (e) {} } const on = bal != null && signedIn(); if (sg.hidden === on) sg.hidden = !on; if (on) { const t = bal.toLocaleString(); if ($('sigilct').textContent !== t) { $('sigilct').textContent = t; try { localStorage.setItem('lh_bal', String(bal)); } catch (e) {} } } } }
     $('dps').textContent = fmt(L.totalDps(S, now));
     $('embers').textContent = fmt(S.embers); { const hp = S.hero ? L.heroPoints(S) : 0; $('kindcount').textContent = S.kindling ? S.kindling : hp > 0 ? '+' + hp : ''; }
     if (tab === 'party' || tab === 'camp') updateSeats(force);
@@ -1830,7 +1830,7 @@
         m.querySelector('#a-out').onclick = async () => {
           await pushCloud(true);
           try { await cognito('RevokeToken', { Token: sess.refresh }); } catch (e) {}
-          sess = null; storeSess(); try { localStorage.removeItem('lh_wix'); } catch (e) {} paintAccount(); closeModal(); toast('user', 'Signed out', 'Your progress stays on this device too.', '');
+          sess = null; storeSess(); try { localStorage.removeItem('lh_wix'); localStorage.removeItem('lh_bal'); } catch (e) {} paintAccount(); closeModal(); toast('user', 'Signed out', 'Your progress stays on this device too.', '');
         };
         m.querySelector('#a-close').onclick = closeModal;
       });
@@ -1882,6 +1882,7 @@
   async function loadProfile() {
     if (!CL || !signedIn()) return null;
     try { prof = await papi('GET', '/profile'); } catch (e) { return prof; }
+    try { localStorage.setItem('lh_bal', String(prof.bal)); } catch (e) {}
     if ((prof.pass || 0) !== (S.pass || 0)) { S.pass = prof.pass || 0; save(); updatePanel(true); }
     if (!!prof.boh !== !!S.boh) { S.boh = !!prof.boh; save(); updateGear(true); }
     // A verified commander link turns on the hero's Grand War aura.
@@ -2144,6 +2145,8 @@
       '<p class="note">Each $10 given, 5 food items or toy donated to the Mercy Corps adds 2 hours for everyone, up to 7 days ahead. The Corps raises money for Extra Life, food for a local pantry and toys for a children’s hospital.</p>' +
       '<div class="row"><a class="btn" href="https://war.born2gamellc.com/" target="_blank" rel="noopener">Give to the Mercy Corps</a><button class="btn ghost" id="mb-ok">Close</button></div>', md => { md.querySelector('#mb-x').onclick = closeModal; md.querySelector('#mb-ok').onclick = closeModal; });
   });
+  // Fetch the Sigil balance as soon as the game opens (the cached last value shows until it arrives).
+  if (CL && signedIn()) loadProfile();
   setTimeout(loadMercy, 2500); setInterval(loadMercy, 3e5); setInterval(paintMercy, 3e4);
   // ---------- Lantern Pass: 30 days of convenience for 500 Sigils (auto-train, +10 bag slots, +4 h offline) ----------
   if (!S.passTrialGiven) { S.passTrialGiven = 1; S.passTrial = Date.now() + 3 * 864e5; save(); }

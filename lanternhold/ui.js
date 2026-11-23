@@ -1,4 +1,4 @@
-/* lh-build 202611232013 */
+/* lh-build 202611232122 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1607,15 +1607,23 @@
     const a = S.autoScrap;
     const draw = () => {
       const rows = L.RARITY.filter(r => r.id !== 'set' && r.id !== 'goblin').map(r => {
-        const n = S.bag.filter(x => x.rar === r.id).length;
+        const n = S.bag.filter(x => x.rar === r.id && !L.wearer(S, x.uid)).length;
         return '<label class="aschip r-' + r.id + '"><input type="checkbox" data-r="' + r.id + '"' + (a.r.includes(r.id) ? ' checked' : '') + '><span class="gem"></span><b>' + r.name + '</b><small>' + n + ' in pack</small></label>';
       }).join('');
-      modal('<div class="asbox"><h2>Auto-scrap</h2><p class="note">Scrap new drops of the rarities you tick the moment they are found, for gold and Dust. They never take up pack space.</p>' +
+      modal('<div class="asbox"><h2>Auto-scrap</h2><p class="note">Scrap new drops of the rarities you tick the moment they are found, for gold and Dust. They never take up pack space. Drops that someone in your party can wear right now and that beat their gear are kept.</p>' +
         '<label class="asmaster"><span class="sw' + (a.on ? ' on' : '') + '"><i></i></span><input type="checkbox" id="as-on"' + (a.on ? ' checked' : '') + '><b>Auto-scrap is ' + (a.on ? 'on' : 'off') + '</b></label>' +
         '<div class="asgrid' + (a.on ? '' : ' off') + '">' + rows + '</div>' +
         '<label class="chk"><input type="checkbox" id="as-up"' + (a.up ? ' checked' : '') + '><span><b>Scrap upgrades too</b><small>Off by default, so a drop that beats what a companion wears is always kept.</small></span></label>' +
-        '<p class="asnote">Set pieces and job set pieces are always kept. Auto-scrap only touches new drops, never what is already in your pack.</p>' +
+        (() => { const l = a.on ? L.autoScrapPack(S) : [], g = l.reduce((t, it) => t + L.salvageValue(it), 0), d = l.reduce((t, it) => t + L.dustValue(it), 0);
+          return '<div class="aspack' + (l.length ? ' on' : '') + '"><div><b>' + (l.length ? l.length + (l.length === 1 ? ' piece' : ' pieces') + ' already in your pack match' + (l.length === 1 ? 'es' : '') : 'Nothing in your pack matches') + '</b><small>' + (l.length ? 'Auto-scrap only catches new drops. Scrap these now for ' + fmt(g) + ' gold and ' + fmt(d) + ' Dust.' : a.on ? 'Your pack is already clear of these rarities.' : 'Turn auto-scrap on to clear matching pieces you already carry.') + '</small></div>' +
+            (l.length ? '<button class="btn danger small" id="as-now">Scrap ' + l.length + ' now</button>' : '') + '</div>'; })() +
+        '<p class="asnote">Set pieces, job set pieces, region sets, locked and worn gear are always kept, and so is the best spare piece for each party member’s slot.</p>' +
         '<div class="row"><button class="btn" id="as-x">Done</button></div></div>', md => {
+          const now = md.querySelector('#as-now'); if (now) now.onclick = () => {
+            const l = L.autoScrapPack(S); let g = 0, d = 0; for (const it of l) { d += L.dustValue(it); g += L.salvage(S, it.uid); }
+            sfx.coin(); updateGear(true); save(); draw();
+            toast('coin', 'Scrapped ' + l.length + (l.length === 1 ? ' piece' : ' pieces'), '+' + fmt(g) + ' gold, +' + fmt(d) + ' Dust', 'feat');
+          };
           md.querySelector('#as-on').onchange = e => { a.on = e.target.checked; save(); paintPackCap(); draw(); };
           md.querySelector('#as-up').onchange = e => { a.up = e.target.checked; save(); };
           md.querySelectorAll('[data-r]').forEach(c => c.onchange = () => {
@@ -3673,6 +3681,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 61, date: 'November 23, 2026', title: 'Auto-scrap fixed', items: [
+      'Fixed: auto-scrap kept most drops. It treated anything a benched companion, or a hero not yet high enough level, might someday wear as an upgrade. Now only a piece someone in your party can wear right now, and that beats their gear, is kept.',
+      'New: the Auto-scrap window shows how many pieces already in your pack match your settings, with a button to scrap them all at once. Locked and worn gear, sets and each party member’s best spare piece are kept.'] },
     { v: 60, date: 'November 23, 2026', title: 'Fair fights in the Ember Ring', items: [
       'Duelling the same hero again within a day now pays less each time: full rewards, then half, then a quarter, then nothing. This covers rating and Laurels for both heroes.',
       'Challenger cards show when a rematch pays less, and when it will pay in full again.'] },
@@ -4655,6 +4666,7 @@
   document.querySelectorAll('.tabs [data-tab="ring"]').forEach(b => b.addEventListener('click', () => { paintRing(); loadRing(); }));
   // Keep the challenge timer fresh while the tab is open.
   setInterval(() => { if (typeof tab !== 'undefined' && tab === 'ring' && !document.hidden && !$('modal').dataset.lock) { const a = document.activeElement; if (!a || !$('ringbox') || !$('ringbox').contains(a)) paintRing(); } }, 30000);
+
   // ---------- the Wardrobe: outfits and lantern styles ----------
   // Looks only: nothing here changes power. Bought with Sigils on the server (infra/lambda/looks.js);
   // keep ids and prices in step with its CAT. The art lives in vector.js (OUTFITS, LANTERNS).

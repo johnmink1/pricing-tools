@@ -1,4 +1,4 @@
-/* lh-build 202611232013 */
+/* lh-build 202611232122 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -920,18 +920,29 @@
   // Auto-scrap (John, 2026-11-23): drops of the ticked rarities are scrapped on pickup for gold and Dust.
   // Set and job-set pieces are always kept, and so is anything that would beat what a companion wears
   // unless the player turns that guard off. s.autoScrap = { on, r: [rarity ids], up: scrap upgrades too }.
+  // Only someone in the party who can wear it now counts: gear nobody can use yet, or that only a benched
+  // companion could use, is scrapped (John, 2026-11-23: auto-scrap kept almost every drop before).
   function isUpgrade(s, it) {
-    return s.unlocked.some(id => {
-      const m = memberById(id); if (!m || m.cls !== it.cls || isGuest(s, id)) return false;
+    return s.party.some(id => {
+      const m = id && memberById(id); if (!m || m.cls !== it.cls || isGuest(s, id) || !canWear(s, id, it)) return false;
       const r = replaces(s, id, it);
       if (r.length) return itemScore(it) > r.reduce((a, x) => a + itemScore(x), 0);
       // an open slot only counts if the pack has no spare piece at least this good to fill it
-      return !s.bag.some(x => x.cls === it.cls && x.slot === it.slot && !wearer(s, x.uid) && itemScore(x) >= itemScore(it));
+      return !s.bag.some(x => x !== it && x.cls === it.cls && x.slot === it.slot && !wearer(s, x.uid) && canWear(s, id, x) && itemScore(x) >= itemScore(it));
     });
+  }
+  function autoScrapBase(s, it) {
+    const a = s.autoScrap;
+    return !!(a && a.r && a.r.includes(it.rar) && !it.set && !it.jset && it.rset == null && it.rar !== 'set' && it.rar !== 'goblin');
+  }
+  // Pack items the current auto-scrap rules would take: unworn, unlocked, and not in any party member's best kit.
+  function autoScrapPack(s) {
+    const keep = new Set(); if (!(s.autoScrap && s.autoScrap.up)) for (const id of s.party) if (id && !isGuest(s, id)) { const k = bestKit(s, id); for (const p in k) keep.add(k[p].uid); }
+    return s.bag.filter(it => !it.lk && !wearer(s, it.uid) && autoScrapBase(s, it) && !keep.has(it.uid));
   }
   function autoScrapHit(s, it) {
     const a = s.autoScrap;
-    if (!a || !a.on || !a.r || !a.r.includes(it.rar) || it.set || it.jset || it.rset != null || it.rar === 'set' || it.rar === 'goblin') return false;
+    if (!a || !a.on || !autoScrapBase(s, it)) return false;
     return !!a.up || !isUpgrade(s, it);
   }
   function equipped(s, id) { return (s.gear[id] || {}); }
@@ -1968,7 +1979,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

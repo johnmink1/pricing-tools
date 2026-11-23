@@ -787,3 +787,7 @@ body.resting #hint{display:none}
 body.resting #abilities{opacity:.45;pointer-events:none}
 body.resting .arena{cursor:default}
 .kcost{display:inline-flex;align-items:center;gap:2px;margin-left:4px}.kcost svg{width:12px;height:12px}
+.tile .affb{position:absolute;left:4px;top:4px;width:7px;height:7px;border-radius:50%;background:var(--ember);box-shadow:0 0 6px rgba(255,138,61,.8)}
+.iaff{display:flex;gap:10px;align-items:flex-start;margin:10px 0;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,138,61,.35);background:rgba(255,138,61,.07)}
+.iaff svg{width:18px;height:18px;color:var(--ember);flex:none;margin-top:2px}.iaff b{display:block;color:#ffc58f}.iaff small{color:var(--muted);font-size:12.5px}
+.iset b em{font-style:normal;color:var(--muted);font-weight:600;font-size:12px;margin-left:6px}

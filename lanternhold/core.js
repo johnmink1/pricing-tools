@@ -444,6 +444,18 @@
     { id: 'crown',  cls: 'necro',  name: 'The Hollow Crown', pieces: { main: 'Hollow Scepter', chest: 'Hollow Regalia', neck: 'Hollow Crown' },
       two: '+30% skeleton damage', three: 'Raise Dead calls 5 skeletons', lore: 'A king’s regalia, left in the Vault when its owner was fed to the lantern.' },
   ];
+  // Job sets help a companion's camp job. They drop rarely from guardians and chests from floor 20.
+  const JOB_SETS = {
+    forage:   { name: 'The Forager’s Kit',       pieces: { head: 'Forager’s Wide Hat',       feet: 'Forager’s Trail Boots',  ring: 'Forager’s Acorn Ring' } },
+    smith:    { name: 'Runesmith’s Regalia',     pieces: { head: 'Runesmith’s Glass Visor',  feet: 'Runesmith’s Forge Boots', ring: 'Runesmith’s Etched Band' } },
+    herb:     { name: 'The Herbalist’s Satchel', pieces: { head: 'Herbalist’s Sunhat',       feet: 'Mossfoot Sandals',       ring: 'Sprig of Rue Ring' } },
+    armor:    { name: 'The Armorer’s Bench',     pieces: { head: 'Armorer’s Leather Cap',    feet: 'Hobnail Boots',          ring: 'Armorer’s Thimble' } },
+    prospect: { name: 'Prospector’s Luck',       pieces: { head: 'Prospector’s Candle Cap',  feet: 'Streamwader Boots',      ring: 'Gold-dust Ring' } },
+    lamp:     { name: 'The Lamplighter’s Vigil', pieces: { head: 'Lamplighter’s Hood',       feet: 'Wickwalker Slippers',    ring: 'Ember Wick Ring' } },
+  };
+  const JOB_SET_TWO = 0.4, JOB_SET_THREE = 1.0;
+  // Rare job affixes: a few pieces of gear also help one camp job when the wearer works it.
+  const AFFIX_CHANCE = { fine: 0.02, rare: 0.06, epic: 0.15 };
   const GEAR_CAP = 40, BAG_STEP = 10, BAG_UPS_MAX = 6;
   let uidSeq = 0;
   const gearPct = it => RARITY.find(r => r.id === it.rar).pct * (1 + 0.03 * it.ilvl) * (1 + 0.2 * it.up);
@@ -456,6 +468,7 @@
   }
   const itemScore = it => { const w = weightOf(it); return gearPct(it) * (w.dps + w.hp); };
   function gearName(it) {
+    if (it.jset) return JOB_SETS[it.jset].pieces[it.slot];
     if (it.set) return SETS.find(x => x.id === it.set).pieces[it.slot];
     return RARITY.find(r => r.id === it.rar).prefix + BASES[it.cls][it.slot];
   }
@@ -479,13 +492,22 @@
     const boost = (opts && opts.boost) || 0, d = Math.min(1, f / 80);
     const p = r() + boost * 0.15 * d;
     rar = p > 0.995 - 0.03 * d ? 'epic' : p > 0.94 - 0.08 * d ? 'rare' : p > 0.7 - 0.12 * d ? 'fine' : 'common';
-    return { uid: Date.now().toString(36) + (uidSeq++), cls, slot, rar, ilvl: f, up: 0 };
+    const it = { uid: Date.now().toString(36) + (uidSeq++), cls, slot, rar, ilvl: f, up: 0 };
+    if (r() < (AFFIX_CHANCE[rar] || 0)) it.aff = { j: JOB_KEYS[Math.floor(r() * JOB_KEYS.length)], v: Math.round((0.1 + r() * 0.2) * (rar === 'epic' ? 1.5 : 1) * 100) / 100 };
+    return it;
+  }
+  const JOB_KEYS = Object.keys(JOB_SETS);
+  function rollJobSet(s, f, r) {
+    const classes = Array.from(new Set(s.party.filter(Boolean).map(id => memberById(id).cls)));
+    const cls = classes.length ? classes[Math.floor(r() * classes.length)] : CLASS_ORDER[Math.floor(r() * 5)];
+    return { uid: Date.now().toString(36) + (uidSeq++), cls, slot: ['head', 'feet', 'ring'][Math.floor(r() * 3)], rar: 'set', jset: JOB_KEYS[Math.floor(r() * JOB_KEYS.length)], ilvl: f, up: 0 };
   }
   const bagCap = s => GEAR_CAP + BAG_STEP * (s.bagUps || 0);
   function dropGear(s, foe, rng, events) {
     const r = rng || Math.random, f = s.floor, loot = 1 + campBonus(s, 'loot') + sk(s, 'loot');
     let it = null;
-    if (foe.boss) {
+    if (f >= 20 && (foe.boss ? r() < 0.03 * loot : foe.chest ? r() < 0.008 * loot : false)) it = rollJobSet(s, f, r);
+    else if (foe.boss) {
       if (f >= 15 && r() < 0.06 * loot) it = rollGear(s, f, { set: true }, r);
       else if (r() < 0.6 * loot) it = rollGear(s, f, { boost: 1 }, r);
     } else if (foe.chest) { if (r() < 0.4 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
@@ -563,8 +585,10 @@
   function bestKit(s, id) {
     const m = memberById(id); if (!m || m.guest) return {};
     const pool = s.bag.filter(it => it.cls === m.cls && canWear(s, id, it) && (!wearer(s, it.uid) || wearer(s, it.uid) === id));
-    const open = openPos(s, id), kit = {};
-    const top = (type, n) => pool.filter(it => it.slot === type).sort((a, b) => itemScore(b) - itemScore(a)).slice(0, n);
+    const open = openPos(s, id), kit = {}, job = jobFree(s, id) && jobOf(s, id), jid = job && job.id;
+    // a companion working a camp job keeps gear that helps that job
+    const score = it => itemScore(it) + (jid && (it.jset === jid || (it.aff && it.aff.j === jid)) ? 10 : 0);
+    const top = (type, n) => pool.filter(it => it.slot === type).sort((a, b) => score(b) - score(a)).slice(0, n);
     for (const t of ['main', 'off', 'head', 'feet', 'neck', 'ring']) {
       const ps = open.filter(p => posType(p) === t), best = top(t, ps.length), g = equipped(s, id);
       // keep items already in place where they stay in the top picks, fill the rest
@@ -574,8 +598,8 @@
       for (const p of ps) if (!kit[p] && rest.length) kit[p] = rest.shift();
     }
     const robe = top('robe', 1)[0], chest = top('chest', 1)[0], legs = top('legs', 1)[0];
-    const split = (chest ? itemScore(chest) : 0) + (legs ? itemScore(legs) : 0);
-    if (robe && itemScore(robe) > split) kit.chest = robe; else { if (chest) kit.chest = chest; if (legs) kit.legs = legs; }
+    const split = (chest ? score(chest) : 0) + (legs ? score(legs) : 0);
+    if (robe && score(robe) > split) kit.chest = robe; else { if (chest) kit.chest = chest; if (legs) kit.legs = legs; }
     return kit;
   }
   // Positions where the best kit differs from what is worn now.
@@ -744,9 +768,16 @@
     { id: 'prospect', name: 'Prospector', stat: 'gold', aff: 'rogue', base: 0.025, icon: 'coin', fmt: 'gold', desc: 'Pans the underground streams for coin the dead left behind.' },
     { id: 'lamp', name: 'Lamplighter', stat: 'lamp', aff: 'necro', base: 0.35, icon: 'lamp', fmt: 'lantern oil per guardian', desc: 'Trims the wick and rations the oil.' },
   ];
+  // Extra job output from what a companion wears: job affixes plus a job set.
+  function jobGear(s, id, jid) {
+    const g = equipped(s, id); let v = 0, n = 0;
+    for (const p in g) { const it = itemOf(s, g[p]); if (!it) continue; if (it.aff && it.aff.j === jid) v += it.aff.v * (1 + 0.1 * it.up); if (it.jset === jid) n++; }
+    return v + (n >= 3 ? JOB_SET_THREE : n >= 2 ? JOB_SET_TWO : 0);
+  }
+  const jobSetCount = (s, id, jid) => { const g = equipped(s, id); let n = 0; for (const p in g) { const it = itemOf(s, g[p]); if (it && it.jset === jid) n++; } return n; };
   function jobValue(s, job, id) {
     const m = memberById(id); if (!m) return 0;
-    return job.base * Math.sqrt(Math.max(1, lvl(s, id))) * (m.cls === job.aff ? 1.5 : 1) * (1 + (m.tier || 0));
+    return job.base * Math.sqrt(Math.max(1, lvl(s, id))) * (m.cls === job.aff ? 1.5 : 1) * (1 + (m.tier || 0)) * (1 + jobGear(s, id, job.id));
   }
   const jobFree = (s, id) => id && id !== 'you' && s.unlocked.includes(id) && !s.party.includes(id) && !isGuest(s, id);
   function campBonus(s, stat) {
@@ -1161,7 +1192,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, resting, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, resting, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

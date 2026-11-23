@@ -1,4 +1,4 @@
-/* lh-build 202611232231 */
+/* lh-build 202611232314 */
 /* Lanternhold illustrated sprites. Each sprite is drawn as layered SVG (outline, shading, rim light, detail),
    tinted per companion or biome, rendered once to an image and then drawn on the arena canvas. */
 (function (root) {
@@ -94,7 +94,7 @@
       // kite shield in front
       G(P('M0 0 H34 V20 Q34 44 17 56 Q0 44 0 20Z', c.lg([lit(c.t('#2c4b8e'), 0.08), c.t('#1b2f5e')], 0, 0, 1, 1)) +
         L_('M3 3 H31 V20 Q31 42 17 52 Q3 42 3 20Z', gold, 2.2) +
-        P('M15 10 H19 V40 H15Z', gold) + P('M8 19 H26 V23 H8Z', gold) + C(17, 21, 3.2, '#f5c242', ' stroke="' + OUT + '" stroke-width="1.4"') +
+        P('M5 33 L17 24 L29 33 V39 L17 30 L5 39Z', gold) + P('M17 8 Q23 15 17 21 Q11 15 17 8Z', '#f5c242', ' stroke="' + OUT + '" stroke-width="1.2"') +
         L_('M6 6 Q12 5 16 6', '#ffffff', 1.2, ' opacity=".5"'), 'translate(74 70) rotate(4)'),
       // shield hand
       Eo(80, 92, 5, 4.5, steelD),

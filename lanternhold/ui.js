@@ -1,4 +1,4 @@
-/* lh-build 202611232231 */
+/* lh-build 202611232314 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2129,6 +2129,7 @@
       '<h3 class="sub">Pledge your banner</h3><div class="sides">' + L.SIDE_ORDER.map(k => { const d = L.SIDES[k]; return '<button class="pick side' + (side === k ? ' on' : '') + (WAR_ART[k] ? ' art' : '') + '" data-side="' + k + '" style="--side:' + d.color + (WAR_ART[k] ? ';--art:url(' + WAR_ART[k] + ')' : '') + '"><b>' + d.name + '</b><i>\u201c' + d.motto + '\u201d</i><small>' + d.desc + '</small><em>' + d.perk + '</em></button>'; }).join('') + '</div>' +
       '<h3 class="sub">Name your hero</h3><input id="h-name" maxlength="16" placeholder="2 to 16 letters" autocomplete="off"><div class="err" id="h-err"></div>' +
       '<div class="row" style="justify-content:center"><button class="btn big" id="h-go">Begin the descent</button></div>', md => {
+        md.className = 'sheet wide setupsheet';
         const si = md.querySelector('#h-signin'); if (si) si.onclick = () => { delete $('modal').dataset.lock; authForm('in'); };
         const nm = md.querySelector('#h-name'); nm.value = setup.heroName || '';
         nm.oninput = () => { setup.heroName = nm.value; };
@@ -3785,14 +3786,20 @@
         'You earn <b>a quarter</b> of your usual gold for up to <b>8 hours</b>.',
         '<b>Night Watch</b> (Skills tab) stretches that up to 3 days.',
         'The <b>Lantern Pass</b> adds 4 more hours.']],
-      ['The side panel', 'i:map', 'Seven tabs, each with one job.', [
+      ['The side panel', 'i:map', 'Eight tabs, each with one job. Locked tabs show the hero level that opens them.', [
         '<b>Party</b>: who fights, and in what order.',
         '<b>Camp</b>: resting companions, camp jobs and training.',
         '<b>Gear</b>: dress your characters.',
         '<b>Skills</b>: your character sheet, skill tree and rekindling.',
         '<b>Market</b>: buy and sell gear, mail and the Sigil exchange.',
         '<b>Guild</b>: invite other players’ heroes into your party.',
-        '<b>Codex</b>: journal, relics and records.']],
+        '<b>PvP</b>: the Ember Ring, duels against other players’ heroes.',
+        '<b>Codex</b>: journal, relics, records and your progress.']],
+      ['Why we fight, music and settings', 'i:lantern', 'The story opening, the soundtrack and your options.', [
+        'The <b>Why we fight</b> opening plays on your first visit. Replay it any time from <b>Settings</b>.',
+        'Lanternhold is free. Once the game’s costs are covered, the proceeds go to the Mercy Corps giving: children’s hospitals, food pantries and local schools.',
+        'The <b>music button</b> in the top bar opens the player: eight original tracks, skip, shuffle, volume and mute.',
+        '<b>Settings</b> (the gear button) holds sound, the tutorial and your save.']],
       ['Controls', 'i:help', 'Everything works with taps; keys are shortcuts.', [
         '<b>Tap, Space or Enter</b>: strike',
         '<b>1 to 5</b>: party abilities. <b>6 to 8</b>: your hero’s specializations.',
@@ -3908,7 +3915,7 @@
         'A <b>Forager</b> at camp improves all drops.']],
       ['Job gear', 'i:hammer', 'Some pieces boost a camp job (orange dot).', [
         'Fine 2%, rare 6%, epic 15% chance to roll one.',
-        'Each job has a 3-piece job set from floor 20: <b>2 pieces +40%</b>, <b>3 pieces +100%</b>.']],
+        'Each job has a 3-piece job set from floor 20 once your hero reaches level 25: <b>2 pieces +40%</b>, <b>3 pieces +100%</b>.']],
       ['Your pack', 'i:bag', 'The pack holds 40 items to start.', [
         'Kindling adds <b>+10 slots</b> up to six times. The Lantern Pass adds 10.',
         'When full, the weakest common item is sold automatically.',
@@ -3974,19 +3981,22 @@
     ] },
     { id: 'social', name: 'Playing together', icon: 'chat', topics: [
       ['Accounts', 'i:user', 'A free account saves your progress online, on any device.', [
-        '<b>Continue with Born 2 Game</b> signs you in with your store account.']],
+        'Accounts are optional. <b>Play without an account</b> keeps your hero on this device only.',
+        '<b>Continue with Born 2 Game</b> signs you in with your store account, or sign up with any email and the code we send you.',
+        'Sign in to use the Players Guild, the Market, the Ember Ring, world boss weekends and Sigils.']],
       ['Discord', 'i:discord', 'Join us on the Grand War Discord.', [
         'Tap the Discord button at the top, or <a href="https://discord.gg/6G7E7rhGFu" target="_blank" rel="noopener">join here</a>.',
         '<b>#lanternhold-chat</b> for players, <b>#lanternhold-bugs</b> for bug reports and <b>#lanternhold-ideas</b> for suggestions.']],
       ['Chat', 'i:chat', 'Global, Trade, Party and Banner channels.', [
-        'Press <b>Chat</b> at the bottom right to open the window, and the dash to tuck it away again.',
+        'Press <b>Chat</b> at the bottom right to open the window, and the dash to tuck it away again. A bubble on the button counts unread messages.',
+        'Tap a name to <b>whisper</b>: a private chat with that player, kept in the Whispers channel.',
         'Banner chat reaches only players under your banner.',
         'Ctrl+click an item to link it. Tap a name to mute or report. No links, and be kind.']],
       ['Trading Post', 'i:bag', 'Buy and sell gear for gold, or mail it to a player.', [
         '<b>Sell</b>: tap an item in Gear, choose <b>Sell on market</b>. Listings last a week.',
         '<b>Mail</b>: send to someone you recruited or chatted with, as a gift or for a price.',
         'Gold and gear have no real-money value.']],
-      ['The Ember Ring (PvP)', 'i:sword', 'Duel other players\u2019 heroes for Laurels and rating.', [
+      ['The Ember Ring (PvP)', 'i:duel', 'Duel other players\u2019 heroes for Laurels and rating.', [
         'Open the <b>PvP</b> tab and press <b>Duel</b>. Only your own hero fights; companions, tonics and Sigils never count.',
         'Each class has the edge on two classes and is countered by two. Learn <b>Ring skills</b> with Laurels and pick 2 abilities and 2 passives for your loadout.',
         'Rematches against the same hero within a day pay less each time, so spread your duels around.',
@@ -4023,6 +4033,13 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 72, date: 'November 23, 2026', title: 'A tidier Hold', items: [
+      'The hero setup screen is wider on computers, so class and banner names no longer spill out of their cards.',
+      'On phones, all four currencies fit the top bar again (Embers and Dust were cut off once gold reached millions). Quests and blessings sit just under them.',
+      'The PvP tab has its own crossed-swords icon, so it no longer looks like the Fight button.',
+      'Tanks now carry the Covenant chevron on their shields and in their class icon.',
+      'A few names were changed: region 6 is now the Drowned Archive, its guardian the Sunken Magister, and the healer Wayfarer branch has Lamplight Song and Quick Breath. Your skills and gear are unchanged.',
+      'The Guide covers the newer parts of the game: the PvP tab, the Why we fight opening, the music player, whispers and the unread bubble in chat, and playing without an account.'] },
     { v: 71, date: 'November 23, 2026', title: 'A calmer marching order', items: [
       'The Party tab is easier to read. Each companion shows only the traits that are working right now, with their effect. The others share one quiet line, and you can hover or tap it to see what they would do.',
       'Send to campfire is now a small flame button next to Auto, and on phones the Train, Auto and campfire buttons sit in one row under each companion.'] },
@@ -4244,7 +4261,7 @@
       'Tap a region to zoom in: its ten floors, story chapters and other delvers up close, with the region’s dossier beside it. Use the arrows to walk region to region, and World map to step back out.',
       'Your hero is marked on the map, and the badge on a region shows how many other delvers have reached it.'] },
     { v: 18, date: 'November 22, 2026', title: 'A map worth reading', items: [
-      'The Map of the Deep is redrawn. Every region has its own painted scenery: lamp-lit cellars, glowing fungus, a lava river in the Cinder Forges, the drowned chapel window, the Bastion walls, lightning on the Stormglass Spire and the Rift itself.',
+      'The Map of the Deep is redrawn. Every region has its own painted scenery: lamp-lit cellars, glowing fungus, a lava river in the Cinder Forges, the drowned archive window, the Bastion walls, lightning on the Stormglass Spire and the Rift itself.',
       'Tap any region for its dossier: its history, which alliance’s warbands hold it, its native monster and trick, its guardian, the story chapters that happen there, and quick travel buttons.',
       'A strip of all fifteen regions across the top. Unexplored regions stay under the fog until you reach them.',
       'Other delvers from the leaderboard now appear on the map at their deepest floor.',
@@ -4812,7 +4829,7 @@
   function ringSkillText(s, r) {
     const v = s.v[Math.max(0, (r || 1) - 1)];
     return ({
-      hit: 'Strikes for ' + ringPc(v) + ' damage.', pierce: 'A holy strike for ' + ringPc(v) + ' damage that never misses and ignores Resolve and armor.',
+      hit: 'Strikes for ' + ringPc(v) + ' damage.', pierce: 'A radiant strike for ' + ringPc(v) + ' damage that never misses and ignores Resolve and armor.',
       stun: 'Hits for ' + ringPc(v) + ' damage and stuns: the foe loses its next turn.', heal: 'Restores ' + ringPc(v) + ' of max health. Used once you drop below 70%.',
       shield: 'Raises a shield that absorbs ' + ringPc(v) + ' of max health, with a light blow.', dot: 'Deals ' + ringPc(v) + ' of your attack on each of the foe\u2019s next 3 turns.',
       drain: 'Hits for ' + ringPc(v) + ' damage and heals you for all of it.', weaken: 'The foe deals ' + ringPc(v) + ' less damage for 4 turns.',

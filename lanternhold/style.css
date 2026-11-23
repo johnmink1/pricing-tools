@@ -1,4 +1,4 @@
-/* lh-build 202611232231 */
+/* lh-build 202611232314 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1515,6 +1515,13 @@ h3.sub .tipi{vertical-align:2px}
   .top .purse{order:3;flex:1 1 0;width:auto}
   .top .hudchip{order:4;height:40px;padding:0 10px}
   .top .hudchip .ql{display:none}
+}
+/* phones: four currencies and the quest/blessing chips don't fit one row once gold reaches millions
+   (Embers and Dust were clipped), so the currencies get the whole row and the chips sit under it. */
+@media (max-width:560px){
+  .top .purse{flex:1 1 100%}
+  .top .purse .stat{padding:0 4px;gap:5px;min-width:0}
+  .top .hudchip{flex:1 1 0;justify-content:center;height:34px;margin:4px 0 0}
 }
 /* gear merge */
 .mergebox h2{display:flex;align-items:center;gap:8px;margin:0 0 6px}.mergebox h2 svg{width:22px;height:22px;color:var(--gold)}

@@ -1,4 +1,4 @@
-/* lh-build 202611232231 */
+/* lh-build 202611232314 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -38,7 +38,7 @@
     { id: 'wren',    name: 'Wren',      title: 'Ascendancy Apprentice', side: 'radiant', cls: 'mage',   tier: 0, hue: 0,    bio: 'A third-circle scholar of the Radiant Ascendancy, chasing a master who went down a year ago. She is brilliant, impatient, and sets things on fire when she is nervous.', line: 'Radiant Ascendancy scholar. Looking for her master. Burning things meanwhile.' },
     { id: 'vael',    name: 'Vael',      title: 'Tide Deserter',        side: 'tide',     cls: 'necro',  tier: 0, hue: 0,    bio: "Once Wren's master and an Ascendancy researcher. The Rift changed him, the Devouring Tide recruited him, and he walked away from both. The dead listen to him now.", line: 'Walked out of the Devouring Tide. Nobody walks out of the Tide.' },
     { id: 'ashe',    name: 'Sir Ashe',  title: 'Covenant Cinder Knight', side: 'covenant', cls: 'tank', tier: 1, hue: -30,  bio: 'A Covenant knight of the Forge Garrison who held the Cinder Forges alone for forty years. His armour never cooled. Neither did his temper.', line: 'Held the Forges for the Covenant for forty years. Still burning.' },
-    { id: 'oracle',  name: 'The Pale Oracle', title: 'Ascendancy Seer', side: 'radiant', cls: 'healer', tier: 1, hue: 160, bio: 'An Ascendancy seer who stayed in the drowned chapel to watch the Rift. She has seen most of the ways this ends and chooses to help anyway.', line: 'Has watched the Rift for the Ascendancy since before the war. Knows how this ends.' },
+    { id: 'oracle',  name: 'The Pale Oracle', title: 'Ascendancy Seer', side: 'radiant', cls: 'healer', tier: 1, hue: 160, bio: 'An Ascendancy seer who stayed in the drowned archive to watch the Rift. She has seen most of the ways this ends and chooses to help anyway.', line: 'Has watched the Rift for the Ascendancy since before the war. Knows how this ends.' },
     { id: 'varga',   name: 'Varga',     title: 'Tide Knife for Hire',  side: 'tide',     cls: 'rogue',  tier: 1, hue: 150,  bio: "Kestrel's older sister and a knife for hire who took Tide coin and Thessaly's coin at the same time. Family won in the end, narrowly.", line: 'Kestrel’s sister. Took Tide coin. Charges double for family.' },
     { id: 'brann',   name: 'Brann',     title: 'Covenant Runesmith',   side: 'covenant', cls: 'mage',   tier: 1, hue: 180,  bio: 'The Covenant runesmith who carved the seal-wards around the lantern. He knows exactly what they hold in and is trying to make up for it.', line: 'Carved the seal-wards that keep the Rift shut. Regrets some of them.' },
     { id: 'hollow',  name: 'The Hollow King', title: 'The First Bearer', side: 'unsworn', cls: 'necro', tier: 1, hue: 60, bio: 'The very first lantern-bearer, fed to the seal before the Grand War had a name. He came back hollow and crowned. He wants his name back.', line: 'The first lantern-bearer. Fed to the seal. Came back anyway.' },
@@ -48,7 +48,7 @@
     covenant: { name: 'Iron Covenant',       motto: 'Hold the line.',            color: '#9fb4c8', perk: '+15% party health',  desc: 'Seal the Rift at any cost. The Hold was a Covenant fortress once.' },
     radiant:  { name: 'Radiant Ascendancy',  motto: 'Rise beyond.',              color: '#ffd36b', perk: '+12% party damage',  desc: 'Harness the Rift’s light and climb past what mortals were meant to be.' },
     tide:     { name: 'Devouring Tide',      motto: 'Everything feeds the Tide.', color: '#d06bff', perk: '+15% gold',          desc: 'Open the Rift and let it swallow the Reach. Their warbands own the deep.' },
-    mercy:    { name: 'Mercy Corps',         motto: 'No one left in the dark.',  color: '#8fcf6a', perk: '+15% healing',       desc: 'Medics who cross every line of the war. Nobody shoots at the Corps. Mostly.' },
+    mercy:    { name: 'Mercy Corps',         motto: 'No one left in the dark.',  color: '#8fcf6a', perk: '+15% healing',       desc: 'Medics who cross every line of the war. Nobody strikes at the Corps. Mostly.' },
     unsworn:  { name: 'Unsworn',             motto: 'My own banner.',            color: '#c9b38a', perk: '+5% health, damage and gold', desc: 'No alliance, no orders. The Rift does not care whose side you are on.' },
   };
   const SIDE_ORDER = ['covenant', 'radiant', 'tide', 'mercy', 'unsworn'];
@@ -87,8 +87,8 @@
       war: { side: 'covenant', units: ['Lost Covenant Sentry', 'Hollow Warden'] } },
     { name: 'The Cinder Forges',       adj: ['Smouldering', 'Ashen', 'Slag'],        hue: -25, bg: ['#33140c', '#140604'], accent: '#ff7a3d', boss: 'Furnace-Heart',
       war: { side: 'radiant', units: ['Ascendant Forgeborn', 'Radiant War-Engine'] } },
-    { name: 'The Drowned Chapel',      adj: ['Drowned', 'Brine', 'Pallid'],          hue: 160, bg: ['#0f2130', '#050c14'], accent: '#6cc4e8', boss: 'The Sunken Bishop',
-      war: { side: 'radiant', units: ['Drowned Zealot', 'Ascendant Chorister'] } },
+    { name: 'The Drowned Archive',     adj: ['Drowned', 'Brine', 'Pallid'],          hue: 160, bg: ['#0f2130', '#050c14'], accent: '#6cc4e8', boss: 'The Sunken Magister',
+      war: { side: 'radiant', units: ['Drowned Adept', 'Ascendant Lightweaver'] } },
     { name: 'Hollow Roots',            adj: ['Rootbound', 'Barkskin', 'Gnarled'],    hue: 40,  bg: ['#22200f', '#0d0c05'], accent: '#d8c26a', boss: 'The Root Mother',
       war: { side: 'tide', units: ['Tide Rootfiend', 'Devourer Brood'] } },
     { name: 'The Starless Vault',      adj: ['Void-touched', 'Starless', 'Umbral'],  hue: 250, bg: ['#141022', '#05040b'], accent: '#9aa6ff', boss: 'The Unlit',
@@ -97,7 +97,7 @@
     { name: 'The Glass Wastes',       adj: ['Glassy', 'Prismatic', 'Shard-backed'], hue: 190, bg: ['#1a2830', '#070d12'], accent: '#7fd6e8', boss: 'The Glass Regent',
       war: { side: 'radiant', units: ['Radiant Glass-Reaper', 'Ascendant Lens-Mage'] }, foe: { id: 'shard', name: 'Glass Crawler' }, mod: 'ward' },
     { name: 'The Ironbound Bastion',  adj: ['Rusted', 'Iron-sworn', 'Riveted'],     hue: 0,   bg: ['#26241f', '#0c0b09'], accent: '#c9b38a', boss: 'Marshal Ironvow',
-      war: { side: 'covenant', units: ['Covenant Holdout', 'Bastion Gunner'] }, foe: { id: 'sentinel', name: 'Iron Husk' }, mod: 'cleave' },
+      war: { side: 'covenant', units: ['Covenant Holdout', 'Bastion Pikeman'] }, foe: { id: 'sentinel', name: 'Iron Husk' }, mod: 'cleave' },
     { name: 'The Weeping Aqueduct',   adj: ['Weeping', 'Silted', 'Brackish'],       hue: 150, bg: ['#10242a', '#050d10'], accent: '#5fd0c0', boss: 'The Brine Matriarch',
       war: { side: 'tide', units: ['Tide Drinker', 'Devourer Leech'] }, foe: { id: 'eel', name: 'Sluice Eel' }, mod: 'regen' },
     { name: 'The Bone Orchard',       adj: ['Pale', 'Root-white', 'Marrow'],        hue: 30,  bg: ['#2a2620', '#0f0d0a'], accent: '#e8dcc0', boss: 'The Orchard Keeper',
@@ -143,7 +143,7 @@
     { id: 'bell',     name: "Sleepwalker's Bell",      desc: '+8% gold while away per level',         per: 0.08 },
     { id: 'tooth',    name: 'Gilded Rat Tooth',        desc: '+12% gold from chests per level',        per: 0.12 },
     { id: 'ward',     name: 'Wardstone Shard',         desc: '+4% party health per level',            per: 0.04 },
-    { id: 'censer',   name: 'Chapel Censer',           desc: '+5% healing per level',                 per: 0.05 },
+    { id: 'censer',   name: 'Brass Censer',            desc: '+5% healing per level',                 per: 0.05 },
   ];
 
   const FEATS = [
@@ -240,10 +240,10 @@
       ], join: 'ashe', goal: 'Put out Furnace-Heart on floor 50' },
     { id: 'oracle', ch: 6, when: s => s.maxFloorEver >= 52, title: 'The Drowned Seer',
       lines: [
-        ['The Pale Oracle', 'healer', 'The Ascendancy flooded this chapel trying to pry the Rift open from below. I stayed to watch what came through.'],
+        ['The Pale Oracle', 'healer', 'The Ascendancy flooded this archive trying to pry the Rift open from below. I stayed to watch what came through.'],
         ['The Pale Oracle', 'healer', 'I have seen you arrive a hundred times. In most of them you turn back here. In the rest, the one who carries the lantern sits on a throne in the dark.'],
         ['The Pale Oracle', 'healer', 'I will heal you either way. Rise beyond, little bearer.'],
-      ], join: 'oracle', goal: 'Face the Sunken Bishop on floor 60' },
+      ], join: 'oracle', goal: 'Face the Sunken Magister on floor 60' },
     { id: 'varga', ch: 7, when: s => s.maxFloorEver >= 63, title: 'Family Business',
       lines: [
         ['Varga', 'rogue', 'Little sister. The Tide paid me to make sure you never reached the Vault. Thessaly paid me to make sure you did.'],
@@ -430,7 +430,7 @@
     healer: [
       { b: 'Grace', s: [SK('Gentle Hands', 'heal', 0.10, 3, '+{v} healing from your hero'), SK('Mending Light', 'pheal', 0.05, 3, '+{v} party healing'), SK('Second Dawn', 'revive', 2, 1, 'Lantern Hymn lifts two more fallen allies')] },
       { b: 'Vigil', s: [SK('Blessed Ward', 'php', 0.05, 3, '+{v} party health'), SK('Sanctuary', 'guard', 0.03, 3, 'Party takes {v} less damage'), SK('Swelling Hymn', 'power', 0.5, 1, 'Lantern Hymn heals 50% more')] },
-      { b: 'Pilgrim', s: [SK('Alms', 'gold', 0.08, 3, '+{v} gold'), SK('Lamplight Psalm', 'lantern', 2, 3, '+{v}s lantern time on guardians'), SK('Quick Prayer', 'cd', 0.3, 1, 'Lantern Hymn comes back 30% sooner')] },
+      { b: 'Wayfarer', s: [SK('Alms', 'gold', 0.08, 3, '+{v} gold'), SK('Lamplight Song', 'lantern', 2, 3, '+{v}s lantern time on guardians'), SK('Quick Breath', 'cd', 0.3, 1, 'Lantern Hymn comes back 30% sooner')] },
     ],
     rogue: [
       { b: 'Shadow', s: [SK('Light Feet', 'dodge', 0.03, 3, '+{v} dodge chance for your hero'), SK('Quick Hands', 'dps', 0.15, 3, '+{v} damage for your hero'), SK('Vanish', 'cd', 0.35, 1, 'Backstab comes back 35% sooner')] },
@@ -556,7 +556,7 @@
     { id: 'buy',      lv: 8,  name: 'Market: buying',    icon: 'coin',   desc: 'Buy gear other players have listed.' },
     { id: 'jobs',     lv: 10, name: 'Camp jobs',         icon: 'hammer', desc: 'Put resting companions to work. One job to start, one more every 5 levels.' },
     { id: 'guild',    lv: 12, name: 'Players Guild',     icon: 'crown',  desc: 'Recruit other players\u2019 heroes into your party.' },
-    { id: 'ring',     lv: 15, name: 'The Ember Ring',    icon: 'sword',  desc: 'Duel other players\u2019 parties for Laurels.' },
+    { id: 'ring',     lv: 15, name: 'The Ember Ring',    icon: 'duel',   desc: 'Duel other players\u2019 parties for Laurels.' },
     { id: 'sell',     lv: 18, name: 'Market: selling',   icon: 'coin',   desc: 'Sell and send gear, and trade on the Sigil exchange.' },
     { id: 'rekindle', lv: 20, name: 'Rekindling',        icon: 'star',   desc: 'Start a new descent from floor ' + REKINDLE_FLOOR + ' or deeper for Embers and Kindling.' },
     { id: 'boss',     lv: 25, name: 'World boss',        icon: 'skull',  desc: 'Join the weekend assaults on the shared world boss.' },
@@ -823,7 +823,7 @@
   const fitsPos = (type, pos) => type === posType(pos) || (type === 'robe' && pos === 'chest');
   const BASES = {
     tank:   { main: "Warden's Mace",  off: 'Tower Shield',  head: 'Iron Helm',          neck: 'Tower Sigil',        chest: 'Bulwark Plate',     legs: 'Plated Greaves',     feet: 'Ironshod Boots',    ring: 'Signet of the Hold' },
-    healer: { main: 'Willow Staff',   off: 'Psalter of Light', head: 'Pilgrim Circlet', neck: 'Censer Charm',       chest: 'Linen Vestment',    robe: 'Mossweave Robe',     legs: 'Linen Leggings',    feet: 'Pilgrim Sandals',   ring: 'Mossstone Ring' },
+    healer: { main: 'Willow Staff',   off: 'Tome of Light',    head: 'Wayfarer Circlet', neck: 'Censer Charm',       chest: 'Linen Vestment',    robe: 'Mossweave Robe',     legs: 'Linen Leggings',    feet: 'Wayfarer Sandals',   ring: 'Mossstone Ring' },
     rogue:  { main: 'Twin Fangs',     off: 'Parrying Dagger', head: 'Shadow Hood',      neck: 'Lucky Coin Chain',   chest: 'Shadowhide Jerkin', legs: 'Quiet Breeches',     feet: 'Soft Boots',        ring: 'Cutpurse Ring' },
     mage:   { main: 'Emberwood Wand', off: 'Focus Orb',     head: 'Scholar Circlet',    neck: 'Focus Prism',        chest: 'Cinder Vest',       robe: 'Cinderweave Robe',   legs: 'Ashen Leggings',    feet: 'Ember-step Slippers', ring: 'Spark Ring' },
     necro:  { main: 'Bone Scepter',   off: 'Grim Tome',     head: 'Skull Cowl',         neck: 'Cracked Phylactery', chest: 'Grave Harness',     robe: 'Gravecloth Shroud',  legs: 'Bone-laced Leggings', feet: 'Grave Walkers',   ring: 'Bone Ring' },
@@ -860,7 +860,7 @@
     { word: 'Glowcap',      name: 'Glowcap Regalia',           k: 'heal', lore: 'Spun from the fungus that sings. It still hums, softly, when someone is hurt.' },
     { word: 'Saltbone',     name: 'Saltbone Bulwark',          k: 'hp',   lore: 'Plates cut from the bones of the galleries, cured hard in brine.' },
     { word: 'Cinderforged', name: 'Cinderforged Panoply',      k: 'dps',  lore: 'Hammered on Furnace-Heart’s own anvil. It runs warm in any cold.' },
-    { word: 'Brinechoir',   name: 'Brinechoir Vestments',      k: 'heal', lore: 'The Sunken Bishop’s choir wore these. They still smell of the tide.' },
+    { word: 'Brinechoir',   name: 'Brinechoir Vestments',      k: 'heal', lore: 'The Sunken Magister’s choir wore these. They still smell of the tide.' },
     { word: 'Rootbound',    name: 'Rootbound Bark',            k: 'hp',   lore: 'Grown, not made, from the Root Mother’s sweeter years.' },
     { word: 'Starless',     name: 'Starless Raiment',          k: 'dps',  lore: 'Cut from the dark of the Vault. Light slides off it.' },
     { word: 'Glasswrought', name: 'Glasswrought Mail',         k: 'dps',  lore: 'Prism-scale armor from the Glass Regent’s court. It throws rainbows when struck.' },
@@ -1379,7 +1379,7 @@
     { id: 'nexus', title: 'The Nexus', group: 'The Grand War', text: 'The centre of the Reach, where the Rift’s power pools. Whoever holds the Nexus holds the war. Every alliance believes the Lantern Deep is a back door to it.' },
     { id: 'front', title: 'The Lantern Deep Front', group: 'The Grand War', text: 'The quietest front of the Grand War, because it is underground and nobody up top believes in it. The warbands down here know better.' },
     { id: 'war_covenant', title: 'The Iron Covenant', group: 'The Grand War', text: '"Hold the line." Soldiers who would seal the Rift forever, whatever it costs. Thessaly’s lantern is the most Covenant thing in the Reach. So is its price.' },
-    { id: 'war_radiant', title: 'The Radiant Ascendancy', group: 'The Grand War', text: '"Rise beyond." Scholars and zealots who believe the Rift is a ladder. Their war-engines and choirs dig toward it from every side.' },
+    { id: 'war_radiant', title: 'The Radiant Ascendancy', group: 'The Grand War', text: '"Rise beyond." Scholars and seekers who believe the Rift is a ladder. Their war-engines and choirs dig toward it from every side.' },
     { id: 'war_tide', title: 'The Devouring Tide', group: 'The Grand War', text: '"Everything feeds the Tide." Warbands that want the Rift wide open, so the dark can swallow the Reach and remake it. Most of what you fight down here once answered to them.' },
     { id: 'mercy', title: 'The Mercy Corps', group: 'The Grand War', text: 'Medics who cross every line in the war and fly no alliance’s banner. Moss wears their green. So did Grandmother Rot, once.' },
     { id: 'biome0', title: 'The Lamplit Cellars', group: 'Places', text: 'Once the Hold’s storerooms. Barrels of lamp oil still line the walls, though nobody remembers who keeps filling them. Tide scavengers have started to.' },
@@ -1387,10 +1387,10 @@
     { id: 'biome2', title: 'The Glimmer Fungus Deep', group: 'Places', text: 'The fungus glows with stolen Rift-light. Spores carry memories: breathe deep and you may hear a stranger’s last thoughts. The Ascendancy harvests them.' },
     { id: 'biome3', title: 'Saltbone Galleries', group: 'Places', text: 'An underground sea dried here long ago. A Covenant company held the galleries to the last soldier. The salt kept them, standing at their posts.' },
     { id: 'biome4', title: 'The Cinder Forges', group: 'Places', text: 'Where the lantern’s glass and iron were made. The Ascendancy built war-engines in the same fires. The fires were never banked, only fed.' },
-    { id: 'biome5', title: 'The Drowned Chapel', group: 'Places', text: 'An Ascendancy chapel to a god of thresholds, flooded when its bishop tried to pry the Rift open from below.' },
+    { id: 'biome5', title: 'The Drowned Archive', group: 'Places', text: 'An Ascendancy archive of Rift-lore, flooded when its magister tried to pry the Rift open from below.' },
     { id: 'biome6', title: 'Hollow Roots', group: 'Places', text: 'The roots of a tree that grew downward toward the Rift, as if something below was the sun. The Tide nests in them.' },
     { id: 'biome7', title: 'The Starless Vault', group: 'Places', text: 'The bottom of every map, and the edge of the Rift itself. The maps are wrong.' },
-    { id: 'biome8', title: 'The Glass Wastes', group: 'Places', text: 'Below the Vault the Rift-light cooled into glass, mile after mile of it. The Ascendancy calls it a mirror of heaven. Walk on it barefoot and it remembers your name.' },
+    { id: 'biome8', title: 'The Glass Wastes', group: 'Places', text: 'Below the Vault the Rift-light cooled into glass, mile after mile of it. The Ascendancy calls it a mirror of the sky. Walk on it barefoot and it remembers your name.' },
     { id: 'biome9', title: 'The Ironbound Bastion', group: 'Places', text: 'A Covenant fortress sunk whole into the deep when the Rift opened, with its garrison still inside. The gates are shut from the inside. Someone is still bolting them.' },
     { id: 'biome10', title: 'The Weeping Aqueduct', group: 'Places', text: 'Covenant engineers built it to carry clean water to the Hold. The Tide reversed the flow. Now it carries everything that drowned upward, toward the light.' },
     { id: 'biome11', title: 'The Bone Orchard', group: 'Places', text: 'Trees grown from the Hollow Roots, fed on battlefields. Their fruit is pale and hard and hums when you hold it. Nobody who has tasted it says what it tastes like.' },
@@ -1402,10 +1402,10 @@
     { id: 'g2', title: 'The Mycelial Choir', group: 'Guardians', text: 'An Ascendancy experiment: teach the Rift-fed spores to sing in unison, and see if the song opens doors. It did. Just not the right ones.' },
     { id: 'g3', title: 'Ossuary Prime', group: 'Guardians', text: 'The Covenant captain who held the Saltbone Galleries. Still holding them. Still does not know the war moved on.' },
     { id: 'g4', title: 'Furnace-Heart', group: 'Guardians', text: 'The greatest Ascendancy war-engine ever built, abandoned when it would not stop burning. Sir Ashe fought it for forty years without winning or losing.' },
-    { id: 'g5', title: 'The Sunken Bishop', group: 'Guardians', text: 'He drowned his own chapel to reach the Rift. He is still praying. The water carries the words a long way down.' },
+    { id: 'g5', title: 'The Sunken Magister', group: 'Guardians', text: 'He drowned his own archive to reach the Rift. He is still reciting his formulas. The water carries the words a long way down.' },
     { id: 'g6', title: 'The Root Mother', group: 'Guardians', text: 'Before the Tide reached her she mended anything that bled. Now she feeds the dark with whatever wanders into her roots.' },
     { id: 'g7', title: 'The Unlit', group: 'Guardians', text: 'The Nyx Rift’s breath, held under the lantern. It does not hate the light. It has simply never been allowed any.' },
-    { id: 'g8', title: 'The Glass Regent', group: 'Guardians', text: 'The Ascendancy’s first saint, who walked into the Rift-glass to become a window. He became a wall instead, and every ward he raises is a prayer that did not land.' },
+    { id: 'g8', title: 'The Glass Regent', group: 'Guardians', text: 'The Ascendancy’s first Luminary, who walked into the Rift-glass to become a window. He became a wall instead, and every ward he raises is a wish that did not land.' },
     { id: 'g9', title: 'Marshal Ironvow', group: 'Guardians', text: 'He swore the Bastion would never fall. It did not fall. It sank, and he held it all the way down. His blade still swings at whoever stands behind you.' },
     { id: 'g10', title: 'The Brine Matriarch', group: 'Guardians', text: 'Mother of every eel in the aqueduct, and most of the things that eat them. Cut her and the water closes the wound.' },
     { id: 'g11', title: 'The Orchard Keeper', group: 'Guardians', text: 'The first bearer Thessaly ever planted, grown into the trees he was buried under. He tends the others now. His shears are coated in sap that does not wash off.' },

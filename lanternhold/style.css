@@ -1855,6 +1855,10 @@ body.resting .taptip{display:none}
 .dmto[hidden]{display:none}.dmto b{color:#c4b5fd}.dmto .iconbtn{width:24px;height:24px;font-size:16px}
 .msg.dm .who{color:#c4b5fd}.msg.dm span{color:#ddd6fe}
 .dmdir{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}
+/* the Nexus Guardian (click-rhythm brake) */
+.tag.nexus{background:#1e0f3a;color:#e6d2ff;border-color:#7a4ae0;box-shadow:0 0 10px #7a3cff55}
+.bar.lantern.nexus i{background:linear-gradient(180deg,#e6d2ff,#8a5af0)}
+.bar.nexus>i{background:repeating-linear-gradient(135deg,#5a2fb0 0 8px,#7a4ae0 8px 16px)!important}
 /* Possible loot in the region dossier */
 .dos-loot{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
 .dos-loot summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}

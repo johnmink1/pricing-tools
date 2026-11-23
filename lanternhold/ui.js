@@ -394,6 +394,81 @@
     }
   }
 
+  // ---------- the Nexus breach (click-rhythm brake, core.js NX_*) ----------
+  // The back wall cracks as the meter fills, violet light leaks through, then the Nexus Guardian steps out.
+  const NX_CRACKS = (() => {
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const out = [];
+    for (let i = 0; i < 9; i++) {
+      const a0 = (i / 9) * Math.PI * 2 + rnd() * 0.5, pts = [[0, 0]];
+      let x = 0, y = 0, a = a0;
+      for (let j = 0; j < 6; j++) { a += (rnd() - 0.5) * 0.9; const l = 0.035 + rnd() * 0.04; x += Math.cos(a) * l; y += Math.sin(a) * l * 0.8; pts.push([x, y]); }
+      out.push(pts);
+    }
+    return out;
+  })();
+  const nxGuard = { born: -9 };
+  function drawBreach(floorY) {
+    const x = S.nx; if (!x || !(x.m > 0 || x.ph)) return 0;
+    const k = x.ph === 1 ? 1 : Math.max(0, Math.min(1, x.m || 0));
+    if (k <= 0) return 0;
+    const cx = Math.round(W * FOE_X), cy = Math.round(floorY * 0.48), sc = Math.min(W, H * 1.6);
+    ctx.fillStyle = 'rgba(10,4,24,' + (k * 0.5) + ')'; ctx.fillRect(0, 0, W, H);
+    const pulse = 0.85 + 0.15 * Math.sin(tAnim * 6);
+    const gr = ctx.createRadialGradient(cx, cy, 2, cx, cy, 20 + k * sc * 0.28);
+    gr.addColorStop(0, 'rgba(190,120,255,' + (0.55 * k * pulse) + ')'); gr.addColorStop(0.5, 'rgba(120,60,230,' + (0.22 * k) + ')'); gr.addColorStop(1, 'rgba(80,30,180,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over';
+    // cracks grow segment by segment
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const pts of NX_CRACKS) {
+      const reach = k * (pts.length - 1);
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      for (let j = 1; j <= Math.ceil(reach); j++) {
+        const f = Math.min(1, reach - (j - 1)), [ax, ay] = pts[j - 1], [bx, by] = pts[j];
+        ctx.lineTo(cx + (ax + (bx - ax) * f) * sc, cy + (ay + (by - ay) * f) * sc);
+      }
+      ctx.strokeStyle = 'rgba(30,10,60,0.9)'; ctx.lineWidth = 3.2; ctx.stroke();
+      ctx.strokeStyle = 'rgba(214,170,255,' + (0.5 + 0.5 * k * pulse) + ')'; ctx.lineWidth = 1.3; ctx.stroke();
+    }
+    // the hole opens once it is through
+    const open = x.ph === 1 ? Math.min(1, (tAnim - nxGuard.born) / 0.6) : x.ph === 2 ? k : Math.max(0, (k - 0.75) / 0.25) * 0.35;
+    if (open > 0) {
+      const rx = sc * 0.11 * open, ry = sc * 0.14 * open;
+      const hg = ctx.createRadialGradient(cx, cy, 1, cx, cy, Math.max(rx, ry));
+      hg.addColorStop(0, '#020008'); hg.addColorStop(0.7, '#12052a'); hg.addColorStop(1, 'rgba(150,90,255,0.9)');
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(220,180,255,' + (0.6 * pulse) + ')'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) { const a = tAnim * (1.2 + i * 0.5) + i * 2; ctx.beginPath(); ctx.ellipse(cx, cy, rx * (0.55 + i * 0.18), ry * (0.55 + i * 0.18), 0, a, a + 1.6); ctx.stroke(); }
+    }
+    // stone dust and violet motes falling from the wall
+    if (Math.random() < k * 0.5) particles.push({ x: cx + (Math.random() - 0.5) * sc * 0.4, y: cy + (Math.random() - 0.5) * sc * 0.2, vx: (Math.random() - 0.5) * 20, vy: 10, life: 0.9, age: 0, c: Math.random() < 0.5 ? '#6b6378' : '#c79bff', s: Math.random() < 0.3 ? 2 : 1 });
+    return k;
+  }
+  function drawGuardian(floorY) {
+    const x = S.nx, a = x.ph === 1 ? Math.min(1, (tAnim - nxGuard.born) / 0.8) : Math.max(0, x.m || 0);
+    if (a <= 0) return;
+    if (!nxGuard.spr) {
+      // the Guardian: a sentinel of Nexus crystal, tinted violet with a pale core
+      const base = sprite('sentinel', 0, false), c = document.createElement('canvas'); c.width = base.width; c.height = base.height;
+      const g = c.getContext('2d'); g.drawImage(base, 0, 0); g.globalCompositeOperation = 'source-atop';
+      const lg = g.createLinearGradient(0, 0, 0, c.height); lg.addColorStop(0, 'rgba(225,200,255,0.75)'); lg.addColorStop(0.5, 'rgba(130,70,250,0.72)'); lg.addColorStop(1, 'rgba(60,20,150,0.8)');
+      g.fillStyle = lg; g.fillRect(0, 0, c.width, c.height); c.lw = base.lw; c.lh = base.lh; nxGuard.spr = c;
+    }
+    const spr = nxGuard.spr, sw = spr.lw * 4, sh = spr.lh * 4, fxC = Math.round(W * FOE_X);
+    const bob = Math.sin(tAnim * 1.6) * 2.5, rise = (1 - a) * 18;
+    const fx = Math.round(fxC - sw / 2), fy = Math.round(floorY + 4 - sh + bob + rise) - 6;
+    const gg = ctx.createRadialGradient(fxC, fy + sh / 2, 4, fxC, fy + sh / 2, sw * 1.1);
+    gg.addColorStop(0, 'rgba(170,100,255,' + (0.45 * a) + ')'); gg.addColorStop(1, 'rgba(120,60,255,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gg; ctx.fillRect(fxC - sw * 1.2, fy - 20, sw * 2.4, sh + 40); ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.45 * a) + ')'; ctx.beginPath(); ctx.ellipse(fxC, floorY + 4, sw * 0.42, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = a * (0.88 + 0.12 * Math.sin(tAnim * 9));
+    ctx.save(); ctx.translate(fx + sw, fy); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0, sw, sh);
+    if (tAnim < foeAnim.flash) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 * a; ctx.drawImage(spr, 0, 0, sw, sh); }
+    ctx.restore(); ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    if (x.ph === 1) { foeAnim.cx = fxC; foeAnim.cy = fy + sh / 2; foeAnim.w = sw; foeAnim.h = sh; }
+  }
+
   function render(now) {
     const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now; tAnim += dt;
     ctx.setTransform(R, 0, 0, R, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
@@ -405,6 +480,7 @@
     if (key !== bgKey) { bgCanvas = buildBackground(b, Math.floor((S.floor - 1) / 10) + 3); bgKey = key; }
     ctx.drawImage(bgCanvas, 0, 0, W, H);
     const floorY = Math.round(H * 0.7);
+    const breach = drawBreach(floorY), nxUp = !!(S.nx && S.nx.ph === 1);
 
     [W * 0.17, W * 0.83].forEach((tx, i) => {
       tx = Math.round(tx); const ty = Math.round(floorY * 0.42) - 3;
@@ -425,7 +501,7 @@
 
     // foe
     const foe = S.foe, fxC = Math.round(W * FOE_X);
-    if (foe) {
+    if (foe && !nxUp) {
       const fk = foe.name + foe.max + S.floor + S.foeIdx;
       if (foeAnim.key !== fk) { foeAnim.key = fk; foeAnim.born = tAnim; }
       const spr = sprite(foe.sprite, foe.chest ? 0 : foe.hue, tAnim < foeAnim.flash);
@@ -455,10 +531,11 @@
       else { ctx.globalAlpha = a; ctx.drawImage(d.spr, d.x - (1 - a) * 4, d.y + (1 - a) * 6, d.w * (1 + (1 - a) * 0.15), d.h * (1 - (1 - a) * 0.3)); ctx.globalAlpha = 1; }
     }
 
+    if (breach && S.nx.ph) drawGuardian(floorY);
     const lay = drawParty(nowMs);
 
     // party attacks: a member lunges and a slash in their colour lands on the foe
-    if (foe && lay.length) {
+    if ((foe || nxUp) && lay.length) {
       slashTimer -= dt;
       if (slashTimer <= 0) {
         slashTimer = 0.3 + Math.random() * 0.3;
@@ -536,7 +613,7 @@
     setTimeout(() => { el.remove(); floaters--; }, 900);
   }
   const fl = document.createElement('style');
-  fl.textContent = '.float{position:absolute;transform:translate(-50%,-50%);font-weight:800;font-size:18px;color:#fff3dc;text-shadow:0 2px 0 #000,0 0 6px rgba(0,0,0,.8);pointer-events:none;animation:fl .9s ease-out forwards;font-variant-numeric:tabular-nums;white-space:nowrap}.float.crit{color:#ffcf3a;font-size:24px}.float.gold{color:#f2c14e;font-size:16px}.float.auto{font-size:14px;color:#e7d6b8}.float.hurt{color:#ff8a78;font-size:14px}.float.heal{color:#9be87a;font-size:14px}.float.skill{color:#fff1c2;font-size:13px;letter-spacing:.06em;text-transform:uppercase}.float.dodge{color:#c9d6e0;font-size:13px}@keyframes fl{0%{opacity:0;margin-top:6px}15%{opacity:1}100%{opacity:0;margin-top:-46px}}';
+  fl.textContent = '.float{position:absolute;transform:translate(-50%,-50%);font-weight:800;font-size:18px;color:#fff3dc;text-shadow:0 2px 0 #000,0 0 6px rgba(0,0,0,.8);pointer-events:none;animation:fl .9s ease-out forwards;font-variant-numeric:tabular-nums;white-space:nowrap}.float.crit{color:#ffcf3a;font-size:24px}.float.gold{color:#f2c14e;font-size:16px}.float.auto{font-size:14px;color:#e7d6b8}.float.hurt{color:#ff8a78;font-size:14px}.float.heal{color:#9be87a;font-size:14px}.float.skill{color:#fff1c2;font-size:13px;letter-spacing:.06em;text-transform:uppercase}.float.dodge{color:#c9d6e0;font-size:13px}.float.nexus{color:#d7b4ff;font-size:16px;text-shadow:0 0 8px #7a3cff,0 2px 0 #000}@keyframes fl{0%{opacity:0;margin-top:6px}15%{opacity:1}100%{opacity:0;margin-top:-46px}}';
   document.head.appendChild(fl);
 
   // ---------- events ----------
@@ -596,7 +673,16 @@
     let kills = 0, gold = 0;
     for (const e of events) {
       logEv(e);
-      if (e.type === 'hit') {
+      if (e.type === 'hit' && e.nexus) {
+        floatText('0', 'nexus', FOE_X + (Math.random() - 0.5) * 0.16, 0.4 + (Math.random() - 0.5) * 0.2);
+        foeAnim.flash = tAnim + 0.05;
+      } else if (e.type === 'nexus') {
+        nxGuard.born = tAnim; sfx.boss(); floatText('The Nexus breaks through!', 'nexus', FOE_X - 0.12, 0.3);
+        toast('flare', 'The Nexus Guardian', S.stats.nexus > 1 ? 'Drawn by the drumming again. Your blows pass through it. Ease your strikes and it will withdraw.'
+          : 'The Nexus hears a rhythm that never tires and comes to see what knocks. Nothing you throw can touch its Guardian. Ease your strikes, let the rhythm settle, and it will withdraw.', 'feat');
+      } else if (e.type === 'nexusleave') {
+        toast('lamp', 'The Guardian withdraws', 'The rhythm settled and the Nexus lost interest. The wall seals behind it and the fight goes on.', '');
+      } else if (e.type === 'hit') {
         if (!e.auto || Math.random() < 0.4) floatText(fmt(e.dmg), e.crit ? 'crit' : e.auto ? 'auto' : '', FOE_X + (Math.random() - 0.5) * 0.2, 0.42 + (Math.random() - 0.5) * 0.2);
         foeAnim.flash = tAnim + 0.06; foeAnim.shake = tAnim + 0.08;
         sfx.hit(e.crit);
@@ -658,7 +744,7 @@
       } else if (e.type === 'lore') {
         const lo = L.LORE.find(x => x.id === e.id); toast('book', 'New journal entry', lo.title, 'feat');
       } else if (e.type === 'wbend') {
-        sendAssault(e.score, e.fell);
+        sendAssault(e.score, e.fell, e.ck, e.iv);
       } else if (e.type === 'goblinflee') {
         sfx.fail(); floatText(e.item ? 'Stolen!' : 'Escaped!', 'crit', 0.5, 0.3);
         if (e.item) toast('bag', e.again ? 'He got away again' : 'The Loot Goblin stole ' + L.gearName(e.item), (e.again ? 'He still has ' + L.gearName(e.item) + ' and' : 'He') + ' fled to floor ' + e.floor + '. Find him there and kill him to get it back.', 'warn');
@@ -1045,7 +1131,7 @@
     else if (t.id === 'm-market') openTrade('market');
     else if (t.id === 'm-mail') openTrade('mail');
   };
-  ['tab-party', 'tab-camp', 'tab-market'].forEach(id => $(id).addEventListener('click', partyClick));
+  ['tab-party', 'tab-camp', 'tab-market', 'tab-guild'].forEach(id => $(id).addEventListener('click', partyClick));
   // camp jobs: pick who does a job, or which job someone does
   function jobsFull() { const n = L.JOB_SLOT_LV.find(x => x > L.heroLv(S)); toast('lock', 'Every job slot is taken', 'You can run ' + L.jobSlots(S) + (L.jobSlots(S) === 1 ? ' camp job' : ' camp jobs') + ' at once.' + (n ? ' Another slot opens at hero level ' + n + '.' : '') + ' Clear a job to move someone.', 'warn'); }
   function jobModal(jid) {
@@ -1342,7 +1428,7 @@
     if (e.target.closest('.dfig')) { profileModal(gearWho); return; }
     const it = e.target.closest('[data-item]'); if (it) { if ((e.ctrlKey || e.metaKey) && linkItem(L.itemOf(S, it.dataset.item))) return; itemModal(it.dataset.item); }
   });
-  ['tab-gear', 'tab-party', 'tab-camp', 'tab-market'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof],[data-pos],[data-unlock]')) { e.preventDefault(); e.target.click(); } }));
+  ['tab-gear', 'tab-party', 'tab-camp', 'tab-market', 'tab-guild'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof],[data-pos],[data-unlock]')) { e.preventDefault(); e.target.click(); } }));
   const itemStats = it => L.itemStats(it);
   function itemModal(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
@@ -1939,8 +2025,28 @@
         $('lanterntext').textContent = 'Lantern oil ' + left.toFixed(1) + 's';
       }
     } else if (!L.alive(S).length) { $('foename').textContent = 'Your party is resting'; }
+    paintNexus();
     if ($('auto').checked !== S.autoAdvance) $('auto').checked = S.autoAdvance;
     if ($('autocast').checked !== S.autoCast) $('autocast').checked = S.autoCast;
+  }
+  // While the Nexus Guardian holds the stage, the foe panel shows it, and the timer bar fills as the rhythm calms.
+  let nxWarned = false, nxShown = false;
+  function paintNexus() {
+    const x = S.nx, up = !!(x && x.ph === 1);
+    if (x && !x.ph && x.m >= 0.5 && !nxWarned) { nxWarned = true; floatText('The wall trembles…', 'nexus', FOE_X - 0.05, 0.32); }
+    if (!x || (!x.ph && !(x.m > 0))) nxWarned = false;
+    $('lanternwrap').classList.toggle('nexus', up); $('hpbar').parentNode.classList.toggle('nexus', up);
+    if (!up) { if (nxShown) { nxShown = false; lastModKey = null; } return; }
+    nxShown = true;
+    $('foename').textContent = 'The Nexus Guardian';
+    const tag = $('foetag'); tag.textContent = 'Nexus'; tag.className = 'tag nexus';
+    if (lastModKey !== 'nexus') { lastModKey = 'nexus'; $('foemods').innerHTML = ''; }
+    $('hpbar').style.width = '100%'; $('wardbar').style.width = '0%';
+    $('hptext').textContent = 'Untouchable · your blows pass through it';
+    const calm = Math.max(0, Math.min(1, (Date.now() - x.last) / (L.NX_CALM * 1000)));
+    $('lanternwrap').hidden = false; $('b-oil').hidden = true;
+    $('lanternbar').style.width = (calm * 100) + '%';
+    $('lanterntext').textContent = calm < 0.05 ? 'Ease your strikes and it will withdraw' : 'The Guardian loses interest…';
   }
   $('auto').addEventListener('change', e => { S.autoAdvance = e.target.checked; S.retryAt = 0; });
   $('autocast').addEventListener('change', e => { S.autoCast = e.target.checked; });
@@ -3730,6 +3836,10 @@
         'If it escapes it steals one item from your pack and hides a few floors deeper. <b>Gear you wear is never taken.</b>',
         'A green note under the chapter goal shows where it hides. Reach that floor and kill it to get the item back.',
         'Every goblin you kill drops six times the gold.']],
+      ['The Nexus Guardian', 's:sentinel', 'Answers a rhythm that never tires. Ease your strikes and it leaves.', [
+        'Strikes that come too fast for too long, or with machine-even spacing, crack the back wall. Fast human tapping does not.',
+        'If the wall breaks, the Guardian takes the stage. <b>Nothing lands on it</b>, and the foe behind it waits.',
+        'Slow down for about three seconds and it withdraws. You lose nothing but the time.']],
       ['World boss weekends', 's:colossus', 'One giant Rift boss every weekend that all signed-in players fight together.', [
         'Runs Friday to Sunday (UTC). A purple bar on the stage shows it; tap it to join a <b>two-minute assault</b>, once every 15 minutes.',
         'Your damage counts at the strength of your deepest floor, so new and veteran delvers matter just as much.',
@@ -3899,10 +4009,17 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 67, date: 'November 23, 2026', title: 'Know what you are hunting', items: [
+    { v: 69, date: 'November 23, 2026', title: 'Know what you are hunting', items: [
       'Every region on the Map of the Deep now shows its possible loot: the region set, class and job set pieces, each gear rarity, relics, Sigils and the Loot Goblin’s Sack.',
       'Each drop shows your own odds per kill from bosses, chests, elites, ambushes and ordinary foes, worked out from the same rules the game uses, after your Keen Eye, Luck, Forager, Finder enchants, companion traits and Seeker’s Charm.',
       'The header shows your total drop bonus. Tap the (i) for the breakdown. Lantern Surge and region mastery raise gold and XP, not drop chances, so they do not change these numbers.'] },
+    { v: 68, date: 'November 23, 2026', title: 'Guild invites fixed', items: [
+      'Fixed: the Invite buttons in the Guild tab did nothing. Pressing Invite now sends the invite right away, shows Invited with a Cancel button, and pops up a notice. The same fix covers accepting or declining party invitations and opening a hero’s profile from the Guild tab.'] },
+    { v: 67, date: 'November 23, 2026', title: 'The Nexus Guardian', items: [
+      'The Nexus has started listening to the Deep. A rhythm that never tires, strikes that land too fast for too long or with perfectly even spacing, sounds to it like a siege engine at the wall.',
+      'When it hears one, the back wall starts to crack and glow. Keep it up and the Nexus Guardian breaks through and takes the stage. Nothing lands on it, not your strikes and not your party.',
+      'Ease your strikes for a few seconds and it loses interest, withdraws, and the fight picks up right where it was. Normal tapping, even fast tapping, never calls it.',
+      'World boss assaults listen too: strikes with that rhythm do not count toward your score.'] },
     { v: 66, date: 'November 23, 2026', title: 'Fresh starts on request', items: [
       'Admins can now reset a single account back to a brand-new game, for testing or when a player asks for a clean slate. You get a notice when it happens, and purchased Sigils are kept unless you ask for them to go too.',
       'A server-wide reset now also keeps Sigil exchange listings and store links in place.'] },
@@ -4616,10 +4733,10 @@
     sfx.boss(); toast('skull', 'Assault!', 'Two minutes against ' + x.name + '. Strike and use your abilities!', 'feat');
     updateStage && updateStage(); paintBoss();
   }
-  async function sendAssault(score, fell) {
+  async function sendAssault(score, fell, ck, iv) {
     if (!(score > 0)) { toast('skull', 'Assault over', fell ? 'Your party fell before landing a blow.' : 'No damage this time.', ''); return; }
     try {
-      const r = await api('POST', { score }, '/boss/hit');
+      const r = await api('POST', { score, ck: ck || 0, iv: iv || [] }, '/boss/hit');
       if (wb.st && r) { wb.st.total = r.total; wb.st.me.score += r.add; wb.st.me.last = Date.now(); }
       toast('skull', fell ? 'Your party fell back' : 'Assault over', 'You dealt ' + score + ' damage to ' + wbState().name + '. Every assault counts toward the next phase.', 'feat');
     } catch (e) { toast('lock', 'The assault did not count', 'The server could not record it. Try again in a moment.', 'warn'); }

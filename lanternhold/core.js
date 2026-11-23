@@ -1691,10 +1691,12 @@
   }
   function endAssault(s, events, fell) {
     if (!s.wb) return;
-    const score = Math.min(WB_CAP, Math.floor(s.wb.score * 10) / 10);
+    const score = Math.min(WB_CAP, Math.floor(s.wb.score * 10) / 10), wb = s.wb;
     s.wb = null; if (s.foe && s.foe.world) { s.foe = null; s.foeSwing = 0; }
     s.stats.wbAssaults = (s.stats.wbAssaults || 0) + 1;
-    events && events.push({ type: 'wbend', score, fell: !!fell });
+    // ck = the part of the score from the player's own strikes, iv = gaps between those strikes (ms). The server
+    // re-runs the rhythm check on iv and drops ck from a machine-even assault (worldboss.js).
+    events && events.push({ type: 'wbend', score, fell: !!fell, ck: Math.min(score, Math.floor((wb.ck || 0) * 10) / 10), iv: (wb.iv || []).slice(0, 3000) });
   }
   function wbFoe(s) {
     const f = Math.max(1, s.maxFloorEver);
@@ -1953,6 +1955,7 @@
   const resting = (s, now) => !!((s.campReturn && s.floor <= CAMP_FLOOR) || s.campUntil > now);
   function tick(s, dt, now, rng, events) {
     s.stats.playTime += dt; s.clock = now;
+    nxTick(s, dt, now, events);
     if (s.wb && (now >= s.wb.until || resting(s, now))) endAssault(s, events);
     if (s.unlocked.length && !(s.traits && s.unlocked.every(id => s.traits[id]))) for (const id of s.unlocked) traitsOf(s, id);
     if (resting(s, now)) {
@@ -1964,6 +1967,7 @@
     for (const id of s.party) if (id && s.down[id] && s.down[id] <= now) { delete s.down[id]; s.hp[id] = maxHpOf(s, id) * 0.4; }
     s.minions = s.minions.filter(m => m.until > now && m.hp > 0);
     if (!alive(s).length) return; // nobody to fight
+    if (nexusOn(s)) return; // the Nexus Guardian holds the floor: the foe behind it waits and nothing lands
     if ((s.foeGap || 0) > now) return; // the next foe is still on its way
     if (!s.foe) { s.foe = makeFoe(s, rng); if (s.foe.pack) events && events.push({ type: 'pack', n: s.foe.pack, name: s.foe.name }); }
     if (s.retryAt && !s.autoAdvance && now >= s.retryAt) { s.autoAdvance = true; s.retryAt = 0; events && events.push({ type: 'retry' }); }
@@ -2008,16 +2012,58 @@
     damageFoe(s, totalDps(s, now) * dt, now, rng, events);
   }
 
+  // The Nexus Guardian: a soft, in-world brake on click bots (John, 2026-11-23).
+  // The Nexus answers a tireless rhythm. When strikes come too fast for too long, or with machine-even spacing,
+  // a meter fills over a few seconds (the back wall cracks). Full: the Nexus Guardian breaks through and takes the
+  // stage, every blow (clicks and party alike) does 0 damage and the foe behind it waits. After NX_CALM seconds
+  // of calm strikes it withdraws and play resumes where it was. Fast human tapping is uneven, so it does not trip it.
+  const NX_WIN = 5000, NX_MIN = 20, NX_RATE = 16, NX_REG_RATE = 8, NX_CV = 0.04, NX_BUILD = 4, NX_FADE = 2, NX_CALM = 3, NX_LEAVE = 2.5;
+  function nxState(s) { if (!s.nx || typeof s.nx !== 'object') s.nx = { m: 0, ph: 0, at: 0, last: 0, t: [] }; if (!Array.isArray(s.nx.t)) s.nx.t = []; return s.nx; }
+  // Pure check on a list of click times (ms): { n, rate, cv, bot }.
+  function nxRead(t, now, win) {
+    win = win || NX_WIN;
+    const w = t.filter(x => x > now - win && x <= now), n = w.length;
+    const rate = n / (win / 1000);
+    if (n < NX_MIN * win / NX_WIN) return { n, rate, cv: 1, bot: false };
+    const iv = []; for (let i = 1; i < n; i++) { const d = w[i] - w[i - 1]; if (d < 1000) iv.push(d); }
+    const m = iv.reduce((a, x) => a + x, 0) / (iv.length || 1), sd = Math.sqrt(iv.reduce((a, x) => a + (x - m) * (x - m), 0) / (iv.length || 1));
+    const cv = m > 0 ? sd / m : 0;
+    return { n, rate, cv, bot: rate >= NX_RATE || (rate >= NX_REG_RATE && cv < NX_CV) };
+  }
+  function nxClick(s, now) {
+    const x = nxState(s), lt = x.t[x.t.length - 1];
+    if (s.wb && s.wb.until > now && lt && now - lt < 1000) { const iv = s.wb.iv || (s.wb.iv = []); if (iv.length < 3000) iv.push(Math.round(now - lt)); }
+    x.t.push(now); if (x.t.length > 120) x.t.splice(0, x.t.length - 120); }
+  const nexusOn = s => !!(s.nx && s.nx.ph === 1);
+  function nxTick(s, dt, now, events) {
+    // once the Guardian is out, judge only the last two seconds so it leaves soon after the rhythm calms
+    const x = nxState(s), r = nxRead(x.t, now, x.ph === 1 ? 2000 : NX_WIN);
+    if (r.bot) x.last = now;
+    if (x.ph === 0) {
+      x.m = Math.max(0, Math.min(1, x.m + (r.bot ? dt / NX_BUILD : -dt / NX_FADE)));
+      if (x.m >= 1) { x.ph = 1; x.at = now; s.stats.nexus = (s.stats.nexus || 0) + 1; events && events.push({ type: 'nexus' }); }
+    } else if (x.ph === 1) {
+      if (now - x.last >= NX_CALM * 1000) { x.ph = 2; x.at = now; events && events.push({ type: 'nexusleave' }); }
+    } else if (x.ph === 2) {
+      x.m = Math.max(0, 1 - (now - x.at) / (NX_LEAVE * 1000));
+      if (now - x.at >= NX_LEAVE * 1000) { x.ph = 0; x.m = 0; x.t = x.t.filter(v => v > now - 1000); }
+    }
+  }
+
   function strike(s, now, rng, events, auto) {
+    if (!auto) nxClick(s, now || Date.now());
     if (resting(s, now)) return 0;
     if ((s.foeGap || 0) > (now || Date.now())) return 0;
+    if (nexusOn(s)) { if (!auto) s.stats.clicks++; events && events.push({ type: 'hit', dmg: 0, crit: false, auto, nexus: true }); return { dmg: 0, crit: false }; }
     if (!s.foe) s.foe = makeFoe(s, rng);
     let dmg = clickDamage(s, now);
     const crit = (rng || Math.random)() < critChance(s);
     if (crit) { dmg *= 5; s.stats.crits++; }
     if (!auto) s.stats.clicks++;
     events && events.push({ type: 'hit', dmg, crit, auto });
+    const sc0 = s.wb ? s.wb.score : 0;
     damageFoe(s, dmg, now, rng, events);
+    if (s.wb && !auto) s.wb.ck = (s.wb.ck || 0) + s.wb.score - sc0;
     return { dmg, crit };
   }
 
@@ -2131,7 +2177,7 @@
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

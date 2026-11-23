@@ -455,6 +455,71 @@
   $('modal').addEventListener('click', e => { if (e.target.id === 'modal' && !$('modal').dataset.lock) closeModal(); });
 
   // ---------- panel: party ----------
+  // ---------- camp: party changes happen at the top of the stair ----------
+  const camp = () => L.atCamp(S, Date.now());
+  function campGate() { if (camp()) return true; campModal(); return false; }
+  function goCamp() {
+    S.campReturn = Math.max(S.campReturn || 0, S.floor);
+    L.gotoFloor(S, L.CAMP_FLOOR); S.autoAdvance = false; $('auto').checked = false;
+    closeModal(); save(); updateStage(); updatePanel(true); sfx.buy();
+    toast('flame', 'Back at camp', 'Change your party, train and gear up. Then press Descend to head back down.', 'feat');
+  }
+  function descend() {
+    const f = Math.min(S.maxFloor, Math.max(2, S.campReturn || S.maxFloor));
+    L.gotoFloor(S, f); S.autoAdvance = f >= S.maxFloor; $('auto').checked = S.autoAdvance; S.campReturn = 0;
+    save(); updateStage(); updatePanel(true);
+    toast('map', 'Down to floor ' + f, L.biomeOf(f).name + '.', '');
+  }
+  function drinkDraught() {
+    if (!L.useDraught(S, Date.now())) { openStore(); return; }
+    closeModal(); sfx.relic(); save(); updatePanel(true);
+    toast('flame', 'You make camp', 'For 60 seconds you can swap companions, recruit, train and change gear right here.', 'feat');
+  }
+  function campModal() {
+    const n = (S.items && S.items.draught) || 0;
+    modal('<div class="center"><div class="campfire-ic">' + icon('flame') + '</div><h2>That happens at camp</h2><p>Swapping companions, recruiting players, training companions and changing gear all happen at camp, at the top of the stair.</p></div>' +
+      '<div class="choice"><button class="pick" id="c-go"><b>Return to camp</b><small>Travel up to floor 1. You can head straight back down to floor ' + S.floor + ' afterwards.</small></button>' +
+      '<button class="pick" id="c-drink"' + (n ? '' : ' disabled') + '><b>Drink a Campfire Draught (' + n + ' left)</b><small>Make camp right here for 60 seconds.</small></button>' +
+      '<button class="pick" id="c-store"><b>Visit the store</b><small>Buy Campfire Draughts and Lantern Oil.</small></button></div>' +
+      '<div class="row"><button class="btn ghost" id="c-x">Not now</button></div>', md => {
+        md.querySelector('#c-go').onclick = goCamp; md.querySelector('#c-drink').onclick = drinkDraught;
+        md.querySelector('#c-store').onclick = openStore; md.querySelector('#c-x').onclick = closeModal;
+      });
+  }
+  function campBarHtml() {
+    const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now());
+    if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>At camp</b><small>Swap companions, recruit, train and change gear.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + Math.min(S.maxFloor, Math.max(2, S.campReturn || S.maxFloor)) + '</button>' : '') + '<button class="btn ghost small" data-camp="store">Store</button></div>';
+    if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Camp made: ' + Math.ceil(left) + 's</b><small>A Campfire Draught is burning. Make your changes now.</small></div><button class="btn ghost small" data-camp="store">Store</button></div>';
+    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Party changes, companion training and gear happen at camp.</small></div><button class="btn small" data-camp="go">Return to camp</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
+  }
+  let campWas = null;
+  function paintCamp() {
+    const h = campBarHtml();
+    for (const id of ['campbar', 'gearcamp']) { const el = $(id); if (el && el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; } }
+    const c = camp(); if (campWas !== null && c !== campWas) { campWas = c; updateSeats(true); paintBoard(); updateGear(true); } campWas = c;
+    document.body.classList.toggle('incamp', c);
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-camp]'); if (!b) return;
+    const a = b.dataset.camp;
+    if (a === 'go') goCamp(); else if (a === 'down') descend(); else if (a === 'drink') drinkDraught(); else if (a === 'store') openStore(); else campModal();
+  });
+  setInterval(paintCamp, 500);
+
+  // ---------- store ----------
+  function openStore() {
+    const row = it => {
+      const p = L.shopPrice(S, it.id), have = (S.items && S.items[it.id]) || 0;
+      return '<div class="trow"><div class="tile r-' + (it.id === 'draught' ? 'epic' : 'rare') + '">' + icon(it.icon) + '</div><div class="tinfo"><b>' + it.name + '</b><small>' + it.desc + '</small><small>You have ' + have + '.</small></div><div class="tact"><span class="price">' + icon('coin') + fmt(p) + '</span><button class="btn small" data-buy="' + it.id + '"' + (p > S.gold ? ' disabled' : '') + '>Buy</button></div></div>';
+    };
+    modal('<div class="maphead"><div><h2>The Quartermaster</h2><small>Old Thessaly keeps a stall by the campfire. Prices follow how much gold you earn.</small></div><button class="iconbtn" id="st-x" aria-label="Close">&times;</button></div><div class="tlist store">' + L.SHOP.map(row).join('') + '</div>' +
+      '<p class="note small">Use a Campfire Draught from the camp bar in the Party or Gear tab. Lantern Oil appears under the lantern during guardian fights.</p>', md => {
+        md.className = 'sheet wide';
+        md.querySelector('#st-x').onclick = closeModal;
+        md.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (L.buyShop(S, b.dataset.buy, 1)) { sfx.coin(); save(); openStore(); paintCamp(); } });
+      });
+  }
+
   const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const buyN = () => S.settings.buy === 'max' ? 'max' : +S.settings.buy;
   function classTag(cls) { return '<span class="ctag c-' + cls + '">' + L.CLASSES[cls].name + '</span>'; }
@@ -523,6 +588,7 @@
     const t = e.target.closest('button'); if (!t) return;
     if (t.dataset.move) { const [i, d] = t.dataset.move.split(':').map(Number); if (L.moveMember(S, i, i + d)) { sfx.buy(); updateSeats(true); updateAbilities(true); } return; }
     if (t.id === 'f-auto') { L.autoFormation(S); S.formationManual = false; sfx.buy(); updateSeats(true); updateAbilities(true); toast('shield', 'Party arranged', 'Tank in front, rogue behind it, healers in the middle where they reach everyone, casters at the back.', ''); return; }
+    if ((t.dataset.train && t.dataset.train !== 'you') || t.dataset.unseat || t.dataset.seat || t.dataset.dismiss || t.dataset.recruit) { if (!campGate()) return; }
     if (t.dataset.train) { if (L.train(S, t.dataset.train, buyN())) { sfx.buy(); updateSeats(true); } }
     else if (t.dataset.unseat) { L.unseat(S, +t.dataset.unseat); updateSeats(true); updateAbilities(true); paintBoard(); }
     else if (t.dataset.seat) pickSeat(t.dataset.seat);
@@ -706,6 +772,7 @@
   }
   $('tab-gear').addEventListener('click', e => {
     const w = e.target.closest('[data-who]'); if (w) { gearWho = w.dataset.who; updateGear(true); return; }
+    if (e.target.closest('[data-equip],#g-best') && !campGate()) return;
     const eq = e.target.closest('[data-equip]'); if (eq) { if (L.equip(S, gearWho, eq.dataset.equip)) { sfx.buy(); updateGear(true); updateSeats(true); } return; }
     if (e.target.closest('#g-best')) { const n = L.equipBest(S, gearWho); if (n) { sfx.buy(); toast('gear-armor', 'Best gear on', n + (n === 1 ? ' piece' : ' pieces') + ' equipped on ' + L.memberById(gearWho).name + '.', ''); updateGear(true); updateSeats(true); } return; }
     if (e.target.closest('.dfig')) { profileModal(gearWho); return; }
@@ -734,9 +801,9 @@
         const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
         const lk = md.querySelector('#i-link'); if (lk) lk.onclick = () => { closeModal(); linkItem(it); };
         const re = () => { updateGear(true); updateSeats(true); itemModal(uid); };
-        const on = md.querySelector('#i-on'); if (on) on.onclick = () => { L.equip(S, gearWho, uid); sfx.buy(); re(); };
-        const off = md.querySelector('#i-off'); if (off) off.onclick = () => { L.unequip(S, w, it.slot); re(); };
-        md.querySelector('#i-up').onclick = () => { if (L.upgrade(S, uid)) { sfx.relic(); re(); } };
+        const on = md.querySelector('#i-on'); if (on) on.onclick = () => { if (!campGate()) return; L.equip(S, gearWho, uid); sfx.buy(); re(); };
+        const off = md.querySelector('#i-off'); if (off) off.onclick = () => { if (!campGate()) return; L.unequip(S, w, it.slot); re(); };
+        md.querySelector('#i-up').onclick = () => { if (!campGate()) return; if (L.upgrade(S, uid)) { sfx.relic(); re(); } };
         md.querySelector('#i-sell').onclick = () => { const v = L.salvage(S, uid); sfx.coin(); closeModal(); updateGear(true); toast('coin', 'Salvaged', '+' + fmt(v) + ' gold', ''); };
         md.querySelector('#i-close').onclick = closeModal;
       });
@@ -770,7 +837,7 @@
       '<div class="row">' + (guest ? '' : '<button class="btn ghost" id="p-gear">Manage gear</button>') + (!inParty && !guest ? '<button class="btn" id="p-seat">Bring along</button>' : '') + '<button class="btn ghost" id="p-close">Close</button></div></div>', md => {
         const box = md.querySelector('.profspr'); try { const img = SP.render(m.cls, 5, m.hue || 0); if (img) box.appendChild(img); } catch (e) {}
         const g = md.querySelector('#p-gear'); if (g) g.onclick = () => { closeModal(); gearWho = id; switchTab('gear'); };
-        const st = md.querySelector('#p-seat'); if (st) st.onclick = () => { closeModal(); pickSeat(id); };
+        const st = md.querySelector('#p-seat'); if (st) st.onclick = () => { closeModal(); if (campGate()) pickSeat(id); };
         md.querySelector('#p-close').onclick = closeModal;
       });
   }
@@ -833,6 +900,7 @@
     draw();
   }
   $('g-scrap').addEventListener('click', openScrap);
+  $('b-oil').addEventListener('click', () => { if (L.useOil(S)) { sfx.relic(); save(); toast('oil', 'The lantern flares', '+15 seconds of oil for this guardian.', 'feat'); } });
   // ---------- panel: relics, feats, ledger, rekindle ----------
   function updateRelics() {
     const box = $('relics');
@@ -936,6 +1004,7 @@
       $('hpbar').style.width = Math.max(0, f.hp / f.max * 100) + '%';
       $('hptext').textContent = fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max);
       $('lanternwrap').hidden = !f.boss;
+      { const n = (S.items && S.items.oil) || 0; $('b-oil').hidden = !f.boss || !n || S.lantern <= 0; $('b-oil').textContent = 'Pour lantern oil (' + n + ')'; }
       if (f.boss) {
         const lt = L.lanternTime(S), left = Math.max(0, lt - S.lantern);
         $('lanternbar').style.width = (left / lt * 100) + '%';
@@ -1513,11 +1582,12 @@
   const TUT = [
     { id: 'strike', title: 'Strike!', text: 'Tap the monster to hit it yourself. Your party fights on its own too, but every tap helps. Try a few.', target: '#arena', tab: null, ready: () => true, done: c => S.stats.clicks >= c.clicks + 5, noNext: true },
     { id: 'gold', title: 'Gold', text: 'Every monster drops gold, even while you are away. Gold is how your party grows stronger.', target: '.stat.gold', ready: () => true },
-    { id: 'train', title: 'Train your party', text: 'Spend gold to train a companion. Higher levels mean more damage, health and healing. Train whoever is cheapest to start.', target: '#seats .buy:not([disabled])', tab: 'party', ready: () => S.gold >= 10, done: c => sumLevels() > c.levels, noNext: true },
+    { id: 'train', title: 'Train your party', text: 'Spend gold to train. Higher levels mean more damage, health and healing. You can train your own hero anywhere, and your companions at camp on floor 1, where you are now.', target: '#seats .buy:not([disabled])', tab: 'party', ready: () => S.gold >= 10, done: c => sumLevels() > c.levels, noNext: true },
     { id: 'abil', title: 'Abilities', text: 'Each class has a special move. They fire by themselves, or press keys 1 to 5 (or tap them) to use one right when you need it.', target: '#abilities', ready: () => true },
     { id: 'order', title: 'Marching order', text: 'The top of this list stands at the front. Keep your tank up front, healers in the middle so they reach everyone, and watch the back for ambushes.', target: '.formhead', tab: 'party', ready: () => S.party.filter(Boolean).length >= 2 },
     { id: 'boss', title: 'Guardians', text: 'Every fifth floor has a guardian. Beat it before the lantern oil runs out, or your party falls back to train and try again.', target: '#lanternwrap', ready: () => S.foe && S.foe.boss },
-    { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor and trinkets. Open Gear to put them on. Each piece fits one class, and a green arrow marks an upgrade.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
+    { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor and trinkets. Open Gear to see them. You put gear on at camp, at the top of the stair, or anywhere with a Campfire Draught. A green arrow marks an upgrade.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
+    { id: 'camp', title: 'Camp', text: 'Swapping companions, training them and changing gear happen at camp. This bar takes you back up and down again, and its Store sells Campfire Draughts that make camp anywhere.', target: '#campbar', tab: 'party', ready: () => S.floor > 1 && S.maxFloorEver >= 4 },
     { id: 'map', title: 'Map of the Deep', text: 'See how far you have come, which guardians you have beaten, and travel back to any floor you have reached.', target: '#btn-map', ready: () => S.maxFloorEver >= 8 },
     { id: 'end', title: 'You are ready', text: 'That is the basics. The story will introduce new companions as you descend. Open the Guide (the ? at the top) any time for the details.', target: '#btn-guide', ready: () => true },
   ];
@@ -1569,6 +1639,7 @@
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and goes in a weapon, armor or trinket slot.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten and where you are. Tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 25 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
+    ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Your own hero can train anywhere, and you can rearrange the marching order at any time.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
     ['Trading Post: market and mail', '<p>Open the <b>Trading Post</b> (the bag button at the top) to trade gear with other players. It needs a free account.</p><p><b>Market</b>: browse gear by class and buy it for gold. To sell, tap an item in your Gear tab and choose <b>Sell on market</b>. Listings last a week, and you can take yours down any time. When something sells, the gold arrives in your mailbox.</p><p><b>Mail</b>: tap an item and choose <b>Send to a player</b> to send it to someone you have recruited or chatted with. Leave the price at 0 for a gift, or set a price they pay if they accept. They can decline, and you can take an offer back until they answer.</p><p>Gold and gear are in-game only and have no real-money value.</p>'],
     ['Multiplayer and chat', '<p>With a free account your progress is saved online and works on any device.</p><p>Once you sign in, your hero appears on a board where other players can recruit it, and you earn gold each time. You can recruit their heroes too. Player heroes are stronger than story companions.</p><p><b>Chat</b> (the speech bubble) has Global, Trade and Party channels. Ctrl+click an item to link it. Tap a name to mute or report. No web links, and be kind.</p>'],
@@ -1588,6 +1659,13 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 10, date: 'November 22, 2026', title: 'Make camp', items: [
+      'Party changes now happen at camp, at the top of the stair: swapping companions, recruiting, training companions and changing gear.',
+      'Return to camp from the camp bar in the Party or Gear tab, then Descend straight back to where you were.',
+      'New Campfire Draught: make camp anywhere for 60 seconds. You start with one.',
+      'New Lantern Oil: 15 more seconds against a guardian.',
+      'The Quartermaster’s store by the campfire sells both.',
+      'Your own hero can still train anywhere, and you can rearrange the marching order at any time.'] },
     { v: 9, date: 'November 22, 2026', title: 'The Trading Post', items: [
       'A market: list gear for gold, browse what other players are selling, and buy it.',
       'Player mail: send gear to players you have recruited or chatted with, as a gift or with a price they can accept or decline.',

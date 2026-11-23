@@ -238,7 +238,7 @@
       gold: 0, floor: 1, foeIdx: 0, maxFloor: 1, maxFloorEver: 1,
       mode: null, hero: null, guests: [],
       unlocked: [], levels: {}, party: [null, null, null, null, null],
-      hp: {}, down: {}, abil: {}, minions: [],
+      hp: {}, down: {}, abil: {}, minions: [], items: { draught: 1, oil: 0 }, campUntil: 0,
       relics: {}, embers: 0, feats: {},
       bag: [], gear: {}, lore: { hold: 1 },
       story: { seen: {}, queue: [] },
@@ -561,6 +561,36 @@
     const rear = live[live.length - 1];
     if (rear && live.length > 1) out.push(rear.cls === 'tank' ? { text: memberById(rear.id).name + ' guards the rear against ambushes.' } : { warn: rear.cls === 'healer' || rear.cls === 'mage', text: memberById(rear.id).name + ' takes the first blows when monsters ambush from behind.' });
     return out;
+  }
+
+
+  // ---------- camp, store and consumables ----------
+  // Party changes (swapping, recruiting, training companions, gear) only happen at camp: floor 1,
+  // or anywhere while a Campfire Draught burns.
+  const CAMP_FLOOR = 1, DRAUGHT_TIME = 60, OIL_TIME = 15;
+  const atCamp = (s, now) => s.floor <= CAMP_FLOOR || (s.campUntil || 0) > (now || Date.now());
+  const campLeft = (s, now) => Math.max(0, ((s.campUntil || 0) - (now || Date.now())) / 1000);
+  const SHOP = [
+    { id: 'draught', name: 'Campfire Draught', icon: 'flame', desc: 'Drink it anywhere to make camp for ' + DRAUGHT_TIME + ' seconds. Swap companions, recruit players, train and change gear without the walk back up.' },
+    { id: 'oil', name: 'Flask of Lantern Oil', icon: 'oil', desc: 'Pour it during a guardian fight for ' + OIL_TIME + ' more seconds before the lantern gutters.' },
+  ];
+  function shopPrice(s, id) {
+    const income = offlineGoldPerSec(s) * 60;
+    return Math.max(id === 'draught' ? 300 : 200, Math.round(income * (id === 'draught' ? 2 : 1.5)));
+  }
+  function buyShop(s, id, n) {
+    n = n || 1; const c = shopPrice(s, id) * n;
+    if (!SHOP.some(x => x.id === id) || c > s.gold) return false;
+    s.gold -= c; s.items = s.items || {}; s.items[id] = (s.items[id] || 0) + n; return true;
+  }
+  function useDraught(s, now) {
+    now = now || Date.now();
+    if (!s.items || !(s.items.draught > 0)) return false;
+    s.items.draught--; s.campUntil = Math.max(now, s.campUntil || 0) + DRAUGHT_TIME * 1000; return true;
+  }
+  function useOil(s) {
+    if (!s.foe || !isBossFloor(s.floor) || !s.items || !(s.items.oil > 0) || s.lantern <= 0) return false;
+    s.items.oil--; s.lantern = Math.max(0, s.lantern - OIL_TIME); return true;
   }
 
   // ---------- setup and guests ----------
@@ -901,6 +931,7 @@
     s.formation = 1;
     s.foe = null; s.lantern = 0; s.minions = []; s.abil = {}; s.down = {};
     s.guests = o.guests || [];
+    s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.campUntil = o.campUntil || 0;
     if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
     s.bag = o.bag || []; s.gear = o.gear || {}; s.lore = Object.assign({ hold: 1 }, o.lore || {});
     registerHero(s);
@@ -909,6 +940,7 @@
   }
 
   const api = {
+    CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,

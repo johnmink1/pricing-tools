@@ -1,4 +1,4 @@
-/* lh-build 202611231501 */
+/* lh-build 202611231509 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1190,6 +1190,7 @@
       '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + esc(L.gearName(it)) + '</h2>' + pips + '<small>Requires level <b class="' + (fits && !w && !L.canWear(S, gearWho, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
       '<div class="istats">' + stats + '</div>' +
       (fits && !w ? '<p class="icmp">' + (ci ? 'Compared with ' + esc(m.name) + '’s ' + reps.map(r => esc(L.gearName(r)) + (r.up ? ' +' + r.up : '')).join(' and ') + '.' : esc(m.name) + ' has an open ' + L.SLOT_NAME[it.slot].toLowerCase() + ' slot.') + (it.slot === 'robe' ? ' A robe covers the chest and legs.' : '') + '</p>' : '') +
+      enchBlock(it) +
       (it.aff ? '<div class="iaff">' + icon('flame') + '<span><b>' + affText(it) + '</b><small>Counts while the wearer works the ' + jobName(it.aff.j) + ' job at the campfire.</small></span></div>' : '') +
       (it.jset ? (() => { const js = L.JOB_SETS[it.jset], n = wearer ? L.jobSetCount(S, w, it.jset) : 0; return '<div class="iset"><b>' + js.name + (wearer ? ' <em>' + n + '/3 worn</em>' : '') + '</b><small>A job set for the ' + jobName(it.jset) + '. It helps whoever wears it while they work that job at camp.</small><small><em>2 pieces</em> +' + Math.round(L.JOB_SET_TWO * 100) + '% ' + jobName(it.jset) + ' output</small><small><em>3 pieces</em> +' + Math.round(L.JOB_SET_THREE * 100) + '% ' + jobName(it.jset) + ' output</small></div>'; })() : '') +
       (set ? '<div class="iset"><b>' + set.name + '</b><small><em>2 pieces</em> ' + set.two + '</small><small><em>3 pieces</em> ' + set.three + '</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
@@ -1200,12 +1201,16 @@
       '</div><div class="itools">' +
       tool('i-lk', 'lock', it.lk ? 'Unlock' : 'Lock', it.lk ? 'on' : '') +
       (S.bag.some(x => L.mergeable(it, x)) ? tool('i-merge', 'relic', 'Merge', it.lk ? 'off' : '') : '') +
+      (L.sockets(it) && S.bag.some(x => x !== it && L.enchList(x).length && !x.lk && !L.wearer(S, x.uid)) ? tool('i-ench', 'star', 'Enchant') : '') +
+      (L.enchList(it).length ? tool('i-dis', 'flare', 'Disenchant', it.lk || w ? 'off' : '') : '') +
       (CL ? tool('i-mkt', 'coin', 'Sell', it.lk ? 'off' : '') + tool('i-send', 'users', 'Send', it.lk ? 'off' : '') + tool('i-link', 'chat', 'Link') : '') +
       tool('i-sell', 'flame', 'Salvage ' + fmt(L.salvageValue(it)), 'danger' + (it.lk ? ' off' : '')) + '</div>' +
       (it.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked. Mass scrap, a full pack and the Loot Goblin all leave it alone. Unlock it to sell, send or salvage.</p>' : '') + '</div>', md => {
         const locked = () => { toast('lock', 'This item is locked', 'Unlock it first to sell, send or salvage it.', 'warn'); };
         md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin.' : L.gearName(it) + ' can be scrapped and sold again.', ''); };
         const gate = f => () => { if (it.lk) return locked(); if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
+        const en = md.querySelector('#i-ench'); if (en) en.onclick = () => enchantPicker({ dst: uid });
+        const ds = md.querySelector('#i-dis'); if (ds) ds.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to disenchant it.', 'warn'); if (w) return toast('flare', 'Take it off first', 'Worn gear cannot be disenchanted.', 'warn'); enchantPicker({ src: uid }); };
         const mg = md.querySelector('#i-merge'); if (mg) mg.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to merge it.', 'warn'); mergePicker(uid); };
         const mk = md.querySelector('#i-mkt'); if (mk) mk.onclick = gate(sellItem);
         const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
@@ -1226,6 +1231,60 @@
 
 
 
+
+  // ---------- enchantments: sockets on each item, and moving an enchant from one item to another ----------
+  const ROMAN9 = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
+  const enchName = x => L.ENCH[x.id].name + ' ' + ROMAN9[x.t];
+  function enchBlock(it) {
+    const n = L.sockets(it), l = L.enchList(it); if (!n) return '';
+    let h = '';
+    for (let i = 0; i < n; i++) h += l[i] ? '<div class="esock on"><i></i><b>' + enchName(l[i]) + '</b><small>' + L.enchText(l[i]) + '</small></div>' : '<div class="esock"><i></i><small>Empty socket</small></div>';
+    return '<div class="iench"><div class="ienh">Enchant sockets ' + tipI('Sockets come from rarity and item level (one more at floor 30 and at floor 80). Enchants help the whole party while anyone in it wears the item. Use Disenchant on another item to move one of its enchants here.') + '</div>' + h + '</div>';
+  }
+  function enchantPicker(o) {
+    let src = o.src || null, idx = 0, dst = o.dst || null, slot = -1;
+    const fixedSrc = !!o.src;
+    const tileOf = x => '<div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>';
+    const sub = x => { const wn = L.wearer(S, x.uid); return L.RARITY.find(r => r.id === x.rar).name + ' ' + L.CLASSES[x.cls].name.toLowerCase() + ' ' + L.SLOT_NAME[x.slot].toLowerCase() + (wn ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(wn).name) + '</i>' : ''); };
+    const fill = x => L.enchList(x).length + '/' + L.sockets(x);
+    const draw = () => {
+      const A = src && L.itemOf(S, src), B = dst && L.itemOf(S, dst);
+      let body = '';
+      if (fixedSrc) {
+        const la = L.enchList(A); if (idx >= la.length) idx = 0;
+        body += '<div class="enstep"><small>1. Enchant to move</small><div class="enchips">' + la.map((x, i) => '<button class="enchip' + (i === idx ? ' sel' : '') + '" data-ei="' + i + '"><b>' + enchName(x) + '</b><small>' + L.enchText(x) + '</small></button>').join('') + '</div></div>';
+        const ts = S.bag.filter(x => x !== A && L.sockets(x)).sort((a, b) => (!!L.wearer(S, b.uid) - !!L.wearer(S, a.uid)) || ((L.sockets(b) - L.enchList(b).length) - (L.sockets(a) - L.enchList(a).length)) || (L.itemScore(b) - L.itemScore(a)));
+        body += '<div class="enstep"><small>2. Item to enchant</small><div class="mglist">' + (ts.length ? ts.slice(0, 60).map(x => '<div class="pkrow r-' + x.rar + (B === x ? ' sel' : '') + '" data-dst="' + x.uid + '" role="button" tabindex="0">' + tileOf(x) + '<span class="pkt"><b>' + esc(L.gearName(x)) + (x.up ? ' +' + x.up : '') + '</b><small>' + sub(x) + '</small></span><span class="cmp eq">' + fill(x) + '</span></div>').join('') : '<p class="note">No other item has an enchant socket yet.</p>') + '</div></div>';
+      } else {
+        const srcs = []; for (const x of S.bag) if (x !== B && !x.lk && !L.wearer(S, x.uid)) L.enchList(x).forEach((e, i) => srcs.push({ x, e, i }));
+        srcs.sort((p, q) => q.e.t - p.e.t);
+        body += '<div class="enstep"><small>1. Pick an enchant to take. Its item is destroyed.</small><div class="mglist">' + srcs.slice(0, 80).map(r => '<div class="pkrow r-' + r.x.rar + (src === r.x.uid && idx === r.i ? ' sel' : '') + '" data-src="' + r.x.uid + '" data-i="' + r.i + '" role="button" tabindex="0">' + tileOf(r.x) + '<span class="pkt"><b>' + enchName(r.e) + '</b><small>' + L.enchText(r.e) + ' &middot; from ' + esc(L.gearName(r.x)) + '</small></span></div>').join('') + '</div></div>';
+      }
+      const lb = B ? L.enchList(B) : [], n = B ? L.sockets(B) : 0;
+      if (B) {
+        if (slot < 0 || slot >= n || slot > lb.length) slot = lb.length < n ? lb.length : 0;
+        body += '<div class="enstep"><small>' + (fixedSrc ? '3' : '2') + '. Socket on ' + esc(L.gearName(B)) + '</small><div class="enchips">' + Array.from({ length: n }, (_, i) => i > lb.length ? '' : '<button class="enchip' + (i === slot ? ' sel' : '') + (lb[i] ? ' full' : '') + '" data-sl="' + i + '"><b>' + (lb[i] ? enchName(lb[i]) : 'Empty') + '</b><small>' + (lb[i] ? 'Replace it' : 'Open socket') + '</small></button>').join('') + '</div></div>';
+      }
+      const A2 = src && L.itemOf(S, src), ok = A2 && B && L.enchList(A2)[idx];
+      const warn = ok ? '<p class="note warn">' + esc(L.gearName(A2)) + (A2.up ? ' +' + A2.up : '') + ' will be destroyed' + (lb[slot] ? ', and ' + enchName(lb[slot]) + ' on ' + esc(L.gearName(B)) + ' is replaced' : '') + '.</p>' : '';
+      modal('<div class="mergebox picker enchbox"><h2>' + icon(fixedSrc ? 'flare' : 'star') + (fixedSrc ? 'Disenchant ' + esc(L.gearName(A)) : 'Enchant ' + esc(L.gearName(B))) + '</h2>' + body + warn +
+        '<div class="row"><button class="btn ghost" id="en-back">Back</button><button class="btn" id="en-go"' + (ok ? '' : ' disabled') + '>' + (ok ? 'Move ' + enchName(L.enchList(A2)[idx]) : 'Pick both items') + '</button></div></div>', md => {
+          md.querySelectorAll('[data-ei]').forEach(e => e.onclick = () => { idx = +e.dataset.ei; draw(); });
+          md.querySelectorAll('[data-dst]').forEach(e => e.onclick = () => { dst = e.dataset.dst; slot = -1; draw(); });
+          md.querySelectorAll('[data-src]').forEach(e => e.onclick = () => { src = e.dataset.src; idx = +e.dataset.i; draw(); });
+          md.querySelectorAll('[data-sl]').forEach(e => e.onclick = () => { slot = +e.dataset.sl; draw(); });
+          md.querySelector('#en-back').onclick = () => itemModal(o.src || o.dst);
+          md.querySelector('#en-go').onclick = () => {
+            if (B && L.wearer(S, B.uid) && !campGate()) return;
+            const r = L.disenchant(S, src, idx, dst, slot); if (!r) return;
+            save(); updateGear(true); updateSeats(true); sfx.relic();
+            toast('star', 'Enchant moved', enchName(r.moved) + ' is now on ' + L.gearName(r.item) + '.', '');
+            itemModal(r.item.uid);
+          };
+        });
+    };
+    draw();
+  }
 
   // ---------- merge: two copies of the same item become one at +1, or both are lost ----------
   function mergePicker(uid) {
@@ -3233,6 +3292,11 @@
         'Open an item and choose <b>Merge</b> when you own another copy. The result is one upgrade above the higher of the two, up to +' + L.UP_MAX + '.',
         'If the merge fails, <b>both pieces are destroyed</b>. Risk starts at 8% for +1 and climbs about 6% per level.',
         'Each point of <b>Luck</b> and <b>Intelligence</b> cuts that risk, up to half. Locked items cannot be merged.']],
+      ['Enchantments', 'i:star', 'Sockets hold enchants that help the whole party.', [
+        'Fine items have 1 socket, rare 2, epic 3 and set pieces 2. Items from floor 30 and floor 80 on get one more each, up to 4. Common items get sockets from floor 30.',
+        'Enchants: <b>Might</b> (damage), <b>Vigor</b> (health), <b>Keen</b> (crits), <b>Fortune</b> (gold), <b>Finder</b> (gear drops), <b>Mending</b> (healing), <b>Warding</b> (less damage taken) and <b>Wick</b> (lantern time). Tiers run I to IX, higher from deeper floors.',
+        '<b>Disenchant</b> destroys an item and moves one of its enchants into a socket on another item of any class. A full socket can be overwritten.',
+        'Merging two items keeps the best enchants of both, as many as the result has sockets.']],
       ['Mass scrap and Mass sell', 'i:coin', 'Clear out your pack in one go from the Gear tab.', [
         '<b>Mass scrap</b> turns the rarities you tick into gold right away.',
         '<b>Mass sell</b> lists them on the market at their current value, up to 25 listings at a time. You get mail with the gold as each one sells.',
@@ -3309,6 +3373,9 @@
     { id: 'social', name: 'Playing together', icon: 'chat', topics: [
       ['Accounts', 'i:user', 'A free account saves your progress online, on any device.', [
         '<b>Continue with Born 2 Game</b> signs you in with your store account.']],
+      ['Discord', 'i:discord', 'Join us on the Grand War Discord.', [
+        'Tap the Discord button at the top, or <a href="https://discord.gg/6G7E7rhGFu" target="_blank" rel="noopener">join here</a>.',
+        '<b>#lanternhold-chat</b> for players, <b>#lanternhold-bugs</b> for bug reports and <b>#lanternhold-ideas</b> for suggestions.']],
       ['Chat', 'i:chat', 'Global, Trade, Party and Banner channels.', [
         'Press <b>Chat</b> at the bottom right to open the window, and the dash to tuck it away again.',
         'Banner chat reaches only players under your banner.',
@@ -3346,6 +3413,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 47, date: 'November 23, 2026', title: 'Enchantments and Disenchant', items: [
+      'Gear now has enchant sockets, more for rarer items and items from deeper floors. Every item you already own has had its enchants rolled.',
+      'Enchants like Might, Vigor, Keen and Fortune help the whole party while anyone in it wears the item.',
+      'Disenchant an item you can\u2019t use to move one of its enchants onto one you can. The disenchanted item is destroyed.',
+      'New Discord button at the top: chat with players, report bugs and share ideas on the Grand War Discord.'] },
     { v: 46, date: 'November 23, 2026', title: 'Merge your gear', items: [
       'Have two of the same item? Open one and choose Merge. They become a single piece one upgrade higher, keeping the better job bonus.',
       'Every merge carries a risk: if it fails, both pieces are destroyed for good. The higher the result, the bigger the risk.',
@@ -3587,7 +3659,7 @@
   // Items and gold live in each player's save, so the client moves them; the server keeps
   // listings, offers and letters so both sides see the same thing.
   const trade = { view: 'market', cls: null, mine: false, list: null, mail: null, msg: '', busy: false, slot: 'all', rar: 'all', sort: 'cheap' };
-  const tradeItem = it => L.normItem({ cls: it.cls, slot: it.slot, rar: it.rar, set: it.set || undefined, jset: it.jset || undefined, aff: it.aff || undefined, ilvl: it.ilvl, up: it.up || 0 });
+  const tradeItem = it => L.normItem({ cls: it.cls, slot: it.slot, rar: it.rar, set: it.set || undefined, jset: it.jset || undefined, aff: it.aff || undefined, en: typeof it.en === 'string' ? it.en : '', ilvl: it.ilvl, up: it.up || 0 });
   const fromServer = it => Object.assign(tradeItem(it), { uid: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) });
   // Letters and listings from before the gold rescale are shown and paid in today's gold.
   const nowGold = (g, at) => at && at < L.ECON_AT ? Math.max(1, Math.round(L.regold(g, L.lvl(S, 'you')))) : g;

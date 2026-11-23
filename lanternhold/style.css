@@ -1120,3 +1120,17 @@ body.resting .arena{cursor:default}
 .msg.sys{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--muted);font-style:italic;padding:6px 8px;border-left:2px solid var(--side,var(--gold));background:linear-gradient(90deg,rgba(245,194,66,.07),transparent);border-radius:0 8px 8px 0;margin:4px 0}
 .msg.sys svg{width:15px;height:15px;flex:none;margin-top:2px;color:var(--side,var(--gold))}
 .msg.sys-covenant{--side:#9fb4c8}.msg.sys-radiant{--side:#ffd36b}.msg.sys-tide{--side:#d06bff}.msg.sys-mercy{--side:#8fcf6a}.msg.sys-unsworn{--side:#c9b38a}
+/* Sigil packs from the Born 2 Game store */
+.packs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:6px 0 12px}
+.pack{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:16px 8px 12px;border-radius:12px;border:1px solid var(--line2);background:linear-gradient(180deg,var(--panel2),var(--panel));color:var(--text);cursor:pointer;font:inherit;transition:transform .12s,border-color .12s}
+.pack:hover{transform:translateY(-2px);border-color:var(--gold)}
+.pack:disabled{opacity:.6;cursor:wait}
+.pack .sigil{width:34px;height:34px;margin-bottom:4px}
+.pack b{font-size:20px;color:var(--gold);line-height:1.1}
+.pack small{color:var(--muted);font-size:12px}
+.pack em{position:absolute;top:-9px;left:50%;transform:translateX(-50%);white-space:nowrap;font-style:normal;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--gold);color:#1a1206}
+.pack span{margin-top:8px;padding:5px 12px;border-radius:999px;background:rgba(245,194,66,.14);color:var(--text);font-weight:700;font-size:14px}
+.storelink{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--panel)}
+.storelink span{flex:1 1 220px;color:var(--muted);font-size:14px}.storelink span b{color:var(--text)}
+@media (max-width:560px){.packs{grid-template-columns:repeat(2,1fr);row-gap:16px}}
+.storelink+.note{margin-top:10px}

@@ -981,6 +981,70 @@ Resources:
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub 'integrations/${ExchangeIntegration}'
 
+  StoreFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: store-tables
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:Query, dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:UpdateItem, dynamodb:ConditionCheckItem]
+                Resource: [!GetAtt TradeTable.Arn, !GetAtt WalletsTable.Arn]
+
+  StoreFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-store
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 25
+      Role: !GetAtt StoreFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE: !Ref TradeTable
+          WALLETS: !Ref WalletsTable
+          PACKS: 7c5854d4-49f8-4244-8ec3-6c27caaa6e59:500,57d4ee44-c741-4616-96ff-9350734b19da:1100,c19c183a-a27a-4918-8d3c-f94e684fb2d8:2400,27c5a9e9-b7fb-48d9-90c8-a450b85e083a:6500
+      Code:
+        ZipFile: |
+          // built from infra/lambda/store.js by infra/build.py
+          const m=require("@aws-sdk/client-dynamodb"),b=new m.DynamoDBClient({}),{TABLE:y,WALLETS:h,PACKS:C}=process.env,k=Object.fromEntries(C.split(",").map(t=>t.split(":")).map(([t,e])=>[t,+e])),s=(t,e)=>({statusCode:t,body:JSON.stringify(e)}),n=t=>({S:String(t)}),i=t=>({N:String(t)}),S=async(t,e)=>{const o=await fetch("https://www.wixapis.com"+t,{headers:{Authorization:e}});if(!o.ok)throw Object.assign(new Error("wix "+o.status),{st:o.status});return o.json()};exports.handler=async t=>{const e=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!e||!e.sub)return s(401,{error:1});if(t.routeKey!=="POST /store/sync")return s(404,{error:1});let o={};try{o=JSON.parse(t.isBase64Encoded?Buffer.from(t.body||"","base64").toString():t.body||"{}")}catch{return s(400,{error:1})}const u=String(o.token||"");if(u.length<20||u.length>4e3)return s(400,{error:1});let a;try{a=(await S("/members/v1/members/my",u)).member}catch{return s(401,{error:"wix"})}if(!a||!a.id)return s(401,{error:"wix"});const d=a.id,w=String(a.profile&&a.profile.nickname||(a.loginEmail||"").replace(/@.*/,"")||"Store account").slice(0,40);try{await b.send(new m.PutItemCommand({TableName:y,Item:{pk:n("wix#"+d),sk:n("link"),u:n(e.sub),name:n(w),at:i(Date.now())},ConditionExpression:"attribute_not_exists(pk) OR u = :u",ExpressionAttributeValues:{":u":n(e.sub)}}))}catch(r){if(r.name==="ConditionalCheckFailedException")return s(409,{error:"taken"});throw r}let p=[];try{p=(await S("/pricing-plans/v2/member/orders?limit=100",u)).orders||[]}catch{return s(502,{error:"orders"})}let x=0;for(const r of p){const c=k[r.planId];if(!(!c||r.lastPaymentStatus!=="PAID"||r.buyer&&r.buyer.memberId!==d))try{await b.send(new m.TransactWriteItemsCommand({TransactItems:[{Put:{TableName:y,Item:{pk:n("wixord#"+r.id),sk:n("-"),u:n(e.sub),m:n(d),n:i(c),at:i(Date.now())},ConditionExpression:"attribute_not_exists(pk)"}},{Update:{TableName:h,Key:{userId:n(e.sub)},UpdateExpression:"SET bal = if_not_exists(bal, :g) + :n, own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":i(100),":n":i(c),":o":{SS:["f.plain"]}}}}]})),x+=c}catch(f){if(f.name!=="TransactionCanceledException")throw f}}const l=await b.send(new m.GetItemCommand({TableName:h,Key:{userId:n(e.sub)}}));return s(200,{ok:!0,name:w,added:x,bal:l.Item&&l.Item.bal?+l.Item.bal.N:100})};
+
+  StoreIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt StoreFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  StoreInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref StoreFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  StoreSyncRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /store/sync
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${StoreIntegration}'
+
   WardenFunctionRole:
     Type: AWS::IAM::Role
     Properties:

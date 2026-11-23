@@ -1682,7 +1682,7 @@
         m.querySelector('#a-out').onclick = async () => {
           await pushCloud(true);
           try { await cognito('RevokeToken', { Token: sess.refresh }); } catch (e) {}
-          sess = null; storeSess(); paintAccount(); closeModal(); toast('user', 'Signed out', 'Your progress stays on this device too.', '');
+          sess = null; storeSess(); try { localStorage.removeItem('lh_wix'); } catch (e) {} paintAccount(); closeModal(); toast('user', 'Signed out', 'Your progress stays on this device too.', '');
         };
         m.querySelector('#a-close').onclick = closeModal;
       });
@@ -1817,7 +1817,7 @@
       '<div class="seg pfseg">' + tabs + '</div><div class="pfbody">' + body + '</div>' +
       '<div class="row"><button class="btn ghost" id="pe-cancel">Cancel</button><button class="btn" id="pe-save">Save profile</button></div>', md => {
         md.querySelector('#pe-x').onclick = closeModal; md.querySelector('#pe-cancel').onclick = closeModal;
-        md.querySelector('#pe-get').onclick = getSigils;
+        md.querySelector('#pe-get').onclick = () => getSigils(paintEditor);
         md.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { if (edTab === 'b') draft.b = (md.querySelector('#pe-bio') || {}).value || draft.b; edTab = b.dataset.et; paintEditor(); });
         const bio = md.querySelector('#pe-bio'); if (bio) bio.oninput = () => { draft.b = bio.value; md.querySelector('#pe-bc').textContent = bio.value.length + ' / 140'; };
         md.querySelectorAll('[data-cos]').forEach(b => b.onclick = () => pickCos(edTab, b.dataset.cos));
@@ -1838,7 +1838,7 @@
     modal('<div class="center"><div class="cosbuy">' + (k === 'e' ? emblem(id) : k === 'f' ? '<span class="cs-f fr-' + id + '"><i></i></span>' : k === 'g' ? '<span class="cs-g bn-' + id + '"></span>' : k === 'c' ? '<span class="cs-c nc-' + id + '">Aa</span>' : '') + '</div><h2>' + esc(name) + '</h2><p>' + COSMETICS[k].label + ' for your profile card. ' + sigil + '<b>' + price + '</b> ' + TOKEN + '. You have ' + prof.bal + '.</p>' +
       '<div class="row"><button class="btn ghost" id="cb-no">Back</button>' + (can ? '<button class="btn" id="cb-yes">Buy for ' + price + '</button>' : '<button class="btn" id="cb-get">Get Sigils</button>') + '</div></div>', md => {
         md.querySelector('#cb-no').onclick = paintEditor;
-        const g = md.querySelector('#cb-get'); if (g) g.onclick = getSigils;
+        const g = md.querySelector('#cb-get'); if (g) g.onclick = () => getSigils(paintEditor);
         const y = md.querySelector('#cb-yes'); if (y) y.onclick = async () => {
           y.disabled = true;
           try { const r = await papi('POST', '/shop', { id: k + '.' + id }); Object.assign(prof, r); sfx.buy(); if (k === 'e') { if (draft.e.length < 6) draft.e.push(id); } else draft[k] = id; toast('star', name + ' is yours', 'Press Save profile to show it.', 'feat'); }
@@ -1847,9 +1847,108 @@
         };
       });
   }
-  function getSigils() {
-    modal('<div class="center"><div class="cosbuy">' + sigil + '</div><h2>' + TOKEN + '</h2><p>' + TOKEN + ' buy looks for your profile: frames, titles, name colors, banners and emblems. They never buy power.</p><p>Every account starts with 100. Sigil packs are coming to the shop soon, and the Born 2 Game team also hands them out at Grand War events.</p><div class="row"><button class="btn" id="gs-ok">Back to my profile</button></div></div>', md => { md.querySelector('#gs-ok').onclick = paintEditor; });
+  // ---------- Sigil packs from the Born 2 Game store ----------
+  // The store runs on Wix. Players sign in there once (OAuth with PKCE, no secrets in the page); the game
+  // keeps the member token and the server checks it with Wix before crediting paid packs.
+  const WIX = 'https://www.wixapis.com', WIX_APP = 'd9d54315-ca58-47e4-9e15-b661ae7e141d', WIX_KEY = 'lh_wix';
+  const PACKS = [['7c5854d4-49f8-4244-8ec3-6c27caaa6e59', 500, '$4.99', ''], ['57d4ee44-c741-4616-96ff-9350734b19da', 1100, '$9.99', '10% bonus'],
+    ['c19c183a-a27a-4918-8d3c-f94e684fb2d8', 2400, '$19.99', '20% bonus'], ['27c5a9e9-b7fb-48d9-90c8-a450b85e083a', 6500, '$49.99', 'Best value']];
+  const homeUrl = () => location.origin + '/lanternhold/';
+  const wixGet = () => { try { return JSON.parse(localStorage.getItem(WIX_KEY) || 'null'); } catch (e) { return null; } };
+  const wixPut = w => { try { w ? localStorage.setItem(WIX_KEY, JSON.stringify(w)) : localStorage.removeItem(WIX_KEY); } catch (e) {} };
+  async function wixPost(path, body, tok) {
+    const r = await fetch(WIX + path, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, tok ? { Authorization: tok } : {}), body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error('store ' + r.status), { code: 'store' });
+    return j;
   }
+  const keepTokens = (j, old) => { const w = Object.assign({}, old || {}, { a: j.access_token, x: Date.now() + (j.expires_in || 3600) * 1000 }); if (j.refresh_token) w.r = j.refresh_token; wixPut(w); return w; };
+  async function wixToken() {
+    const w = wixGet(); if (!w) return null;
+    if (w.a && w.x > Date.now() + 60000) return w.a;
+    if (!w.r) return null;
+    try { return keepTokens(await wixPost('/oauth2/token', { clientId: WIX_APP, grantType: 'refresh_token', refreshToken: w.r }), w).a; }
+    catch (e) { wixPut(null); return null; }
+  }
+  const b64u = buf => btoa(String.fromCharCode.apply(null, new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const rnd = n => b64u(crypto.getRandomValues(new Uint8Array(n)));
+  async function wixGo(body, tok) {
+    if (!tok) tok = (await wixPost('/oauth2/token', { clientId: WIX_APP, grantType: 'anonymous' })).access_token;
+    const r = await wixPost('/redirect-session/v1/redirect-session', body, tok);
+    save(); if (signedIn()) await Promise.race([pushCloud(true), new Promise(ok => setTimeout(ok, 3000))]);
+    location.href = r.redirectSession.fullUrl;
+  }
+  async function storeSignIn() {
+    const v = rnd(48), st = rnd(12), ch = b64u(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+    try { sessionStorage.setItem('lh_pkce', JSON.stringify({ v, st })); } catch (e) {}
+    await wixGo({ auth: { authRequest: { redirectUri: homeUrl(), clientId: WIX_APP, codeChallenge: ch, codeChallengeMethod: 'S256', responseMode: 'fragment', responseType: 'code', scope: 'offline_access', state: st } } });
+  }
+  async function buyPack(id) {
+    const tok = await wixToken();
+    if (!tok) return storeSignIn();
+    await wixGo({ paidPlansCheckout: { planId: id }, callbacks: { postFlowUrl: homeUrl() + '?store=back', thankYouPageUrl: homeUrl() + '?store=paid' } }, tok);
+  }
+  let storeBusy = false;
+  async function storeSync(loud) {
+    if (storeBusy || !CL || !signedIn()) return;
+    const tok = await wixToken(); if (!tok) return;
+    storeBusy = true;
+    try {
+      const r = await papi('POST', '/store/sync', { token: tok });
+      const w = wixGet(); if (w) { w.n = r.name; wixPut(w); }
+      if (prof) prof.bal = r.bal;
+      if (r.added) { sfx.buy(); toast('star', '+' + r.added.toLocaleString() + ' ' + TOKEN, 'Your store purchase is in your wallet. Thank you for supporting Lanternhold!', 'feat'); }
+      else if (loud) toast('star', 'All caught up', 'No new store purchases on ' + r.name + '. A new purchase can take a minute to show.', '');
+    } catch (e) {
+      if (e.code === 'taken') { wixPut(null); toast('lock', 'Store account already linked', 'That Born 2 Game account is linked to another hero. Sign in to the game as that hero to use it.', 'warn'); }
+      else if (e.code === 'wix') { wixPut(null); if (loud) toast('lock', 'Store sign-in expired', 'Sign in with your Born 2 Game account again.', 'warn'); }
+      else if (loud) toast('lock', 'Could not reach the store', 'Try again in a moment.', 'warn');
+    }
+    storeBusy = false;
+  }
+  // Back from the store: finish the sign-in, or look for a new purchase.
+  async function storeReturn() {
+    const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
+    const code = h.get('code'), err = h.get('error'), back = q.get('store');
+    if (!code && !err && !back) return false;
+    q.delete('store'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
+    if (code) {
+      let p = null; try { p = JSON.parse(sessionStorage.getItem('lh_pkce') || 'null'); sessionStorage.removeItem('lh_pkce'); } catch (e) {}
+      if (!p || p.st !== h.get('state')) return;
+      try { keepTokens(await wixPost('/oauth2/token', { clientId: WIX_APP, grantType: 'authorization_code', redirectUri: homeUrl(), code, codeVerifier: p.v })); }
+      catch (e) { toast('lock', 'Store sign-in did not finish', 'Try signing in again from Get Sigils.', 'warn'); return; }
+      if (!signedIn()) { toast('star', 'Store account remembered', 'Sign in to the game and your purchases will reach your hero.', ''); return; }
+      await storeSync(false);
+      const w = wixGet(); if (w && w.n) toast('user', 'Store account linked', w.n + ' is linked to this hero. Packs you buy land in your wallet.', 'feat');
+    } else if (back) {
+      await storeSync(back === 'paid');
+      if (back === 'paid') setTimeout(() => storeSync(false), 20000);
+    }
+    return true;
+  }
+  function getSigils(back) {
+    back = typeof back === 'function' ? back : closeModal;
+    const w = wixGet(), linked = !!(w && (w.a || w.r));
+    const tiles = PACKS.map(p => '<button class="pack" data-pack="' + p[0] + '">' + sigil + '<b>' + p[1].toLocaleString() + '</b><small>' + TOKEN + '</small>' + (p[3] ? '<em>' + p[3] + '</em>' : '') + '<span>' + p[2] + '</span></button>').join('');
+    modal('<div class="maphead"><div><h2>Get ' + TOKEN + '</h2><small>Looks for your profile, or sell them to other players for gold.</small></div><button class="iconbtn" id="gs-x" aria-label="Close">&times;</button></div>' +
+      '<div class="packs">' + tiles + '</div>' +
+      (!signedIn() ? '<p class="note">Sign in to the game first so we know which hero gets the ' + TOKEN + '.</p>' :
+        linked ? '<div class="storelink"><span>Store account: <b>' + esc(w.n || 'linked') + '</b></span><button class="btn small ghost" id="gs-sync">Check for purchases</button><button class="btn small ghost" id="gs-out">Unlink</button></div>' :
+        '<div class="storelink"><span>Packs are sold in the Born 2 Game store. Sign in there once and every pack you buy lands on this hero.</span><button class="btn small" id="gs-in">Sign in with Born 2 Game</button></div>') +
+      '<p class="note">Payment is handled by the Born 2 Game store at born2gamellc.com. Every account also starts with 100 ' + TOKEN + ', and the team hands more out at Grand War events.</p>' +
+      '<div class="row"><button class="btn ghost" id="gs-ok">Back</button></div>', md => {
+        md.querySelector('#gs-x').onclick = closeModal; md.querySelector('#gs-ok').onclick = () => back();
+        const go = async (b, f) => { b.disabled = true; try { await f(); } catch (e) { b.disabled = false; toast('lock', 'Could not reach the store', 'Check your connection and try again.', 'warn'); } };
+        md.querySelectorAll('[data-pack]').forEach(b => b.onclick = () => {
+          if (!signedIn()) { toast('user', 'Sign in first', 'Make a free game account so your ' + TOKEN + ' have a home.', 'warn'); return; }
+          go(b, () => buyPack(b.dataset.pack));
+        });
+        const i = md.querySelector('#gs-in'); if (i) i.onclick = () => go(i, storeSignIn);
+        const sy = md.querySelector('#gs-sync'); if (sy) sy.onclick = async () => { sy.disabled = true; await storeSync(true); getSigils(back); };
+        const o = md.querySelector('#gs-out'); if (o) o.onclick = () => { wixPut(null); toast('user', 'Store account unlinked', 'This device no longer checks it for purchases.', ''); getSigils(back); };
+      });
+  }
+  setTimeout(() => { storeReturn().then(done => { if (!done) storeSync(false); }); }, 1500);
   async function linkCommander(n) {
     n = String(n || '').trim();
     if (n && !commander(n)) { toast('lock', 'Commander not found', 'Pick your name from the Grand War list. It must match the war ladder exactly.', 'warn'); return; }
@@ -2533,7 +2632,7 @@
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten, where you are and where other delvers have reached. Tap a region to zoom in on its ten floors and read its dossier (its history, who holds it, its monsters and its guardian), then tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 4% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
-    ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset. You can also trade Sigils with other players for gold on the <b>Sigils</b> page of the Trading Post.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
+    ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in. Want more Sigils? Press <b>Get Sigils</b>, sign in once with your Born 2 Game store account, and buy a pack. It lands in your wallet within a minute.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset. You can also trade Sigils with other players for gold on the <b>Sigils</b> page of the Trading Post.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
     ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
     ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
@@ -2555,6 +2654,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 25, date: 'November 23, 2026', title: 'Sigil packs', items: [
+      'Sigil packs are here: 500 for $4.99, 1,100 for $9.99, 2,400 for $19.99 and 6,500 for $49.99. Press Get Sigils on your profile or in the Sigil exchange.',
+      'Sign in once with your Born 2 Game store account. Packs you buy in the store land in your hero’s wallet automatically, usually within a minute.',
+      'Sigils still only buy looks, or gold from other players on the exchange. They never buy power.'] },
     { v: 24, date: 'November 23, 2026', title: 'Automatic updates', items: [
       'When a new version comes out, the game now saves your progress and reloads itself after a short countdown, so everyone always plays the latest version with the latest fixes.'] },
     { v: 23, date: 'November 23, 2026', title: 'Smaller numbers and the Sigil exchange', items: [

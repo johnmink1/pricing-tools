@@ -1033,7 +1033,7 @@
       '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>' +
       '<div class="dollbar"><small>' + cname + ' gear only. Tap a slot to change it. Worn gear stays on the character, not in the pack.</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
-    $('bagcount').textContent = L.packCount(S) + '/' + L.bagCap(S);
+    $('bagcount').textContent = S.boh ? L.packCount(S) + ' · Bag of Holding' : L.packCount(S) + '/' + L.bagCap(S); $('g-boh').hidden = !!S.boh || !CL;
     const tile = (it, dim) => {
       const w = L.wearer(S, it.uid), fit = it.cls === m.cls;
       const d = fit && !w ? Math.round((L.itemScore(it) - L.replaces(S, gearWho, it).reduce((a, x) => a + L.itemScore(x), 0)) * 100) : 0;
@@ -1265,6 +1265,7 @@
     draw();
   }
   $('g-scrap').addEventListener('click', openScrap);
+  $('g-boh').addEventListener('click', () => openBoh());
   $('b-oil').addEventListener('click', () => { if (L.useOil(S)) { sfx.relic(); save(); toast('oil', 'The lantern flares', '+15 seconds of oil for this guardian.', 'feat'); } });
   // ---------- panel: relics, feats, ledger, rekindle ----------
   function updateRelics() {
@@ -1335,7 +1336,7 @@
       '<div class="ktree">' + tree.map(br => '<div class="kbranch"><h4>' + br.b + '</h4>' + br.s.map(node).join('<i class="klink"></i>') + '</div>').join('') + '</div>' +
       '<div class="kfoot"><span>Spent ' + L.skillSpent(S) + ' of 48</span>' + (L.skillSpent(S) ? '<button class="btn ghost small" id="k-reset">Reset tree</button>' : '') + '</div>' +
       '<h3 class="sub">Spend Kindling</h3><div class="kshop">' +
-      '<div class="kitem"><div class="kic">' + icon('bag') + '</div><div><b>Bigger pack</b><small>+' + L.BAG_STEP + ' bag slots. You have ' + L.bagCap(S) + '.</small></div>' +
+      '<div class="kitem"><div class="kic">' + icon('bag') + '</div><div><b>Bigger pack</b><small>+' + L.BAG_STEP + ' bag slots. You have ' + (S.boh ? 'endless room with your Bag of Holding' : L.bagCap(S)) + '.</small></div>' +
       (capNext > 0 ? '<button class="btn small" id="k-bag"' + (k >= bc ? '' : ' disabled') + '>' + bc + ' Kindling</button>' : '<em class="kmax">Full size</em>') + '</div>' +
       '<div class="kitem"><div class="kic">' + icon('gear-trinket') + '</div><div><b>Rings and a second trinket</b><small>Every character can open rings 2 to 5 and a second trinket slot. Tap a locked slot on the Gear tab.</small></div><button class="btn ghost small" id="k-gear">Open Gear</button></div>' +
       L.KINDLE_UPS.map(u => { const r = (S.kup || {})[u.id] || 0, c = L.kupCost(S, u.id);
@@ -1837,6 +1838,7 @@
     if (!CL || !signedIn()) return null;
     try { prof = await papi('GET', '/profile'); } catch (e) { return prof; }
     if ((prof.pass || 0) !== (S.pass || 0)) { S.pass = prof.pass || 0; save(); updatePanel(true); }
+    if (!!prof.boh !== !!S.boh) { S.boh = !!prof.boh; save(); updateGear(true); }
     // A verified commander link turns on the hero's Grand War aura.
     const had = JSON.stringify(S.war || null);
     if (prof.wv && prof.wl) { await loadWar(); const c = commander(prof.wl); if (c) S.war = { n: c.n, lv: c.lv | 0, h: c.h.slice(0, 12) }; }
@@ -1919,10 +1921,11 @@
       '<div class="pfwrap">' + looksCard(me) + '</div>' +
       '<div class="pfbal"><span>' + sigil + '<b>' + prof.bal + '</b> ' + TOKEN + '</span><button class="btn small ghost" id="pe-get">Get Sigils</button></div>' +
       '<div class="pfbal pass"><span>Lantern Pass: <b>' + (passLeft() || 'none') + '</b></span><button class="btn small ghost" id="pe-pass">' + (passLeft() ? 'Extend' : 'Get the pass') + '</button></div>' +
+      '<div class="pfbal pass"><span>Bag of Holding: <b>' + (S.boh ? 'owned' : 'none') + '</b></span>' + (S.boh ? '' : '<button class="btn small ghost" id="pe-boh">See it</button>') + '</div>' +
       '<div class="seg pfseg">' + tabs + '</div><div class="pfbody">' + body + '</div>' +
       '<div class="row"><button class="btn ghost" id="pe-cancel">Cancel</button><button class="btn" id="pe-save">Save profile</button></div>', md => {
         md.querySelector('#pe-x').onclick = closeModal; md.querySelector('#pe-cancel').onclick = closeModal;
-        md.querySelector('#pe-get').onclick = () => getSigils(paintEditor); md.querySelector('#pe-pass').onclick = openPass;
+        md.querySelector('#pe-get').onclick = () => getSigils(paintEditor); md.querySelector('#pe-pass').onclick = openPass; const bo = md.querySelector('#pe-boh'); if (bo) bo.onclick = () => openBoh();
         md.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { if (edTab === 'b') draft.b = (md.querySelector('#pe-bio') || {}).value || draft.b; edTab = b.dataset.et; paintEditor(); });
         const bio = md.querySelector('#pe-bio'); if (bio) bio.oninput = () => { draft.b = bio.value; md.querySelector('#pe-bc').textContent = bio.value.length + ' / 140'; };
         md.querySelectorAll('[data-cos]').forEach(b => b.onclick = () => pickCos(edTab, b.dataset.cos));
@@ -2116,6 +2119,27 @@
           y.disabled = true;
           try { const r = await papi('POST', '/store/pass'); S.pass = r.pass; prof.bal = r.bal; prof.pass = r.pass; save(); sfx.buy(); updatePanel(true); updateSeats(true); toast('star', 'Lantern Pass active', 'Auto-train, extra bag slots and longer offline time for ' + passLeft() + '.', 'feat'); closeModal(); }
           catch (e) { y.disabled = false; toast('lock', 'That did not go through', e.code === 'funds' ? 'Not enough ' + TOKEN + '.' : 'Try again in a moment.', 'warn'); }
+        };
+      });
+  }
+  // ---------- Bag of Holding: endless pack space, bought once for 6,500 Sigils ----------
+  async function openBoh() {
+    if (CL && signedIn() && !prof) await loadProfile();
+    const can = prof && prof.bal >= L.BOH_COST;
+    modal('<div class="maphead"><div><h2>Bag of Holding</h2><small>Bought once, yours for good. Never power.</small></div><button class="iconbtn" id="bh-x" aria-label="Close">&times;</button></div>' +
+      '<div class="bohart">' + icon('bag') + '</div>' +
+      '<p>A satchel stitched from Rift-silk by the Hold’s quartermasters. Whatever goes in finds room, and nothing is ever sold off because your pack was full.</p>' +
+      '<ul class="passfx"><li><b>Endless pack</b><span>No item limit. Keep every set piece and job item you find.</span></li>' +
+      '<li><b>No more auto-selling</b><span>Loot is never sold off for lack of space, and market returns and mail always fit.</span></li></ul>' +
+      (S.boh ? '<p class="passstate">You own the Bag of Holding.</p>' : '<p class="passstate">Costs <b>' + fmt(L.BOH_COST) + ' ' + TOKEN + '</b>, once. ' + (prof ? 'You have ' + fmt(prof.bal) + '.' : '') + '</p>') +
+      (!signedIn() ? '<p class="note">Sign in to the game to buy it with ' + TOKEN + '.</p>' : '') +
+      '<div class="row"><button class="btn ghost" id="bh-no">' + (S.boh ? 'Close' : 'Not now') + '</button>' + (signedIn() && !S.boh ? (can ? '<button class="btn" id="bh-buy">' + sigil + ' Buy for ' + fmt(L.BOH_COST) + ' ' + TOKEN + '</button>' : '<button class="btn" id="bh-get">Get ' + TOKEN + '</button>') : '') + '</div>', md => {
+        md.querySelector('#bh-x').onclick = closeModal; md.querySelector('#bh-no').onclick = closeModal;
+        const g = md.querySelector('#bh-get'); if (g) g.onclick = () => getSigils(openBoh);
+        const y = md.querySelector('#bh-buy'); if (y) y.onclick = async () => {
+          y.disabled = true;
+          try { const r = await papi('POST', '/store/pass', { what: 'boh' }); S.boh = true; prof.bal = r.bal; prof.boh = true; save(); try { pushCloud(true); } catch (e) {} sfx.relic(); updateGear(true); toast('bag', 'Bag of Holding', 'Your pack has endless room now.', 'feat'); closeModal(); }
+          catch (e) { y.disabled = false; toast('lock', 'That did not go through', e.code === 'funds' ? 'Not enough ' + TOKEN + '.' : e.code === 'state' ? 'You already own one.' : 'Try again in a moment.', 'warn'); }
         };
       });
   }
@@ -2888,7 +2912,7 @@
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 4% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
     ['Earning Sigils', '<p>You can earn Sigils without spending money. <b>Daily quests</b> (the counter at the top) pay 1 Sigil each and 2 more for finishing all three. Treasure chests and guardians sometimes hold 1 to 3 Sigils. Going deeper and the Kindling upgrade <b>Sigil Sense</b> raise those odds. You can also sell gear for gold and buy Sigils from other players on the exchange.</p>'],
     ['Mercy’s Blessing', '<p>Real donations to the Grand War’s Mercy Corps bless every hero in Lanternhold: +10% gold, +10% party health and +20% healing. Each $10 given, 5 food items or toy donated adds 2 hours, up to 7 days ahead. While it burns, a green heart at the top shows the time left. Tap it to see how to give.</p>'],
-    ['Lantern Pass', '<p>The Lantern Pass costs 500 Sigils for 30 days, and buying it again adds another 30. It only makes the game more convenient and never makes you stronger:</p><ul><li><b>Auto</b> training buttons for every character</li><li><b>+10 bag slots</b></li><li><b>+4 hours</b> of earning while you are away</li></ul><p>Every save gets a free 3-day trial. Tap any locked Auto button to start it, or find the pass under <b>Customize profile</b> on your hero’s portrait.</p>'],
+    ['Lantern Pass', '<p>The Lantern Pass costs 500 Sigils for 30 days, and buying it again adds another 30. It only makes the game more convenient and never makes you stronger:</p><ul><li><b>Auto</b> training buttons for every character</li><li><b>+10 bag slots</b></li><li><b>+4 hours</b> of earning while you are away</li></ul><p>Every save gets a free 3-day trial. Tap any locked Auto button to start it, or find the pass under <b>Customize profile</b> on your hero’s portrait.</p><p><b>Bag of Holding</b>: a one-time buy for 6,500 Sigils that gives you an endless pack. Nothing is ever auto-sold for lack of room. Find it next to your pack on the Gear tab.</p>'],
     ['Your banner', '<p>Your hero flies one of five banners, and each gives a perk: Iron Covenant +15% party health, Radiant Ascendancy +12% party damage, Devouring Tide +15% gold, Mercy Corps +15% healing, Unsworn +5% health, damage and gold.</p><p><b>Banner kin</b>: every companion or recruited hero in your party who flies your banner makes your perk 40% stronger. The line above your party shows how many kin you have. Banner chat is a good place to find them.</p>'],
     ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in. Want more Sigils? Press <b>Get Sigils</b>, sign in once with your Born 2 Game store account, and buy a pack. It lands in your wallet within a minute.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset. You can also trade Sigils with other players for gold on the <b>Sigils</b> page of the Trading Post.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
     ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
@@ -2912,6 +2936,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 32, date: 'November 23, 2026', title: 'Bag of Holding', items: [
+      'New in the store: the Bag of Holding. Buy it once for 6,500 Sigils and your pack never fills up again, so loot is never sold off for lack of space.',
+      'Find it on the Gear tab next to your pack, under Market and Sigils, or in your profile.'] },
     { v: 31, date: 'November 23, 2026', title: 'Party invites', items: [
       'Recruiting a player now sends them an invite. Their hero joins your party only after they accept.',
       'Invites you receive show at the top of the Players Guild on the Party tab, with Accept and Decline. You also get a notice when one arrives.',
@@ -3128,6 +3155,7 @@
   // The Sigil exchange: cheapest gold per Sigil first. Buying moves the Sigils to your account and the gold to the seller's mailbox.
   function sigilsView() {
     let h = '<div class="sigex"><div class="sigbal">' + sigil + '<span>You have <b>' + (prof ? prof.bal.toLocaleString() : '…') + '</b> ' + TOKEN + '</span><button class="btn small ghost" id="s-get">Get Sigils</button></div>';
+    if (!S.boh) h += '<div class="sigbal boh">' + icon('bag') + '<span><b>Bag of Holding</b>: an endless pack, bought once for ' + fmt(L.BOH_COST) + ' ' + TOKEN + '.</span><button class="btn small ghost" id="s-boh">See it</button></div>';
     if (trade.msg) h += '<p class="note">' + esc(trade.msg) + '</p>';
     const x = trade.sig;
     if (x) {
@@ -3278,6 +3306,7 @@
     const d = t.dataset;
     if (t.id === 't-signin') { authForm('in'); return; }
     if (t.id === 's-get') { getSigils(); return; }
+    if (t.id === 's-boh') { openBoh(); return; }
     if (t.id === 's-list') tradeAct(async () => {
       const n = Math.floor(+$('s-n').value), p = Math.floor(+$('s-p').value);
       if (!(n >= 1) || !(p >= 1)) { toast('lock', 'Check the numbers', 'Enter how many Sigils to sell and a total price in gold.', 'warn'); return; }

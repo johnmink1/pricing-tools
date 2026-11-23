@@ -30,7 +30,7 @@ exports.handler = async (e) => {
     await db.send(new D.UpdateItemCommand({ TableName: H, Key: hk, UpdateExpression: x, ConditionExpression: 'attribute_exists(pid) AND attribute_not_exists(ban)', ...(v && { ExpressionAttributeValues: v }) }));
     await db.send(new D.UpdateItemCommand({ TableName: W, Key: wk, UpdateExpression: x, ...(v && { ExpressionAttributeValues: v }) }));
   };
-  const out = w => ({ bal: +w.bal.N, own: w.own.SS, pf: w.pf ? JSON.parse(w.pf.S) : null, wl: w.wl ? w.wl.S : '', wv: !!(w.wv && w.wv.N === '1'), pass: w.pass ? +w.pass.N : 0 });
+  const out = w => ({ bal: +w.bal.N, own: w.own.SS, pf: w.pf ? JSON.parse(w.pf.S) : null, wl: w.wl ? w.wl.S : '', wv: !!(w.wv && w.wv.N === '1'), pass: w.pass ? +w.pass.N : 0, boh: !!w.boh });
   try {
     if (rk === 'GET /profile') {
       const w = await wallet(), h = await hero(me);

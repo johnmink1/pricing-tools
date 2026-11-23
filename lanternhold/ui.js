@@ -1,4 +1,4 @@
-/* lh-build 202611232219 */
+/* lh-build 202611232221 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -3444,7 +3444,29 @@
         (beats.length ? '<dt>Story</dt><dd>' + beats.map(s => '<button class="linkbtn" data-scene="' + s.id + '">Chapter ' + s.ch + ': ' + esc(s.title) + '</button>').join('') + '</dd>' : '') +
         (here.length ? '<dt>Delvers here</dt><dd>' + here.slice(0, 6).map(p => esc(p.name) + ' <small>(floor ' + p.floor + ')</small>').join(', ') + '</dd>' : '') +
       '</dl>' +
-      '<div class="dos-go"><button class="btn small" data-go="' + to + '">Travel to floor ' + to + '</button>' + (to > x.first ? '<button class="btn small ghost" data-go="' + x.first + '">Region entrance</button>' : '') + '</div></div>';
+      '<div class="dos-go"><button class="btn small" data-go="' + to + '">Travel to floor ' + to + '</button>' + (to > x.first ? '<button class="btn small ghost" data-go="' + x.first + '">Region entrance</button>' : '') + '</div>' + lootList(x.first) + '</div>';
+  }
+  // Possible loot (John, 2026-11-23): the region's drops with this player's real odds per kill, from L.regionLoot.
+  const LOOT_COLOR = Object.assign({}, RARITY_COLOR, { relic: '#ff9f5a', sigil: '#9fd0ff', goblin: '#7dff6a' });
+  function lootPct(p) {
+    if (p >= 0.995) return '100%';
+    if (p >= 0.1) return Math.round(p * 100) + '%';
+    if (p >= 0.01) return (p * 100).toFixed(1) + '%';
+    if (p >= 0.001) return (p * 100).toFixed(2) + '%';
+    return '1 in ' + fmt(Math.round(1 / p));
+  }
+  let lootOpen = true;
+  try { lootOpen = localStorage.getItem('lh_loot') !== '0'; } catch (e) {}
+  document.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('dos-loot')) { lootOpen = e.target.open; try { localStorage.setItem('lh_loot', lootOpen ? '1' : '0'); } catch (x) {} } }, true);
+  function lootList(first) {
+    const R = L.regionLoot(S, first), b = R.bonus, up = Math.round((b.total - 1) * 100);
+    const why = (b.parts.length ? 'Your gear-drop bonus: ' + b.parts.map(x => x[0] + ' +' + (x[1] * 100).toFixed(1) + '%').join(', ') + '. ' : 'No gear-drop bonus yet. Keen Eye, Luck, the Forager camp job, Finder enchants and the Seeker’s Charm all raise it. ') +
+      'Odds are per kill of that kind. In fights here: chests ' + (R.rates.chest * 100).toFixed(1) + '%, elites ' + Math.round(R.rates.elite * 100) + '%, ambushes ' + Math.round(R.rates.pack * 100) + '%. ' +
+      'Lantern Surge and region mastery add gold and XP, not drops. Relic and Goblin Sack odds are fixed.';
+    return '<details class="dos-loot"' + (lootOpen ? ' open' : '') + '><summary><span>Possible loot</span><small>' + (up ? '<b>+' + up + '%</b> drop bonus' : 'no drop bonus') + '</small></summary>' +
+      R.rows.map(r => '<div class="lt"><div class="lt-h"><b style="color:' + (LOOT_COLOR[r.rar] || 'inherit') + '">' + esc(r.name) + '</b><small>' + esc(r.note) + '</small></div>' +
+        '<div class="lt-s">' + r.src.map(x => '<span><small>' + esc(x[0]) + '</small> ' + lootPct(x[1]) + '</span>').join('') + '</div></div>').join('') +
+      '<p class="lt-f">Per kill, for your party right now. Bosses guard floors ' + (first + 4) + ' and ' + (first + 9) + '. ' + tipI(why) + '</p></details>';
   }
   function overview(base, reached) {
     const regs = L.BIOMES.map((_, r) => regionInfo(r, base, reached));
@@ -3921,7 +3943,7 @@
         'Rekindle when progress slows down.']],
       ['Story, journal and map', 'i:book', 'The story unfolds as you descend.', [
         'Replay scenes in the <b>Journal</b>.',
-        'The <b>Map of the Deep</b> shows every region and lets you travel to floors you have reached.']],
+        'The <b>Map of the Deep</b> shows every region and lets you travel to floors you have reached. Each region’s dossier lists its <b>possible loot</b> with your real odds per kill, after your drop bonuses.']],
     ] },
     { id: 'sigils', name: 'Sigils and perks', icon: 'star', topics: [
       ['Earning Sigils', 'i:star', 'You can earn Sigils without spending money.', [
@@ -3992,6 +4014,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 69, date: 'November 23, 2026', title: 'Know what you are hunting', items: [
+      'Every region on the Map of the Deep now shows its possible loot: the region set, class and job set pieces, each gear rarity, relics, Sigils and the Loot Goblin’s Sack.',
+      'Each drop shows your own odds per kill from bosses, chests, elites, ambushes and ordinary foes, worked out from the same rules the game uses, after your Keen Eye, Luck, Forager, Finder enchants, companion traits and Seeker’s Charm.',
+      'The header shows your total drop bonus. Tap the (i) for the breakdown. Lantern Surge and region mastery raise gold and XP, not drop chances, so they do not change these numbers.'] },
     { v: 68, date: 'November 23, 2026', title: 'Guild invites fixed', items: [
       'Fixed: the Invite buttons in the Guild tab did nothing. Pressing Invite now sends the invite right away, shows Invited with a Cancel button, and pops up a notice. The same fix covers accepting or declining party invitations and opening a hero’s profile from the Guild tab.'] },
     { v: 67, date: 'November 23, 2026', title: 'The Nexus Guardian', items: [

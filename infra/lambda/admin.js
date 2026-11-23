@@ -1,4 +1,4 @@
-// Lanternhold admin: server wipe and player bans. Only members of the Cognito "admins" group get in.
+// Lanternhold admin: player list and bans (the server wipe and player reset live in reset.js). Only members of the Cognito "admins" group get in.
 // GET /epoch is public: clients compare it with their save and start over after a wipe.
 const D = require('@aws-sdk/client-dynamodb');
 const C = require('@aws-sdk/client-cognito-identity-provider');
@@ -18,18 +18,6 @@ async function scanAll(T, keep) {
     k = r.LastEvaluatedKey;
   } while (k);
   return out;
-}
-async function clear(T, keys, keep) {
-  const items = await scanAll(T, keep);
-  for (let i = 0; i < items.length; i += 25) {
-    let req = { [T]: items.slice(i, i + 25).map(it => ({ DeleteRequest: { Key: Object.fromEntries(keys.map(k => [k, it[k]])) } })) };
-    for (let n = 0; n < 6 && req && Object.keys(req).length; n++) {
-      const r = await db.send(new D.BatchWriteItemCommand({ RequestItems: req }));
-      req = r.UnprocessedItems;
-      if (req && Object.keys(req).length) await new Promise(z => setTimeout(z, 200 * (n + 1)));
-    }
-  }
-  return items.length;
 }
 exports.handler = async (e) => {
   const rk = e.routeKey;
@@ -52,15 +40,6 @@ exports.handler = async (e) => {
       seen: i.seen ? +i.seen.N : 0, on: i.seen ? now - i.seen.N < 18e4 : false, banned: !!i.ban, canBan: !!i.u,
     })).sort((a, c) => c.seen - a.seen);
     return res(200, { players: list, epoch: await getEpoch() });
-  }
-  if (rk === 'POST /admin/wipe') {
-    if (b.confirm !== 'WIPE') return res(400, { error: 'confirm' });
-    const saves = await clear(SAVES, ['userId'], i => i.userId.S === '#epoch');
-    const heroes = await clear(HEROES, ['pid'], i => !!i.ban);
-    const trade = await clear(TRADE, ['pk', 'sk']);
-    const epoch = Date.now();
-    await db.send(new D.PutItemCommand({ TableName: SAVES, Item: { userId: S('#epoch'), data: S(''), updated: { N: String(epoch) } } }));
-    return res(200, { ok: true, epoch, saves, heroes, trade });
   }
   if (rk === 'POST /admin/ban' || rk === 'POST /admin/unban') {
     const id = String(b.id || '');

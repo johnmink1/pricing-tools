@@ -623,3 +623,4 @@ button.scene:hover{border-color:var(--accent)}
   #seats .seat .buy{min-width:84px;padding:6px 8px}
   .formhead{flex-wrap:wrap}.formhead small{display:none}
 }
+@media (min-width:721px){.tabs{gap:0;justify-content:space-between}.tabs button{padding:10px 7px 11px;font-size:14px;gap:5px}.tabs button svg{width:15px;height:15px}.tabs em{margin-left:0}}

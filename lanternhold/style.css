@@ -1,4 +1,4 @@
-/* lh-build 202611231532 */
+/* lh-build 202611231543 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1542,3 +1542,52 @@ a.iconbtn{text-decoration:none}
 .mmcap{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
 .taptip{position:absolute;right:10px;bottom:10px;margin:0;width:20px;height:20px;font-size:12px;background:rgba(4,7,13,.6);z-index:2}
 body.resting .taptip{display:none}
+/* ---- Tidy tabs v2: sub-views and compact rows ---- */
+.subseg{display:flex;gap:4px;margin:2px 0 10px;padding:3px;border:1px solid var(--line);border-radius:10px;background:#0a0f19}
+.subseg button{flex:1;padding:7px 10px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:600 13px/1 Inter,sans-serif;cursor:pointer}
+.subseg button.on{background:var(--panel);color:var(--text);box-shadow:inset 0 0 0 1px var(--line2)}
+.subseg button em{font-style:normal;color:var(--dim);font-weight:500;margin-left:4px}
+#tab-gear[data-view="kit"] .packbar,#tab-gear[data-view="kit"] #bag{display:none}
+#tab-gear[data-view="pack"] #gearslots,#tab-gear[data-view="pack"] .gset,#tab-gear[data-view="pack"] #gearsetbox{display:none}
+#tab-gear[data-view="pack"] .packbar{margin-top:0}
+#tab-rekindle[data-view="stats"] #skills,#tab-rekindle[data-view="stats"] .rekindle{display:none}
+#tab-rekindle[data-view="tree"] #charsheet,#tab-rekindle[data-view="tree"] .rekindle{display:none}
+#tab-rekindle[data-view="rekindle"] #charsheet,#tab-rekindle[data-view="rekindle"] #skills{display:none}
+/* camp: compact job tiles */
+.camp .jobs{gap:6px;margin:8px 0 10px}
+.camp .job{display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:6px;row-gap:0;align-items:center;padding:7px 8px;border-radius:10px}
+.camp .job .jic{grid-row:span 2}.camp .job .jic svg{width:18px;height:18px}
+.camp .job b{font-size:13px}.camp .job small{font-size:11.5px}
+.camp .job em{grid-column:2;font-size:11.5px}
+/* camp: compact companion rows */
+.seat.bench{grid-template-columns:40px minmax(0,1fr) 150px;padding:8px 10px;gap:10px}
+.seat.bench .lv{font-size:12px}
+.seat.bench .traits{margin-top:4px;gap:3px}
+.seat.bench .trait{padding:1px 6px;font-size:10.5px}
+.seat.bench .acts{gap:4px}
+.seat.bench .buy{padding:5px 8px}
+.seat.bench .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.seat.bench .minis button{padding:5px 2px;font-size:11.5px;min-width:0;justify-content:center}
+.seat.bench .minis .autot svg{width:11px;height:11px}
+/* skills: compact stat rows */
+.cgrid{gap:4px}
+.cstat{padding:5px 10px;gap:8px}
+.cscore{width:38px;padding-right:6px}.cscore b{font-size:17px}
+.ctx b{font-size:13.5px}.ctx small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbtns .btn.small{padding:5px 10px}
+.chead{margin:0 0 8px}.chead h3{font-size:18px}
+@media (max-width:520px){.seat.bench{grid-template-columns:40px minmax(0,1fr)}.seat.bench .acts{grid-column:1/-1}}
+/* fight log */
+.flogbox{margin-top:8px;border:1px solid var(--line);border-radius:10px;background:var(--bg2)}
+.flogbox>summary{cursor:pointer;padding:9px 12px;font:700 12px/1 var(--title);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.flogbox[open]>summary{border-bottom:1px solid var(--line)}
+.fseg{display:flex;gap:4px;padding:8px 10px 4px}
+.fseg button{padding:4px 10px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font:600 12px/1.2 Inter,sans-serif;cursor:pointer}
+.fseg button.on{color:var(--text);border-color:var(--gold);background:#2a2410}
+.flist{list-style:none;margin:0;padding:4px 10px 10px;max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.flist li{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:#b9c4d8;padding:3px 6px;border-radius:6px;border-left:2px solid transparent}
+.flist li time{color:var(--dim);font-size:11px;flex:none}
+.flist li em{font-style:normal;color:var(--dim)}
+.flist li .bad{color:#ff8a78}.flist li .good{color:#7fd88a}
+.flist li.fk-fight{border-left-color:#c8453a}.flist li.fk-party{border-left-color:#6cc4e8}.flist li.fk-loot{border-left-color:var(--gold)}
+.flist li.none{color:var(--dim);font-style:italic}

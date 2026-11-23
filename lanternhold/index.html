@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- lh-build 202611231532 -->
+<!-- lh-build 202611231543 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -51,7 +51,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611231532">
+<link rel="stylesheet" href="style.css?v=202611231543">
 </head>
 <body>
 <div id="app">
@@ -140,6 +140,7 @@
         <div class="kin" id="kinline" hidden></div>
         <div id="seats"></div>
         <details class="ftips"><summary id="fsum">Formation tips</summary><ul class="fnotes" id="fnotes"></ul></details>
+        <details class="flogbox" id="flogbox"><summary>Fight log <i class="tipi" data-tip="What happened in recent fights: kills, critical strikes, abilities, falls, ambushes and loot. Hits are summed up on each kill to keep it short.">i</i></summary><div id="flog"><div class="fseg"><button data-ff="all" class="on">All</button><button data-ff="fight">Fights</button><button data-ff="party">Party</button><button data-ff="loot">Loot</button></div><ul class="flist"></ul></div></details>
       </div>
       <div class="tabbody" id="tab-camp" hidden>
         <div id="campbar2"></div>
@@ -153,18 +154,20 @@
       <div class="tabbody" id="tab-ring" hidden><div id="ringbox"></div></div>
       <div class="tabbody" id="tab-gear" hidden>
         <div id="gearcamp"></div>
+        <div class="seg subseg"><button data-v="kit" class="on">Equipped</button><button data-v="pack">Pack <em id="packn"></em></button></div>
         <div class="whoseg" id="gearwho"></div>
         <div class="slots" id="gearslots"></div>
         <div class="packbar"><h3 class="sub">Pack <em id="bagcount"></em></h3><button class="btn ghost small" id="g-boh" hidden>Bag of Holding</button><button class="btn ghost small" id="g-msell" hidden>Mass sell</button><button class="btn ghost small" id="g-mmerge" data-tip="Merge spare copies of the same item in pairs. Each merge can fail and destroy both pieces.">Mass merge</button><button class="btn ghost small" id="g-scrap">Mass scrap</button></div>
         <div class="bag" id="bag"></div>
       </div>
       <div class="tabbody" id="tab-rekindle" hidden>
+        <div class="seg subseg"><button data-v="stats" class="on">Stats</button><button data-v="tree">Skill tree</button><button data-v="rekindle">Rekindle</button></div>
         <div id="charsheet"></div>
         <div id="skills"></div>
         <div class="rekindle">
           <svg viewBox="0 0 32 32" class="bigflame" aria-hidden="true"><use href="#i-lantern"/></svg>
           <h2>Rekindle the Lantern</h2>
-          <p>Return to the surface and pour what you learned into the lantern. Gold, floors and training reset. You gain <b>Embers</b>, each adding +4% damage and gold forever, and <b>Kindling</b> to spend on your skill tree, bag space and extra gear slots. Your companions, gear, relics, story and feats are kept.</p>
+          <p>Start over from the surface, stronger. <i class="tipi" data-tip="Gold, floors and training reset. You gain Embers, each adding +4% damage and gold forever, and Kindling to spend on your skill tree, bag space and extra gear slots. Your companions, gear, relics, story, Dust and feats are kept.">i</i></p>
           <div class="gain">You would gain <b id="embergain">0</b> Embers and <b id="kindgain">0</b> Kindling</div>
           <p class="muted" id="rekindlenote">Reach floor 50 to rekindle.</p>
           <button class="btn big" id="btn-rekindle" disabled>Rekindle</button>
@@ -253,11 +256,11 @@
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
 <div class="tip" id="tip" role="tooltip" hidden></div>
-<script>window.LH_BUILD = "202611231532";</script>
+<script>window.LH_BUILD = "202611231543";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611231532"></script>
-<script src="sprites.js?v=202611231532"></script>
-<script src="vector.js?v=202611231532"></script>
-<script src="ui.js?v=202611231532"></script>
+<script src="core.js?v=202611231543"></script>
+<script src="sprites.js?v=202611231543"></script>
+<script src="vector.js?v=202611231543"></script>
+<script src="ui.js?v=202611231543"></script>
 </body>
 </html>

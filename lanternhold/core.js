@@ -557,8 +557,8 @@
   // Total of one effect from your hero's tree, Grand War aura and character stats. It only counts while your hero is in the party.
   // Tonics from the Quartermaster: small timed buffs, one of each at a time; drinking again adds time up to an hour.
   const TONIC_CAP = 3600;
-  // Sigil prices for Quartermaster items; the server (perks.js IP) charges the same.
-  const ITEM_SIGILS = { draught: 10, oil: 5, t_fury: 15, t_bark: 15, t_mend: 10, t_keen: 10, t_gold: 20, t_loot: 20, t_xp: 15 };
+  // Sigils buy speed-ups only (John, 2026-11-23); combat tonics and Lantern Oil are gold only. perks.js IP charges the same.
+  const ITEM_SIGILS = { draught: 10, t_gold: 20, t_loot: 20, t_xp: 15 };
   const TONICS = [
     { id: 't_fury',   name: 'Draught of Fury',     icon: 'sword',  k: 'pdps',  v: 0.15, min: 10, mult: 3,   desc: '+15% party damage for 10 minutes.' },
     { id: 't_bark',   name: 'Ironbark Tonic',      icon: 'shield', k: 'php',   v: 0.15, min: 10, mult: 3,   desc: '+15% party health for 10 minutes.' },

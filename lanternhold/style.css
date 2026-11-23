@@ -1,4 +1,4 @@
-/* lh-build 202611231532 */
+/* lh-build 202611231542 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1149,6 +1149,12 @@ body.resting .arena{cursor:default}
 @keyframes mercyglow{50%{box-shadow:0 0 12px rgba(143,207,106,.45)}}
 .mercyfx{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px}.mercyfx li{padding:8px 12px;border-radius:10px;background:rgba(143,207,106,.1);border:1px solid rgba(143,207,106,.35);color:var(--text)}
 @media (max-width:560px){.stat.mercy{font-size:13px}}
+.stat.surge{color:#ffd36b;cursor:pointer;font:inherit;font-weight:800;font-size:15px;animation:surgeglow 2.4s ease-in-out infinite}
+.stat.surge:hover{border-color:#ffd36b}
+@keyframes surgeglow{50%{box-shadow:0 0 14px rgba(255,211,107,.5)}}
+.surgefx li{background:rgba(255,211,107,.1);border-color:rgba(255,211,107,.35)}
+.surgenote{margin:0 0 12px}.surgenote b{color:var(--gold)}
+@media (max-width:560px){.stat.surge{font-size:13px}}
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
 /* Lantern Pass */
 .passfx{list-style:none;padding:0;margin:8px 0 12px;display:grid;gap:8px}

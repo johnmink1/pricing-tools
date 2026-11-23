@@ -32,9 +32,10 @@ exports.handler = async (e) => {
     const r = await db.send(new ScanCommand({ TableName: T, Limit: 300 }));
     const cut = Date.now() - 30 * 864e5;
     let list = (r.Items || []).filter(i => i.pid.S !== me && i.name && i.seen && Number(i.seen.N) > cut)
-      .map(i => ({ id: i.pid.S, name: i.name.S, cls: i.cls.S, level: Number(i.lv.N), floor: Number(i.fl.N), side: i.sd ? i.sd.S : 'unsworn' }));
+      .map(i => ({ id: i.pid.S, name: i.name.S, cls: i.cls.S, level: Number(i.lv.N), floor: Number(i.fl.N), side: i.sd ? i.sd.S : 'unsworn', on: Date.now() - Number(i.seen.N) < 18e4 }));
     for (let k = list.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [list[k], list[j]] = [list[j], list[k]]; }
-    return res(200, { heroes: list.slice(0, 8) });
+    list.sort((a, c) => c.on - a.on);
+    return res(200, { heroes: list.slice(0, 10) });
   }
   if (rk === 'POST /recruit') {
     const id = String(b.heroId || '');

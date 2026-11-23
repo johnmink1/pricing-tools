@@ -170,7 +170,7 @@
   // ---------- party in the arena ----------
   const FOE_X = 0.72;
   const CLASS_ICON = { tank: 'shield', healer: 'cross', rogue: 'dagger', mage: 'flare', necro: 'skull' };
-  const memberAnim = {};
+  const memberAnim = {}, minionSwing = [];
   const mAnim = id => (memberAnim[id] = memberAnim[id] || { hit: 0, lunge: 0, x: 0, y: 0 });
   const FRONT = { tank: 0, rogue: 1, mage: 2, necro: 3, healer: 4 };
   function partyLayout() {
@@ -185,9 +185,21 @@
     const lay = partyLayout();
     const floorY = Math.round(H * 0.7);
     // skeleton minions stand between the party and the foe
+    // each skeleton winds back, lunges and rakes the foe with a ghostly claw
     S.minions.forEach((m, i) => {
-      const spr = sprite('minion', 0, false), x = Math.round(W * FOE_X) - 34 - i * 7, y = floorY - 16 + (i % 2) * 3;
-      ctx.globalAlpha = 0.9; ctx.drawImage(spr, x, y, spr.width * 2, spr.height * 2); ctx.globalAlpha = 1;
+      const spr = sprite('minion', 0, false), bx = Math.round(W * FOE_X) - 34 - i * 7, by = floorY - 16 + (i % 2) * 3;
+      const rate = 1.1 + (i % 3) * 0.17, ph = (tAnim * rate + i * 0.29) % 1;
+      const wind = ph > 0.78 ? (ph - 0.78) / 0.22 : 0, strike = ph < 0.16 ? 1 - ph / 0.16 : 0;
+      const dx = Math.round(strike * 6 - wind * 2), dy = -Math.round(strike * 2);
+      const w2 = spr.width * 2, h2 = spr.height * 2, cx = bx + dx + w2 / 2, cy = by + dy + h2;
+      ctx.save(); ctx.globalAlpha = 0.92; ctx.translate(cx, cy); ctx.rotate(strike * 0.22 - wind * 0.12);
+      ctx.drawImage(spr, -w2 / 2, -h2, w2, h2); ctx.restore();
+      const key = Math.floor(tAnim * rate + i * 0.29);
+      if (S.foe && foeAnim.cx && minionSwing[i] !== key && ph < 0.05) {
+        minionSwing[i] = key;
+        slashes.push({ x: foeAnim.cx - foeAnim.w * 0.25 + Math.random() * foeAnim.w * 0.2, y: foeAnim.cy + (Math.random() - 0.3) * foeAnim.h * 0.4, a: -0.6 + Math.random() * 0.4, t: tAnim, c: '#7affc8', big: false });
+        burst(cx + 6, cy - h2 / 2, 2, ['#d8cfb8', '#7affc8'], 14);
+      }
     });
     for (const p of lay) {
       const m = L.memberById(p.id), a = mAnim(p.id), down = !!S.down[p.id];
@@ -473,7 +485,7 @@
       const id = S.party[i];
       if (!id) {
         const canFill = S.unlocked.some(x => !S.party.includes(x)) || (S.guests || []).some(g => !S.party.includes(g.id));
-        html += '<div class="seat empty"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span><div class="ic">' + icon('user') + '</div><div class="info"><div class="nm">Empty seat</div><div class="lv">' + (canFill ? 'Pick a companion below to fill it.' : 'Recruit a player or meet more companions in the story. See <b>Grow your party</b> below.') + '</div></div></div>';
+        html += '<div class="seat empty"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span><div class="ic">' + icon('user') + '</div><div class="info"><div class="nm">Empty seat</div><div class="lv">' + (canFill ? 'Pick a companion below to fill it.' : 'Bring someone from the Campfire or recruit from the Players Guild below.') + '</div></div></div>';
         continue;
       }
       const m = L.memberById(id), down = S.down[id], hp = Math.max(0, S.hp[id] || 0), mx = L.maxHpOf(S, id);
@@ -489,7 +501,7 @@
         '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
         '<div class="lv">' + (down ? 'Fallen. Back up in ' + Math.ceil((down - now) / 1000) + 's' : memberStatsLine(id, now)) + '</div>' +
         '<div class="hpbar"><i data-hp="' + id + '"></i></div></div>' + btn +
-        (id !== 'you' && !guest ? '<button class="mini x" data-unseat="' + i + '" title="Send to camp" aria-label="Send to camp">&times;</button>' : '') + '</div>';
+        (id !== 'you' && !guest ? '<button class="mini x" data-unseat="' + i + '" title="Send to the campfire" aria-label="Send to the campfire">&times;</button>' : '') + '</div>';
     }
     if (html !== seatsHtml) {
       box.innerHTML = html; seatsHtml = html;
@@ -497,11 +509,11 @@
     }
     paintHp();
     const bench = S.unlocked.filter(x => !S.party.includes(x));
-    $('benchwrap').hidden = !bench.length;
-    const benchHtml = bench.map(id => {
+    let benchHtml = bench.map(id => {
       const m = L.memberById(id);
       return '<div class="seat bench">' + portrait(id) + '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + '</div><div class="lv">' + esc(m.title) + ' &middot; Level ' + L.lvl(S, id) + '</div><div class="line">' + esc(m.line) + '</div></div><button class="btn small" data-seat="' + id + '">Bring along</button></div>';
     }).join('');
+    if (!bench.length) benchHtml = '<p class="note">No one is at the fire. Everyone you have met is in your party.</p>';
     if ($('bench').dataset.h !== benchHtml) { $('bench').innerHTML = benchHtml; $('bench').dataset.h = benchHtml; }
   }
   $('tab-party').addEventListener('click', e => {
@@ -516,14 +528,13 @@
     else if (t.dataset.recruit) recruitPlayer(t.dataset.recruit);
     else if (t.id === 'b-find') findHeroes();
     else if (t.id === 'b-signin') openAccount();
-    else if (t.id === 'b-gomulti') goMulti();
     else if (t.id === 'f-recruit') { const g = $('grow'); g && g.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   });
   function pickSeat(id) {
     const empty = S.party.indexOf(null);
     if (empty >= 0) { L.seat(S, id, empty); updateSeats(true); updateAbilities(true); return; }
     const m = L.memberById(id);
-    modal('<h2>Who stays at camp?</h2><p>' + esc(m.name) + ' takes their seat.</p><div class="choice">' +
+    modal('<h2>Who goes back to the campfire?</h2><p>' + esc(m.name) + ' takes their seat.</p><div class="choice">' +
       S.party.map((x, i) => x === 'you' || !x ? '' : '<button class="pick" data-slot="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', level ' + L.lvl(S, x) + '</small></button>').join('') +
       '</div><div class="row"><button class="btn ghost" id="m-cancel">Cancel</button></div>', md => {
         md.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { L.seat(S, id, +b.dataset.slot); closeModal(); updateSeats(true); updateAbilities(true); paintBoard(); });
@@ -540,55 +551,34 @@
   function paintBoard() {
     const w = $('boardwrap');
     const open = S.party.filter(x => !x).length;
-    const met = S.unlocked.filter(id => id !== 'you' && !L.isGuest(S, id)).length;
     const nc = nextCompanion();
-    let h = '<h3 class="sub" id="grow">Grow your party</h3><div class="grow">';
-    // Story companions
-    h += '<div class="growcard"><div class="gh">' + icon('user') + '<b>Story companions</b></div>' +
-      '<p>Companions join on their own as the story moves forward. You have met <b>' + met + '</b> so far. Anyone not in a seat waits at camp above, and you can swap them in any time.</p>' +
-      (nc ? '<p class="next">Next to join: <b>' + esc(nc.name) + '</b> ' + classTag(nc.cls) + '<br><small>Keep following your goal: ' + esc(L.currentGoal(S)) + '.</small></p>' : '<p class="next">You have met every story companion.</p>') + '</div>';
-    // Other players
-    h += '<div class="growcard"><div class="gh">' + icon('users') + '<b>Recruit other players</b></div>';
-    if (S.mode !== 'multi') {
-      h += '<p>Other players’ heroes are stronger than story companions. To recruit them, switch this game to <b>Multiplayer</b> and sign in with a free account. Your progress, gear and companions all stay.</p>' +
-        '<button class="btn small" id="b-gomulti">Switch to Multiplayer</button>';
-    } else if (!CL) {
-      h += '<p>The hero board is not available right now. Try again later.</p>';
+    $('campnext').innerHTML = nc ? '<p class="next">Next to join the fire: <b>' + esc(nc.name) + '</b> ' + classTag(nc.cls) + '<br><small>They will find you as the story goes on. Your goal: ' + esc(L.currentGoal(S)) + '.</small></p>' : '<p class="next">Every story companion has found the fire.</p>';
+    let h = '<h3 class="sub" id="grow">Players Guild</h3><div class="growcard">' +
+      '<p>Heroes made by other players. They are stronger than story companions and fight at the level their owner trained them to. Your own hero is listed here too, and you earn gold whenever someone recruits it.</p>';
+    if (!CL) {
+      h += '<p>The Players Guild is not available right now. Try again later.</p>';
     } else if (!signedIn()) {
-      h += '<ol class="steps"><li><b>Sign in</b> with a free account.</li><li>Press <b>Find heroes</b> to see players you can recruit.</li><li>Press <b>Recruit</b> to put one in an empty seat.</li></ol>' +
+      h += '<ol class="steps"><li><b>Sign in</b> with a free account.</li><li>Press <b>Browse the guild</b> to see players’ heroes.</li><li>Press <b>Recruit</b> to put one in an empty seat.</li></ol>' +
         '<button class="btn small" id="b-signin">Sign in to recruit</button>';
     } else {
-      h += '<ol class="steps"><li>Press <b>Find heroes</b> to see players you can recruit.</li><li>Press <b>Recruit</b> to put one in an empty seat. They fight at the level their owner trained them to.</li><li>Your own hero is on the board too, and you earn gold each time someone recruits it.</li></ol>' +
-        (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note warnline">All five seats are full. Press &times; on a companion to send them to camp and make room.</p>') +
-        '<button class="btn small" id="b-find">' + (boardList ? 'Find different heroes' : 'Find heroes') + '</button>';
+      h += (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note warnline">All five seats are full. Press &times; on a companion to send them to the campfire and make room.</p>') +
+        '<button class="btn small" id="b-find">' + (boardList ? 'Show other heroes' : 'Browse the guild') + '</button>';
       if (boardMsg) h += '<p class="note">' + esc(boardMsg) + '</p>';
-      if (boardList) h += '<div class="board">' + boardList.map(g => '<div class="seat bench"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div><div class="info"><div class="nm">' + esc(g.name) + ' ' + classTag(g.cls) + '</div><div class="lv">Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
+      if (boardList) h += '<div class="board">' + boardList.map(g => '<div class="seat bench"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div><div class="info"><div class="nm">' + esc(g.name) + ' ' + classTag(g.cls) + '</div><div class="lv">' + (g.on ? '<span class="online">Online now</span> &middot; ' : '') + 'Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
         ((S.guests || []).some(x => x.id === 'p_' + g.id) ? '<span class="muted">In party</span>' : '<button class="btn small" data-recruit="' + g.id + '">Recruit</button>') + '</div>').join('') + '</div>';
       if ((S.guests || []).length) h += '<p class="note">To let a player’s hero go, press Dismiss on their seat.</p>';
     }
-    w.innerHTML = h + '</div></div>';
-  }
-  function goMulti() {
-    modal('<h2>Switch to Multiplayer?</h2><p>Your hero joins the board where other players can recruit it, and you can recruit theirs. Everything you have now stays: floors, gold, gear and companions.</p><p class="note">This needs a free account. You can play on without one, but recruiting needs sign-in.</p><div class="row"><button class="btn" id="m-yes">Switch</button><button class="btn ghost" id="m-no">Not now</button></div>', md => {
-      md.querySelector('#m-no').onclick = closeModal;
-      md.querySelector('#m-yes').onclick = () => {
-        S.mode = 'multi'; save();
-        closeModal(); sfx.buy();
-        toast('users', 'Multiplayer on', signedIn() ? 'Press Find heroes to recruit other players.' : 'Sign in to start recruiting other players.', 'feat');
-        if (signedIn()) publishHero(); else if (CL) setTimeout(() => authForm('in'), 300);
-        paintBoard();
-      };
-    });
+    w.innerHTML = h + '</div>';
   }
   async function findHeroes() {
-    boardMsg = 'Looking for heroes…'; paintBoard();
-    try { const r = await api('GET', null, '/heroes'); boardList = (r && r.heroes) || []; boardMsg = boardList.length ? '' : 'No other heroes yet. Check back soon.'; }
-    catch (e) { boardMsg = 'Could not reach the hero board. Try again in a moment.'; }
+    boardMsg = 'Searching the guild…'; paintBoard();
+    try { const r = await api('GET', null, '/heroes'); boardList = (r && r.heroes) || []; boardMsg = boardList.length ? '' : 'The guild hall is quiet right now. Check back soon.'; }
+    catch (e) { boardMsg = 'Could not reach the Players Guild. Try again in a moment.'; }
     paintBoard();
   }
   async function recruitPlayer(gid) {
     const g = (boardList || []).find(x => x.id === gid); if (!g) return;
-    if (!S.party.includes(null)) { toast('user', 'No empty seat', 'Send a companion to camp first, then recruit.', 'warn'); return; }
+    if (!S.party.includes(null)) { toast('user', 'No empty seat', 'Send a companion to the campfire first, then recruit.', 'warn'); return; }
     L.addGuest(S, { id: 'p_' + g.id, name: g.name, cls: g.cls, level: g.level });
     try { await api('POST', { heroId: g.id }, '/recruit'); } catch (e) {}
     toast('user', g.name + ' joins your party', 'A ' + L.CLASSES[g.cls].name + ' at level ' + g.level + '.', 'feat');
@@ -976,29 +966,24 @@
     necro: 'Raises skeletons that fight and soak up hits.',
   };
   function setup(note) {
-    let mode = 'solo', cls = 'rogue', side = 'covenant';
+    let cls = 'rogue', side = 'covenant';
     $('modal').dataset.lock = '1';
     const draw = () => modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Lanternhold</h2></div>' +
       (note ? '<p class="center">' + note + '</p>' : '<p class="center">The Grand War burns across the Shattered Reach. Beneath a forgotten Hold, a single lantern keeps a tear in the Nyx Rift shut, and every alliance wants what lies under it. Take the lantern down.</p>') +
-      '<h3 class="sub">How do you want to play?</h3><div class="modes">' +
-      '<button class="pick' + (mode === 'solo' ? ' on' : '') + '" data-mode="solo"><b>Solo</b><small>Your hero and the companions you meet in the story.</small></button>' +
-      '<button class="pick' + (mode === 'multi' ? ' on' : '') + '" data-mode="multi"><b>Multiplayer</b><small>Also recruit other players’ heroes, who are stronger than story companions. Needs a free account.</small></button></div>' +
       '<h3 class="sub">Choose your class</h3><div class="classes">' + L.CLASS_ORDER.map(c => '<button class="pick cls' + (cls === c ? ' on' : '') + '" data-cls="' + c + '"><span class="ic c-' + c + '">' + icon(CLASS_ICON[c]) + '</span><b>' + L.CLASSES[c].name + '</b><small>' + CLASS_BLURB[c] + '</small></button>').join('') + '</div>' +
       '<h3 class="sub">Pledge your banner</h3><div class="sides">' + L.SIDE_ORDER.map(k => { const d = L.SIDES[k]; return '<button class="pick side' + (side === k ? ' on' : '') + '" data-side="' + k + '" style="--side:' + d.color + '"><b>' + d.name + '</b><i>\u201c' + d.motto + '\u201d</i><small>' + d.desc + '</small><em>' + d.perk + '</em></button>'; }).join('') + '</div>' +
       '<h3 class="sub">Name your hero</h3><input id="h-name" maxlength="16" placeholder="2 to 16 letters" autocomplete="off"><div class="err" id="h-err"></div>' +
       '<div class="row" style="justify-content:center"><button class="btn big" id="h-go">Begin the descent</button></div>', md => {
         const nm = md.querySelector('#h-name'); nm.value = setup.heroName || '';
         nm.oninput = () => { setup.heroName = nm.value; };
-        md.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { mode = b.dataset.mode; draw(); });
         md.querySelectorAll('[data-cls]').forEach(b => b.onclick = () => { cls = b.dataset.cls; draw(); });
         md.querySelectorAll('[data-side]').forEach(b => b.onclick = () => { side = b.dataset.side; draw(); });
         md.querySelector('#h-go').onclick = () => {
           const name = nm.value.trim().replace(/\s+/g, ' ');
           if (!/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(name)) { md.querySelector('#h-err').textContent = 'Use 2 to 16 letters. Spaces, hyphens and apostrophes are fine.'; return; }
-          L.startGame(S, mode, cls, name, side);
+          L.startGame(S, 'multi', cls, name, side);
           delete $('modal').dataset.lock; closeModal(); audio(); save();
           updateSeats(true); updateAbilities(true); updatePanel(true);
-          if (mode === 'multi' && CL && !signedIn()) setTimeout(() => authForm('up'), 300);
           setTimeout(checkStory, 400);
         };
       });
@@ -1546,8 +1531,8 @@
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and goes in a weapon, armor or trinket slot.</p><p>In the Gear tab, pick a companion to see what fits them. Green tags mean an upgrade, and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten and where you are. Tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 25 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
-    ['Growing your party', '<p>Your party has five seats. Press <b>Recruit</b> in the Party tab to jump to <b>Grow your party</b>.</p><p><b>Story companions</b> join on their own as the story moves forward. It shows who joins next and the goal that leads there. Companions not in a seat wait at camp, and you can swap them in any time.</p><p><b>Other players</b>: switch to Multiplayer (you keep all progress) and sign in. Press <b>Find heroes</b>, then <b>Recruit</b> to put one in an empty seat. They are stronger than story companions. Press <b>Dismiss</b> on their seat to let them go.</p>'],
-    ['Multiplayer and chat', '<p>With a free account your progress is saved online and works on any device.</p><p>In <b>Multiplayer</b>, your hero appears on a board where other players can recruit it, and you earn gold each time. You can recruit their heroes too. Player heroes are stronger than story companions.</p><p><b>Chat</b> (the speech bubble) has Global, Trade and Party channels. Ctrl+click an item to link it. Tap a name to mute or report. No web links, and be kind.</p>'],
+    ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or &times; on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
+    ['Multiplayer and chat', '<p>With a free account your progress is saved online and works on any device.</p><p>Once you sign in, your hero appears on a board where other players can recruit it, and you earn gold each time. You can recruit their heroes too. Player heroes are stronger than story companions.</p><p><b>Chat</b> (the speech bubble) has Global, Trade and Party channels. Ctrl+click an item to link it. Tap a name to mute or report. No web links, and be kind.</p>'],
     ['Controls', '<ul><li><b>Tap the arena, Space or Enter</b>: strike</li><li><b>1 to 5</b>: use an ability</li><li><b>Ctrl+click an item</b>: link it in chat</li><li><b>Arrows on the floor header</b>: move between floors you have reached</li></ul>'],
   ];
   function openGuide() {
@@ -1564,11 +1549,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 7, date: 'November 22, 2026', title: 'Grow your party', items: [
-      'A new Recruit button in the Party tab takes you to Grow your party.',
-      'See which story companion joins next and the goal that leads to them.',
-      'Solo games can switch to Multiplayer at any time without losing progress, so you can recruit other players’ heroes.',
-      'Clear steps for finding and recruiting other players, and how many seats you have open.'] },
+    { v: 7, date: 'November 22, 2026', title: 'Campfire and Players Guild', items: [
+      'Every game is now multiplayer. Your progress is untouched.',
+      'The Campfire: story companions rest here. Bring them along whenever you like, and see who joins next.',
+      'The Players Guild: recruit heroes made by other players. Heroes whose owners are playing right now are marked Online now.',
+      'A Players Guild button at the top of the Party tab takes you straight there.',
+      'Raised skeletons now visibly lunge and claw at monsters (thanks for the suggestion, Chipplin).'] },
     { v: 6, date: 'November 22, 2026', title: 'Help for new delvers', items: [
       'A step-by-step tutorial for new players that points at the real buttons.',
       'The Delver’s Guide: open the ? at the top for a handbook on every system.',

@@ -551,3 +551,7 @@ button.scene:hover{border-color:var(--accent)}
 .growcard .steps{margin:6px 0 10px;padding-left:20px;font-size:14px;line-height:1.5}
 .growcard .warnline{color:var(--ember)}
 .growcard .board{margin-top:10px}
+.camp .next{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:8px 0 0;font-size:14px}
+.camp .next small{color:var(--muted)}
+.online{color:var(--good);font-weight:700}
+.online::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);margin-right:4px;vertical-align:1px}

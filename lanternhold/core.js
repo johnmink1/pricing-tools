@@ -565,7 +565,7 @@
 
   // ---------- setup and guests ----------
   function startGame(s, mode, cls, name, side) {
-    s.mode = mode; s.hero = { cls, name, side: SIDES[side] ? side : 'unsworn' };
+    s.mode = 'multi'; s.hero = { cls, name, side: SIDES[side] ? side : 'unsworn' };
     if (s.hero.side !== 'unsworn' && s.hero.side !== 'mercy') s.lore['war_' + s.hero.side] = Date.now();
     if (s.hero.side === 'mercy') s.lore.mercy = Date.now();
     registerHero(s);
@@ -901,6 +901,7 @@
     s.formation = 1;
     s.foe = null; s.lantern = 0; s.minions = []; s.abil = {}; s.down = {};
     s.guests = o.guests || [];
+    if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
     s.bag = o.bag || []; s.gear = o.gear || {}; s.lore = Object.assign({ hold: 1 }, o.lore || {});
     registerHero(s);
     for (const id of s.party) if (id && (s.hp[id] == null || s.hp[id] <= 0)) s.hp[id] = maxHpOf(s, id);

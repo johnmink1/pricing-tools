@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- lh-build 202611232124 -->
+<!-- lh-build 202611232138 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -51,7 +51,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611232124">
+<link rel="stylesheet" href="style.css?v=202611232138">
 </head>
 <body>
 <div id="app">
@@ -217,11 +217,12 @@
   <button class="chatfab" id="btn-chat" hidden aria-label="Open chat"><svg viewBox="0 0 24 24"><use href="#i-chat"/></svg><span>Chat</span><small id="chatpeek"></small><i id="chatdot" hidden></i></button>
   <aside class="chat" id="chat" hidden aria-label="Chat">
     <div class="chattitle"><b>Chat</b><button class="iconbtn" id="chatmin" aria-label="Minimize chat" title="Minimize"><svg viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>
-    <div class="chathead"><div class="seg" id="chatch"><button data-ch="global" class="on">Global</button><button data-ch="banner">Banner</button><button data-ch="trade">Trade</button><button data-ch="party">Party</button></div></div>
+    <div class="chathead"><div class="seg" id="chatch"><button data-ch="global" class="on">Global</button><button data-ch="banner">Banner</button><button data-ch="trade">Trade</button><button data-ch="party">Party</button><button data-ch="dm">Whispers</button></div></div>
     <select id="chatroom" hidden aria-label="Which party"></select>
     <div class="chatlog" id="chatlog" aria-live="polite"></div>
+    <div class="dmto" id="dmto" hidden></div>
     <form class="chatform" id="chatform" autocomplete="off"><input id="chatin" maxlength="200" placeholder="Say something" aria-label="Message"><button class="btn small" type="submit">Send</button></form>
-    <small class="chatnote" id="chatnote">Be kind. No web links. Ctrl+click an item to link it. Tap a name to mute or report.</small>
+    <small class="chatnote" id="chatnote">Be kind. No web links. Ctrl+click an item to link it. Tap a name to whisper, mute or report.</small>
   </aside>
   <div id="toasts" aria-live="polite"></div>
 </div>
@@ -275,12 +276,12 @@
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
 <div class="tip" id="tip" role="tooltip" hidden></div>
-<script>window.LH_BUILD = "202611232124";</script>
+<script>window.LH_BUILD = "202611232138";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="music.js?v=202611232124"></script>
-<script src="core.js?v=202611232124"></script>
-<script src="sprites.js?v=202611232124"></script>
-<script src="vector.js?v=202611232124"></script>
-<script src="ui.js?v=202611232124"></script>
+<script src="music.js?v=202611232138"></script>
+<script src="core.js?v=202611232138"></script>
+<script src="sprites.js?v=202611232138"></script>
+<script src="vector.js?v=202611232138"></script>
+<script src="ui.js?v=202611232138"></script>
 </body>
 </html>

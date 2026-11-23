@@ -22,6 +22,139 @@
     '...kkkkkkkkkk...',
   ] };
 
+  S.shard = { pal: {'k':  '#0e1418',  'c':  '#7fd6e8',  'l':  '#d6fbff',  'd':  '#3a7f92',  'e':  '#ff5ad0'}, px: [
+    '................',
+    '................',
+    '.......kk.......',
+    '......kclk......',
+    '.....kclllk.....',
+    '....kcclccck....',
+    '...kcdcllcdck...',
+    'k.kccceccecck.k.',
+    '.kkcccccccccckk.',
+    '..kdcccccccccdk.',
+    '.kkddcccccccddkk',
+    'k..kdddddddddk.k',
+    '..k.kk.kk.kk.k..',
+    '.k..k..k..k...k.',
+    'k...k..k..k....k',
+    '................'
+  ] };
+
+  S.sentinel = { pal: {'k':  '#14120f',  'm':  '#7a6a55',  'l':  '#b8a688',  'd':  '#4a3f33',  'e':  '#ff8a3d',  'r':  '#8a3a2a'}, px: [
+    '................',
+    '.....kkkkkk.....',
+    '....kllmmmmk....',
+    '....kmkkkkmk....',
+    '....kmkeekmk....',
+    '....kmmkkmmk....',
+    '..kkkmmmmmmkkk..',
+    '.klmmkmrrmkmmlk.',
+    '.kmmdkmrrmkdmmk.',
+    '.kmk.kmmmmk.kmk.',
+    '.kmk.kmmmmk.kmk.',
+    '..k..kddddk..k..',
+    '.....kmkkmk.....',
+    '.....kmk.kmk....',
+    '....kddk.kddk...',
+    '....kkk...kkk...'
+  ] };
+
+  S.eel = { pal: {'k':  '#0a1816',  'g':  '#3fa898',  'l':  '#8fe8d8',  'd':  '#1f5a52',  'e':  '#f2f26a',  'w':  '#eafff8'}, px: [
+    '................',
+    '................',
+    '.........kkk....',
+    '........kgggk...',
+    '.......kglgegk..',
+    '.......kgggggwk.',
+    '......kgggdkkk..',
+    '.....kggddk.....',
+    '....kggdk.......',
+    '...kgglk........',
+    '..kgglk...kk....',
+    '..kgldk..kgdk...',
+    '..kggdkkkggdk...',
+    '...kdddgggddk...',
+    '....kkddddkk....',
+    '......kkkk......'
+  ] };
+
+  S.thorn = { pal: {'k':  '#1a1612',  'b':  '#e8dcc0',  'd':  '#a89878',  'g':  '#6a7a3a',  'e':  '#ff4a4a'}, px: [
+    '................',
+    '..k....kk....k..',
+    '..bk..kbbk..kb..',
+    '...bk.kbbk.kb...',
+    '....bkkbbkkb....',
+    '.....kbbbbk.....',
+    '....kbebbebk....',
+    '....kbbbbbbk....',
+    '...kdbbkkbbdk...',
+    '..kbkdbbbbdkbk..',
+    '..b.kdbbbbdk.b..',
+    '....kddbbddk....',
+    '.....kdddddk....',
+    '....kgk..kgk....',
+    '...kgk....kgk...',
+    '...kk......kk...'
+  ] };
+
+  S.prism = { pal: {'k':  '#0c0e1c',  'c':  '#9ab8ff',  'l':  '#e8f0ff',  'd':  '#4a5aa8',  'e':  '#fff27a'}, px: [
+    '................',
+    '.......kk.......',
+    '......kclk......',
+    '.....kcllck.....',
+    '....kccllcck....',
+    '...kcccllccck...',
+    '..kccckeekccck..',
+    '..kcccekkeccck..',
+    '..kccckeekccck..',
+    '...kcccddccck...',
+    '....kccddcck....',
+    '.....kcddck.....',
+    '......kddk......',
+    '.l.....kk.....l.',
+    '..l..........l..',
+    '................'
+  ] };
+
+  S.hound = { pal: {'k':  '#180a10',  'b':  '#7a2a3a',  'l':  '#c4506a',  'd':  '#4a1422',  'e':  '#ffd24a',  'w':  '#f2ead8'}, px: [
+    '................',
+    '................',
+    '..kk........kk..',
+    '..kbk......kbk..',
+    '..kbbkkkkkkbbk..',
+    '.kbbbbbbbbbbbbk.',
+    '.kbebbbbbbbbebk.',
+    '.kbbbbllllbbbbk.',
+    '..kbwkbbbbkwbk..',
+    '...kkwbbbbwkk...',
+    '....kbbbbbbk....',
+    '...kdbbbbbbdk...',
+    '..kddkbbbbkddk..',
+    '..kdk.kddk.kdk..',
+    '..kk..kk.kk.kk..',
+    '................'
+  ] };
+
+  S.riftling = { pal: {'k':  '#06040e',  'v':  '#4a2a8a',  'l':  '#9a6aff',  'd':  '#22124a',  'e':  '#ffffff',  's':  '#c9a6ff'}, px: [
+    '................',
+    '....s......s....',
+    '.....kkkkkk.....',
+    '....kvvvvvvk....',
+    '...kvvlvvlvvk...',
+    '..kvvkekkekvvk..',
+    '..kvvvvvvvvvvk..',
+    '..kvdvvkkvvdvk..',
+    '...kdvvvvvvdk...',
+    '..s.kdvvvvdk.s..',
+    '....kvdvvdvk....',
+    '...kv.kddk.vk...',
+    '..kv..kddk..vk..',
+    '..k...kvvk...k..',
+    '.....kv..vk.....',
+    '.....k....k.....'
+  ] };
+
   S.rat = { pal: { k: '#1a1212', b: '#8a6a58', l: '#b8957c', d: '#5a4034', p: '#e8a0a0', e: '#ffdf6b', w: '#f2ead8' }, px: [
     '................',
     '................',

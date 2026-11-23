@@ -468,7 +468,7 @@
   document.head.appendChild(fl);
 
   // ---------- events ----------
-  let pendingGold = 0, lastGoldFloat = 0;
+  let pendingGold = 0, lastGoldFloat = 0, sealedToast = false;
   const RARITY_COLOR = { common: '#d8cfb8', fine: '#8fcf6a', rare: '#6cc4e8', epic: '#c78bff', set: '#f2c14e' };
   function handleEvents() {
     let kills = 0, gold = 0;
@@ -492,6 +492,12 @@
         const a = mAnim(e.target); floatText('Dodge', 'dodge', a.x / W, (a.y - 6) / H);
       } else if (e.type === 'fall') {
         const a = mAnim(e.id); floatText(L.memberById(e.id).name + ' falls', 'hurt', a.x / W, (a.y - 10) / H);
+      } else if (e.type === 'poison') {
+        const a = mAnim(e.id); if (Math.random() < 0.5) floatText('Poisoned', 'heal', a.x / W, (a.y - 12) / H);
+      } else if (e.type === 'ward') {
+        floatText('Ward', 'skill', FOE_X, 0.3); burst(foeAnim.cx, foeAnim.cy, 18, ['#bfe6ff', '#ffffff', '#7fb8e8'], 35);
+      } else if (e.type === 'sealed') {
+        if (!sealedToast) { sealedToast = true; toast('lock', 'The way is sealed', 'Act One ends here. The Rift Threshold opens again with Season 2 of the Grand War. Your party holds the landing and keeps earning.', 'feat'); }
       } else if (e.type === 'revive') {
         const a = mAnim(e.id); floatText('Back up', 'heal', a.x / W, (a.y - 10) / H);
       } else if (e.type === 'ability') {
@@ -887,11 +893,11 @@
         const next = kind === 'neck2' || sl === 'ring' + (2 + L.unlocksOf(S, gearWho).rings);
         return '<div class="dslot ds-' + sl + ' locked"><div class="tile ghost' + (next ? ' unl" data-unlock="' + kind + '" role="button" tabindex="0"' : '"') + ' title="' + (next ? 'Unlock with ' + c + ' Kindling' : 'Unlock the ring before it first') + '">' + icon('lock') + (next ? '<i class="kc">' + c + '</i>' : '') + '</div><span>' + name + '</span></div>';
       }
-      if (sl === 'legs' && robe) return '<div class="dslot ds-legs covered" title="The robe covers the legs"><div class="tile ghost"><img class="iimg" src="' + SP.itemIcon(m.cls, 'legs', 'common') + '" alt=""></div><span>Robe</span></div>';
+      if (sl === 'legs' && robe) return '<div class="dslot ds-legs covered" title="The robe covers the legs. Tap to choose leggings instead."><div class="tile ghost" data-pos="legs" role="button" tabindex="0"><img class="iimg" src="' + SP.itemIcon(m.cls, 'legs', 'common') + '" alt=""></div><span>Robe</span></div>';
       const it = g[sl] && L.itemOf(S, g[sl]);
       const up = better[sl] ? '<i class="upb" title="Better one in your pack">&#9650;</i>' : '';
-      if (!it) return '<div class="dslot ds-' + sl + ' empty" title="Empty ' + name.toLowerCase() + ' slot"><div class="tile ghost"><img class="iimg" src="' + SP.itemIcon(m.cls, type, 'common') + '" alt="">' + up + '</div><span>' + name + '</span></div>';
-      return '<div class="dslot ds-' + sl + '"><div class="tile r-' + it.rar + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + up + '</div><span>' + name + '</span></div>';
+      if (!it) return '<div class="dslot ds-' + sl + ' empty" title="Choose a ' + name.toLowerCase() + '"><div class="tile ghost" data-pos="' + sl + '" role="button" tabindex="0"><img class="iimg" src="' + SP.itemIcon(m.cls, type, 'common') + '" alt="">' + up + '</div><span>' + name + '</span></div>';
+      return '<div class="dslot ds-' + sl + '"><div class="tile r-' + it.rar + '" data-pos="' + sl + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + up + '</div><span>' + name + '</span></div>';
     };
     // totals from worn gear
     const dmg = L.gearPctOf(S, gearWho, 'dps'), hp = L.gearPctOf(S, gearWho, 'hp');
@@ -904,7 +910,7 @@
       '<div class="dcol">' + ['main', 'off', 'neck2', 'feet'].map(slotTile).join('') + '</div>' +
       '<div class="drings">' + ['ring1', 'ring2', 'ring3', 'ring4', 'ring5'].map(slotTile).join('') + '</div></div>' +
       '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>' +
-      '<div class="dollbar"><small>' + cname + ' gear only. Tap a piece for details.</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
+      '<div class="dollbar"><small>' + cname + ' gear only. Tap a slot to choose what goes there.</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
     $('bagcount').textContent = S.bag.length + '/' + L.bagCap(S);
     const tile = (it, dim) => {
@@ -937,10 +943,11 @@
     const eq = e.target.closest('[data-equip]'); if (eq) { if (L.equip(S, gearWho, eq.dataset.equip)) { sfx.buy(); updateGear(true); updateSeats(true); } return; }
     if (e.target.closest('#g-best')) { const n = L.equipBest(S, gearWho); if (n) { sfx.buy(); toast('gear-armor', 'Best gear on', n + (n === 1 ? ' piece' : ' pieces') + ' equipped on ' + L.memberById(gearWho).name + '.', ''); updateGear(true); updateSeats(true); } return; }
     const ul = e.target.closest('[data-unlock]'); if (ul) { unlockModal(gearWho, ul.dataset.unlock); return; }
+    const ps = e.target.closest('[data-pos]'); if (ps) { slotPicker(gearWho, ps.dataset.pos); return; }
     if (e.target.closest('.dfig')) { profileModal(gearWho); return; }
     const it = e.target.closest('[data-item]'); if (it) { if ((e.ctrlKey || e.metaKey) && linkItem(L.itemOf(S, it.dataset.item))) return; itemModal(it.dataset.item); }
   });
-  ['tab-gear', 'tab-party', 'tab-camp', 'tab-market'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof]')) { e.preventDefault(); e.target.click(); } }));
+  ['tab-gear', 'tab-party', 'tab-camp', 'tab-market'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof],[data-pos],[data-unlock]')) { e.preventDefault(); e.target.click(); } }));
   const itemStats = it => L.itemStats(it);
   function itemModal(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
@@ -994,6 +1001,40 @@
   }
 
 
+
+
+  // ---------- slot picker: tap a gear slot to choose what goes there ----------
+  function slotPicker(id, pos) {
+    const m = L.memberById(id); if (!m) return;
+    const g = S.gear[id] || {}, cur = g[pos] && L.itemOf(S, g[pos]);
+    const type = L.posType(pos), name = L.SLOT_NAME[pos];
+    const robeNow = pos === 'legs' && L.robeOn(S, id) ? L.itemOf(S, g.chest) : null;
+    const curScore = cur ? L.itemScore(cur) : robeNow ? L.itemScore(robeNow) : 0;
+    const list = S.bag.filter(it => it.cls === m.cls && L.fitsPos(it.slot, pos) && it.uid !== (cur && cur.uid))
+      .map(it => ({ it, d: Math.round((L.itemScore(it) - (it.slot === 'robe' ? L.replaces(S, id, it).reduce((a, x) => a + L.itemScore(x), 0) : curScore)) * 100), ok: L.canWear(S, id, it), w: L.wearer(S, it.uid) }))
+      .sort((a, b) => (b.ok - a.ok) || (b.d - a.d));
+    const row = x => {
+      const it = x.it, wn = x.w ? L.memberById(x.w).name : '';
+      const tag = !x.ok ? '<span class="cmp down">Needs level ' + L.reqLevel(it) + '</span>' : x.d > 0 ? '<span class="cmp up">&#9650; ' + x.d + '%</span>' : x.d < 0 ? '<span class="cmp down">&#9660; ' + (-x.d) + '%</span>' : '<span class="cmp eq">Same</span>';
+      return '<div class="pkrow r-' + it.rar + (x.ok ? '' : ' no') + '"><div class="tile r-' + it.rar + '" data-info="' + it.uid + '" role="button" tabindex="0" title="Details"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
+        '<span class="pkt"><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it) + (wn ? ' &middot; <i class="worn">worn by ' + esc(wn) + '</i>' : '') + '</small></span>' + tag +
+        '<button class="btn small" data-pick="' + it.uid + '"' + (x.ok ? '' : ' disabled') + '>Equip</button></div>';
+    };
+    const head = cur ? '<div class="pkcur"><small>Wearing now</small><div class="pkrow r-' + cur.rar + '"><div class="tile r-' + cur.rar + '" data-info="' + cur.uid + '" role="button" tabindex="0"><img class="iimg" src="' + SP.itemIcon(cur.cls, cur.slot, cur.rar) + '" alt="">' + (cur.up ? '<i class="upn">+' + cur.up + '</i>' : '') + '</div><span class="pkt"><b>' + esc(L.gearName(cur)) + (cur.up ? ' +' + cur.up : '') + '</b><small>' + itemEffect(cur) + '</small></span><button class="btn small ghost" id="pk-info">Details</button><button class="btn small ghost" id="pk-off">Take off</button></div></div>'
+      : robeNow ? '<p class="note">' + esc(L.gearName(robeNow)) + ' covers the legs. Leggings here will take the robe off.</p>' : '';
+    modal('<div class="picker"><div class="maphead"><div><h2>' + esc(m.name) + '’s ' + name.toLowerCase() + '</h2><small>' + (camp() ? 'Pick a piece to wear here.' : 'You can look now. Changing gear happens at camp.') + '</small></div><button class="iconbtn" id="pk-x" aria-label="Close">&times;</button></div>' + head +
+      (list.length ? '<div class="pklist">' + list.map(row).join('') + '</div>' : '<p class="note">No ' + L.CLASSES[m.cls].name.toLowerCase() + ' ' + (type === 'chest' ? 'chest pieces or robes' : name.toLowerCase().replace(/ \d$/, '') + 's') + ' in your pack' + (cur ? ' to swap in' : '') + ' yet. They drop from monsters, chests and guardians, and you can buy them on the Market.</p>') + '</div>', md => {
+      const re = () => { updateGear(true); updateSeats(true); };
+      md.querySelector('#pk-x').onclick = closeModal;
+      const off = md.querySelector('#pk-off'); if (off) off.onclick = () => { if (!campGate()) return; L.unequip(S, id, pos); sfx.buy(); re(); slotPicker(id, pos); };
+      const inf = md.querySelector('#pk-info'); if (inf) inf.onclick = () => itemModal(cur.uid);
+      md.querySelector('.picker').onclick = e => {
+        const pk = e.target.closest('[data-pick]');
+        if (pk) { if (!campGate()) return; const w = L.wearer(S, pk.dataset.pick); if (w) L.unequip(S, w, L.wornPos(S, pk.dataset.pick)); if (L.equip(S, id, pk.dataset.pick, pos)) { sfx.buy(); re(); closeModal(); toast('gear-armor', 'Equipped', L.gearName(L.itemOf(S, pk.dataset.pick)) + ' on ' + m.name + '.', ''); } else re(); return; }
+        const t = e.target.closest('[data-info]'); if (t) itemModal(t.dataset.info);
+      };
+    });
+  }
 
   // ---------- Kindling: unlock extra gear slots ----------
   function unlockModal(id, kind) {
@@ -1229,7 +1270,7 @@
     updateAbilities();
   }
 
-  let lastPipKey = '';
+  let lastPipKey = '', lastModKey = null;
   function updateStage() {
     const b = L.biomeOf(S.floor), cyc = L.depthCycle(S.floor);
     $('floor').textContent = S.floor;
@@ -1244,13 +1285,15 @@
       $('pips').innerHTML = boss ? '<i class="boss now"></i>' : Array.from({ length: L.FOES_PER_FLOOR }, (_, i) => '<i class="' + (i < S.foeIdx ? 'done' : i === S.foeIdx ? 'now' : '') + '"></i>').join('');
     }
     $('goalch').textContent = 'Chapter ' + L.chapterOf(S);
-    $('goaltext').textContent = L.currentGoal(S);
+    { let g = L.currentGoal(S); if (S.maxFloorEver > L.ACT_ONE_END && !L.actTwoOpen()) { const d = Math.max(0, L.ACT_TWO_AT - Date.now()), dd = Math.floor(d / 864e5), hh = Math.floor(d / 36e5) % 24; g = 'Act Two opens with Season 2, in ' + (dd ? dd + 'd ' : '') + hh + 'h'; } if ($('goaltext').textContent !== g) $('goaltext').textContent = g; }
     const f = S.foe;
     if (f) {
       $('foename').textContent = f.name;
       const tag = $('foetag'); tag.textContent = f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; tag.className = 'tag' + (f.chest ? ' chest' : '') + (f.elite ? ' war w-' + f.side : '');
+      { const mk = (f.mods || []).join(','); if (mk !== lastModKey) { lastModKey = mk; $('foemods').innerHTML = (f.mods || []).map(m => '<span class="mod m-' + m + '" title="' + esc(L.MODS[m].desc) + '">' + esc(L.MODS[m].name) + '</span>').join(''); } }
       $('hpbar').style.width = Math.max(0, f.hp / f.max * 100) + '%';
-      $('hptext').textContent = fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max);
+      $('wardbar').style.width = Math.min(100, (f.ward || 0) / f.max * 100) + '%';
+      $('hptext').textContent = fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max) + (f.ward > 0 ? ' + ' + fmt(f.ward) + ' ward' : '');
       $('lanternwrap').hidden = !f.boss;
       { const n = (S.items && S.items.oil) || 0; $('b-oil').hidden = !f.boss || !n || S.lantern <= 0; $('b-oil').textContent = 'Pour lantern oil (' + n + ')'; }
       if (f.boss) {
@@ -1884,6 +1927,7 @@
     ['Your party and classes', '<p>You lead a party of five. You meet companions in the story; tap any portrait to read about them.</p><ul><li><b>Tank</b>: takes the hits. Shield Wall cuts damage by 70%.</li><li><b>Healer</b>: keeps everyone standing. Lantern Hymn heals the party and lifts a fallen ally.</li><li><b>Rogue</b>: the most damage, and dodges a quarter of attacks. Backstab hits for 12 seconds of damage at once.</li><li><b>Mage</b>: Ember Storm quadruples damage for a few seconds. Save it for guardians.</li><li><b>Necromancer</b>: raises skeletons that fight and soak up blows, and heals the party as it hits.</li></ul><p>Abilities fire by themselves. Turn that off under the arena and press 1 to 5 to time them yourself.</p>'],
     ['Marching order', '<p>The Party list is your marching order. The top member stands at the front, nearest the monster. Use the arrows to move people, or Auto-arrange.</p><ul><li>A <b>tank</b> in the front two draws the attacks. Without one, whoever is in front gets hit most.</li><li>Heals get <b>15% weaker per step</b> between healer and patient, so healers belong in the middle.</li><li>Some monsters <b>ambush</b> from behind and hit the rear member hard. A tank at the back guards against it.</li></ul><p>The notes under the list tell you how your current order is doing.</p>'],
     ['Monsters and guardians', '<p>Monsters hit back. If your whole party falls, it retreats a floor, rests, and tries again in a little over a minute. Use that time to train and check gear.</p><p>Every 5th floor has a <b>guardian</b>. You must beat it before the lantern oil runs out. Guardians drop better gear and, from floor 10, sometimes a relic.</p><p>Soldiers from the Grand War alliances (marked with their banner) are tougher than normal monsters and drop more.</p>'],
+    ['Monster tricks and Act One', '<p>Deeper monsters have tricks, shown as coloured tags under their name. Tap or hover a tag to read it.</p><ul><li><b>Enraged</b>: hits much harder once it is badly hurt.</li><li><b>Warded</b>: raises a shield (the striped part of its health bar) that soaks damage first.</li><li><b>Regenerating</b>: heals itself over time.</li><li><b>Venomous</b>: its hits poison the target for a few seconds.</li><li><b>Cleaving</b>: each hit also strikes whoever stands behind its target.</li><li><b>Swift</b>: attacks faster.</li></ul><p>Guardians get more tricks the deeper you go, and each region below the Vault has its own. Act One runs through fifteen regions to the Lampmother on floor 150. Act Two opens with Season 2 of the Grand War, and a countdown appears once you get there.</p>'],
     ['The side panel', '<p><b>Party</b> is your marching order for the fight. <b>Camp</b> is the campfire: resting companions, camp jobs and training. <b>Gear</b> dresses your characters. <b>Skills</b> holds your hero’s skill tree and rekindling. <b>Market</b> has the Trading Post and the Players Guild. <b>Codex</b> keeps your journal, relics and records.</p>'],
     ['Skills and Kindling', '<p>Every rekindle gives you <b>Kindling</b>: 2 at floor 50, plus 1 for every 10 floors deeper. Spend it in the Skills tab on your hero’s class tree. Each class has three branches of three skills, and a skill needs the one above it first.</p><p>Kindling also buys a bigger pack (+10 slots) and opens extra gear slots for any character: rings 2 to 5 and a second trinket. Tap a locked slot on the Gear tab. You can reset the skill tree for free at camp.</p>'],
     ['Job gear', '<p>A few pieces of gear carry a camp-job bonus, shown by an orange dot. It counts while the wearer works that job at the campfire. Fine gear has about a 2% chance, rare 6% and epic 15%.</p><p>Each job also has its own three-piece job set (helmet, feet and ring). These drop very rarely from guardians and chests from floor 20. Two pieces add +40% to that job and all three add +100%.</p>'],
@@ -1912,6 +1956,13 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 13, date: 'November 22, 2026', title: 'Act One: below the Starless Vault', items: [
+      'Seven new regions below the Starless Vault: the Glass Wastes, the Ironbound Bastion, the Weeping Aqueduct, the Bone Orchard, the Stormglass Spire, the Nexus Scar and the Rift Threshold.',
+      'The story goes on through chapter 15, with seven new guardians and the truth about the Lampmother waiting on floor 150.',
+      'Monsters now have tricks: Enraged, Warded, Regenerating, Venomous, Cleaving and Swift. Each region has its own favourite, and guardians get more of them the deeper you go.',
+      'Act One ends on floor 150. Act Two opens with Season 2 of the Grand War, and the game counts down to it once you get there.',
+      'Seven new monsters for the Bestiary, plus new journal pages for every region and guardian.',
+      'Tap any gear slot on the Gear tab to see every piece that fits it, compared with what is worn now, and equip one straight from the list.'] },
     { v: 12, date: 'November 22, 2026', title: 'Skill trees, Kindling and a full set of gear slots', items: [
       'Every class now has a skill tree for your hero, with three branches of three skills each.',
       'Rekindling gives Kindling: 2 at floor 50, plus 1 for every 10 floors deeper. If you rekindled before today, you already have 2 for each time.',

@@ -1,4 +1,4 @@
-/* lh-build 202611232217 */
+/* lh-build 202611232218 */
 /* Lanternhold intro: "Why we fight". A short cinematic that plays the first time someone opens the game.
    Skippable at any time, replayable from Settings (window.LHIntro.play()). Seen flag: localStorage "lh_intro". */
 (function () {

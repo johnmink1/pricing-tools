@@ -1,4 +1,4 @@
-/* lh-build 202611232217 */
+/* lh-build 202611232218 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1859,3 +1859,20 @@ body.resting .taptip{display:none}
 .tag.nexus{background:#1e0f3a;color:#e6d2ff;border-color:#7a4ae0;box-shadow:0 0 10px #7a3cff55}
 .bar.lantern.nexus i{background:linear-gradient(180deg,#e6d2ff,#8a5af0)}
 .bar.nexus>i{background:repeating-linear-gradient(135deg,#5a2fb0 0 8px,#7a4ae0 8px 16px)!important}
+/* Possible loot in the region dossier */
+.dos-loot{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.dos-loot summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.dos-loot summary::-webkit-details-marker{display:none}
+.dos-loot summary::before{content:'▸';font-size:10px;transition:transform .15s}
+.dos-loot[open] summary::before{transform:rotate(90deg)}
+.dos-loot summary>span{color:var(--text);font-weight:700}
+.dos-loot summary small{margin-left:auto;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted)}
+.dos-loot summary small b{color:var(--good)}
+.dos-loot .lt{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.dos-loot .lt:last-of-type{border-bottom:0}
+.lt-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;font-size:13px}
+.lt-h small{color:var(--muted);font-size:11px}
+.lt-s{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.lt-s span{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;background:#1a151e;border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.lt-s span small{font-weight:400;color:var(--dim);font-size:11px}
+.lt-f{margin:6px 0 0;font-size:11px;color:var(--dim)}

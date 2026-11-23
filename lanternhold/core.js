@@ -1,4 +1,4 @@
-/* lh-build 202611232217 */
+/* lh-build 202611232218 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -1004,6 +1004,54 @@
     s.bag.push(it);
     if (it.set) { s.lore['set_' + it.set] = Date.now(); }
     events && events.push({ type: it.rset != null ? 'rset' : 'loot', item: it });
+  }
+  // Possible loot (John, 2026-11-23): this player's real drop odds for a region, shown in the map dossier.
+  // It mirrors dropGear, killFoe, dropSigils and makeFoe, so keep it in step when those odds change.
+  function lootBonus(s) {
+    const hero = s.party.includes('you'), st = hero ? statVal(s, 'loot') : 0, au = hero ? auraVal(s, 'loot') : 0;
+    const parts = [
+      ['Class skills', skBase(s, 'loot') - st - au], ['Luck', st], ['War aura', au], ['Seeker’s Charm', tonicVal(s, 'loot')],
+      ['Companion traits', traitVal(s, 'loot')], ['Enchants', enchVal(s, 'loot')], ['Forager at camp', campBonus(s, 'loot')],
+    ].filter(x => x[1] > 1e-9);
+    return { parts, total: 1 + parts.reduce((a, x) => a + x[1], 0) };
+  }
+  // Odds of each rarity from rollGear at floor f with a given boost.
+  function rarOdds(f, boost) {
+    const d = Math.min(1, f / 80), sh = (boost || 0) * 0.15 * d, P = t => Math.min(1, Math.max(0, 1 - (t - sh)));
+    const epic = P(0.995 - 0.03 * d), rare = P(0.94 - 0.08 * d) - epic, fine = P(0.7 - 0.12 * d) - epic - rare;
+    return { epic, rare, fine, common: Math.max(0, 1 - epic - rare - fine) };
+  }
+  function regionLoot(s, first) {
+    const top = first + 9, mid = first + 4, lb = lootBonus(s), m = lb.total, c = p => Math.min(1, Math.max(0, p));
+    const ri = regionSetAt(first), rs = {};
+    for (const k in RSET_DROP) rs[k] = ri < 0 ? 0 : c(RSET_DROP[k] * m);
+    const jsOn = canUse(s, 'jset'), jsB = jsOn && top >= 20 ? c(0.03 * m) : 0, jsC = jsOn && mid >= 20 ? c(0.008 * m) : 0;
+    const csB = top >= 15 ? (1 - rs.boss) * (1 - jsB) * c(0.06 * m) : 0;
+    // Plain gear per kind of kill: what is left after the rarer rolls above, times the gear roll and the rarity split.
+    const gear = {
+      boss: [(1 - rs.boss) * (1 - jsB) * (1 - (top >= 15 ? c(0.06 * m) : 0)) * c(0.6 * m), rarOdds(top, 1)],
+      chest: [(1 - rs.chest) * (1 - jsC) * c(0.4 * m), rarOdds(mid, 0.5)],
+      elite: [(1 - rs.elite) * c(0.15 * m), rarOdds(mid, 0.5)],
+      pack: [(1 - rs.pack) * c(0.25 * m), rarOdds(mid, 0.5)],
+      foe: [(1 - rs.foe) * c(0.012 * m), rarOdds(mid, 0)],
+    };
+    const SRC = { boss: 'Boss', chest: 'Chest', elite: 'Elite', pack: 'Ambush', foe: 'Foe' };
+    const srcOf = o => Object.keys(o).filter(k => o[k] > 0).map(k => [SRC[k], o[k]]);
+    const rows = [];
+    if (ri >= 0) {
+      const own = s.bag.filter(it => it.rset === ri).map(it => it.slot);
+      rows.push({ id: 'rset', rar: 'set', name: REGION_SETS[ri].name, note: 'Region set · 4 pieces' + (own.length ? ' · ' + new Set(own).size + ' found' : ''), src: srcOf(rs) });
+    }
+    if (csB) rows.push({ id: 'cset', rar: 'set', name: 'Class set piece', note: 'For a class in your party', src: [['Boss', csB]] });
+    if (jsB || jsC) rows.push({ id: 'jset', rar: 'set', name: 'Job set piece', note: 'Camp job gear', src: srcOf({ boss: (1 - rs.boss) * jsB, chest: (1 - rs.chest) * jsC }) });
+    for (const r of ['epic', 'rare', 'fine', 'common']) {
+      const o = {}; for (const k in gear) o[k] = gear[k][0] * gear[k][1][r];
+      rows.push({ id: r, rar: r, name: RARITY.find(x => x.id === r).name + ' gear', note: r === 'common' ? 'Any slot' : 'Any slot' + (AFFIX_CHANCE[r] ? ' · ' + Math.round(AFFIX_CHANCE[r] * 100) + '% carry a job affix' : ''), src: srcOf(o) });
+    }
+    if (top >= 10) rows.push({ id: 'relic', rar: 'relic', name: 'Relic', note: 'Guardian first clears are far better', src: [['Boss', 0.03], ['First clear', 0.35]], flat: true });
+    rows.push({ id: 'sigil', rar: 'sigil', name: 'Sigils (1 to 3)', note: 'Up to ' + SIGIL_DROP_DAY + ' found a day', src: [['Boss', c(sigilChance(s, 'boss'))], ['Chest', c(sigilChance(s, 'chest'))]], flat: true });
+    if (top >= GOBLIN_FLOOR) rows.push({ id: 'sack', rar: 'goblin', name: 'Loot Goblin’s Sack', note: 'Goblins show up in ' + (GOBLIN_CHANCE * 100).toFixed(1) + '% of fights from floor ' + GOBLIN_FLOOR, src: [['Goblin kill', GOBLIN_SACK_CHANCE]], flat: true });
+    return { bonus: lb, floor: mid, rows, rates: { chest: c(chestChance(s)), elite: ELITE_CHANCE, pack: PACK_CHANCE, goblin: GOBLIN_CHANCE } };
   }
   // Auto-scrap (John, 2026-11-23): drops of the ticked rarities are scrapped on pickup for gold and Dust.
   // Set and job-set pieces are always kept, and so is anything that would beat what a companion wears
@@ -2130,7 +2178,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

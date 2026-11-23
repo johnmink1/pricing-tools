@@ -1,4 +1,4 @@
-/* lh-build 202611232221 */
+/* lh-build 202611232223 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -3986,10 +3986,11 @@
         'Laurels buy the <b>Ringwarden kit</b>: PvP gear with <b>Edge</b> (more damage to heroes) and <b>Resolve</b> (less damage from heroes). It works only in the Ring.']],
       ['Your profile', 'i:user', 'The card other players see.', [
         'Tap your portrait, then <b>Customize profile</b>: frame, title, color, banner, emblems and a bio.']],
-      ['The Wardrobe', 'i:star', 'Outfits and lanterns, looks only.', [
+      ['The Wardrobe', 'i:star', 'Outfits, lanterns and war banners, looks only.', [
         'Open it from the <b>Wardrobe</b> button in the Gear tab, from your portrait, or from the Quartermaster.',
         'Outfits recolor a hero from helm to boots; the rarest add an aura. Buy one once and dress any hero in your company in it.',
         'Lantern styles change the lantern beside your lead hero and the light around your party.',
+        'War banners fly on a pole behind your party and show on your hero in the Ember Ring, the standings, the Players Guild and next to your name in chat.',
         'Other players see your hero\u2019s outfit in the Players Guild, as a guest in their party and in the Ember Ring. Nothing here changes power.']],
     ] },
   ];
@@ -4014,6 +4015,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 70, date: 'November 23, 2026', title: 'Raise your colors', items: [
+      'The Wardrobe has a new Banners tab with 11 war banners, from the free Delver’s Pennant to the gold-fringed Last Lantern.',
+      'Your banner flies behind your party and shows on your hero card in the Ember Ring, on challenger cards, in the standings, on your Players Guild card and next to your name in chat.',
+      'Banners are looks only. They never change your party’s power.'] },
     { v: 69, date: 'November 23, 2026', title: 'Know what you are hunting', items: [
       'Every region on the Map of the Deep now shows its possible loot: the region set, class and job set pieces, each gear rarity, relics, Sigils and the Loot Goblin’s Sack.',
       'Each drop shows your own odds per kill from bosses, chests, elites, ambushes and ordinary foes, worked out from the same rules the game uses, after your Keen Eye, Luck, Forager, Finder enchants, companion traits and Seeker’s Charm.',

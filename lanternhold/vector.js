@@ -685,11 +685,87 @@
       Pn('M84 40 Q90 32 100 31', 'none', ' stroke="#ffffff" stroke-width="1.4" opacity=".6"'),
     ].join('');
   }, 200, 200);
+  // ---------------- wardrobe: outfits and lantern styles (looks only, bought with Sigils) ----------------
+  // An outfit recolours a hero sprite by material: metal (low saturation), trim (gold), main cloth (cool hues)
+  // and accent cloth (warm hues). Skin, hair, eyes and outlines keep their colours. Some outfits add an aura.
+  // Each part is [hue, saturation, lightness scale, lightness shift]; hue null keeps the original hue.
+  const OUTFITS = {
+    ember:    { m: [22, 0.1, 0.95, 0], g: [38, 0.9, 1, 0.02], p: [6, 0.72, 0.95, 0], a: [28, 0.85, 1, 0.04] },
+    frost:    { m: [205, 0.22, 1.02, 0.04], g: [200, 0.25, 1.05, 0.08], p: [204, 0.6, 1, 0.04], a: [186, 0.55, 1.05, 0.06] },
+    wild:     { m: [95, 0.1, 0.92, 0], g: [32, 0.62, 0.9, -0.02], p: [118, 0.45, 0.88, 0], a: [42, 0.6, 0.95, 0] },
+    dusk:     { m: [262, 0.14, 0.9, 0], g: [220, 0.18, 1.05, 0.06], p: [272, 0.5, 0.9, 0], a: [318, 0.55, 0.95, 0] },
+    ivory:    { m: [42, 0.18, 1.08, 0.1], g: [42, 0.86, 1, 0.02], p: [40, 0.32, 1.25, 0.12], a: [8, 0.6, 0.95, 0] },
+    obsidian: { m: [240, 0.1, 0.5, -0.02], g: [44, 0.9, 1, 0.02], p: [356, 0.7, 0.8, 0], a: [356, 0.75, 0.85, 0], aura: 'smoke' },
+    gilded:   { m: [44, 0.75, 1, 0.02], g: [0, 0, 1.12, 0.1], p: [44, 0.2, 1.3, 0.12], a: [200, 0.55, 1, 0.02], aura: 'gold' },
+    rift:     { m: [268, 0.3, 0.75, 0], g: [178, 0.8, 1, 0.06], p: [272, 0.62, 0.85, 0], a: [180, 0.7, 0.95, 0.04], aura: 'rift' },
+    sworn:    { m: [40, 0.28, 1.1, 0.1], g: [46, 1, 1.05, 0.06], p: [28, 0.82, 1, 0.04], a: [10, 0.8, 1, 0.02], aura: 'lantern' },
+  };
+  function recolor(svg, o) {
+    const memo = {};
+    return svg.replace(/#[0-9a-fA-F]{6}\b/g, x => {
+      x = x.toLowerCase(); if (memo[x]) return memo[x];
+      const [h, s, l] = hsl(x); let part = null;
+      if (l < 0.13 || l > 0.97) part = null;                                  // outlines, eyes, highlights
+      else if (h >= 12 && h <= 36 && s > 0.35 && s < 0.8 && l > 0.5 && l < 0.9) part = null; // skin and hair
+      else if (s < 0.3) part = o.m;
+      else if (h >= 36 && h <= 56 && s > 0.5 && l > 0.3) part = o.g;
+      else if (h >= 70 && h < 300) part = o.p;
+      else part = o.a;
+      if (!part) return memo[x] = x;
+      const [th, ts, k, dl] = part, nl = Math.max(0.04, Math.min(0.96, l * k + dl));
+      return memo[x] = hex(th == null ? h : th, ts, nl);
+    });
+  }
+  // Aura layers drawn behind (under) and in front of (over) the sprite, inside the 120 x 160 hero frame.
+  function aura(kind, c) {
+    const A = { smoke: ['#3a2c3e', '#c23a3a'], gold: ['#ffe9a0', '#fff6d8'], rift: ['#7a3cff', '#7affe8'], lantern: ['#ffb64a', '#fff1b8'] }[kind];
+    if (!A) return ['', ''];
+    const glow = c.glowF(6), soft = c.glowF(2.2);
+    const under = E(60, 150, 46, 9, A[0], ' opacity=".55" filter="' + glow + '"') + E(60, 92, 44, 64, c.rg([[A[0], 0.42], [A[0], 0.12], [A[0], 0]]), '');
+    const pts = [[18, 120, 2.2], [100, 104, 1.8], [26, 62, 1.6], [96, 46, 2.4], [12, 88, 1.4], [106, 136, 1.6], [40, 24, 1.3], [84, 22, 1.5]];
+    let over = '';
+    if (kind === 'smoke') over = L_('M16 150 Q8 120 20 96 Q30 76 18 56', A[0], 3, ' opacity=".35" filter="' + soft + '"') + L_('M104 150 Q112 124 100 100 Q92 80 104 60', A[0], 3, ' opacity=".35" filter="' + soft + '"') + pts.slice(0, 5).map(p => C(p[0], p[1], p[2] * 0.8, A[1], ' opacity=".8"')).join('');
+    else over = pts.map(p => C(p[0], p[1], p[2] * 2.4, A[1], ' opacity=".45" filter="' + soft + '"') + C(p[0], p[1], p[2], '#ffffff', ' opacity=".9"')).join('') +
+      (kind === 'gold' || kind === 'lantern' ? Pn('M60 2 L62 8 L68 10 L62 12 L60 18 L58 12 L52 10 L58 8Z', A[1], ' opacity=".85"') : '') +
+      (kind === 'rift' ? L_('M8 70 Q20 66 24 76 M98 30 Q108 26 112 36 M92 130 Q104 126 108 136', A[1], 1.4, ' opacity=".7"') : '');
+    return [under, over];
+  }
+  // Lantern styles: the colour of the party's carried lantern and its light in the Deep.
+  const LANTERNS = {
+    ember: { flame: ['#fff3c4', '#ffb347', '#e0622a'], glow: [255, 180, 90], metal: '#8a6a3a', name: 'Hearth Ember' },
+    moon:  { flame: ['#ffffff', '#cfe2ff', '#7a9ad8'], glow: [170, 200, 255], metal: '#9aa6b8', name: 'Moonlit' },
+    wisp:  { flame: ['#f4ffe0', '#9cf27a', '#3aa84a'], glow: [140, 240, 140], metal: '#5a6a3a', name: 'Marsh Wisp' },
+    rose:  { flame: ['#fff0f4', '#ff8fb4', '#d03a6a'], glow: [255, 140, 180], metal: '#8a4a5a', name: 'Rosefire' },
+    rift:  { flame: ['#f4eaff', '#b98aff', '#6a3ae0'], glow: [180, 130, 255], metal: '#4a3a6a', name: 'Riftglass' },
+    sun:   { flame: ['#ffffff', '#fff1a0', '#f5c242'], glow: [255, 236, 160], metal: '#c99a3a', name: 'Sunforged' },
+    soul:  { flame: ['#eafffb', '#7affe0', '#2aa89a'], glow: [120, 255, 225], metal: '#3a5a5a', name: 'Soulflame' },
+    void:  { flame: ['#ffffff', '#9aa6ff', '#2a2266'], glow: [140, 150, 255], metal: '#2a2a3a', name: 'Starless' },
+  };
+  ART.lantern = { w: 40, h: 60, draw(c) {
+    const L0 = LANTERNS[c.lant] || LANTERNS.ember, mt = c.lg([lit(L0.metal, 0.25), L0.metal, lit(L0.metal, -0.2)], 0, 0, 1, 1);
+    return [
+      C(20, 34, 19, c.rg([[L0.flame[1], 0.5], [L0.flame[1], 0.15], [L0.flame[1], 0]]), ''),
+      L_('M14 6 Q20 -2 26 6', L0.metal, 2.4), P('M10 10 H30 L28 16 H12Z', mt, ' stroke-width="1.8"'),
+      P('M12 16 H28 L30 46 H10Z', c.lg([[L0.flame[0], 0.55], [L0.flame[1], 0.4], [L0.flame[2], 0.5]], 0, 0, 0, 1), ' stroke-width="1.8"'),
+      P('M20 22 Q27 32 24 40 Q20 44 16 40 Q13 32 20 22Z', c.lg([L0.flame[0], L0.flame[1], L0.flame[2]], 0, 0, 0, 1), ' stroke="none"'),
+      E(20, 37, 2.4, 3, '#ffffff', ' opacity=".9"'),
+      L_('M15 17 V45 M25 17 V45', L0.metal, 1.6), P('M8 46 H32 L30 52 H10Z', mt, ' stroke-width="1.8"'),
+      L_('M13 19 L13 40', '#ffffff', 1, ' opacity=".5"'),
+    ].join('');
+  } };
   // ---------------- build, load and draw ----------------
+  // hue is a number, or 'hue~outfit' for a hero in an outfit; the lantern sprite takes '~style'.
   function svgOf(name, hue) {
     const a = ART[name]; if (!a) return null;
-    const c = new Ctx(hue); const body = a.draw(c);
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + a.w + ' ' + a.h + '" width="' + a.w * 4 + '" height="' + a.h * 4 + '"><defs>' + c.defs.join('') + '</defs>' + body + '</svg>';
+    const sp = String(hue || 0).split('~'), o = OUTFITS[sp[1]];
+    const c = new Ctx(o ? 0 : +sp[0] || 0); c.lant = sp[1];
+    let inner = '<defs>' + c.defs.join('') + '</defs>', body = a.draw(c);
+    inner = '<defs>' + c.defs.join('') + '</defs>' + body;
+    if (o) {
+      inner = recolor(inner, o);
+      if (o.aura && a.w === 120) { const c2 = new Ctx(0), au = aura(o.aura, c2); inner = '<defs>' + c2.defs.join('') + '</defs>' + au[0] + inner + au[1]; }
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + a.w + ' ' + a.h + '" width="' + a.w * 4 + '" height="' + a.h * 4 + '">' + inner + '</svg>';
   }
   const imgs = {}, pend = {};
   let waiting = 0;
@@ -704,9 +780,13 @@
   const pxRender = PX.render;
   // Same footprint as the pixel sprite (grid units x scale), so the game's layout code is unchanged.
   function render(name, scale, hue) {
-    const a = ART[name]; if (!a) return pxRender(name, scale, hue);
+    const a = ART[name]; if (!a) return pxRender(name, scale, +String(hue || 0).split('~')[0] || 0);
     const k = name + '|' + (hue || 0), im = imgs[k];
-    if (!im) { load(name, hue); return pxRender(name, scale, hue); }
+    if (!im) {
+      load(name, hue);
+      const pc = pxRender(name, scale, +String(hue || 0).split('~')[0] || 0); if (pc) return pc;
+      const e = document.createElement('canvas'); e.width = Math.max(1, Math.round(a.w / 10 * scale)); e.height = Math.max(1, Math.round(a.h / 10 * scale)); return e;
+    }
     const gw = a.w / 10 * (a.unit || 1), gh = a.h / 10 * (a.unit || 1);
     const cv = document.createElement('canvas'); cv.width = Math.round(gw * scale); cv.height = Math.round(gh * scale);
     const x = cv.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
@@ -722,5 +802,5 @@
     return c.toDataURL();
   }
   for (const n in ART) load(n, 0);
-  root.LHSprites = Object.assign({}, PX, { render, spriteURL, svgOf, vector: true, ready: () => waiting === 0 });
+  root.LHSprites = Object.assign({}, PX, { render, spriteURL, svgOf, OUTFITS, LANTERNS, vector: true, ready: () => waiting === 0 });
 })(this);

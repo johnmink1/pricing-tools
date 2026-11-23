@@ -2339,6 +2339,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 20, date: 'November 22, 2026', title: 'One look, one war', items: [
+      'The whole game now wears the Grand War colors: deep night-blue panels, war-gold highlights and the same lettering as the Grand War site, so the war pages and the rest of the game finally match.',
+      'Tidier header on phones: everything fits on one line.'] },
     { v: 19, date: 'November 22, 2026', title: 'The world map', items: [
       'The map now fits on one screen. All fifteen regions sit along the road from the Hold to the Nyx Rift, each with its own painted window, ten floor pips and a check once its guardian falls.',
       'Tap a region to zoom in: its ten floors, story chapters and other delvers up close, with the region’s dossier beside it. Use the arrows to walk region to region, and World map to step back out.',

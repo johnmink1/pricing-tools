@@ -507,11 +507,57 @@
   }
   const fmtPct = v => '+' + (Math.round(v * 1000) / 10) + '%';
   function auraVal(s, key) { const a = warAura(s); return a && a.fx[key] || 0; }
-  // Total of one effect from your hero's tree and Grand War aura. It only counts while your hero is in the party.
+  // Character sheet: your hero earns XP from every fight and levels up. Each level gives a stat point
+  // (two every fifth level). Stats start at 10 like a tabletop character; each point above 10 adds a small
+  // party bonus, and the two stats your class favours count half again. Luck touches everything a little.
+  const STATS = [
+    { id: 'str', name: 'Strength',     short: 'STR', desc: 'party damage',                fx: { pdps: 0.006 } },
+    { id: 'dex', name: 'Dexterity',    short: 'DEX', desc: 'critical hits and dodging',   fx: { crit: 0.001, dodge: 0.001 } },
+    { id: 'con', name: 'Constitution', short: 'CON', desc: 'party health',                fx: { php: 0.008 } },
+    { id: 'int', name: 'Intelligence', short: 'INT', desc: 'ability power and damage',    fx: { power: 0.01, pdps: 0.002 } },
+    { id: 'wis', name: 'Wisdom',       short: 'WIS', desc: 'healing and ability cooldowns', fx: { pheal: 0.008, cd: 0.003 } },
+    { id: 'cha', name: 'Charisma',     short: 'CHA', desc: 'gold from every fight',       fx: { gold: 0.008 } },
+    { id: 'lck', name: 'Luck',         short: 'LCK', desc: 'a little of everything: loot, chests, crits, gold, Sigils and ambush spoils', fx: { loot: 0.005, chest: 0.0002, crit: 0.0005, gold: 0.003, sig: 0.000002, spoils: 0.01 } },
+  ];
+  const STAT_CLASS = { tank: ['str', 'con'], healer: ['wis', 'cha'], rogue: ['dex', 'lck'], mage: ['int', 'wis'], necro: ['int', 'con'] };
+  const STAT_BASE = 10, STAT_AFFINITY = 1.5, STAT_MAX = 99;
+  const xpNeed = lv => Math.round(12 * lv * lv + 20);
+  function heroLevel(s) {
+    // Heroes from before the character sheet start with XP for half their past fights.
+    if (s.hxp == null && s.hero) s.hxp = Math.floor(((s.stats && s.stats.kills) || 0) * (1 + (s.maxFloorEver || 1) / 25) * 0.5);
+    let lv = 1, x = s.hxp || 0;
+    while (x >= xpNeed(lv)) { x -= xpNeed(lv); lv++; }
+    return { lv, xp: x, need: xpNeed(lv) };
+  }
+  const pointsFor = lv => (lv - 1) + Math.floor(lv / 5);
+  const statSpent = s => Object.values(s.attr || {}).reduce((a, b) => a + b, 0);
+  const heroPoints = s => pointsFor(heroLevel(s).lv) - statSpent(s);
+  const statScore = (s, id) => STAT_BASE + ((s.attr || {})[id] || 0);
+  function addStat(s, id, n) {
+    n = n || 1;
+    if (!STATS.some(x => x.id === id) || heroPoints(s) < n || statScore(s, id) + n > STAT_MAX) return false;
+    s.attr = s.attr || {}; s.attr[id] = (s.attr[id] || 0) + n; return true;
+  }
+  function resetStats(s, now) { if (!atCamp(s, now)) return false; s.attr = {}; return true; }
+  function statVal(s, key) {
+    const c = heroCls(s), pri = STAT_CLASS[c] || [];
+    let t = 0;
+    for (const st of STATS) { const v = st.fx[key], n = (s.attr || {})[st.id]; if (v && n) t += v * n * (pri.includes(st.id) ? STAT_AFFINITY : 1); }
+    return t;
+  }
+  function gainXp(s, foe, events) {
+    if (!s.hero) return;
+    const base = (1 + s.floor / 25) * (foe.boss ? 15 : foe.chest ? 2 : foe.elite ? 4 : 1) * (foe.pack ? foe.pack * 2 : 1);
+    const before = heroLevel(s).lv;
+    s.hxp += base;
+    const after = heroLevel(s).lv;
+    if (after > before && events) events.push({ type: 'herolevel', lv: after, pts: pointsFor(after) - pointsFor(before) });
+  }
+  // Total of one effect from your hero's tree, Grand War aura and character stats. It only counts while your hero is in the party.
   function sk(s, key) {
     if (!s.party.includes('you')) return 0;
-    if (!s.skills) return auraVal(s, key);
-    let t = auraVal(s, key);
+    if (!s.skills) return auraVal(s, key) + statVal(s, key);
+    let t = auraVal(s, key) + statVal(s, key);
     for (const id in s.skills) { const k = skillById(id); if (k && k.k === key && k.cls === heroCls(s)) t += k.v * s.skills[id]; }
     return t;
   }
@@ -691,6 +737,7 @@
       if (f >= 15 && r() < 0.06 * loot) it = rollGear(s, f, { set: true }, r);
       else if (r() < 0.6 * loot) it = rollGear(s, f, { boost: 1 }, r);
     } else if (foe.chest) { if (r() < 0.4 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
+    else if (foe.pack) { if (r() < (foe.elite ? 0.4 : 0.25) * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
     else if (foe.elite) { if (r() < 0.15 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
     else if (r() < 0.012 * loot) it = rollGear(s, f, null, r);
     if (!it) return;
@@ -1098,6 +1145,7 @@
   const alive = s => s.party.filter(id => id && !s.down[id] && lvl(s, id));
 
   // ---------- foes ----------
+  const PACK_CHANCE = 0.03, PACK_FLOOR = 3, PACK_GOLD = 2;
   function makeFoe(s, rng) {
     const f = s.floor, boss = isBossFloor(f), r = rng || Math.random;
     const chest = !boss && r() < chestChance(s);
@@ -1114,9 +1162,13 @@
     if (elite) { side = b.war.side; name = b.war.units[Math.floor(r() * b.war.units.length)]; sprite = ['skeleton', 'ghost', 'eye'][Math.floor(r() * 3)]; }
     const hp = foeHp(f, boss) * (chest ? 0.5 : elite ? 2.5 : 1);
     // Some foes sneak up and hit the back of the line first.
-    const ambush = !boss && !chest && f >= 6 && r() < (elite ? 0.3 : 0.1) ? 2 : 0;
+    let ambush = !boss && !chest && f >= 6 && r() < (elite ? 0.3 : 0.1) ? 2 : 0;
+    // Ambush encounter: now and then a few monsters team up and jump the party. Tougher, but the spoils are rich.
+    const pack = !boss && !chest && f >= PACK_FLOOR && r() < PACK_CHANCE ? 2 + Math.floor(r() * 3) : 0;
+    let hpx = hp;
+    if (pack) { hpx = hp * pack * 0.85; ambush = 2; }
     const mods = chest ? [] : rollMods(f, boss, elite, b, r);
-    return { name, sprite, boss, chest, elite, side, ambush, hp, max: hp, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) * (mods.includes('swift') ? 1.35 : 1), mods, ward: 0, wardAt: 0 };
+    return { name, sprite, boss, chest, elite, side, ambush, pack, hp: hpx, max: hpx, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) * (pack ? 1 + 0.3 * (pack - 1) : 1) * (mods.includes('swift') ? 1.35 : 1), mods, ward: 0, wardAt: 0 };
   }
   function rollMods(f, boss, elite, b, r) {
     let n = boss ? (f >= 20 ? 1 : 0) + (f >= 60 ? 1 : 0) + (f >= 110 ? 1 : 0) : elite ? (f >= 30 ? 1 : 0) + (f >= 100 ? 1 : 0) : (f >= 40 && r() < Math.min(0.4, 0.08 + (f - 40) / 300) ? 1 : 0);
@@ -1150,7 +1202,7 @@
   // The server caps how many found Sigils a player can bank per day (perks.js), so this stays a slow trickle.
   const SIGIL_CHEST = 0.0005, SIGIL_BOSS = 0.001, SIGIL_DEPTH = 0.0001, SIGIL_DROP_DAY = 15;
   const sigilLuck = s => kup(s, 'sense') + SIGIL_DEPTH * Math.min(5, Math.floor((s.maxFloorEver || 0) / 30));
-  const sigilChance = (s, kind) => (kind === 'boss' ? SIGIL_BOSS : SIGIL_CHEST) + sigilLuck(s);
+  const sigilChance = (s, kind) => (kind === 'boss' ? SIGIL_BOSS : SIGIL_CHEST) + sigilLuck(s) + sk(s, 'sig');
   function dropSigils(s, foe, rng, events) {
     if (!foe.chest && !foe.boss) return;
     const r = rng || Math.random;
@@ -1186,7 +1238,9 @@
     let g = foeGold(f, foe.boss) * goldMult(s);
     if (foe.chest) { g *= 10 * (1 + relicVal(s, 'tooth')); s.stats.chests++; }
     if (foe.elite) { g *= 3; unlockLore(s, 'war_' + foe.side, events); }
+    if (foe.pack) { g *= foe.pack * PACK_GOLD * (1 + sk(s, 'spoils')); s.stats.packs = (s.stats.packs || 0) + 1; s.stats.kills += foe.pack - 1; }
     s.gold += g; s.stats.goldEarned += g; s.stats.kills++;
+    gainXp(s, foe, events);
     events && events.push({ type: 'kill', gold: g, foe });
     unlockLore(s, foe.boss ? 'boss' : 'foe_' + foe.sprite, events);
     if (foe.boss && f % 10 === 0) unlockLore(s, 'g' + (Math.floor((f - 1) / 10) % BIOMES.length), events);
@@ -1358,7 +1412,7 @@
     for (const id of s.party) if (id && s.down[id] && s.down[id] <= now) { delete s.down[id]; s.hp[id] = maxHpOf(s, id) * 0.4; }
     s.minions = s.minions.filter(m => m.until > now && m.hp > 0);
     if (!alive(s).length) return; // nobody to fight
-    if (!s.foe) s.foe = makeFoe(s, rng);
+    if (!s.foe) { s.foe = makeFoe(s, rng); if (s.foe.pack) events && events.push({ type: 'pack', n: s.foe.pack, name: s.foe.name }); }
     if (s.retryAt && !s.autoAdvance && now >= s.retryAt) { s.autoAdvance = true; s.retryAt = 0; events && events.push({ type: 'retry' }); }
     if (s.foe.boss) {
       s.lantern += dt;
@@ -1512,6 +1566,7 @@
   const api = {
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
+    STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,

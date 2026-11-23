@@ -1154,7 +1154,9 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 /* Daily quests */
 .stat.quests{color:var(--gold);cursor:pointer;font:inherit;font-weight:800;font-size:15px;position:relative}
 .stat.quests svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8}
-.stat.quests.ready::after{content:'';position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--violet);box-shadow:0 0 8px var(--violet)}
+.stat.quests.ready{color:#fff;background:rgba(232,121,249,.18);border-color:var(--violet);box-shadow:0 0 12px rgba(232,121,249,.45);animation:qpulse 1.6s ease-in-out infinite}
+@keyframes qpulse{50%{box-shadow:0 0 4px rgba(232,121,249,.2)}}
+.stat.quests.done{color:var(--good);border-color:rgba(143,207,106,.45);background:rgba(143,207,106,.08)}
 .quests{list-style:none;padding:0;margin:8px 0 12px;display:grid;gap:8px}
 .quest{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--panel)}
 .quest>div{flex:1;min-width:0}.quest b{display:block}.quest small{color:var(--muted);font-size:12px}
@@ -1167,3 +1169,26 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .stat.quests{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .kin{margin:6px 0 8px;padding:8px 12px;border-radius:10px;border:1px solid var(--side,#f5c242);background:linear-gradient(90deg,color-mix(in srgb,var(--side,#f5c242) 14%,transparent),transparent);font-size:14px;color:var(--text)}
 .kin b{color:var(--side,#f5c242)}
+/* Character sheet */
+#charsheet:not(:empty){margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.chead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 10px}
+.chead h3{font-family:var(--title);font-size:20px;margin:0 0 2px}.chead small{color:var(--muted);font-size:13px}
+.kbal.cpts{background:rgba(245,194,66,.08);border-color:rgba(245,194,66,.3)}.kbal.cpts svg,.kbal.cpts b{color:var(--gold)}
+.kbal.cpts.on{box-shadow:0 0 0 2px rgba(245,194,66,.25);animation:cpulse 2s ease-in-out infinite}
+@keyframes cpulse{50%{box-shadow:0 0 0 5px rgba(245,194,66,.08)}}
+.cxp{position:relative;height:22px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;margin-bottom:12px}
+.cxp i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,var(--gold2),var(--gold));opacity:.55}
+.cxp span{position:relative;display:block;text-align:center;font-size:12px;line-height:20px;color:var(--text);font-variant-numeric:tabular-nums}
+.cgrid{display:grid;gap:6px}
+.cstat{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--panel);border:1px solid var(--line)}
+.cstat.fav{border-color:rgba(245,194,66,.35)}
+.cscore{flex:none;width:46px;text-align:center;border-right:1px solid var(--line);padding-right:8px}
+.cscore b{display:block;font-family:var(--title);font-size:20px;line-height:1.1}.cscore small{color:var(--muted);font-size:11px}
+.ctx{flex:1;min-width:0}.ctx b{font-size:14px}.ctx small{display:block;color:var(--muted);font-size:12px;line-height:1.35}
+.cfav{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--gold);border:1px solid rgba(245,194,66,.4);border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:1px}
+.cbtns{flex:none;display:flex;gap:4px}
+#foetag.ambush{background:rgba(232,96,74,.15);color:#ff9a85;border-color:rgba(232,96,74,.5)}
+button.stat.quests{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 14px 6px 10px;color:var(--gold)}
+button.stat.quests:hover{border-color:var(--line2)}
+button.stat.quests.ready{color:#fff;background:rgba(232,121,249,.18);border-color:var(--violet)}
+button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);border-color:rgba(143,207,106,.45)}

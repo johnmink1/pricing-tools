@@ -881,3 +881,9 @@ body.resting .arena{cursor:default}
 /* pack tiles: clearer level badge */
 .tile .lvb{font-size:10.5px;font-weight:800;padding:1px 4px;border-radius:5px;color:#d9ccb0;letter-spacing:.02em}
 .tile .lvb.no{color:#ff9c88;background:#3a1511e6}
+/* class change */
+.respecs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}
+.respecs .btn{display:flex;align-items:center;justify-content:center;gap:8px}
+.respecs .btn svg{width:18px;height:18px}
+.respecs .btn.confirm{border-color:var(--accent);color:var(--accent)}
+.kitem .kp{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}

@@ -5,7 +5,7 @@ here = os.path.dirname(os.path.abspath(__file__))
 build = time.strftime('%Y%m%d%H%M', time.gmtime())
 p = os.path.join(here, 'index.html'); s = open(p).read()
 s = re.sub(r'(href="style\.css)(\?v=\w+)?"', r'\1?v=' + build + '"', s)
-for js in ('core', 'sprites', 'ui'):
+for js in ('core', 'sprites', 'vector', 'ui'):
     s = re.sub(r'(src="' + js + r'\.js)(\?v=\w+)?"', r'\1?v=' + build + '"', s)
 if 'window.LH_BUILD' in s: s = re.sub(r'window\.LH_BUILD = "\w*";', 'window.LH_BUILD = "' + build + '";', s)
 else: s = s.replace('<script>window.LH_SUPPORT_URL', '<script>window.LH_BUILD = "' + build + '";</script>\n<script>window.LH_SUPPORT_URL', 1)

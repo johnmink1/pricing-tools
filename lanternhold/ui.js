@@ -1,4 +1,4 @@
-/* lh-build 202611231956 */
+/* lh-build 202611232000 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -3636,6 +3636,7 @@
       ['The Ember Ring (PvP)', 'i:sword', 'Duel other players\u2019 heroes for Laurels and rating.', [
         'Open the <b>PvP</b> tab and press <b>Duel</b>. Only your own hero fights; companions, tonics and Sigils never count.',
         'Each class has the edge on two classes and is countered by two. Learn <b>Ring skills</b> with Laurels and pick 2 abilities and 2 passives for your loadout.',
+        'Rematches against the same hero within a day pay less each time, so spread your duels around.',
         '10 challenges, one back every 30 minutes. Wins give rating and Laurels, losses a few Laurels; your hero also defends while you are away. A full kit is a long climb.',
         'Laurels buy the <b>Ringwarden kit</b>: PvP gear with <b>Edge</b> (more damage to heroes) and <b>Resolve</b> (less damage from heroes). It works only in the Ring.']],
       ['Your profile', 'i:user', 'The card other players see.', [
@@ -3668,6 +3669,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 59, date: 'November 23, 2026', title: 'Fair fights in the Ember Ring', items: [
+      'Duelling the same hero again within a day now pays less each time: full rewards, then half, then a quarter, then nothing. This covers rating and Laurels for both heroes.',
+      'Challenger cards show when a rematch pays less, and when it will pay in full again.'] },
     { v: 58, date: 'November 23, 2026', title: 'The Ember Ring: abilities, counters and Ring skills', items: [
       'Heroes now fight with their class abilities in duels: Shield Bash stuns, Mend heals, Backstab and Fireball burst, Life Drain steals health, and more.',
       'Every class has the edge on two classes and is countered by two others. Challenger cards show who has the edge, and what each foe brings.',
@@ -4431,6 +4435,7 @@
     return { m: lg(dps), v: lg(hp) };
   }
   const ringEnergy = me => me ? Math.max(0, RING_EMAX - Math.ceil(Math.max(0, me.et - Date.now()) / RING_EINT)) : 0;
+  const ringIn = ms => { const m = Math.max(1, Math.ceil(ms / 6e4)); return m >= 60 ? Math.ceil(m / 60) + 'h' : m + 'm'; };
   async function loadRing(force) {
     if (!CL || !signedIn() || !S.hero || rg.busy) return;
     if (!force && rg.st && Date.now() - rg.at < 60000) return;
@@ -4474,8 +4479,10 @@
       h += st.foes.length ? '<div class="ringfoes">' + st.foes.map(f => {
         const q = ringPower(f.s) / mp, odd = q > 1.35 ? ['tough', 'Tough fight'] : q < 0.75 ? ['easy', 'You are favored'] : ['even', 'Even match'];
         const ed = ringEdge(you.cls, f.c), mu = ed > 0 ? '<span class="mu good" title="' + esc(ringWhy(you.cls, f.c)) + '">' + icon('star') + 'Your ' + CLS_NAME(you.cls).toLowerCase() + ' has the edge</span>' : ed < 0 ? '<span class="mu bad" title="' + esc(ringWhy(f.c, you.cls)) + '">' + icon('shield') + 'Counters your ' + CLS_NAME(you.cls).toLowerCase() + '</span>' : '';
+        const rc = me.rc && me.rc[f.id], rq = rc ? (me.rep || [1, .5, .25, 0])[Math.min(rc[0], 3)] : 1;
+        const rm = !rc ? '' : rq > 0 ? '<span class="mu rep">' + icon('refresh') + 'Rematch: ' + Math.round(rq * 100) + '% rating and Laurels</span>' : '<span class="mu bad">' + icon('refresh') + 'Rematch pays nothing for ' + ringIn(rc[1] - Date.now()) + '</span>';
         const brings = (f.lo ? f.lo.a.concat(f.lo.p) : []).map(id => { const k = ringSkill(id); return k ? k.n : ''; }).filter(Boolean);
-        return '<div class="ringfoe"><div class="rffig">' + ringFig(f.c, outfitHue((looksCache[f.id] || {}).k), 2) + '</div><div class="rfinfo"><div class="nm">' + esc(f.n) + ' ' + classTag(f.c) + '</div><small><span class="rtitle sm rt-' + ringTitle(f.r).toLowerCase() + '">' + ringTitle(f.r) + '</span> ' + f.r.toLocaleString('en-US') + ' &middot; ' + f.w + '&ndash;' + f.l + ' &middot; <i class="odds ' + odd[0] + '">' + odd[1] + '</i></small></small>' + (mu ? '<small>' + mu + '</small>' : '') + (brings.length ? '<small class="brings">Brings ' + brings.map(esc).join(' &middot; ') + '</small>' : '') + '<small class="dim">' + ringStatLine(f.s) + '</small></div>' +
+        return '<div class="ringfoe"><div class="rffig">' + ringFig(f.c, outfitHue((looksCache[f.id] || {}).k), 2) + '</div><div class="rfinfo"><div class="nm">' + esc(f.n) + ' ' + classTag(f.c) + '</div><small><span class="rtitle sm rt-' + ringTitle(f.r).toLowerCase() + '">' + ringTitle(f.r) + '</span> ' + f.r.toLocaleString('en-US') + ' &middot; ' + f.w + '&ndash;' + f.l + ' &middot; <i class="odds ' + odd[0] + '">' + odd[1] + '</i></small>' + (mu ? '<small>' + mu + '</small>' : '') + (rm ? '<small>' + rm + '</small>' : '') + (brings.length ? '<small class="brings">Brings ' + brings.map(esc).join(' &middot; ') + '</small>' : '') + '<small class="dim">' + ringStatLine(f.s) + '</small></div>' +
           '<button class="btn small" data-duel="' + f.id + '"' + (en ? '' : ' disabled title="No challenges left. One returns every 30 minutes."') + '>Duel</button></div>';
       }).join('') + '</div>' : '<p class="note">No other heroes have entered the Ring yet. Check back soon, or tell a friend to bring their hero.</p>';
       h += '<div class="row"><button class="btn ghost small" id="ring-ref">' + icon('refresh') + ' New challengers</button></div>';
@@ -4618,7 +4625,7 @@
         while (step(true)); paint();
         md.querySelector('.rdside.s' + (r.win ? 1 : 0)).classList.add('fallen');
         const res = md.querySelector('#rd-res'); res.hidden = false; res.className = 'rdres ' + (r.win ? 'won' : 'lost');
-        res.innerHTML = '<h3>' + (r.win ? 'Victory' : 'Defeat') + '</h3><p>' + (r.dr >= 0 ? '+' : '') + r.dr + ' rating &middot; +' + r.ll + ' Laurels' + (r.fw ? ' (first win of the day bonus)' : '') + '</p>';
+        res.innerHTML = '<h3>' + (r.win ? 'Victory' : 'Defeat') + '</h3><p>' + (r.dr >= 0 ? '+' : '') + r.dr + ' rating &middot; +' + r.ll + ' Laurels' + (r.fw ? ' (first win of the day bonus)' : '') + '</p>' + (r.q < 1 ? '<p class="note small">' + (r.q > 0 ? 'Rematch: ' + Math.round(r.q * 100) + '% of the usual rating and Laurels.' : 'You have fought this hero too often today, so this duel paid nothing. Try another challenger.') + '</p>' : '');
         r.win ? sfx.relic() : sfx.fail();
         const sk = md.querySelector('#rd-skip'); sk.textContent = 'Back to the Ring'; sk.className = 'btn'; sk.onclick = close;
         rg.at = 0; loadRing(true);
@@ -4641,7 +4648,6 @@
   document.querySelectorAll('.tabs [data-tab="ring"]').forEach(b => b.addEventListener('click', () => { paintRing(); loadRing(); }));
   // Keep the challenge timer fresh while the tab is open.
   setInterval(() => { if (typeof tab !== 'undefined' && tab === 'ring' && !document.hidden && !$('modal').dataset.lock) { const a = document.activeElement; if (!a || !$('ringbox') || !$('ringbox').contains(a)) paintRing(); } }, 30000);
-
   // ---------- the Wardrobe: outfits and lantern styles ----------
   // Looks only: nothing here changes power. Bought with Sigils on the server (infra/lambda/looks.js);
   // keep ids and prices in step with its CAT. The art lives in vector.js (OUTFITS, LANTERNS).

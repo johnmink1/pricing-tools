@@ -1732,6 +1732,22 @@
   });
   document.querySelector('.tabs [data-tab="admin"]').addEventListener('click', () => loadAdmin());
 
+  // ---------- leaderboard ----------
+  let lbAt = 0;
+  async function loadBoard(force) {
+    const box = $('boardtop'); if (!box) return;
+    if (!CL) { box.innerHTML = '<p class="note">The leaderboard needs the online server.</p>'; return; }
+    if (!force && Date.now() - lbAt < 60000) return; lbAt = Date.now();
+    if (!box.innerHTML) box.innerHTML = '<p class="note">Loading the deepest delvers…</p>';
+    try {
+      const r = await fetch(CL.api.replace(/\/$/, '') + '/leaderboard'); if (!r.ok) throw 0;
+      const top = (await r.json()).top || [], me = S.hero && S.hero.name;
+      box.innerHTML = '<p class="note">The deepest delvers across the Reach. Sign in to put your hero on the board. Updates every minute.</p>' +
+        (top.length ? '<ol class="lboard">' + top.map((p, i) => '<li class="' + (i < 3 ? 'top' + (i + 1) : '') + (p.name === me ? ' me' : '') + '"><span class="lbr">' + (i + 1) + '</span><span class="lbn"><b>' + esc(p.name) + '</b> ' + classTag(p.cls) + (L.SIDES[p.side] ? '<small>' + esc(L.SIDES[p.side].name) + '</small>' : '') + '</span><span class="lbf"><b>Floor ' + p.floor + '</b><small>level ' + p.level + '</small></span></li>').join('') + '</ol>' : '<p class="note">Nobody is on the board yet. Be the first.</p>');
+    } catch (e) { box.innerHTML = '<p class="note">The leaderboard could not load right now. Try again in a minute.</p>'; lbAt = 0; }
+  }
+  $('codexseg').addEventListener('click', e => { if (e.target.closest('[data-cx="board"]')) loadBoard(); });
+
   // ---------- chat: Global, Trade and Party ----------
   const CHAT_POLL_OPEN = 5000;
   const chat = { ch: 'global', leader: null, open: false, msgs: {}, since: {}, timer: 0, me: null, rooms: [], muted: new Set() };

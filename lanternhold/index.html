@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611230220">
+<link rel="stylesheet" href="style.css?v=202611230221">
 </head>
 <body>
 <div id="app">
@@ -117,10 +117,11 @@
       </div>
       <div class="tabbody" id="tab-admin" hidden><div id="adminbox"></div></div>
       <div class="tabbody" id="tab-codex" hidden>
-        <div class="seg codexseg" id="codexseg"><button data-cx="journal" class="on">Journal <em id="lorecount"></em></button><button data-cx="relics">Relics <em id="relcount"></em></button><button data-cx="stats">Records <em id="featcount"></em></button></div>
+        <div class="seg codexseg" id="codexseg"><button data-cx="journal" class="on">Journal <em id="lorecount"></em></button><button data-cx="relics">Relics <em id="relcount"></em></button><button data-cx="stats">Records <em id="featcount"></em></button><button data-cx="board">Leaderboard</button></div>
         <div class="cx" id="cx-journal">
         <div id="journal"></div>
       </div>
+        <div class="cx" id="cx-board" hidden><div id="boardtop"></div></div>
         <div class="cx" id="cx-relics" hidden>
         <p class="note">Guardians on floor 10 and below sometimes drop a relic. Relics stay with you forever, and a duplicate raises its level.</p>
         <div class="relics" id="relics"></div>
@@ -191,10 +192,10 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611230220";</script>
+<script>window.LH_BUILD = "202611230221";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611230220"></script>
-<script src="sprites.js?v=202611230220"></script>
-<script src="ui.js?v=202611230220"></script>
+<script src="core.js?v=202611230221"></script>
+<script src="sprites.js?v=202611230221"></script>
+<script src="ui.js?v=202611230221"></script>
 </body>
 </html>

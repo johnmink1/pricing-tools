@@ -861,3 +861,14 @@ body.resting .arena{cursor:default}
 .whogroup[open]>summary::before{transform:rotate(90deg)}
 .whogroup>summary em{font-style:normal;color:var(--dim)}
 .whogroup>div{display:flex;flex-wrap:wrap;gap:6px}
+/* leaderboard */
+.lboard{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.lboard li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:#1a130e;border:1px solid var(--line)}
+.lboard li.me{border-color:var(--accent)}
+.lboard .lbr{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;background:#2a1f18;color:var(--muted)}
+.lboard .top1 .lbr{background:#f2c14e;color:#2a1a05}
+.lboard .top2 .lbr{background:#cfd6dc;color:#1e2226}
+.lboard .top3 .lbr{background:#c98a4e;color:#2a1405}
+.lboard .lbn{flex:1;min-width:0}
+.lboard .lbn small,.lboard .lbf small{display:block;color:var(--muted);font-size:12px}
+.lboard .lbf{text-align:right}

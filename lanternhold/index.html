@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- lh-build 202611231439 -->
+<!-- lh-build 202611231443 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -51,7 +51,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611231439">
+<link rel="stylesheet" href="style.css?v=202611231443">
 </head>
 <body>
 <div id="app">
@@ -60,20 +60,20 @@
       <svg viewBox="0 0 32 32" class="logo" aria-hidden="true"><use href="#i-lantern"/></svg>
       <div><b>Lanternhold</b><small>A Grand War Front</small></div>
     </div>
-    <button class="onlinect" id="online" hidden title="Players online now. Tap to see heroes in the Guild."><i></i><span id="onlinect">0</span><small>online</small></button>
+    <button class="onlinect" id="online" hidden data-tip="Players online right now. Tap to see heroes in the Guild."><i></i><span id="onlinect">0</span><small>online</small></button>
     <div class="purse">
-      <div class="stat gold" title="Gold"><svg viewBox="0 0 24 24"><use href="#i-coin"/></svg><span id="gold">0</span></div>
-      <div class="stat dps" title="Party damage per second"><svg viewBox="0 0 24 24"><use href="#i-sword"/></svg><span id="dps">0</span><small>/s</small></div>
-      <div class="stat ember" title="Embers: +4% damage and gold each"><svg viewBox="0 0 24 24"><use href="#i-flame"/></svg><span id="embers">0</span></div>
-      <button class="stat quests" id="quests" title="Daily quests"><svg viewBox="0 0 24 24"><use href="#i-flare"/></svg><span id="questct">0/3</span></button>
-      <button class="stat mercy" id="mercy" title="Mercy's Blessing" hidden><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7-4.4-9.3-9C1 8.6 3 5 6.5 5c2 0 3.6 1.1 4.5 2.6h2C13.9 6.1 15.5 5 17.5 5 21 5 23 8.6 21.3 12 19 16.6 12 21 12 21zM11 9v2.5H8.5v2H11V16h2v-2.5h2.5v-2H13V9z"/></svg><span id="mercyct"></span></button>
-      <button class="stat sigils" id="sigils" title="Sigils: spend them on profile looks" hidden><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l3 5 6 1-4 4 1 6-6-3-6 3 1-6-4-4 6-1z"/></svg><span id="sigilct">0</span></button>
+      <div class="stat gold" data-tip="Gold. Every monster drops some. Spend it on training, upgrades and the Store."><svg viewBox="0 0 24 24"><use href="#i-coin"/></svg><span id="gold">0</span></div>
+      <div class="stat dps" data-tip="Party damage per second, with every bonus counted."><svg viewBox="0 0 24 24"><use href="#i-sword"/></svg><span id="dps">0</span><small>/s</small></div>
+      <div class="stat ember" data-tip="Embers. Each one adds 4% damage and gold for good. Earned by rekindling."><svg viewBox="0 0 24 24"><use href="#i-flame"/></svg><span id="embers">0</span></div>
+      <button class="stat sigils" id="sigils" data-tip="Sigils. Spend them on speed-ups and looks in the Store." hidden><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l3 5 6 1-4 4 1 6-6-3-6 3 1-6-4-4 6-1z"/></svg><span id="sigilct">0</span></button>
     </div>
+      <button class="stat hudchip quests" id="quests" data-tip="Daily quests. Three small goals a day for gold and Sigils."><svg viewBox="0 0 24 24"><use href="#i-flare"/></svg><span id="questct">0/3</span></button>
+      <button class="stat hudchip mercy" id="mercy" data-tip="Mercy's Blessing is active. Tap for details." hidden><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7-4.4-9.3-9C1 8.6 3 5 6.5 5c2 0 3.6 1.1 4.5 2.6h2C13.9 6.1 15.5 5 17.5 5 21 5 23 8.6 21.3 12 19 16.6 12 21 12 21zM11 9v2.5H8.5v2H11V16h2v-2.5h2.5v-2H13V9z"/></svg><span id="mercyct"></span></button>
     <a class="support" id="support" href="#" target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24"><use href="#i-cup"/></svg><span>Support the game</span></a>
     <button class="updatebtn" id="btn-update" hidden><svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span>Update ready</span></button>
             <button class="account" id="btn-account" hidden aria-label="Sign in"></button>
-    <button class="iconbtn" id="btn-guide" aria-label="Guide" title="Guide"><svg viewBox="0 0 24 24"><use href="#i-help"/></svg></button>
-    <button class="iconbtn" id="btn-settings" aria-label="Settings"><svg viewBox="0 0 24 24"><use href="#i-gear"/></svg></button>
+    <button class="iconbtn" id="btn-guide" aria-label="Guide" data-tip="Guide: how everything works"><svg viewBox="0 0 24 24"><use href="#i-help"/></svg></button>
+    <button class="iconbtn" id="btn-settings" aria-label="Settings" data-tip="Settings"><svg viewBox="0 0 24 24"><use href="#i-gear"/></svg></button>
   </header>
   <a class="warstrip" id="warstrip" href="https://war.born2gamellc.com/" target="_blank" rel="noopener" title="Open the Grand War war room">
     <span class="ws-brand">Born <i>2</i> Game &middot; The Grand War</span>
@@ -132,14 +132,14 @@
       <div class="tabbody" id="tab-party">
         <div id="campbar"></div>
         <div class="buybar"><span>Train</span><div class="seg" id="buyseg"><button data-n="1" class="on">x1</button><button data-n="10">x10</button><button data-n="25">x25</button><button data-n="max">Max</button></div></div>
-        <div class="formhead"><span><b>Marching order</b> <small>Top of the list stands at the front, nearest the monsters.</small></span><span class="fbtns"><button class="btn ghost small" id="f-recruit">Recruit players</button><button class="btn ghost small" id="f-auto">Auto-arrange</button></span></div>
+        <div class="formhead"><span><b>Marching order</b> <i class="tipi" data-tip="The top of the list stands at the front, nearest the monsters. Tanks up front, healers in the middle, and watch the back for ambushes.">i</i></span><span class="fbtns"><button class="btn ghost small" id="f-recruit">Recruit players</button><button class="btn ghost small" id="f-auto">Auto-arrange</button></span></div>
         <div class="kin" id="kinline" hidden></div>
         <div id="seats"></div>
         <details class="ftips"><summary id="fsum">Formation tips</summary><ul class="fnotes" id="fnotes"></ul></details>
       </div>
       <div class="tabbody" id="tab-camp" hidden>
         <div id="campbar2"></div>
-        <div id="benchwrap" class="camp"><h3 class="sub">Campfire</h3><p class="note">Companions resting by the fire work camp jobs that help the whole party, even while you are deep below. Train them here to make their jobs count for more.</p><div id="bench"></div><div id="campnext"></div></div>
+        <div id="benchwrap" class="camp"><h3 class="sub">Campfire <i class="tipi" data-tip="Companions resting by the fire work camp jobs that help the whole party, even while you are deep below. Train them to make their jobs count for more.">i</i></h3><div id="bench"></div><div id="campnext"></div></div>
       </div>
       <div class="tabbody" id="tab-market" hidden>
         <div class="seg mktseg" id="mktseg"><button data-mv="market" class="on">Market</button><button data-mv="mail">Mailbox <em id="mailn"></em></button><button data-mv="sigils">Sigils</button></div>
@@ -245,11 +245,12 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611231439";</script>
+<script>window.LH_BUILD = "202611231443";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611231439"></script>
-<script src="sprites.js?v=202611231439"></script>
-<script src="vector.js?v=202611231439"></script>
-<script src="ui.js?v=202611231439"></script>
+<script src="core.js?v=202611231443"></script>
+<script src="sprites.js?v=202611231443"></script>
+<script src="vector.js?v=202611231443"></script>
+<script src="ui.js?v=202611231443"></script>
+<div class="tip" id="tip" role="tooltip" hidden></div>
 </body>
 </html>

@@ -473,7 +473,7 @@
       const id = S.party[i];
       if (!id) {
         const canFill = S.unlocked.some(x => !S.party.includes(x)) || (S.guests || []).some(g => !S.party.includes(g.id));
-        html += '<div class="seat empty"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span><div class="ic">' + icon('user') + '</div><div class="info"><div class="nm">Empty seat</div><div class="lv">' + (canFill ? 'Pick a companion below to fill it.' : (S.mode === 'multi' ? 'Recruit a player or meet more companions in the story.' : 'You will meet more companions as the story goes on.')) + '</div></div></div>';
+        html += '<div class="seat empty"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span><div class="ic">' + icon('user') + '</div><div class="info"><div class="nm">Empty seat</div><div class="lv">' + (canFill ? 'Pick a companion below to fill it.' : 'Recruit a player or meet more companions in the story. See <b>Grow your party</b> below.') + '</div></div></div>';
         continue;
       }
       const m = L.memberById(id), down = S.down[id], hp = Math.max(0, S.hp[id] || 0), mx = L.maxHpOf(S, id);
@@ -510,12 +510,14 @@
     if (t.dataset.move) { const [i, d] = t.dataset.move.split(':').map(Number); if (L.moveMember(S, i, i + d)) { sfx.buy(); updateSeats(true); updateAbilities(true); } return; }
     if (t.id === 'f-auto') { L.autoFormation(S); S.formationManual = false; sfx.buy(); updateSeats(true); updateAbilities(true); toast('shield', 'Party arranged', 'Tank in front, rogue behind it, healers in the middle where they reach everyone, casters at the back.', ''); return; }
     if (t.dataset.train) { if (L.train(S, t.dataset.train, buyN())) { sfx.buy(); updateSeats(true); } }
-    else if (t.dataset.unseat) { L.unseat(S, +t.dataset.unseat); updateSeats(true); updateAbilities(true); }
+    else if (t.dataset.unseat) { L.unseat(S, +t.dataset.unseat); updateSeats(true); updateAbilities(true); paintBoard(); }
     else if (t.dataset.seat) pickSeat(t.dataset.seat);
-    else if (t.dataset.dismiss) { L.dismissGuest(S, t.dataset.dismiss); updateSeats(true); updateAbilities(true); }
+    else if (t.dataset.dismiss) { L.dismissGuest(S, t.dataset.dismiss); updateSeats(true); updateAbilities(true); paintBoard(); }
     else if (t.dataset.recruit) recruitPlayer(t.dataset.recruit);
     else if (t.id === 'b-find') findHeroes();
     else if (t.id === 'b-signin') openAccount();
+    else if (t.id === 'b-gomulti') goMulti();
+    else if (t.id === 'f-recruit') { const g = $('grow'); g && g.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   });
   function pickSeat(id) {
     const empty = S.party.indexOf(null);
@@ -524,26 +526,59 @@
     modal('<h2>Who stays at camp?</h2><p>' + esc(m.name) + ' takes their seat.</p><div class="choice">' +
       S.party.map((x, i) => x === 'you' || !x ? '' : '<button class="pick" data-slot="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', level ' + L.lvl(S, x) + '</small></button>').join('') +
       '</div><div class="row"><button class="btn ghost" id="m-cancel">Cancel</button></div>', md => {
-        md.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { L.seat(S, id, +b.dataset.slot); closeModal(); updateSeats(true); updateAbilities(true); });
+        md.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { L.seat(S, id, +b.dataset.slot); closeModal(); updateSeats(true); updateAbilities(true); paintBoard(); });
         md.querySelector('#m-cancel').onclick = closeModal;
       });
   }
 
-  // ---------- multiplayer hero board ----------
+  // ---------- growing the party: story companions + recruiting players ----------
   let boardList = null, boardMsg = '';
+  function nextCompanion() {
+    for (const b of L.STORY) if (b.join && !S.unlocked.includes(b.join)) return L.memberById(b.join);
+    return null;
+  }
   function paintBoard() {
     const w = $('boardwrap');
-    if (S.mode !== 'multi') { w.innerHTML = ''; return; }
-    let h = '<h3 class="sub">Recruit other players</h3>';
-    if (!CL) h += '<p class="note">The hero board is not available right now.</p>';
-    else if (!signedIn()) h += '<p class="note">Sign in to publish your hero and recruit other players’ heroes. Player heroes are stronger than story companions.</p><button class="btn small" id="b-signin">Sign in</button>';
-    else {
-      h += '<p class="note">Player heroes fight at the level their owner has trained them to. Their owner earns gold every time someone recruits them.</p><button class="btn small" id="b-find">' + (boardList ? 'Find different heroes' : 'Find heroes') + '</button>';
+    const open = S.party.filter(x => !x).length;
+    const met = S.unlocked.filter(id => id !== 'you' && !L.isGuest(S, id)).length;
+    const nc = nextCompanion();
+    let h = '<h3 class="sub" id="grow">Grow your party</h3><div class="grow">';
+    // Story companions
+    h += '<div class="growcard"><div class="gh">' + icon('user') + '<b>Story companions</b></div>' +
+      '<p>Companions join on their own as the story moves forward. You have met <b>' + met + '</b> so far. Anyone not in a seat waits at camp above, and you can swap them in any time.</p>' +
+      (nc ? '<p class="next">Next to join: <b>' + esc(nc.name) + '</b> ' + classTag(nc.cls) + '<br><small>Keep following your goal: ' + esc(L.currentGoal(S)) + '.</small></p>' : '<p class="next">You have met every story companion.</p>') + '</div>';
+    // Other players
+    h += '<div class="growcard"><div class="gh">' + icon('users') + '<b>Recruit other players</b></div>';
+    if (S.mode !== 'multi') {
+      h += '<p>Other players’ heroes are stronger than story companions. To recruit them, switch this game to <b>Multiplayer</b> and sign in with a free account. Your progress, gear and companions all stay.</p>' +
+        '<button class="btn small" id="b-gomulti">Switch to Multiplayer</button>';
+    } else if (!CL) {
+      h += '<p>The hero board is not available right now. Try again later.</p>';
+    } else if (!signedIn()) {
+      h += '<ol class="steps"><li><b>Sign in</b> with a free account.</li><li>Press <b>Find heroes</b> to see players you can recruit.</li><li>Press <b>Recruit</b> to put one in an empty seat.</li></ol>' +
+        '<button class="btn small" id="b-signin">Sign in to recruit</button>';
+    } else {
+      h += '<ol class="steps"><li>Press <b>Find heroes</b> to see players you can recruit.</li><li>Press <b>Recruit</b> to put one in an empty seat. They fight at the level their owner trained them to.</li><li>Your own hero is on the board too, and you earn gold each time someone recruits it.</li></ol>' +
+        (open ? '<p class="note">' + open + (open === 1 ? ' seat is' : ' seats are') + ' open.</p>' : '<p class="note warnline">All five seats are full. Press &times; on a companion to send them to camp and make room.</p>') +
+        '<button class="btn small" id="b-find">' + (boardList ? 'Find different heroes' : 'Find heroes') + '</button>';
       if (boardMsg) h += '<p class="note">' + esc(boardMsg) + '</p>';
       if (boardList) h += '<div class="board">' + boardList.map(g => '<div class="seat bench"><div class="ic c-' + g.cls + ' player">' + icon(CLASS_ICON[g.cls]) + '</div><div class="info"><div class="nm">' + esc(g.name) + ' ' + classTag(g.cls) + '</div><div class="lv">Level ' + g.level + ' &middot; reached floor ' + g.floor + '</div></div>' +
         ((S.guests || []).some(x => x.id === 'p_' + g.id) ? '<span class="muted">In party</span>' : '<button class="btn small" data-recruit="' + g.id + '">Recruit</button>') + '</div>').join('') + '</div>';
+      if ((S.guests || []).length) h += '<p class="note">To let a player’s hero go, press Dismiss on their seat.</p>';
     }
-    w.innerHTML = h;
+    w.innerHTML = h + '</div></div>';
+  }
+  function goMulti() {
+    modal('<h2>Switch to Multiplayer?</h2><p>Your hero joins the board where other players can recruit it, and you can recruit theirs. Everything you have now stays: floors, gold, gear and companions.</p><p class="note">This needs a free account. You can play on without one, but recruiting needs sign-in.</p><div class="row"><button class="btn" id="m-yes">Switch</button><button class="btn ghost" id="m-no">Not now</button></div>', md => {
+      md.querySelector('#m-no').onclick = closeModal;
+      md.querySelector('#m-yes').onclick = () => {
+        S.mode = 'multi'; save();
+        closeModal(); sfx.buy();
+        toast('users', 'Multiplayer on', signedIn() ? 'Press Find heroes to recruit other players.' : 'Sign in to start recruiting other players.', 'feat');
+        if (signedIn()) publishHero(); else if (CL) setTimeout(() => authForm('in'), 300);
+        paintBoard();
+      };
+    });
   }
   async function findHeroes() {
     boardMsg = 'Looking for heroes…'; paintBoard();
@@ -557,7 +592,7 @@
     L.addGuest(S, { id: 'p_' + g.id, name: g.name, cls: g.cls, level: g.level });
     try { await api('POST', { heroId: g.id }, '/recruit'); } catch (e) {}
     toast('user', g.name + ' joins your party', 'A ' + L.CLASSES[g.cls].name + ' at level ' + g.level + '.', 'feat');
-    updateSeats(true); updateAbilities(true);
+    updateSeats(true); updateAbilities(true); paintBoard();
   }
 
   // ---------- abilities bar ----------
@@ -1511,6 +1546,7 @@
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and goes in a weapon, armor or trinket slot.</p><p>In the Gear tab, pick a companion to see what fits them. Green tags mean an upgrade, and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten and where you are. Tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 25 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
+    ['Growing your party', '<p>Your party has five seats. Press <b>Recruit</b> in the Party tab to jump to <b>Grow your party</b>.</p><p><b>Story companions</b> join on their own as the story moves forward. It shows who joins next and the goal that leads there. Companions not in a seat wait at camp, and you can swap them in any time.</p><p><b>Other players</b>: switch to Multiplayer (you keep all progress) and sign in. Press <b>Find heroes</b>, then <b>Recruit</b> to put one in an empty seat. They are stronger than story companions. Press <b>Dismiss</b> on their seat to let them go.</p>'],
     ['Multiplayer and chat', '<p>With a free account your progress is saved online and works on any device.</p><p>In <b>Multiplayer</b>, your hero appears on a board where other players can recruit it, and you earn gold each time. You can recruit their heroes too. Player heroes are stronger than story companions.</p><p><b>Chat</b> (the speech bubble) has Global, Trade and Party channels. Ctrl+click an item to link it. Tap a name to mute or report. No web links, and be kind.</p>'],
     ['Controls', '<ul><li><b>Tap the arena, Space or Enter</b>: strike</li><li><b>1 to 5</b>: use an ability</li><li><b>Ctrl+click an item</b>: link it in chat</li><li><b>Arrows on the floor header</b>: move between floors you have reached</li></ul>'],
   ];
@@ -1528,6 +1564,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 7, date: 'November 22, 2026', title: 'Grow your party', items: [
+      'A new Recruit button in the Party tab takes you to Grow your party.',
+      'See which story companion joins next and the goal that leads to them.',
+      'Solo games can switch to Multiplayer at any time without losing progress, so you can recruit other players’ heroes.',
+      'Clear steps for finding and recruiting other players, and how many seats you have open.'] },
     { v: 6, date: 'November 22, 2026', title: 'Help for new delvers', items: [
       'A step-by-step tutorial for new players that points at the real buttons.',
       'The Delver’s Guide: open the ? at the top for a handbook on every system.',

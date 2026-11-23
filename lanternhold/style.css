@@ -446,3 +446,43 @@ button.scene:hover{border-color:var(--accent)}
 .chatnote{display:block;padding:0 10px 8px;color:var(--dim);font-size:12px}
 .chatnote.warn{color:#f0a094}
 @media (max-width:720px){.chat{right:0;left:0;bottom:0;width:auto;max-width:none;height:70vh;border-radius:14px 14px 0 0}}
+
+/* map of the Deep */
+.mapbtn{display:inline-flex;align-items:center;gap:6px;margin:4px auto 0;padding:5px 12px;border-radius:999px;border:1px solid var(--line2);background:var(--panel);color:var(--text);font-weight:700;font-size:13px}
+.mapbtn:hover{border-color:var(--accent)}
+.mapbtn svg{width:16px;height:16px;color:var(--accent)}
+.stage .mapbtn{display:flex;width:max-content}
+.modal .sheet.mapsheet{max-width:620px;padding:18px 18px 14px;display:flex;flex-direction:column;height:calc(100vh - 32px)}
+.maphead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+.maphead h2{margin:0 0 2px}
+.maphead small{color:var(--muted);font-size:13px}
+.maphead .iconbtn{flex:none;font-size:22px}
+.mapscroll{flex:1;overflow-y:auto;border-radius:12px;border:1px solid var(--line2);background:#0b0806;overscroll-behavior:contain}
+.deepmap{display:block;width:100%;height:auto}
+.deepmap .mt{font-family:var(--title);font-size:15px;font-weight:700;fill:#f3e6cf}
+.deepmap .ms{font-size:10px;fill:#b8a68a}
+.deepmap .mg{font-size:9px;fill:#f3e6cf;text-anchor:middle;font-weight:700;paint-order:stroke;stroke:#0b0806;stroke-width:3px}
+.deepmap .mk{font-size:10px;font-weight:900;text-anchor:middle;fill:#1a120b}
+.deepmap .mb{font-size:8px;font-weight:800;text-anchor:middle;fill:#e9c98a}
+.deepmap .mh{font-size:10px;font-weight:800;text-anchor:middle;fill:#f2c14e;paint-order:stroke;stroke:#0b0806;stroke-width:3px}
+.deepmap .mr{font-size:11px;text-anchor:middle;fill:#b9a6ff;font-style:italic}
+.deepmap .mnode.ok,.deepmap .mbeat{cursor:pointer}
+.deepmap .mnode.ok:hover circle:last-of-type{stroke:#fff;stroke-width:2}
+.deepmap .pulse{animation:mpulse 1.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes mpulse{50%{transform:scale(1.35);opacity:.55}}
+@media (prefers-reduced-motion:reduce){.deepmap .pulse{animation:none}}
+.maplegend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:12px;color:var(--muted)}
+.maplegend span{display:inline-flex;align-items:center;gap:5px}
+.maplegend i{display:inline-grid;place-items:center;width:10px;height:10px;border-radius:50%;font-style:normal}
+.lg-f{background:#e9c98a}.lg-g{background:var(--accent);width:14px!important;height:14px!important}
+.lg-s{width:14px!important;height:14px!important;border:1px solid #e9c98a;font-size:8px;font-weight:800;color:#e9c98a}
+.lg-y{background:#f2c14e;clip-path:polygon(0 0,100% 0,50% 100%);border-radius:0!important}
+@media (max-width:720px){.modal .sheet.mapsheet{padding:12px;height:calc(100vh - 16px)}}
+
+/* update ready */
+.updatebtn{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 18%,var(--panel));color:var(--text);font-weight:800;font-size:14px;white-space:nowrap;animation:upglow 2s ease-in-out infinite}
+.updatebtn[hidden]{display:none}
+.updatebtn svg{width:18px;height:18px;color:var(--accent)}
+@keyframes upglow{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 25%,transparent)}}
+@media (prefers-reduced-motion:reduce){.updatebtn{animation:none}}
+@media (max-width:720px){.updatebtn span{display:none}.updatebtn{padding:0 10px}}

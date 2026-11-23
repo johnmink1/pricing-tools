@@ -436,7 +436,7 @@
     setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 400); }, 4200);
   }
   function modal(html, onMount) {
-    $('modalbody').innerHTML = html; $('modal').hidden = false;
+    $('modalbody').className = 'sheet'; $('modalbody').innerHTML = html; $('modal').hidden = false;
     onMount && onMount($('modalbody'));
   }
   function closeModal() { $('modal').hidden = true; }
@@ -1278,6 +1278,99 @@
     });
     document.addEventListener('visibilitychange', () => { if (!document.hidden && chat.open) pollChat(); });
   }
+
+  // ---------- map of the Lantern Deep ----------
+  // A cut-away of the descent: the Hold on top, one band per region, a winding trail of floors.
+  const MAP_W = 360, BAND = 168, TOP = 96;
+  function storyFloor(b) { const m = String(b.when).match(/maxFloorEver >= (\d+)/); return m ? +m[1] : 1; }
+  function mapNode(f) {
+    const r = Math.floor((f - 1) / 10), i = (f - 1) % 10, ltr = r % 2 === 0;
+    const col = ltr ? i : 9 - i;
+    const x = 34 + col * 32.4, y = TOP + r * BAND + 76 + Math.sin(i * 1.3 + r) * 12 + (i % 2 ? 18 : 0);
+    return { x: Math.round(x), y: Math.round(y) };
+  }
+  function openMap() {
+    const cyc = L.depthCycle(S.floor), base = cyc * 10 * L.BIOMES.length;
+    const reached = S.maxFloor, cur = S.floor;
+    const H_ = TOP + L.BIOMES.length * BAND + 70;
+    let svg = '<svg class="deepmap" viewBox="0 0 ' + MAP_W + ' ' + H_ + '" role="img" aria-label="Map of the Lantern Deep">';
+    svg += '<defs>' + L.BIOMES.map((b, r) => '<linearGradient id="mg' + r + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + b.bg[0] + '"/><stop offset="1" stop-color="' + b.bg[1] + '"/></linearGradient>').join('') +
+      '<radialGradient id="mglow"><stop offset="0" stop-color="#ffcf7a" stop-opacity=".9"/><stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/></radialGradient></defs>';
+    // the Hold, on the surface
+    svg += '<rect x="0" y="0" width="' + MAP_W + '" height="' + TOP + '" fill="#2a2015"/><path d="M0 ' + (TOP - 8) + ' Q 90 ' + (TOP - 22) + ' 180 ' + (TOP - 10) + ' T 360 ' + (TOP - 12) + ' V ' + TOP + ' H 0 Z" fill="#1a130c"/>' +
+      '<g transform="translate(272 14)" fill="#c9a46a"><rect x="0" y="26" width="60" height="34" rx="2"/><rect x="8" y="10" width="14" height="18"/><rect x="38" y="10" width="14" height="18"/><rect x="24" y="0" width="12" height="28"/><circle cx="30" cy="40" r="7" fill="#ffd27a"/></g>' +
+      '<circle cx="302" cy="54" r="26" fill="url(#mglow)"/><text x="16" y="30" class="mt">The Hold</text><text x="16" y="46" class="ms">Iron Covenant fortress, Shattered Reach</text>';
+    L.BIOMES.forEach((b, r) => {
+      const y0 = TOP + r * BAND, first = base + r * 10 + 1, known = first <= reached || (cyc === 0 && r === 0);
+      svg += '<rect x="0" y="' + y0 + '" width="' + MAP_W + '" height="' + BAND + '" fill="url(#mg' + r + ')"/>';
+      svg += '<path d="M0 ' + (y0 + 2) + ' Q 120 ' + (y0 + 10 + (r % 2) * 8) + ' 240 ' + (y0 + 4) + ' T 360 ' + (y0 + 6) + '" stroke="rgba(0,0,0,.45)" stroke-width="3" fill="none"/>';
+      const sd = L.SIDES[b.war.side];
+      svg += '<text x="14" y="' + (y0 + 22) + '" class="mt" fill="' + b.accent + '">' + esc(known ? b.name : 'Unexplored') + '</text>';
+      svg += '<text x="14" y="' + (y0 + 37) + '" class="ms">Floors ' + first + '–' + (first + 9) + (known ? ' · ' + sd.name + ' warbands' : '') + '</text>';
+      if (!known) svg += '<rect x="0" y="' + (y0 + 44) + '" width="' + MAP_W + '" height="' + (BAND - 44) + '" fill="rgba(5,4,3,.55)"/>';
+    });
+    // the trail
+    const nodes = []; for (let k = 1; k <= 10 * L.BIOMES.length; k++) nodes.push(Object.assign({ f: base + k }, mapNode(k)));
+    const path = nodes.map((n, i) => (i ? 'L' : 'M') + n.x + ' ' + n.y).join(' ');
+    svg += '<path d="' + path + '" stroke="#000" stroke-opacity=".5" stroke-width="5" fill="none" stroke-linejoin="round"/>';
+    const lastIdx = Math.max(0, Math.min(nodes.length - 1, reached - base - 1));
+    svg += '<path d="' + nodes.slice(0, lastIdx + 1).map((n, i) => (i ? 'L' : 'M') + n.x + ' ' + n.y).join(' ') + '" stroke="#e9c98a" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round" fill="none"/>';
+    // story moments
+    const beats = cyc === 0 ? L.STORY.filter(b => S.story.seen[b.id] && b.id !== 'intro') : [];
+    for (const b of beats) { const f = Math.min(storyFloor(b), 80), n = nodes[f - 1]; if (!n) continue; svg += '<g class="mbeat" data-scene="' + b.id + '"><title>' + esc('Chapter ' + b.ch + ': ' + b.title) + '</title><circle cx="' + (n.x + 9) + '" cy="' + (n.y - 12) + '" r="6" fill="#1b140d" stroke="#e9c98a"/><text x="' + (n.x + 9) + '" y="' + (n.y - 9.5) + '" class="mb">' + b.ch + '</text></g>'; }
+    for (const n of nodes) {
+      const boss = L.isBossFloor(n.f), big = n.f % 10 === 0, ok = n.f <= reached, here = n.f === cur;
+      const b = L.BIOMES[Math.floor((n.f - base - 1) / 10)];
+      const r = big ? 9 : boss ? 6.5 : 3.6;
+      svg += '<g class="mnode' + (ok ? ' ok' : '') + (here ? ' here' : '') + '" data-floor="' + n.f + '"><title>' + (boss ? (big ? b.boss : 'Guardian') + ', floor ' + n.f : 'Floor ' + n.f) + (ok ? '' : ' (not reached)') + '</title>' +
+        (here ? '<circle cx="' + n.x + '" cy="' + n.y + '" r="16" fill="url(#mglow)" class="pulse"/>' : '') +
+        '<circle cx="' + n.x + '" cy="' + n.y + '" r="' + (r + 6) + '" fill="transparent"/>' +
+        '<circle cx="' + n.x + '" cy="' + n.y + '" r="' + r + '" fill="' + (ok ? (boss ? b.accent : '#e9c98a') : '#2b241c') + '" stroke="' + (boss ? '#1a120b' : 'rgba(0,0,0,.6)') + '" stroke-width="' + (boss ? 2 : 1) + '"/>' +
+        (big ? '<text x="' + n.x + '" y="' + (n.y + 3.5) + '" class="mk">' + (n.f < reached ? '✓' : '!') + '</text>' : '') +
+        (big && ok ? '<text x="' + n.x + '" y="' + (n.y + 24) + '" class="mg">' + esc(b.boss) + '</text>' : '') + '</g>';
+    }
+    // you are here
+    const hn = nodes[cur - base - 1];
+    if (hn) svg += '<g class="youhere"><path d="M' + hn.x + ' ' + (hn.y - 12) + ' l-6 -11 h12 z" fill="#f2c14e" stroke="#1a120b"/><text x="' + hn.x + '" y="' + (hn.y - 27) + '" class="mh">You</text></g>';
+    // the Rift below
+    const yb = TOP + L.BIOMES.length * BAND;
+    svg += '<rect x="0" y="' + yb + '" width="' + MAP_W + '" height="70" fill="#07050d"/><path d="M150 ' + (yb + 14) + ' l12 18 l-8 4 l16 22 l-22 -18 l8 -4 z" fill="#9a7cff" opacity=".8"/><text x="' + MAP_W / 2 + '" y="' + (yb + 64) + '" class="mr">' + (S.story.seen.end ? 'The Nyx Rift. The stair keeps going.' : 'Something waits below.') + '</text>';
+    svg += '</svg>';
+    const depthName = cyc ? ' · Depth ' + ['', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'][Math.min(cyc, 7)] : '';
+    modal('<div class="maphead"><div><h2>The Lantern Deep' + depthName + '</h2><small>Deepest floor reached: <b>' + reached + '</b>. Tap a lit floor to travel there, or a numbered marker to replay that chapter.</small></div><button class="iconbtn" id="map-x" aria-label="Close map">&times;</button></div><div class="mapscroll">' + svg + '</div>' +
+      '<div class="maplegend"><span><i class="lg-f"></i>Floor</span><span><i class="lg-g"></i>Guardian</span><span><i class="lg-s">3</i>Story chapter</span><span><i class="lg-y"></i>You</span></div>', md => {
+        md.closest('.sheet') && md.closest('.sheet').classList.add('mapsheet');
+        const sc = md.querySelector('.mapscroll'), here = md.querySelector('.mnode.here');
+        if (here && sc) { const svgEl = md.querySelector('svg'), k = svgEl.getBoundingClientRect().height / H_; sc.scrollTop = Math.max(0, (hn ? hn.y : 0) * k - sc.clientHeight / 2); }
+        md.querySelector('#map-x').onclick = closeMap;
+        md.querySelector('svg').addEventListener('click', e => {
+          const bt = e.target.closest('.mbeat'); if (bt) { const b = L.STORY.find(x => x.id === bt.dataset.scene); closeMap(); if (b) playScene(b, true); return; }
+          const g = e.target.closest('.mnode.ok'); if (!g) return;
+          const f = +g.dataset.floor; closeMap();
+          if (f !== S.floor) { L.gotoFloor(S, f); S.autoAdvance = f >= S.maxFloor; updateStage(); toast('map', 'Travelled to floor ' + f, L.biomeOf(f).name + (f < S.maxFloor ? '. Descend automatically is off so you stay here. Turn it back on to push deeper.' : '.'), ''); }
+        });
+      });
+  }
+  function closeMap() { const sh = document.querySelector('.modal .sheet.mapsheet'); if (sh) sh.classList.remove('mapsheet'); closeModal(); }
+  $('btn-map').addEventListener('click', openMap);
+
+  // ---------- update available ----------
+  // version.json is stamped on every release; if it differs from this page's build, offer a refresh.
+  async function checkUpdate() {
+    if (!window.LH_BUILD) return;
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      const j = await r.json();
+      if (j.build && j.build !== window.LH_BUILD && $('btn-update').hidden) {
+        $('btn-update').hidden = false;
+        toast('refresh', 'A new update is ready', 'Tap Update ready at the top to load it. Your progress is saved first.', 'feat');
+      }
+    } catch (e) {}
+  }
+  $('btn-update').addEventListener('click', () => { try { save(); } catch (e) {} try { pushCloud && pushCloud(true); } catch (e) {} setTimeout(() => location.reload(), 300); });
+  setInterval(checkUpdate, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+  setTimeout(checkUpdate, 20000);
   // ---------- boot ----------
   resize();
   window.addEventListener('resize', resize);

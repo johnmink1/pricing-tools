@@ -1346,3 +1346,28 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 @media (min-width:901px) and (max-width:1180px){.stat small{display:none}.onlinect small{display:none}.updatebtn span{display:none}.updatebtn{padding:0 10px}}
 .brand .logo{flex:none}.brand{flex:none}
 @media (min-width:901px) and (max-width:1100px){.brand>div{display:none}}
+/* World boss weekends */
+.wbbar{display:flex;align-items:center;gap:8px;margin:6px auto 0;max-width:100%;padding:6px 12px;border-radius:999px;border:1px solid #5a3a8e;background:linear-gradient(90deg,#160c28,#22123a);color:#e2d2ff;font-size:13px;cursor:pointer;text-align:left}
+.wbbar[hidden]{display:none}
+.wbbar svg{width:16px;height:16px;flex:none;color:#c58bff}
+.wbbar b{color:#fff}
+.wbbar span{min-width:0}
+.wbbar em{font-style:normal;font-weight:800;font-size:12px;color:#1a0d2e;background:#c58bff;border-radius:999px;padding:2px 9px;white-space:nowrap;margin-left:auto}
+.wbbar em.wait{background:transparent;color:#c58bff;border:1px solid #5a3a8e}
+.wbbar:hover{border-color:#c58bff}
+.wbbar.on{border-color:#c58bff;box-shadow:0 0 0 1px #c58bff55,0 0 18px #9b4dff44;animation:wbpulse 1.6s ease-in-out infinite;cursor:default}
+@keyframes wbpulse{50%{box-shadow:0 0 0 1px #c58bff88,0 0 26px #9b4dff77}}
+.tag.world{background:#2a1645;color:#e2c6ff;border-color:#6a3fa8}
+.bar.lantern.wb i{background:linear-gradient(180deg,#d9a8ff,#8a4ae0)}
+.bar.hp.wb i{background:linear-gradient(180deg,#b06bff,#5a2a9e)}
+.wbhero{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:center;margin:6px 0 10px;padding:12px;border-radius:14px;border:1px solid #4a2f78;background:radial-gradient(circle at 15% 50%,#3a1f66 0,#160c28 60%)}
+.wbhero img{width:120px;height:120px;object-fit:contain;image-rendering:auto;filter:drop-shadow(0 0 12px #9b4dff88)}
+.wbhero p{margin:0 0 10px;color:#d8ccef;font-size:14px}
+.wbph{display:flex;justify-content:space-between;font-size:13px;color:#e2d2ff;margin-bottom:4px}
+.bar.wbbar2{height:10px;background:#1a0f2e;border:1px solid #4a2f78}
+.bar.wbbar2 i{background:linear-gradient(90deg,#7a3fd0,#d76bff)}
+.wbphase small{display:block;margin-top:6px;color:var(--muted);font-size:12px}
+.wbtop{margin:4px 0 12px;padding:0 0 0 22px;display:grid;gap:4px}
+.wbtop li{padding:4px 8px;border-radius:8px;background:var(--panel)}
+.wbtop li{display:list-item}.wbtop li span{font-weight:700}.wbtop li b{float:right;color:var(--gold)}
+@media (max-width:560px){.wbhero{grid-template-columns:72px 1fr}.wbhero img{width:72px;height:72px}}

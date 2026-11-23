@@ -395,9 +395,9 @@
       const lungeF = tAnim < foeAnim.lunge ? -4 : 0;
       const fx = Math.round(fxC - sw / 2 + shake + lungeF), fy = Math.round(floorY + 4 - sh + bob + drop) - (flier ? 10 : 0);
       ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(fxC, floorY + 4, sw * 0.42, 3, 0, 0, Math.PI * 2); ctx.fill();
-      if (foe.boss) {
-        const gg = ctx.createRadialGradient(fxC, fy + sh / 2, 4, fxC, fy + sh / 2, sw);
-        gg.addColorStop(0, 'rgba(255,80,40,0.18)'); gg.addColorStop(1, 'rgba(255,80,40,0)');
+      if (foe.boss || foe.world) {
+        const gg = ctx.createRadialGradient(fxC, fy + sh / 2, 4, fxC, fy + sh / 2, sw), gc = foe.world ? '170,90,255,' : '255,80,40,';
+        gg.addColorStop(0, 'rgba(' + gc + (foe.world ? '0.3)' : '0.18)')); gg.addColorStop(1, 'rgba(' + gc + '0)');
         ctx.fillStyle = gg; ctx.fillRect(fxC - sw, fy - 10, sw * 2, sh + 20);
       }
       ctx.globalAlpha = Math.min(1, age / 0.15);
@@ -551,6 +551,8 @@
         claimFound();
       } else if (e.type === 'lore') {
         const lo = L.LORE.find(x => x.id === e.id); toast('book', 'New journal entry', lo.title, 'feat');
+      } else if (e.type === 'wbend') {
+        sendAssault(e.score, e.fell);
       } else if (e.type === 'goblinflee') {
         sfx.fail(); floatText(e.item ? 'Stolen!' : 'Escaped!', 'crit', 0.5, 0.3);
         if (e.item) toast('bag', e.again ? 'He got away again' : 'The Loot Goblin stole ' + L.gearName(e.item), (e.again ? 'He still has ' + L.gearName(e.item) + ' and' : 'He') + ' fled to floor ' + e.floor + '. Find him there and kill him to get it back.', 'warn');
@@ -1495,14 +1497,24 @@
     if (f) {
       $('foename').textContent = f.pack ? f.name + ' and ' + (f.pack - 1) + ' more' : f.name;
       if (f.goblin && !f.seen) { f.seen = 1; goblinArrives(f); }
-      const tag = $('foetag'); tag.textContent = f.goblin ? 'Thief' : f.pack ? 'Ambush ×' + f.pack : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; tag.className = 'tag' + (f.goblin ? ' thief' : '') + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
+      const tag = $('foetag'); tag.textContent = f.world ? 'World boss' : f.goblin ? 'Thief' : f.pack ? 'Ambush ×' + f.pack : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; tag.className = 'tag' + (f.world ? ' world' : '') + (f.goblin ? ' thief' : '') + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
       { const mk = (f.mods || []).join(','); if (mk !== lastModKey) { lastModKey = mk; $('foemods').innerHTML = (f.mods || []).map(m => '<span class="mod m-' + m + '" title="' + esc(L.MODS[m].desc) + '">' + esc(L.MODS[m].name) + '</span>').join(''); } }
-      $('hpbar').style.width = Math.max(0, f.hp / f.max * 100) + '%';
-      $('wardbar').style.width = Math.min(100, (f.ward || 0) / f.max * 100) + '%';
-      $('hptext').textContent = fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max) + (f.ward > 0 ? ' + ' + fmt(f.ward) + ' ward' : '');
-      $('lanternwrap').hidden = !f.boss && !f.goblin; $('lanternwrap').classList.toggle('flee', !!f.goblin);
+      if (f.world && S.wb) {
+        const ph = L.wbPhase(wbState().total + S.wb.score), pct = ph.into / ph.need * 100;
+        $('hpbar').style.width = Math.max(0, 100 - pct) + '%'; $('wardbar').style.width = '0%';
+        $('hptext').textContent = 'Phase ' + (ph.broken + 1) + ' · ' + Math.floor(100 - pct) + '% left · your damage ' + (Math.floor(S.wb.score * 10) / 10);
+      } else {
+        $('hpbar').style.width = Math.max(0, f.hp / f.max * 100) + '%';
+        $('wardbar').style.width = Math.min(100, (f.ward || 0) / f.max * 100) + '%';
+        $('hptext').textContent = fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max) + (f.ward > 0 ? ' + ' + fmt(f.ward) + ' ward' : '');
+      }
+      $('lanternwrap').hidden = !f.boss && !f.goblin && !f.world; $('lanternwrap').classList.toggle('flee', !!f.goblin); $('lanternwrap').classList.toggle('wb', !!f.world); $('hpbar').parentNode.classList.toggle('wb', !!f.world);
       { const n = (S.items && S.items.oil) || 0; $('b-oil').hidden = !f.boss || !n || S.lantern <= 0; $('b-oil').textContent = 'Pour lantern oil (' + n + ')'; }
-      if (f.goblin) {
+      if (f.world && S.wb) {
+        const left = Math.max(0, (S.wb.until - Date.now()) / 1000);
+        $('lanternbar').style.width = (left / L.WB_TIME * 100) + '%';
+        $('lanterntext').textContent = 'Assault ends in ' + left.toFixed(0) + 's';
+      } else if (f.goblin) {
         const left = Math.max(0, L.GOBLIN_TIME - f.flee);
         $('lanternbar').style.width = (left / L.GOBLIN_TIME * 100) + '%';
         $('lanterntext').textContent = 'Runs off in ' + left.toFixed(1) + 's';
@@ -3089,6 +3101,11 @@
         'If it escapes it steals one item from your pack and hides a few floors deeper. <b>Gear you wear is never taken.</b>',
         'A green note under the chapter goal shows where it hides. Reach that floor and kill it to get the item back.',
         'Every goblin you kill drops six times the gold.']],
+      ['World boss weekends', 's:colossus', 'One giant Rift boss every weekend that all signed-in players fight together.', [
+        'Runs Friday to Sunday (UTC). A purple bar on the stage shows it; tap it to join a <b>two-minute assault</b>, once every 15 minutes.',
+        'Your damage counts at the strength of your deepest floor, so new and veteran delvers matter just as much.',
+        'Everyone fills one shared health bar. Each phase broken makes the next one twice as tough.',
+        'After the weekend tap <b>Claim</b>: 3 Sigils for taking part, 1 more per phase broken (up to 5), 5 more for the top three, and a purse of gold.']],
       ['Abilities', 'i:star', 'Each party member has one ability; your hero can learn more.', [
         'They fire by themselves. Turn that off under the arena to time them.',
         'Keys <b>1 to 5</b> use them; <b>6 to 8</b> are specializations from the skill tree.']],
@@ -3200,6 +3217,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 40, date: 'November 23, 2026', title: 'World boss weekends', items: [
+      'A giant of void crystal, the Rift Colossus, has broken through beneath the Hold. Every signed-in player fights the same boss and fills one shared health bar.',
+      'Tap the purple bar on the stage to join a two-minute assault. You can go again every 15 minutes. Strike and use your abilities for more damage.',
+      'Damage counts at the strength of your deepest floor, so everyone helps. Each phase broken makes the next one tougher.',
+      'When the event ends, claim Sigils: 3 for taking part, 1 per phase broken (up to 5) and 5 more for the top three, plus a purse of gold.',
+      'From now on a new world boss attacks every weekend, Friday to Sunday (UTC). This first one runs until Friday as a preview.'] },
     { v: 39, date: 'November 23, 2026', title: 'Players online', items: [
       'A green counter next to the Lanternhold name shows how many players are online right now. Tap it to see heroes in the Guild.'] },
     { v: 38, date: 'November 23, 2026', title: 'Clearer store and the Lanternholder membership', items: [
@@ -3694,6 +3717,98 @@
     setInterval(() => { if (signedIn() && !document.hidden) loadMail(true); }, 90000);
     setTimeout(() => { if (signedIn()) loadMail(true); }, 4000);
   }
+  // ---------- World boss weekends ----------
+  // Every weekend one huge Rift boss attacks the Hold. Signed-in players send 2-minute assaults; the server adds
+  // everyone's damage into one shared health bar with phases, and pays Sigils once the weekend is over.
+  const wb = { st: null, at: 0, busy: false, key: '' };
+  const wbDur = ms => { const s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return d ? d + 'd ' + h + 'h' : h ? h + 'h ' + m + 'm' : m + ':' + String(x).padStart(2, '0'); };
+  async function loadBoss() {
+    if (!CL || !signedIn()) { wb.st = null; return; }
+    try { wb.st = await api('GET', null, '/boss'); wb.at = Date.now(); } catch (e) {}
+  }
+  // What the player can do right now: join, wait for the cooldown, claim, or wait for the next weekend.
+  function wbState() {
+    const now = Date.now(), w = L.wbWindow(now), live = now >= w.start && now < w.end, st = wb.st;
+    const name = L.wbName(w.id);
+    const me = st && st.w && st.w.id === w.id ? st.me : null;
+    const ready = me ? Math.max(0, me.last + L.WB_COOL * 1000 - now) : 0;
+    let claim = null;
+    if (st) {
+      if (!st.w.live && st.me.score > 0 && !st.me.cl) claim = st.w.id;
+      else if (st.prev && st.prev.score > 0 && !st.prev.cl) claim = st.prev.id;
+    }
+    const next = live ? 0 : (now < w.start ? w.start : w.start + 7 * 864e5);
+    return { now, w, live, name, me, ready, claim, next, total: st && st.w.id === w.id ? st.total : 0 };
+  }
+  function paintBoss() {
+    const el = $('wbbar'), x = wbState(), inA = S.wb && S.wb.until > x.now;
+    let h = '';
+    if (inA) h = icon('skull') + '<span><b>Assault on ' + esc(S.wb.name) + '</b> · ' + wbDur(S.wb.until - x.now) + ' left · your damage <b>' + Math.floor(S.wb.score * 10) / 10 + '</b></span>';
+    else if (x.claim) h = icon('crown') + '<span><b>The world boss has fallen back.</b> Your reward is waiting.</span><em>Claim</em>';
+    else if (x.live) {
+      const ph = L.wbPhase(x.total);
+      h = icon('skull') + '<span><b>World boss: ' + esc(x.name) + '</b> · phase ' + (ph.broken + 1) + ' · ' + Math.floor(ph.into / ph.need * 100) + '% · ends in ' + wbDur(x.w.end - x.now) + '</span>' +
+        (!CL || !signedIn() ? '<em>Sign in to fight</em>' : x.ready > 0 ? '<em class="wait">Next assault ' + wbDur(x.ready) + '</em>' : '<em>Join the assault</em>');
+    } else if (x.next - x.now < 2 * 864e5) h = icon('skull') + '<span><b>' + esc(L.wbName(L.wbWindow(x.next).id)) + '</b> attacks the Hold in ' + wbDur(x.next - x.now) + '</span><em class="wait">Details</em>';
+    if (h !== wb.key) { wb.key = h; el.innerHTML = h; el.hidden = !h; el.classList.toggle('on', !!inA); }
+  }
+  function openBoss() {
+    const x = wbState(), st = wb.st, ph = L.wbPhase(x.total), pct = Math.floor(ph.into / ph.need * 100);
+    const top = st && st.w.id === x.w.id ? st.top : [];
+    const rank = x.me && x.me.score > 0 ? top.findIndex(t => t.score <= x.me.score) + 1 : 0;
+    modal('<div class="maphead"><div><h2>' + esc(x.name) + '</h2><small>World boss · ' + (x.live ? 'ends in ' + wbDur(x.w.end - x.now) : 'next attack in ' + wbDur(x.next - x.now)) + '</small></div><button class="iconbtn" id="wb-x" aria-label="Close">&times;</button></div>' +
+      '<div class="wbhero"><img src="' + SP.spriteURL('colossus', 3, 0) + '" alt=""><div>' +
+      '<p>A giant of void crystal has torn through the Nyx Rift beneath the Hold. Every delver fights the same monster: each assault you make chips at one shared health bar.</p>' +
+      '<div class="wbphase"><div class="wbph"><b>Phase ' + (ph.broken + 1) + '</b><span>' + pct + '%</span></div><div class="bar wbbar2"><i style="width:' + pct + '%"></i></div><small>' + ph.broken + (ph.broken === 1 ? ' phase' : ' phases') + ' broken so far · ' + (st ? st.n : 0) + (st && st.n === 1 ? ' delver has' : ' delvers have') + ' joined</small></div></div></div>' +
+      '<ul class="passfx"><li><b>Assaults</b><span>Two minutes against the boss at the strength of your deepest floor. One every 15 minutes. Strike and use your abilities for more damage.</span></li>' +
+      '<li><b>Rewards</b><span>After the weekend: 3 Sigils for taking part, 1 more for every phase the server breaks (up to 5), and 5 more for the top three. Plus a big purse of gold.</span></li>' +
+      '<li><b>When</b><span>Every weekend, Friday to Sunday (all times UTC).' + (x.w.id === '2026-11-23' ? ' This first one is a preview and runs until Friday.' : '') + '</span></li></ul>' +
+      (top.length ? '<h3 class="sub">Top delvers</h3><ol class="wbtop">' + top.map(t => '<li><span class="c-' + esc(t.cls) + '">' + esc(t.name) + '</span><b>' + Math.floor(t.score).toLocaleString('en-US') + '</b></li>').join('') + '</ol>' : '') +
+      (x.me && x.me.score > 0 ? '<p class="passstate">Your damage this event: <b>' + Math.floor(x.me.score).toLocaleString('en-US') + '</b>' + (rank ? ', rank ' + rank : '') + '.</p>' : '') +
+      '<div class="row">' + (x.claim ? '<button class="btn" id="wb-claim">Claim your reward</button>' : !CL || !signedIn() ? '<button class="btn" id="wb-in">Sign in to fight</button>' : x.live ? (x.ready > 0 ? '<button class="btn" disabled>Next assault in ' + wbDur(x.ready) + '</button>' : '<button class="btn" id="wb-go">Join the assault</button>') : '') + '<button class="btn ghost" id="wb-no">Close</button></div>', md => {
+      md.querySelector('#wb-x').onclick = closeModal; md.querySelector('#wb-no').onclick = closeModal;
+      const go = md.querySelector('#wb-go'); if (go) go.onclick = () => { closeModal(); joinAssault(); };
+      const cl = md.querySelector('#wb-claim'); if (cl) cl.onclick = () => claimBoss(x.claim, cl);
+      const si = md.querySelector('#wb-in'); if (si) si.onclick = () => { closeModal(); authForm('in'); };
+    });
+  }
+  function joinAssault() {
+    const x = wbState();
+    if (!x.live || x.ready > 0 || !signedIn()) return openBoss();
+    if (L.resting(S, Date.now())) { toast('flame', 'Your party is resting', 'Head back into the deep first, then join the assault.', 'warn'); return; }
+    if (!L.startAssault(S, Date.now(), x.name)) return;
+    sfx.boss(); toast('skull', 'Assault!', 'Two minutes against ' + x.name + '. Strike and use your abilities!', 'feat');
+    updateStage && updateStage(); paintBoss();
+  }
+  async function sendAssault(score, fell) {
+    if (!(score > 0)) { toast('skull', 'Assault over', fell ? 'Your party fell before landing a blow.' : 'No damage this time.', ''); return; }
+    try {
+      const r = await api('POST', { score }, '/boss/hit');
+      if (wb.st && r) { wb.st.total = r.total; wb.st.me.score += r.add; wb.st.me.last = Date.now(); }
+      toast('skull', fell ? 'Your party fell back' : 'Assault over', 'You dealt ' + score + ' damage to ' + wbState().name + '. Every assault counts toward the next phase.', 'feat');
+    } catch (e) { toast('lock', 'The assault did not count', 'The server could not record it. Try again in a moment.', 'warn'); }
+    loadBoss().then(paintBoss);
+  }
+  async function claimBoss(id, btn) {
+    if (wb.busy) return; wb.busy = true; if (btn) btn.disabled = true;
+    try {
+      const r = await api('POST', { id }, '/boss/claim');
+      if (!r) throw 0;
+      const g = Math.max(2000, L.offlineGoldPerSec(S) * 1800 * (1 + r.phases));
+      S.gold += g; S.stats.goldEarned += g; if (typeof prof !== 'undefined' && prof) prof.bal = r.bal; save();
+      closeModal(); sfx.relic();
+      toast('crown', 'World boss reward', '+' + r.sig + ' Sigils and ' + fmt(g) + ' gold. You ranked ' + r.rank + ' of ' + r.n + '.', 'feat');
+    } catch (e) { if (btn) btn.disabled = false; toast('lock', 'Could not claim yet', 'Try again in a moment.', 'warn'); }
+    wb.busy = false; loadBoss().then(paintBoss); updatePanel(true);
+  }
+  $('wbbar').addEventListener('click', () => {
+    const x = wbState();
+    if (S.wb && S.wb.until > x.now) return;
+    if (x.live && !x.claim && x.ready <= 0 && signedIn()) joinAssault(); else openBoss();
+  });
+  setTimeout(() => loadBoss().then(paintBoss), 3000);
+  setInterval(() => { if (!document.hidden) loadBoss().then(paintBoss); }, 120000);
+  setInterval(paintBoss, 1000);
   // ---------- boot ----------
   checkEpoch(); wipedNotice(); paintAdminTab(); if (signedIn()) idToken().then(paintAdminTab);
   resize();

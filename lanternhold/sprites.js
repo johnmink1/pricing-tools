@@ -21,6 +21,24 @@
     '....kggk.kggk...',
     '....kkkk.kkkk...',
   ] };
+  S.colossus = { pal: { k: '#0a0614', b: '#2a1f45', p: '#4a3a6e', x: '#d76bff', r: '#ff5ad0', w: '#ffe8fb' }, px: [
+    '......kxk.......',
+    '....kkbbbkk.....',
+    '...kbbrwrbbk....',
+    'kxk.kbbbbbk.kxk.',
+    'kppkkpppppkkppk.',
+    'kppbbbbrbbbbppk.',
+    '.kpbbbrrrbbbpk..',
+    '.kpbbbbrbbbbpk..',
+    'kpp.kbbrbbbk.ppk',
+    'kpk.kbbbbbbk.kpk',
+    '.k..kbbbbbbk..k.',
+    '....kbbk.kbbk...',
+    '....kbbk.kbbk...',
+    '...kpppk.kpppk..',
+    '...kkkkk.kkkkk..',
+    '................',
+  ] };
   S.slime = { pal: { k: '#1b1020', g: '#5fbf5a', l: '#a6ea7e', d: '#327a3e', w: '#f4fbe8', e: '#14200f' }, px: [
     '................',
     '................',

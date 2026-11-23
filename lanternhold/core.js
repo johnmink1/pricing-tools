@@ -1253,6 +1253,7 @@
   const PACK_CHANCE = 0.03, PACK_FLOOR = 3, PACK_GOLD = 2;
   function makeFoe(s, rng) {
     const f = s.floor, boss = isBossFloor(f), r = rng || Math.random;
+    if (s.wb && s.wb.until > (s.clock || Date.now())) return wbFoe(s);
     if (!boss) {
       if (s.goblin && s.goblin.item && f >= s.goblin.floor) return goblinFoe(s, true);
       if (!s.goblin && f >= GOBLIN_FLOOR && r() < GOBLIN_CHANCE && s.bag.some(it => !wearer(s, it.uid))) return goblinFoe(s, false);
@@ -1306,6 +1307,35 @@
     s.stats.goblinRuns = (s.stats.goblinRuns || 0) + 1;
     events && events.push({ type: 'goblinflee', item: it, floor: s.goblin.floor, again: foe && foe.goblin === 2 });
   }
+  // World boss weekends: 2-minute assaults on a shared Rift boss (server: infra/lambda/worldboss.js).
+  // Damage counts in "monsters' worth" at your deepest floor, so every delver's assault weighs the same.
+  const WB_TIME = 120, WB_COOL = 15 * 60, WB_HP1 = 1000, WB_CAP = 400, WB_PREVIEW = [Date.parse('2026-11-23T00:00:00Z'), Date.parse('2026-11-27T00:00:00Z')];
+  const WB_NAMES = ['The Rift Colossus', 'The Hollow Sovereign', 'Maw of the Nyx', 'The Ashen Leviathan'];
+  function wbWindow(t) {
+    if (t >= WB_PREVIEW[0] && t < WB_PREVIEW[1]) return { id: '2026-11-23', start: WB_PREVIEW[0], end: WB_PREVIEW[1] };
+    const d = new Date(t), mid = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), fri = mid - ((d.getUTCDay() + 2) % 7) * 864e5;
+    return { id: new Date(fri).toISOString().slice(0, 10), start: fri, end: fri + 3 * 864e5 };
+  }
+  const wbName = id => WB_NAMES[Math.floor(Date.parse(id + 'T00:00:00Z') / 6048e5) % WB_NAMES.length];
+  // Which phase the server's total has reached, and how far into it.
+  function wbPhase(total) { let k = 0, need = WB_HP1, t = total; while (t >= need && k < 30) { t -= need; need *= 2; k++; } return { broken: k, into: t, need }; }
+  function startAssault(s, now, name) {
+    if (resting(s, now) || !alive(s).length || (s.wb && s.wb.until > now)) return false;
+    s.wb = { until: now + WB_TIME * 1000, score: 0, unit: foeHp(Math.max(1, s.maxFloorEver), false), name };
+    s.foe = null; s.foeSwing = 0;
+    return true;
+  }
+  function endAssault(s, events, fell) {
+    if (!s.wb) return;
+    const score = Math.min(WB_CAP, Math.floor(s.wb.score * 10) / 10);
+    s.wb = null; if (s.foe && s.foe.world) { s.foe = null; s.foeSwing = 0; }
+    s.stats.wbAssaults = (s.stats.wbAssaults || 0) + 1;
+    events && events.push({ type: 'wbend', score, fell: !!fell });
+  }
+  function wbFoe(s) {
+    const f = Math.max(1, s.maxFloorEver);
+    return { name: s.wb.name, sprite: 'colossus', world: true, boss: false, chest: false, elite: false, side: null, ambush: 0, pack: 0, hp: 1e300, max: 1e300, hue: 0, atk: foeDps(f, true) * FOE_SWING * 0.8, mods: [], ward: 0, wardAt: 0 };
+  }
   function rollMods(f, boss, elite, b, r) {
     let n = boss ? (f >= 20 ? 1 : 0) + (f >= 60 ? 1 : 0) + (f >= 110 ? 1 : 0) : elite ? (f >= 30 ? 1 : 0) + (f >= 100 ? 1 : 0) : (f >= 40 && r() < Math.min(0.4, 0.08 + (f - 40) / 300) ? 1 : 0);
     const out = [];
@@ -1320,6 +1350,7 @@
       if (!s.foe) s.foe = makeFoe(s, rng);
       const foe = s.foe, mult = (foe.boss ? 1 + relicVal(s, 'lens') : 1) * (1 + fxOn(s, 'vuln', now || Date.now()));
       let dmg = amount * mult;
+      if (foe.world) { s.wb.score += dmg / s.wb.unit; drain(s, dmg); return; }
       if (foe.ward > 0) { const soak = Math.min(foe.ward, dmg); foe.ward -= soak; dmg -= soak; amount = dmg / mult; if (dmg <= 0) return; }
       if (dmg < foe.hp) { foe.hp -= dmg; drain(s, dmg); return; }
       amount -= foe.hp / mult; drain(s, foe.hp);
@@ -1492,6 +1523,8 @@
   }
 
   function wipe(s, now, events) {
+    // Falling to the world boss just ends the assault; the damage dealt still counts.
+    if (s.foe && s.foe.world) { for (const id of s.party) if (id) { delete s.down[id]; s.hp[id] = maxHpOf(s, id) * 0.6; } s.minions = []; endAssault(s, events, true); return; }
     s.stats.wipes++;
     events && events.push({ type: 'wipe', name: s.foe ? s.foe.name : '' });
     for (const id of s.party) if (id) { delete s.down[id]; s.hp[id] = maxHpOf(s, id) * 0.6; }
@@ -1545,6 +1578,7 @@
   const resting = (s, now) => !!((s.campReturn && s.floor <= CAMP_FLOOR) || s.campUntil > now);
   function tick(s, dt, now, rng, events) {
     s.stats.playTime += dt; s.clock = now;
+    if (s.wb && (now >= s.wb.until || resting(s, now))) endAssault(s, events);
     if (s.unlocked.length && !(s.traits && s.unlocked.every(id => s.traits[id]))) for (const id of s.unlocked) traitsOf(s, id);
     if (resting(s, now)) {
       for (const id of s.party) if (id) { delete s.down[id]; const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + mx * 0.25 * (1 + campTrait(s, 'rest')) * dt); }
@@ -1717,7 +1751,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

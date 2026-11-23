@@ -11,7 +11,7 @@ const pidOf = sub => crypto.createHash('sha256').update('lh:' + sub).digest('hex
 // Keep KIT, the rank gates, the cost and stats() in step with the Ember Ring part of the game (v_pvp.js).
 // Per rank: [Resolve, Edge, +hp share, +attack share]. Ranks 6-10 need a peak rating of 1300, 11-15 need 1600.
 const KIT = [[5, 0, .02, 0], [7, 0, .015, 0], [0, 5, 0, .015], [3, 3, .01, .01], [0, 7, 0, .02]];
-const gate = r => r >= 10 ? 1600 : r >= 5 ? 1300 : 0, cost = r => 40 + 25 * r;
+const gate = r => r >= 10 ? 1600 : r >= 5 ? 1300 : 0, cost = r => 60 + 30 * r;
 const EMAX = 10, EINT = 30 * 6e4, START = 1000;
 function stats(x) {
   let R = 0, E = 0, hp = 1, at = 1;

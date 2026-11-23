@@ -12,7 +12,7 @@ const pidOf = sub => crypto.createHash('sha256').update('lh:' + sub).digest('hex
 // Keep KIT, the rank gates, the cost and stats() in step with the Ember Ring part of the game (v_pvp.js).
 // Per rank: [Resolve, Edge, +hp share, +attack share]. Ranks 6-10 need a peak rating of 1300, 11-15 need 1600.
 const KIT = [[5, 0, .02, 0], [7, 0, .015, 0], [0, 5, 0, .015], [3, 3, .01, .01], [0, 7, 0, .02]];
-const gate = r => r >= 10 ? 1600 : r >= 5 ? 1300 : 0, cost = r => 40 + 25 * r;
+const gate = r => r >= 10 ? 1600 : r >= 5 ? 1300 : 0, cost = r => 60 + 30 * r;
 const EMAX = 10, EINT = 30 * 6e4, START = 1000;
 function stats(x) {
   let R = 0, E = 0, hp = 1, at = 1;
@@ -56,10 +56,11 @@ exports.handler = async (e) => {
       const rnd = () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
       const d = duel(my, fo, rnd), w = d.win ? 1 : 0, ex = 1 / (1 + Math.pow(10, (fo.r - my.r) / 400));
       const dr = Math.round(32 * (w - ex)), fr = Math.round(16 * (w - ex)), day = new Date(now).toISOString().slice(0, 10), fw = w && my.fd !== day;
-      const ll = w ? Math.min(40, 20 + Math.max(0, Math.round((fo.r - my.r) / 20))) + (fw ? 40 : 0) : 6;
+      // Laurels are a grind on purpose (John): a win is 8, up to 12 against a stronger hero, a loss 3, the day's first win +10.
+      const ll = w ? 8 + Math.min(4, Math.max(0, Math.round((fo.r - my.r) / 50))) + (fw ? 10 : 0) : 3;
       const a = await up(me, 'SET r = :r, pk = :pk, et = :et, fd = :fd ADD ' + (w ? 'w' : 'l') + ' :one, ll :ll',
         { ':r': N(Math.max(0, my.r + dr)), ':pk': N(Math.max(my.pk, my.r + dr)), ':et': N(Math.max(my.et, now) + EINT), ':fd': S(fw ? day : my.fd || '-'), ':one': N(1), ':ll': N(ll), ':o': N(my.et) }, 'et = :o OR attribute_not_exists(et)');
-      await up(id, 'SET r = :r ADD ' + (w ? 'dl :one' : 'dw :one, ll :d'), Object.assign({ ':r': N(Math.max(0, fo.r - fr)), ':one': N(1) }, w ? {} : { ':d': N(4) }));
+      await up(id, 'SET r = :r ADD ' + (w ? 'dl :one' : 'dw :one, ll :d'), Object.assign({ ':r': N(Math.max(0, fo.r - fr)), ':one': N(1) }, w ? {} : { ':d': N(2) }));
       return res(200, { win: !!w, log: d.log, first: d.first, dr, ll, fw: !!fw, a: pub(my), b: pub(fo), me: mine(row(a.Attributes)) });
     }
   } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'state' }); throw x; }

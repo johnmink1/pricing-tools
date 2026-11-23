@@ -539,3 +539,15 @@ button.scene:hover{border-color:var(--accent)}
 .notes .nh span{font-size:12px;color:var(--dim)}
 .notes ul{margin:6px 0 2px;padding-left:18px}
 .notes li{color:var(--muted);font-size:14px;line-height:1.45;margin-bottom:3px}
+/* grow your party */
+.fbtns{display:flex;gap:6px;flex-shrink:0}
+.grow{display:grid;gap:10px;margin-bottom:6px}
+.growcard{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.growcard .gh{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:15px}
+.growcard .gh svg{width:20px;height:20px;color:var(--gold)}
+.growcard p{margin:6px 0;font-size:14px;line-height:1.45}
+.growcard .next{background:var(--bg2);border-radius:8px;padding:8px 10px}
+.growcard .next small{color:var(--muted)}
+.growcard .steps{margin:6px 0 10px;padding-left:20px;font-size:14px;line-height:1.5}
+.growcard .warnline{color:var(--ember)}
+.growcard .board{margin-top:10px}

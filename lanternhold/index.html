@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- lh-build 202611231520 -->
+<!-- lh-build 202611231526 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -51,7 +51,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611231520">
+<link rel="stylesheet" href="style.css?v=202611231526">
 </head>
 <body>
 <div id="app">
@@ -65,6 +65,7 @@
       <div class="stat gold" data-tip="Gold. Every monster drops some. Spend it on training, upgrades and the Store."><svg viewBox="0 0 24 24"><use href="#i-coin"/></svg><span id="gold">0</span></div>
       <div class="stat dps" data-tip="Party damage per second, with every bonus counted."><svg viewBox="0 0 24 24"><use href="#i-sword"/></svg><span id="dps">0</span><small>/s</small></div>
       <div class="stat ember" data-tip="Embers. Each one adds 4% damage and gold for good. Earned by rekindling."><svg viewBox="0 0 24 24"><use href="#i-flame"/></svg><span id="embers">0</span></div>
+      <div class="stat dust" data-tip="Dust. Scrap gear to get it, more from rarer and deeper pieces. Enchanting and disenchanting cost Dust."><svg viewBox="0 0 24 24"><use href="#i-dust"/></svg><span id="dust">0</span></div>
       <button class="stat sigils" id="sigils" data-tip="Sigils. Spend them on speed-ups and looks in the Store." hidden><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l3 5 6 1-4 4 1 6-6-3-6 3 1-6-4-4 6-1z"/></svg><span id="sigilct">0</span></button>
     </div>
       <button class="stat hudchip quests" id="quests" data-tip="Daily quests. Three small goals a day for gold and Sigils."><svg viewBox="0 0 24 24"><use href="#i-flare"/></svg><span id="questct">0/3</span></button>
@@ -153,7 +154,7 @@
         <div id="gearcamp"></div>
         <div class="whoseg" id="gearwho"></div>
         <div class="slots" id="gearslots"></div>
-        <div class="packbar"><h3 class="sub">Pack <em id="bagcount"></em></h3><button class="btn ghost small" id="g-boh" hidden>Bag of Holding</button><button class="btn ghost small" id="g-msell" hidden>Mass sell</button><button class="btn ghost small" id="g-scrap">Mass scrap</button></div>
+        <div class="packbar"><h3 class="sub">Pack <em id="bagcount"></em></h3><button class="btn ghost small" id="g-boh" hidden>Bag of Holding</button><button class="btn ghost small" id="g-msell" hidden>Mass sell</button><button class="btn ghost small" id="g-mmerge" data-tip="Merge spare copies of the same item in pairs. Each merge can fail and destroy both pieces.">Mass merge</button><button class="btn ghost small" id="g-scrap">Mass scrap</button></div>
         <div class="bag" id="bag"></div>
       </div>
       <div class="tabbody" id="tab-rekindle" hidden>
@@ -240,6 +241,7 @@
     <symbol id="i-fist" viewBox="0 0 24 24"><path d="M3 13l6-6M7 17l7-7M11 21l8-8M16 4l4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
     <symbol id="i-oil" viewBox="0 0 24 24"><path d="M12 3c3 4.5 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-6.5 6-11z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 14.5a3 3 0 0 0 3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-relic" viewBox="0 0 24 24"><path d="M12 2.5l7 4v11l-7 4-7-4v-11z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 7l3.5 5L12 17l-3.5-5z" fill="currentColor"/></symbol>
+    <symbol id="i-dust" viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z" fill="currentColor"/><circle cx="18.5" cy="16.5" r="1.8" fill="currentColor" opacity=".8"/><circle cx="6.5" cy="17.5" r="1.4" fill="currentColor" opacity=".7"/><circle cx="12.5" cy="20" r="1.1" fill="currentColor" opacity=".6"/></symbol>
     <symbol id="i-discord" viewBox="0 0 24 24"><path d="M8.3 5.2A15 15 0 0 0 4.6 6.4C2.4 9.7 1.8 13 2.1 16.2a15 15 0 0 0 4.6 2.3l1-1.6a9.6 9.6 0 0 1-1.6-.8l.4-.3a10.7 10.7 0 0 0 9 0l.4.3-1.6.8 1 1.6a15 15 0 0 0 4.6-2.3c.4-3.7-.6-7-2.5-9.8a15 15 0 0 0-3.7-1.2l-.5 1a13.7 13.7 0 0 0-4.4 0zM9 14a1.6 1.8 0 1 1 0-3.6A1.6 1.8 0 0 1 9 14zm6 0a1.6 1.8 0 1 1 0-3.6 1.6 1.8 0 0 1 0 3.6z" fill="currentColor"/></symbol>
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
   </defs>
@@ -250,11 +252,11 @@
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
 <div class="tip" id="tip" role="tooltip" hidden></div>
-<script>window.LH_BUILD = "202611231520";</script>
+<script>window.LH_BUILD = "202611231526";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611231520"></script>
-<script src="sprites.js?v=202611231520"></script>
-<script src="vector.js?v=202611231520"></script>
-<script src="ui.js?v=202611231520"></script>
+<script src="core.js?v=202611231526"></script>
+<script src="sprites.js?v=202611231526"></script>
+<script src="vector.js?v=202611231526"></script>
+<script src="ui.js?v=202611231526"></script>
 </body>
 </html>

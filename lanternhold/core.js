@@ -1,4 +1,4 @@
-/* lh-build 202611231520 */
+/* lh-build 202611231526 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -907,8 +907,13 @@
     s.gold -= c; it.up++; return true;
   }
   const salvageValue = it => foeGold(Math.max(1, it.ilvl), false) * 3 * (1 + RARITY.findIndex(r => r.id === it.rar)) * (1 + it.up);
+  // Dust (John, 2026-11-23): scrapping gear also gives Dust, more for rarer and deeper pieces. Moving an enchant costs Dust.
+  const DUST = { common: 1, fine: 3, rare: 8, epic: 20, set: 15 };
+  const dustValue = it => Math.max(1, Math.round((DUST[it.rar] || 1) * (1 + it.ilvl / 25) * (1 + 0.25 * (it.up || 0))));
+  const enchCost = x => 5 * x.t * x.t;
   function salvage(s, uid) {
     const it = itemOf(s, uid); if (!it || it.lk) return 0;
+    s.dust = (s.dust || 0) + dustValue(it);
     const w = wornAt(s, uid); if (w) delete s.gear[w[0]][w[1]];
     s.bag = s.bag.filter(x => x !== it);
     const v = salvageValue(it); s.gold += v; return v;
@@ -957,11 +962,11 @@
   function disenchant(s, srcUid, idx, dstUid, slot) {
     const a = itemOf(s, srcUid), b = itemOf(s, dstUid);
     if (!a || !b || a === b || a.lk || wornAt(s, a.uid)) return null;
-    const la = enchList(a), lb = enchList(b), x = la[idx]; if (!x) return null;
+    const la = enchList(a), lb = enchList(b), x = la[idx]; if (!x || (s.dust || 0) < enchCost(x)) return null;
     const n = sockets(b); if (!(slot >= 0 && slot < n && slot <= lb.length)) return null;
     const old = lb[slot] || null; lb[slot] = { id: x.id, t: x.t }; b.en = enchStr(lb);
-    s.bag = s.bag.filter(y => y !== a); enchDirty();
-    return { item: b, moved: x, replaced: old, lost: a };
+    s.dust -= enchCost(x); s.bag = s.bag.filter(y => y !== a); enchDirty();
+    return { item: b, moved: x, replaced: old, lost: a, cost: enchCost(x) };
   }
   // Merging (John, 2026-11-23): two copies of the same item fuse into one a level higher (+1), keeping the higher
   // item level and the better camp-job affix. Every merge can fail and destroy BOTH pieces. The risk climbs with the
@@ -985,6 +990,18 @@
     a.en = enchStr(enchList(a).concat(enchList(b)).sort((x, y) => y.t - x.t).slice(0, sockets(a)));
     drop(b); enchDirty();
     return { ok: true, risk: m.risk, item: a };
+  }
+  // Mass merge: pair up unworn, unlocked copies of the same item, best with next best, one merge per pair.
+  // Only merges whose result is at most `cap` are planned. Each pair carries its own risk of losing both.
+  function massMergePlan(s, cap) {
+    const g = {};
+    for (const it of s.bag) if (!it.lk && !wornAt(s, it.uid) && it.up < UP_MAX) (g[mergeKey(it)] = g[mergeKey(it)] || []).push(it);
+    const out = [];
+    for (const k in g) {
+      const l = g[k].sort((a, b) => b.up - a.up || b.ilvl - a.ilvl);
+      for (let i = 0; i + 1 < l.length; i += 2) { const r = mergeRisk(s, l[i], l[i + 1]); if (r.to <= cap) out.push({ a: l[i], b: l[i + 1], to: r.to, risk: r.risk }); }
+    }
+    return out;
   }
   // Locked items are kept out of every bulk action: mass scrap, auto-sell on a full pack, and the Loot Goblin.
   function toggleLock(s, uid) { const it = itemOf(s, uid); if (!it) return false; if (it.lk) delete it.lk; else it.lk = 1; return !!it.lk; }
@@ -1814,7 +1831,7 @@
     s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.tonic = o.tonic || {}; s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
     // Skill trees arrived after some players had already rekindled: 2 points for each past rekindle.
     s.kup = o.kup || {}; s.autoTrain = o.autoTrain || {}; s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
-    s.bagUps = o.bagUps || 0; s.boh = !!o.boh; s.traits = o.traits || {}; s.goblin = o.goblin && o.goblin.item ? { item: normItem(o.goblin.item), floor: o.goblin.floor || 1, at: o.goblin.at || 0 } : null; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0;
+    s.bagUps = o.bagUps || 0; s.boh = !!o.boh; s.traits = o.traits || {}; s.goblin = o.goblin && o.goblin.item ? { item: normItem(o.goblin.item), floor: o.goblin.floor || 1, at: o.goblin.at || 0 } : null; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0; s.dust = o.dust || 0;
     if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
     s.bag = (o.bag || []).map(normItem); s.gear = o.gear || {};
     const OLD = { weapon: 'main', armor: 'chest', trinket: 'neck' };
@@ -1831,7 +1848,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

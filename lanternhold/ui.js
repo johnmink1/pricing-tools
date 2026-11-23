@@ -1,4 +1,4 @@
-/* lh-build 202611231520 */
+/* lh-build 202611231526 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1224,7 +1224,7 @@
         sv.onclick = () => {
           if (it.lk) return locked();
           if (!sv.classList.contains('confirm') && (it.rar === 'epic' || it.rar === 'set' || it.up || w)) { sv.classList.add('confirm'); sv.querySelector('span').textContent = 'Tap again to salvage'; return; }
-          const v = L.salvage(S, uid); sfx.coin(); closeModal(); updateGear(true); updateSeats(true); toast('coin', 'Salvaged', '+' + fmt(v) + ' gold', '');
+          const v = L.salvage(S, uid); sfx.coin(); closeModal(); updateGear(true); updateSeats(true); toast('coin', 'Salvaged', '+' + fmt(v) + ' gold, +' + L.dustValue(it) + ' Dust', '');
         };
         md.querySelector('#i-close').onclick = closeModal;
       });
@@ -1266,10 +1266,11 @@
         if (slot < 0 || slot >= n || slot > lb.length) slot = lb.length < n ? lb.length : 0;
         body += '<div class="enstep"><small>' + (fixedSrc ? '3' : '2') + '. Socket on ' + esc(L.gearName(B)) + '</small><div class="enchips">' + Array.from({ length: n }, (_, i) => i > lb.length ? '' : '<button class="enchip' + (i === slot ? ' sel' : '') + (lb[i] ? ' full' : '') + '" data-sl="' + i + '"><b>' + (lb[i] ? enchName(lb[i]) : 'Empty') + '</b><small>' + (lb[i] ? 'Replace it' : 'Open socket') + '</small></button>').join('') + '</div></div>';
       }
-      const A2 = src && L.itemOf(S, src), ok = A2 && B && L.enchList(A2)[idx];
+      const A2 = src && L.itemOf(S, src), mv = A2 && L.enchList(A2)[idx], cost = mv ? L.enchCost(mv) : 0, ok = mv && B && (S.dust || 0) >= cost;
+      const costLine = mv ? '<p class="encost' + ((S.dust || 0) < cost ? ' short' : '') + '">' + icon('dust') + ' Costs <b>' + fmt(cost) + ' Dust</b>. You have ' + fmt(S.dust || 0) + '. Scrap gear to get more.</p>' : '';
       const warn = ok ? '<p class="note warn">' + esc(L.gearName(A2)) + (A2.up ? ' +' + A2.up : '') + ' will be destroyed' + (lb[slot] ? ', and ' + enchName(lb[slot]) + ' on ' + esc(L.gearName(B)) + ' is replaced' : '') + '.</p>' : '';
-      modal('<div class="mergebox picker enchbox"><h2>' + icon(fixedSrc ? 'flare' : 'star') + (fixedSrc ? 'Disenchant ' + esc(L.gearName(A)) : 'Enchant ' + esc(L.gearName(B))) + '</h2>' + body + warn +
-        '<div class="row"><button class="btn ghost" id="en-back">Back</button><button class="btn" id="en-go"' + (ok ? '' : ' disabled') + '>' + (ok ? 'Move ' + enchName(L.enchList(A2)[idx]) : 'Pick both items') + '</button></div></div>', md => {
+      modal('<div class="mergebox picker enchbox"><h2>' + icon(fixedSrc ? 'flare' : 'star') + (fixedSrc ? 'Disenchant ' + esc(L.gearName(A)) : 'Enchant ' + esc(L.gearName(B))) + '</h2>' + body + costLine + warn +
+        '<div class="row"><button class="btn ghost" id="en-back">Back</button><button class="btn" id="en-go"' + (ok ? '' : ' disabled') + '>' + (ok ? 'Move ' + enchName(mv) : mv && B ? 'Not enough Dust' : 'Pick both items') + '</button></div></div>', md => {
           md.querySelectorAll('[data-ei]').forEach(e => e.onclick = () => { idx = +e.dataset.ei; draw(); });
           md.querySelectorAll('[data-dst]').forEach(e => e.onclick = () => { dst = e.dataset.dst; slot = -1; draw(); });
           md.querySelectorAll('[data-src]').forEach(e => e.onclick = () => { src = e.dataset.src; idx = +e.dataset.i; draw(); });
@@ -1279,7 +1280,7 @@
             if (B && L.wearer(S, B.uid) && !campGate()) return;
             const r = L.disenchant(S, src, idx, dst, slot); if (!r) return;
             save(); updateGear(true); updateSeats(true); sfx.relic();
-            toast('star', 'Enchant moved', enchName(r.moved) + ' is now on ' + L.gearName(r.item) + '.', '');
+            toast('star', 'Enchant moved', enchName(r.moved) + ' is now on ' + L.gearName(r.item) + '. -' + fmt(r.cost) + ' Dust', '');
             itemModal(r.item.uid);
           };
         });
@@ -1446,23 +1447,49 @@
     const draw = () => {
       const list = scrapList(), gold = list.reduce((a, it) => a + L.salvageValue(it), 0);
       const chk = (k, label, sub) => '<label class="chk"><input type="checkbox" data-opt="' + k + '"' + (scrapOpts[k] ? ' checked' : '') + '><span><b>' + label + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></label>';
-      modal('<h2>Mass scrap</h2><p>Salvage many pieces at once for gold. Gear someone is wearing and items you have locked are never scrapped.' + (S.bag.some(x => x.lk) ? ' You have <b>' + S.bag.filter(x => x.lk).length + '</b> locked.' : '') + '</p>' +
+      modal('<h2>Mass scrap</h2><p>Salvage many pieces at once for gold and Dust. Gear someone is wearing and items you have locked are never scrapped.' + (S.bag.some(x => x.lk) ? ' You have <b>' + S.bag.filter(x => x.lk).length + '</b> locked.' : '') + '</p>' +
         '<div class="scrapgrid">' + L.RARITY.map(r => chk(r.id, '<span class="r-' + r.id + '" style="color:var(--rc)">' + r.name + '</span>', S.bag.filter(x => x.rar === r.id && !L.wearer(S, x.uid)).length + ' unworn')).join('') + '</div>' +
         chk('keepBest', 'Keep the best of each kind', 'Saves your strongest spare piece for every class and slot.') +
         chk('keepUp', 'Keep upgraded pieces', 'Anything you have spent gold upgrading stays.') +
-        '<p class="scrapsum">' + (list.length ? 'Scraps <b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' for <b>' + fmt(gold) + ' gold</b>.' : 'Nothing matches. Tick more rarities above.') + '</p>' +
+        '<p class="scrapsum">' + (list.length ? 'Scraps <b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' for <b>' + fmt(gold) + ' gold</b> and <b>' + fmt(list.reduce((a, it) => a + L.dustValue(it), 0)) + ' Dust</b>.' : 'Nothing matches. Tick more rarities above.') + '</p>' +
         '<div class="row"><button class="btn danger" id="s-go"' + (list.length ? '' : ' disabled') + '>Scrap ' + list.length + '</button><button class="btn ghost" id="s-x">Cancel</button></div>', md => {
           md.querySelectorAll('[data-opt]').forEach(c => c.onchange = () => { scrapOpts[c.dataset.opt] = c.checked; draw(); });
           md.querySelector('#s-x').onclick = closeModal;
           md.querySelector('#s-go').onclick = () => {
-            const l = scrapList(); let g = 0; for (const it of l) g += L.salvage(S, it.uid);
+            const l = scrapList(); let g = 0, d = 0; for (const it of l) { d += L.dustValue(it); g += L.salvage(S, it.uid); }
             closeModal(); sfx.coin(); updateGear(true); save();
-            toast('coin', 'Scrapped ' + l.length + (l.length === 1 ? ' piece' : ' pieces'), '+' + fmt(g) + ' gold', 'feat');
+            toast('coin', 'Scrapped ' + l.length + (l.length === 1 ? ' piece' : ' pieces'), '+' + fmt(g) + ' gold, +' + fmt(d) + ' Dust', 'feat');
           };
         });
     };
     draw();
   }
+  // ---------- mass merge ----------
+  let mmCap = 3;
+  function openMassMerge() {
+    const draw = () => {
+      const plan = L.massMergePlan(S, mmCap), exp = plan.reduce((a, p) => a + p.risk, 0);
+      const pct = v => Math.round(v * 1000) / 10 + '%';
+      modal('<div class="mergebox"><h2>' + icon('relic') + 'Mass merge</h2><p class="note">Merges spare copies of the same item in pairs, best with next best. Worn and locked items are left alone. ' + tipI('Every merge rolls on its own. If it fails, both pieces in that pair are destroyed. Luck and Intelligence lower the risk.') + '</p>' +
+        '<div class="mmcap">' + [1, 2, 3, 5, 10].map(n => '<button class="enchip' + (n === mmCap ? ' sel' : '') + '" data-cap="' + n + '"><b>Up to +' + n + '</b></button>').join('') + '</div>' +
+        (plan.length ? '<div class="mmlist">' + plan.map(p => '<div class="mmrow r-' + p.a.rar + '"><b>' + esc(L.gearName(p.a)) + ' +' + p.a.up + ' &amp; +' + p.b.up + ' &rarr; +' + p.to + '</b><em>' + pct(p.risk) + ' risk</em></div>').join('') + '</div>' +
+          '<div class="mgodds"><div><small>Merges</small><b>' + plan.length + '</b></div><div class="ok"><small>Expected wins</small><b>' + (Math.round((plan.length - exp) * 10) / 10) + '</b></div><div class="bad"><small>Expected losses</small><b>' + (Math.round(exp * 10) / 10) + '</b></div></div>' +
+          '<p class="mgcut">A loss destroys both pieces in that pair, so about ' + Math.round(exp * 2) + ' items could be lost.</p>'
+          : '<p class="scrapsum">No spare pairs to merge up to +' + mmCap + '. Worn and locked items are skipped.</p>') +
+        '<div class="row"><button class="btn ghost" id="mm-x">Cancel</button><button class="btn danger" id="mm-go"' + (plan.length ? '' : ' disabled') + '>Merge ' + plan.length + '</button></div></div>', md => {
+          md.querySelectorAll('[data-cap]').forEach(b => b.onclick = () => { mmCap = +b.dataset.cap; draw(); });
+          md.querySelector('#mm-x').onclick = closeModal;
+          md.querySelector('#mm-go').onclick = () => {
+            let ok = 0, bad = 0;
+            for (const p of L.massMergePlan(S, mmCap)) { const r = L.mergeItems(S, p.a.uid, p.b.uid); if (!r) continue; if (r.ok) ok++; else bad++; }
+            closeModal(); save(); updateGear(true); updateSeats(true); ok ? sfx.relic() : sfx.coin();
+            toast('relic', 'Mass merge done', ok + ' merged' + (bad ? ', ' + bad + ' failed (' + bad * 2 + ' items lost)' : '') + '.', bad ? 'warn' : 'feat');
+          };
+        });
+    };
+    draw();
+  }
+  $('g-mmerge').addEventListener('click', openMassMerge);
   $('g-scrap').addEventListener('click', openScrap);
   $('g-boh').addEventListener('click', () => openBoh());
   $('b-oil').addEventListener('click', () => { if (L.useOil(S)) { sfx.relic(); save(); toast('oil', 'The lantern flares', '+15 seconds of oil for this guardian.', 'feat'); } });
@@ -1601,7 +1628,7 @@
     $('gold').textContent = fmt(S.gold);
     { const sg = $('sigils'); if (sg) { let bal = typeof prof !== 'undefined' && prof ? prof.bal : null; if (!(bal >= 0)) { bal = null; try { const c = localStorage.getItem('lh_bal'); if (c != null && +c >= 0) bal = +c; } catch (e) {} } const on = bal != null && signedIn(); if (sg.hidden === on) sg.hidden = !on; if (on) { const t = bal.toLocaleString(); if ($('sigilct').textContent !== t) { $('sigilct').textContent = t; try { localStorage.setItem('lh_bal', String(bal)); } catch (e) {} } } } }
     $('dps').textContent = fmt(L.totalDps(S, now));
-    $('embers').textContent = fmt(S.embers); { const hp = S.hero ? L.heroPoints(S) : 0; $('kindcount').textContent = S.kindling ? S.kindling : hp > 0 ? '+' + hp : ''; }
+    $('embers').textContent = fmt(S.embers); { const d = $('dust'); if (d) d.textContent = fmt(S.dust || 0); } { const hp = S.hero ? L.heroPoints(S) : 0; $('kindcount').textContent = S.kindling ? S.kindling : hp > 0 ? '+' + hp : ''; }
     if (tab === 'party' || tab === 'camp') updateSeats(force);
     if (tab === 'market' && force) showMarketView();
     if (tab === 'guild' && force) { if (!boardList && CL && signedIn() && !boardMsg) findHeroes(); else paintBoard(); }
@@ -3291,13 +3318,18 @@
         'You can still equip and upgrade a locked item. Unlock it to sell, send or salvage it.']],
       ['Merging items', 'i:relic', 'Merge two copies of the same item into one at +1.', [
         'Open an item and choose <b>Merge</b> when you own another copy. The result is one upgrade above the higher of the two, up to +' + L.UP_MAX + '.',
+        '<b>Mass merge</b> in the Gear tab pairs up spare copies (never worn or locked ones) up to the level you pick, and shows the expected losses first.',
         'If the merge fails, <b>both pieces are destroyed</b>. Risk starts at 8% for +1 and climbs about 6% per level.',
         'Each point of <b>Luck</b> and <b>Intelligence</b> cuts that risk, up to half. Locked items cannot be merged.']],
       ['Enchantments', 'i:star', 'Sockets hold enchants that help the whole party.', [
         'Fine items have 1 socket, rare 2, epic 3 and set pieces 2. Items from floor 30 and floor 80 on get one more each, up to 4. Common items get sockets from floor 30.',
         'Enchants: <b>Might</b> (damage), <b>Vigor</b> (health), <b>Keen</b> (crits), <b>Fortune</b> (gold), <b>Finder</b> (gear drops), <b>Mending</b> (healing), <b>Warding</b> (less damage taken) and <b>Wick</b> (lantern time). Tiers run I to IX, higher from deeper floors.',
         '<b>Disenchant</b> destroys an item and moves one of its enchants into a socket on another item of any class. A full socket can be overwritten.',
+        'Moving an enchant costs <b>Dust</b>: 5 for tier I, 20 for II, 45 for III and so on (5 &times; tier&sup2;).',
         'Merging two items keeps the best enchants of both, as many as the result has sockets.']],
+      ['Dust', 'i:dust', 'Scrap gear to get Dust for enchanting.', [
+        'Every item you salvage or mass scrap gives Dust as well as gold. Rarer, deeper and upgraded pieces give more.',
+        'Your Dust shows in the top bar. Rekindling keeps it.']],
       ['Mass scrap and Mass sell', 'i:coin', 'Clear out your pack in one go from the Gear tab.', [
         '<b>Mass scrap</b> turns the rarities you tick into gold right away.',
         '<b>Mass sell</b> lists them on the market at their current value, up to 25 listings at a time. You get mail with the gold as each one sells.',
@@ -3414,6 +3446,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 48, date: 'November 23, 2026', title: 'Dust and Mass merge', items: [
+      'Scrapping gear now gives Dust as well as gold. Your Dust shows in the top bar.',
+      'Enchanting and disenchanting cost Dust, more for higher tiers.',
+      'New Mass merge button in the Gear tab. Pick how high to go, see the expected losses, then merge every spare pair at once. Worn and locked items are never touched.',
+      'Fixed: after rekindling at the main camp there was no button to start fighting again.'] },
     { v: 47, date: 'November 23, 2026', title: 'Enchantments and Disenchant', items: [
       'Gear now has enchant sockets, more for rarer items and items from deeper floors. Every item you already own has had its enchants rolled.',
       'Enchants like Might, Vigor, Keen and Fortune help the whole party while anyone in it wears the item.',

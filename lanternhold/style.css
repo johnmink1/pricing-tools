@@ -1322,3 +1322,4 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 .chat{height:440px}
 @media (max-width:720px){.chatfab{bottom:calc(76px + env(safe-area-inset-bottom));right:12px;padding:9px 13px 9px 10px}.chatfab span{display:none}.chat{bottom:calc(66px + env(safe-area-inset-bottom));height:60vh}}
 .campbar>div{min-width:120px}.campbar .btn.small{padding:6px 10px}
+#toasts{bottom:76px}@media (max-width:560px){#toasts{bottom:136px}}

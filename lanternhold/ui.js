@@ -1452,7 +1452,7 @@
   function updatePanel(force) {
     const now = Date.now();
     $('gold').textContent = fmt(S.gold);
-    { const sg = $('sigils'); if (sg) { let bal = typeof prof !== 'undefined' && prof ? prof.bal : null; if (bal == null) { try { const c = localStorage.getItem('lh_bal'); if (c != null) bal = +c; } catch (e) {} } const on = bal != null && signedIn(); if (sg.hidden === on) sg.hidden = !on; if (on) { const t = bal.toLocaleString(); if ($('sigilct').textContent !== t) { $('sigilct').textContent = t; try { localStorage.setItem('lh_bal', String(bal)); } catch (e) {} } } } }
+    { const sg = $('sigils'); if (sg) { let bal = typeof prof !== 'undefined' && prof ? prof.bal : null; if (!(bal >= 0)) { bal = null; try { const c = localStorage.getItem('lh_bal'); if (c != null && +c >= 0) bal = +c; } catch (e) {} } const on = bal != null && signedIn(); if (sg.hidden === on) sg.hidden = !on; if (on) { const t = bal.toLocaleString(); if ($('sigilct').textContent !== t) { $('sigilct').textContent = t; try { localStorage.setItem('lh_bal', String(bal)); } catch (e) {} } } } }
     $('dps').textContent = fmt(L.totalDps(S, now));
     $('embers').textContent = fmt(S.embers); { const hp = S.hero ? L.heroPoints(S) : 0; $('kindcount').textContent = S.kindling ? S.kindling : hp > 0 ? '+' + hp : ''; }
     if (tab === 'party' || tab === 'camp') updateSeats(force);
@@ -2925,7 +2925,7 @@
     try { save(); } catch (e) {}
     try { if (typeof pushCloud === 'function' && signedIn()) await Promise.race([pushCloud(true), new Promise(r => setTimeout(r, 4000))]); } catch (e) {}
     // A fresh query string skips any cached copy of the page.
-    location.replace(location.pathname + '?u=' + encodeURIComponent(b || Date.now()) + location.hash);
+    location.replace(location.pathname + '?u=' + encodeURIComponent(b || '') + '&t=' + Date.now().toString(36) + location.hash);
   }
   async function checkUpdate() {
     if (!window.LH_BUILD || updating) return;
@@ -2933,8 +2933,14 @@
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
       const j = await r.json();
       if (!j.build || j.build === window.LH_BUILD) return;
+      window.LH_NEXT = j.build;
       // Already reloaded for this build but the page is still old (a slow cache): offer the button instead of looping.
-      if (new URLSearchParams(location.search).get('u') === j.build) { $('btn-update').hidden = false; return; }
+      // The web host can take a minute to hand every visitor the new files, so try again quietly a few times first.
+      if (new URLSearchParams(location.search).get('u') === j.build) {
+        let n = 0; try { n = +sessionStorage.getItem('lh_upretry') || 0; sessionStorage.setItem('lh_upretry', String(n + 1)); } catch (e) {}
+        if (n < 3) { updating = true; setTimeout(() => loadBuild(j.build), 15000 * (n + 1)); return; }
+        $('btn-update').hidden = false; return;
+      }
       updating = true;
       let n = 10;
       modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Update required</h2><p>A new version of Lanternhold is out. Your progress is saved, and the game reloads in <b id="up-n">' + n + '</b> seconds.</p><div class="row" style="justify-content:center"><button class="btn" id="up-now">Update now</button></div></div>', md => {
@@ -2943,10 +2949,11 @@
       const t = setInterval(() => { n--; const e = $('up-n'); if (e) e.textContent = Math.max(0, n); if (n <= 0) { clearInterval(t); loadBuild(j.build); } }, 1000);
     } catch (e) {}
   }
-  $('btn-update').addEventListener('click', () => loadBuild(''));
+  $('btn-update').addEventListener('click', () => { try { sessionStorage.removeItem('lh_upretry'); } catch (e) {} loadBuild(window.LH_NEXT || ''); });
+  try { if (new URLSearchParams(location.search).get('u') === window.LH_BUILD) sessionStorage.removeItem('lh_upretry'); } catch (e) {}
   setInterval(checkUpdate, 2 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
-  setTimeout(checkUpdate, 20000);
+  setTimeout(checkUpdate, new URLSearchParams(location.search).get('u') ? 4000 : 20000);
 
   // ---------- tutorial (coach marks) and the Guide ----------
   // Steps show one at a time, point at the real control, and wait for the player to do the thing.

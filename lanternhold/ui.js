@@ -234,9 +234,99 @@
     return lay;
   }
 
+  // ---------- camp: the party rests around a campfire at the top of the stair ----------
+  let campBg = null, campKey = '';
+  function buildCamp() {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'), r = rngFrom(7), floorY = Math.round(H * 0.7);
+    const sky = x.createLinearGradient(0, 0, 0, floorY);
+    sky.addColorStop(0, '#070912'); sky.addColorStop(0.7, '#141526'); sky.addColorStop(1, '#231a22');
+    x.fillStyle = sky; x.fillRect(0, 0, W, floorY);
+    for (let i = 0; i < 90; i++) { x.fillStyle = 'rgba(230,225,255,' + (0.25 + r() * 0.6) + ')'; x.fillRect(Math.floor(r() * W), Math.floor(r() * floorY * 0.7), 1, 1); }
+    // moon
+    x.fillStyle = '#e9e3cf'; x.beginPath(); x.arc(Math.round(W * 0.82), Math.round(H * 0.16), 9, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#141526'; x.beginPath(); x.arc(Math.round(W * 0.82) + 4, Math.round(H * 0.16) - 2, 8, 0, Math.PI * 2); x.fill();
+    // far hills and the ruined Hold
+    x.fillStyle = '#16131c';
+    for (let i = 0; i <= W; i += 2) { const h = 14 + Math.sin(i * 0.02) * 8 + Math.sin(i * 0.051) * 5; x.fillRect(i, floorY - h - 18, 2, h + 18); }
+    x.fillStyle = '#0f0d13';
+    const hx = Math.round(W * 0.14); x.fillRect(hx, floorY - 62, 22, 62); x.fillRect(hx - 3, floorY - 66, 28, 5);
+    for (let i = 0; i < 4; i++) x.fillRect(hx - 3 + i * 8, floorY - 70, 4, 4);
+    x.fillRect(hx + 22, floorY - 38, 40, 38); x.fillStyle = '#2a1d14'; x.fillRect(hx + 8, floorY - 50, 5, 7);
+    // pines
+    x.fillStyle = '#0c0f10';
+    for (let i = 0; i < 9; i++) { const px = Math.round(W * (0.3 + i * 0.085) + r() * 14), ph = 26 + Math.floor(r() * 18);
+      for (let j = 0; j < ph; j++) { const w = Math.max(1, Math.round((j / ph) * 9)); x.fillRect(px - w, floorY - 14 - ph + j, w * 2, 1); } x.fillRect(px - 1, floorY - 14, 2, 4); }
+    // ground
+    const g = x.createLinearGradient(0, floorY - 12, 0, H);
+    g.addColorStop(0, '#1d1a14'); g.addColorStop(1, '#0d0b08');
+    x.fillStyle = g; x.fillRect(0, floorY - 12, W, H - floorY + 12);
+    for (let i = 0; i < 160; i++) { x.fillStyle = r() < 0.5 ? '#2a2a1a' : '#151309'; x.fillRect(Math.floor(r() * W), floorY - 10 + Math.floor(r() * (H - floorY + 10)), 1 + Math.floor(r() * 2), 1); }
+    for (let i = 0; i < 40; i++) { const gx = Math.floor(r() * W), gy = floorY - 10 + Math.floor(r() * 8); x.fillStyle = '#26301a'; x.fillRect(gx, gy, 1, 2); x.fillRect(gx + 2, gy + 1, 1, 1); }
+    // the stair back down, a dark mouth in the rock
+    const sx = Math.round(W * 0.9); x.fillStyle = '#1a1612'; x.fillRect(sx - 18, floorY - 26, 36, 30); x.fillStyle = '#050403'; x.fillRect(sx - 12, floorY - 20, 24, 24);
+    x.fillStyle = '#2a241c'; for (let i = 0; i < 4; i++) x.fillRect(sx - 10 + i, floorY - 2 - i * 4, 20 - i * 2, 2);
+    return c;
+  }
+  // seats around the fire: dx, dy from the fire, and whether the sitter faces left
+  const CAMP_SEATS = [[-46, 4, 0], [46, 4, 1], [-30, -12, 0], [30, -12, 1], [-62, -6, 0], [62, -6, 1], [-12, -20, 0], [14, -20, 1]];
+  function drawCamp(now) {
+    if (campKey !== W + 'x' + H) { campBg = buildCamp(); campKey = W + 'x' + H; }
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(campBg, 0, 0);
+    const floorY = Math.round(H * 0.7), fx = Math.round(W * 0.5), fy = floorY + 10;
+    const fl = Math.sin(tAnim * 9) + Math.sin(tAnim * 13.7) * 0.6;
+    const glow = ctx.createRadialGradient(fx, fy - 6, 2, fx, fy - 6, 120 + fl * 4);
+    glow.addColorStop(0, 'rgba(255,160,70,0.42)'); glow.addColorStop(0.5, 'rgba(255,120,50,0.12)'); glow.addColorStop(1, 'rgba(255,110,40,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over';
+    // who sits by the fire: the party first, then companions resting at camp
+    const who = S.party.filter(Boolean).concat(S.unlocked.filter(id => !S.party.includes(id))).slice(0, CAMP_SEATS.length);
+    const seats = who.map((id, i) => ({ id, x: fx + CAMP_SEATS[i][0], y: fy + CAMP_SEATS[i][1], flip: CAMP_SEATS[i][2] }));
+    const sitter = p => {
+      const m = L.memberById(p.id); if (!m) return;
+      const spr = sprite(m.cls, m.hue || 0, false), w2 = spr.width * 2, h2 = spr.height * 2;
+      const breathe = Math.round(Math.sin(tAnim * 1.6 + p.x) * 0.5);
+      const bx = p.x - w2 / 2, by = p.y - h2 + 6 + breathe;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 5, 11, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+      // sitting: the lower legs are hidden behind a log seat
+      ctx.save(); ctx.beginPath(); ctx.rect(bx - 2, by - 2, w2 + 4, h2 - 6); ctx.clip();
+      if (p.flip) { ctx.translate(bx + w2, by); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0, w2, h2); } else ctx.drawImage(spr, bx, by, w2, h2);
+      ctx.restore();
+      ctx.fillStyle = '#3b2616'; ctx.fillRect(p.x - 11, p.y - 2, 22, 5); ctx.fillStyle = '#5a3a20'; ctx.fillRect(p.x - 11, p.y - 2, 22, 1); ctx.fillStyle = '#2a1a0e'; ctx.fillRect(p.x - 11, p.y + 2, 22, 1);
+      // firelight on the side facing the fire
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,140,60,' + (0.07 + fl * 0.015) + ')'; ctx.fillRect(p.flip ? bx : bx + w2 / 2, by, w2 / 2, h2 - 6); ctx.globalCompositeOperation = 'source-over';
+      if (p.id === 'you') { ctx.fillStyle = '#f2c14e'; ctx.fillRect(p.x - 1, by - 5, 3, 1); ctx.fillRect(p.x, by - 4, 1, 1); }
+    };
+    seats.filter(p => p.y < fy).sort((a, b) => a.y - b.y).forEach(sitter);
+    // the fire: stones, crossed logs, flames and sparks
+    ctx.fillStyle = '#4a4440'; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; ctx.fillRect(Math.round(fx + Math.cos(a) * 13) - 2, Math.round(fy + Math.sin(a) * 4) - 1, 4, 3); }
+    ctx.fillStyle = '#4b2e18'; ctx.fillRect(fx - 11, fy - 3, 22, 3); ctx.fillStyle = '#6a4224'; ctx.fillRect(fx - 9, fy - 5, 6, 3); ctx.fillRect(fx + 3, fy - 5, 6, 3);
+    for (let i = 0; i < 7; i++) {
+      const ph = tAnim * (2.2 + i * 0.31) + i * 1.7, h = 9 + Math.sin(ph) * 3 + (i % 3) * 3, ox = (i - 3) * 2 + Math.round(Math.sin(ph * 1.3) * 1);
+      ctx.fillStyle = i % 2 ? '#ff6a1f' : '#ff8f2a'; ctx.fillRect(fx + ox - 1, fy - 4 - h, 3, h);
+    }
+    for (let i = 0; i < 4; i++) { const ph = tAnim * (3 + i * 0.4) + i, h = 5 + Math.sin(ph) * 2; ctx.fillStyle = '#ffd25a'; ctx.fillRect(fx - 3 + i * 2, fy - 4 - h, 1 + (i % 2), h); }
+    ctx.fillStyle = '#fff2b0'; ctx.fillRect(fx - 1, fy - 7, 2, 3);
+    if (Math.random() < 0.35) particles.push({ x: fx + (Math.random() - 0.5) * 8, y: fy - 12, vx: (Math.random() - 0.5) * 8, vy: -22 - Math.random() * 18, life: 1 + Math.random(), age: 0, c: Math.random() < 0.5 ? '#ffb04a' : '#ff7a2a', s: 1, float: true });
+    seats.filter(p => p.y >= fy).forEach(sitter);
+    const dt = 1 / 60;
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i]; p.age += dt; if (p.age > p.life) { particles.splice(i, 1); continue; }
+      p.x += (p.vx + Math.sin(tAnim * 3 + i) * 4) * dt; p.y += p.vy * dt;
+      ctx.globalAlpha = Math.min(1, (p.life - p.age) * 1.5); ctx.fillStyle = p.c; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s);
+    }
+    ctx.globalAlpha = 1;
+    // fireflies
+    for (let i = 0; i < 8; i++) {
+      const px = (i * 97 + Math.sin(tAnim * 0.4 + i) * 30 + W) % W, py = floorY - 30 + Math.sin(tAnim * 0.7 + i * 2) * 18;
+      ctx.fillStyle = 'rgba(200,255,140,' + (0.25 + 0.25 * Math.sin(tAnim * 2 + i)) + ')'; ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
+    }
+  }
+
   function render(now) {
     const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now; tAnim += dt;
     const nowMs = Date.now();
+    document.body.classList.toggle('resting', L.resting(S, nowMs));
+    if (L.resting(S, nowMs)) { drawCamp(nowMs); requestAnimationFrame(render); return; }
     const b = L.biomeOf(S.floor);
     const key = b.name + W + 'x' + H;
     if (key !== bgKey) { bgCanvas = buildBackground(b, Math.floor((S.floor - 1) / 10) + 3); bgKey = key; }
@@ -484,7 +574,7 @@
   function drinkDraught() {
     if (!L.useDraught(S, Date.now())) { openStore(); return; }
     closeModal(); sfx.relic(); save(); updatePanel(true);
-    toast('flame', 'You make camp', 'For 60 seconds you can swap companions, recruit, train and change gear right here.', 'feat');
+    toast('flame', 'You make camp', 'For 60 seconds the party rests and heals, and you can swap companions, recruit, train and change gear right here.', 'feat');
   }
   function campModal() {
     const n = (S.items && S.items.draught) || 0;
@@ -506,9 +596,16 @@
   let campWas = null;
   function paintCamp() {
     const h = campBarHtml();
-    for (const id of ['campbar', 'gearcamp']) { const el = $(id); if (el && el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; } }
+    for (const id of ['campbar', 'campbar2', 'gearcamp']) { const el = $(id); if (el && el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; } }
     const c = camp(); if (campWas !== null && c !== campWas) { campWas = c; updateSeats(true); paintBoard(); updateGear(true); } campWas = c;
     document.body.classList.toggle('incamp', c);
+    const rc = $('restcard');
+    if (rc) {
+      const left = L.campLeft(S, Date.now());
+      const r = left > 0 && S.floor > L.CAMP_FLOOR ? '<div><b>Resting by the fire, ' + Math.ceil(left) + 's</b><small>The party heals up. The fight waits until the draught burns out.</small></div>'
+        : '<div><b>Resting at camp</b><small>The party heals by the fire. Nobody fights while you rest.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + Math.min(S.maxFloor, Math.max(2, S.campReturn || S.maxFloor)) + '</button>' : '');
+      if (rc.dataset.h !== r) { rc.innerHTML = r; rc.dataset.h = r; }
+    }
   }
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-camp]'); if (!b) return;
@@ -604,7 +701,7 @@
     if (!bench.length) benchHtml = jobsHtml + '<p class="note">No one is at the fire. Companions who rest here can take a job that helps the whole party.</p>';
     if ($('bench').dataset.h !== benchHtml) { $('bench').innerHTML = benchHtml; $('bench').dataset.h = benchHtml; }
   }
-  $('tab-party').addEventListener('click', e => {
+  const partyClick = e => {
     const pf = e.target.closest('[data-prof]'); if (pf) { profileModal(pf.dataset.prof); return; }
     const t = e.target.closest('button'); if (!t) return;
     if (t.dataset.move) { const [i, d] = t.dataset.move.split(':').map(Number); if (L.moveMember(S, i, i + d)) { sfx.buy(); updateSeats(true); updateAbilities(true); } return; }
@@ -623,8 +720,11 @@
     else if (t.dataset.recruit) recruitPlayer(t.dataset.recruit);
     else if (t.id === 'b-find') findHeroes();
     else if (t.id === 'b-signin') openAccount();
-    else if (t.id === 'f-recruit') { const g = $('grow'); g && g.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-  });
+    else if (t.id === 'f-recruit') switchTab('market');
+    else if (t.id === 'm-market') openTrade('market');
+    else if (t.id === 'm-mail') openTrade('mail');
+  };
+  ['tab-party', 'tab-camp', 'tab-market'].forEach(id => $(id).addEventListener('click', partyClick));
   // camp jobs: pick who does a job, or which job someone does
   function jobModal(jid) {
     const j = L.JOBS.find(x => x.id === jid), cur = S.jobs && S.jobs[jid];
@@ -748,10 +848,8 @@
   let gearWho = 'you', gearKey = '';
   const SLOT_ICON = { weapon: 'sword', armor: 'gear-armor', trinket: 'gear-trinket' };
   function itemEffect(it) {
-    const p = L.gearPct(it), pct = v => '+' + Math.round(v * 100) + '%';
-    if (it.slot === 'weapon') return pct(p) + ' damage' + (it.cls === 'healer' ? ' and healing' : '');
-    if (it.slot === 'armor') return pct(p) + ' health';
-    return it.cls === 'healer' ? pct(p) + ' healing, ' + pct(p / 2) + ' health' : pct(p / 2) + ' damage and health';
+    const st = L.itemStats(it);
+    return st.map(([k, v], i) => '+' + Math.round(v * 100) + '% ' + k.toLowerCase()).join(', ');
   }
   function itemChip(it, extra, cls) {
     const w = L.wearer(S, it.uid);
@@ -759,9 +857,8 @@
   }
   // How an item compares to what this member wears in that slot, in gear percent.
   function compareTag(it, id) {
-    const cur = (S.gear[id] || {})[it.slot], ci = cur && L.itemOf(S, cur);
-    if (ci && ci.uid === it.uid) return '<span class="cmp eq">Equipped</span>';
-    const d = Math.round((L.gearPct(it) - (ci ? L.gearPct(ci) : 0)) * 100);
+    if (L.wearer(S, it.uid) === id) return '<span class="cmp eq">Equipped</span>';
+    const d = Math.round((L.itemScore(it) - L.replaces(S, id, it).reduce((a, x) => a + L.itemScore(x), 0)) * 100);
     return d > 0 ? '<span class="cmp up">&#9650; ' + d + '% better</span>' : d < 0 ? '<span class="cmp down">&#9660; ' + (-d) + '% worse</span>' : '<span class="cmp eq">Same</span>';
   }
   // Away from camp you only see the party you brought down; the campfire roster stays hidden.
@@ -780,30 +877,37 @@
     const m = L.memberById(gearWho), g = S.gear[gearWho] || {}, cname = L.CLASSES[m.cls].name;
     const set = L.SETS.find(x => x.cls === m.cls), sc = L.setCount(S, gearWho, set.id);
     const better = L.betterFor(S, gearWho), nb = Object.keys(better).length;
+    const openP = L.openPos(S, gearWho), robe = L.robeOn(S, gearWho);
     const slotTile = sl => {
+      const type = L.posType(sl), name = L.SLOT_NAME[sl];
+      if (!openP.includes(sl)) {
+        const kind = sl === 'neck2' ? 'neck2' : 'ring', c = L.unlockCost(S, gearWho, kind);
+        const next = kind === 'neck2' || sl === 'ring' + (2 + L.unlocksOf(S, gearWho).rings);
+        return '<div class="dslot ds-' + sl + ' locked"><div class="tile ghost' + (next ? ' unl" data-unlock="' + kind + '" role="button" tabindex="0"' : '"') + ' title="' + (next ? 'Unlock with ' + c + ' Kindling' : 'Unlock the ring before it first') + '">' + icon('lock') + (next ? '<i class="kc">' + c + '</i>' : '') + '</div><span>' + name + '</span></div>';
+      }
+      if (sl === 'legs' && robe) return '<div class="dslot ds-legs covered" title="The robe covers the legs"><div class="tile ghost"><img class="iimg" src="' + SP.itemIcon(m.cls, 'legs', 'common') + '" alt=""></div><span>Robe</span></div>';
       const it = g[sl] && L.itemOf(S, g[sl]);
       const up = better[sl] ? '<i class="upb" title="Better one in your pack">&#9650;</i>' : '';
-      if (!it) return '<div class="dslot ds-' + sl + ' empty" title="Empty ' + L.SLOT_NAME[sl].toLowerCase() + ' slot"><div class="tile ghost"><img class="iimg" src="' + SP.itemIcon(m.cls, sl, 'common') + '" alt="">' + up + '</div><span>' + L.SLOT_NAME[sl] + '</span></div>';
-      return '<div class="dslot ds-' + sl + '"><div class="tile r-' + it.rar + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + up + '</div><span>' + L.SLOT_NAME[sl] + '</span></div>';
+      if (!it) return '<div class="dslot ds-' + sl + ' empty" title="Empty ' + name.toLowerCase() + ' slot"><div class="tile ghost"><img class="iimg" src="' + SP.itemIcon(m.cls, type, 'common') + '" alt="">' + up + '</div><span>' + name + '</span></div>';
+      return '<div class="dslot ds-' + sl + '"><div class="tile r-' + it.rar + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + up + '</div><span>' + name + '</span></div>';
     };
     // totals from worn gear
-    let dmg = 0, hp = 0, heal = 0;
-    for (const sl of L.SLOTS) { const it = g[sl] && L.itemOf(S, g[sl]); if (!it) continue; const p = L.gearPct(it);
-      if (sl === 'weapon') { dmg += p; if (it.cls === 'healer') heal += p; } else if (sl === 'armor') hp += p; else if (it.cls === 'healer') { heal += p; hp += p / 2; } else { dmg += p / 2; hp += p / 2; } }
+    const dmg = L.gearPctOf(S, gearWho, 'dps'), hp = L.gearPctOf(S, gearWho, 'hp');
     const pc = v => '+' + Math.round(v * 100) + '%';
-    const totals = [m.cls === 'healer' ? ['Healing', heal] : ['Damage', dmg], ['Health', hp]].map(([k, v]) => '<div><small>' + k + '</small><b>' + pc(v) + '</b></div>').join('');
-    let h = '<div class="doll">' + slotTile('weapon') +
-      '<div class="dfig" data-prof="' + gearWho + '" role="button" tabindex="0" title="About ' + esc(m.name) + '"><img src="' + SP.spriteURL(m.cls, 5, m.hue || 0) + '" alt=""><b>' + esc(m.name) + '</b>' + classTag(m.cls) + '</div>' +
-      slotTile('armor') + slotTile('trinket') +
+    const totals = [m.cls === 'healer' ? ['Healing', dmg] : ['Damage', dmg], ['Health', hp]].map(([k, v]) => '<div><small>' + k + '</small><b>' + pc(v) + '</b></div>').join('');
+    let h = '<div class="doll">' +
+      '<div class="dcol">' + ['head', 'neck', 'chest', 'legs'].map(slotTile).join('') + '</div>' +
+      '<div class="dmid"><div class="dfig" data-prof="' + gearWho + '" role="button" tabindex="0" title="About ' + esc(m.name) + '"><img src="' + SP.spriteURL(m.cls, 5, m.hue || 0) + '" alt=""><b>' + esc(m.name) + '</b>' + classTag(m.cls) + '</div>' +
       '<div class="dstats">' + totals + '</div></div>' +
+      '<div class="dcol">' + ['main', 'off', 'neck2', 'feet'].map(slotTile).join('') + '</div>' +
+      '<div class="drings">' + ['ring1', 'ring2', 'ring3', 'ring4', 'ring5'].map(slotTile).join('') + '</div></div>' +
       '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>' +
       '<div class="dollbar"><small>' + cname + ' gear only. Tap a piece for details.</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
-    $('bagcount').textContent = S.bag.length + '/' + L.GEAR_CAP;
+    $('bagcount').textContent = S.bag.length + '/' + L.bagCap(S);
     const tile = (it, dim) => {
       const w = L.wearer(S, it.uid), fit = it.cls === m.cls;
-      const cur = fit && (S.gear[gearWho] || {})[it.slot], ci = cur && L.itemOf(S, cur);
-      const d = fit && !w ? Math.round((L.gearPct(it) - (ci ? L.gearPct(ci) : 0)) * 100) : 0;
+      const d = fit && !w ? Math.round((L.itemScore(it) - L.replaces(S, gearWho, it).reduce((a, x) => a + L.itemScore(x), 0)) * 100) : 0;
       return '<div class="tile r-' + it.rar + (dim ? ' dim' : '') + (w ? ' worn' : '') + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + ' (' + itemEffect(it) + ')' + (w ? ', worn by ' + esc(L.memberById(w).name) : '') + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' +
         '<i class="lvb' + (fit && !L.canWear(S, gearWho, it) ? ' no' : '') + '">' + L.reqLevel(it) + '</i>' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (d > 0 && L.canWear(S, gearWho, it) ? '<i class="upb">&#9650;</i>' : '') + (w ? '<i class="wb" title="Worn">' + esc(L.memberById(w).name.charAt(0)) + '</i>' : '') + '</div>';
     };
@@ -830,16 +934,12 @@
     if (e.target.closest('[data-equip],#g-best') && !campGate()) return;
     const eq = e.target.closest('[data-equip]'); if (eq) { if (L.equip(S, gearWho, eq.dataset.equip)) { sfx.buy(); updateGear(true); updateSeats(true); } return; }
     if (e.target.closest('#g-best')) { const n = L.equipBest(S, gearWho); if (n) { sfx.buy(); toast('gear-armor', 'Best gear on', n + (n === 1 ? ' piece' : ' pieces') + ' equipped on ' + L.memberById(gearWho).name + '.', ''); updateGear(true); updateSeats(true); } return; }
+    const ul = e.target.closest('[data-unlock]'); if (ul) { unlockModal(gearWho, ul.dataset.unlock); return; }
     if (e.target.closest('.dfig')) { profileModal(gearWho); return; }
     const it = e.target.closest('[data-item]'); if (it) { if ((e.ctrlKey || e.metaKey) && linkItem(L.itemOf(S, it.dataset.item))) return; itemModal(it.dataset.item); }
   });
-  ['tab-gear', 'tab-party'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof]')) { e.preventDefault(); e.target.click(); } }));
-  function itemStats(it) {
-    const p = L.gearPct(it);
-    if (it.slot === 'weapon') return it.cls === 'healer' ? [['Damage', p], ['Healing', p]] : [['Damage', p]];
-    if (it.slot === 'armor') return [['Health', p]];
-    return it.cls === 'healer' ? [['Healing', p], ['Health', p / 2]] : [['Damage', p / 2], ['Health', p / 2]];
-  }
+  ['tab-gear', 'tab-party', 'tab-camp', 'tab-market'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof]')) { e.preventDefault(); e.target.click(); } }));
+  const itemStats = it => L.itemStats(it);
   function itemModal(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
     let m = L.memberById(gearWho), w = L.wearer(S, uid);
@@ -847,8 +947,8 @@
     const set = it.set && L.SETS.find(x => x.id === it.set);
     const fits = m.cls === it.cls, rar = L.RARITY.find(r => r.id === it.rar);
     const cost = L.upgradeCost(it), maxed = it.up >= L.UP_MAX;
-    const cur = fits && !w && (S.gear[gearWho] || {})[it.slot], ci = cur && L.itemOf(S, cur);
-    const curStats = ci ? Object.fromEntries(itemStats(ci)) : {};
+    const reps = fits && !w ? L.replaces(S, gearWho, it) : [], ci = reps[0];
+    const curStats = {}; for (const r of reps) for (const [k, v] of itemStats(r)) curStats[k] = (curStats[k] || 0) + v;
     const nextStats = maxed ? null : Object.fromEntries(itemStats(Object.assign({}, it, { up: it.up + 1 })));
     const pc = v => '+' + Math.round(v * 100) + '%';
     const stats = itemStats(it).map(([k, v]) => {
@@ -863,7 +963,7 @@
       '<div class="ihero"><div class="tile big r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
       '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + esc(L.gearName(it)) + '</h2>' + pips + '<small>Requires level <b class="' + (fits && !w && !L.canWear(S, gearWho, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
       '<div class="istats">' + stats + '</div>' +
-      (fits && !w ? '<p class="icmp">' + (ci ? 'Compared with ' + esc(m.name) + '’s ' + esc(L.gearName(ci)) + (ci.up ? ' +' + ci.up : '') + '.' : esc(m.name) + ' has nothing in this slot.') + '</p>' : '') +
+      (fits && !w ? '<p class="icmp">' + (ci ? 'Compared with ' + esc(m.name) + '’s ' + reps.map(r => esc(L.gearName(r)) + (r.up ? ' +' + r.up : '')).join(' and ') + '.' : esc(m.name) + ' has an open ' + L.SLOT_NAME[it.slot].toLowerCase() + ' slot.') + (it.slot === 'robe' ? ' A robe covers the chest and legs.' : '') + '</p>' : '') +
       (set ? '<div class="iset"><b>' + set.name + '</b><small><em>2 pieces</em> ' + set.two + '</small><small><em>3 pieces</em> ' + set.three + '</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
       (wearer ? '<div class="iworn"><img src="' + SP.spriteURL(wearer.cls, 2, wearer.hue || 0) + '" alt="">Worn by <b>' + esc(wearer.name) + '</b></div>' : '') +
       '<div class="iacts">' +
@@ -878,7 +978,7 @@
         const lk = md.querySelector('#i-link'); if (lk) lk.onclick = () => { closeModal(); linkItem(it); };
         const re = () => { updateGear(true); updateSeats(true); itemModal(uid); };
         const on = md.querySelector('#i-on'); if (on) on.onclick = () => { if (!campGate()) return; L.equip(S, gearWho, uid); sfx.buy(); re(); };
-        const off = md.querySelector('#i-off'); if (off) off.onclick = () => { if (!campGate()) return; L.unequip(S, w, it.slot); re(); };
+        const off = md.querySelector('#i-off'); if (off) off.onclick = () => { if (!campGate()) return; L.unequip(S, w, L.wornPos(S, uid)); re(); };
         const up = md.querySelector('#i-up'); if (up) up.onclick = () => { if (!campGate()) return; if (L.upgrade(S, uid)) { sfx.relic(); re(); } };
         const sv = md.querySelector('#i-sell');
         sv.onclick = () => {
@@ -890,6 +990,18 @@
   }
 
 
+
+  // ---------- Kindling: unlock extra gear slots ----------
+  function unlockModal(id, kind) {
+    const m = L.memberById(id), c = L.unlockCost(S, id, kind); if (!c) return;
+    const what = kind === 'neck2' ? 'a second trinket slot' : 'ring slot ' + (2 + L.unlocksOf(S, id).rings);
+    const can = (S.kindling || 0) >= c;
+    modal('<div class="center"><div class="kbig">' + icon('flame') + '</div><h2>Unlock ' + what + '</h2><p>' + esc(m.name) + ' can wear one more ' + (kind === 'neck2' ? 'trinket' : 'ring') + '. This costs <b class="kind">' + c + ' Kindling</b> and stays unlocked forever, even after rekindling.</p><p class="muted">You have ' + (S.kindling || 0) + ' Kindling. You earn it by rekindling.</p>' +
+      '<div class="row"><button class="btn ghost" id="u-no">Not now</button><button class="btn" id="u-yes"' + (can ? '' : ' disabled') + '>' + (can ? 'Unlock' : 'Not enough Kindling') + '</button></div></div>', md => {
+        md.querySelector('#u-no').onclick = closeModal;
+        md.querySelector('#u-yes').onclick = () => { if (L.unlockSlot(S, id, kind)) { sfx.relic(); save(); closeModal(); toast('flame', 'Slot unlocked', m.name + ' can now wear ' + (kind === 'neck2' ? 'two trinkets' : (1 + L.unlocksOf(S, id).rings) + ' rings') + '.', 'feat'); updateGear(true); } };
+      });
+  }
 
   // ---------- companion profile ----------
   const SIDE_OF_MEMBER = id => { const m = L.memberById(id); if (id === 'you') return L.sideOf(S); return m.side || null; };
@@ -904,7 +1016,7 @@
     if (c.drain) stats.push(['Life drain', 'heals party as it hits']);
     stats.push(['Power', m.player ? 'Full (player hero)' : Math.round(L.NPC_POWER * 100) + '% (story companion)']);
     const gear = S.gear[id] || {};
-    const gearList = L.SLOTS.map(sl => { const it = gear[sl] && L.itemOf(S, gear[sl]); return '<li><span>' + L.SLOT_NAME[sl] + '</span>' + (it ? '<b class="r-' + it.rar + '">' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b>' : '<i>Empty</i>') + '</li>'; }).join('');
+    const gearList = L.openPos(S, id).filter(sl => !(sl === 'legs' && L.robeOn(S, id))).map(sl => { const it = gear[sl] && L.itemOf(S, gear[sl]); return '<li><span>' + L.SLOT_NAME[sl] + '</span>' + (it ? '<b class="r-' + it.rar + '">' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b>' : '<i>Empty</i>') + '</li>'; }).join('');
     const bio = id === 'you' ? 'That is you. You took the lantern from Old Thessaly and carried it down the stair' + (sd ? ', under the banner of the ' + sd.name : '') + '.'
       : guest ? 'Another player’s hero, lent to your party. They fight at the level their owner trained them to. You cannot change their gear or train them.'
       : (m.bio || m.line);
@@ -1010,6 +1122,8 @@
   function updateRekindle() {
     const e = L.embersFor(S);
     $('embergain').textContent = fmt(e);
+    $('kindgain').textContent = L.skillPointsFor(S);
+    updateSkills();
     $('btn-rekindle').disabled = e <= 0;
     $('rekindlenote').textContent = S.maxFloor < L.REKINDLE_FLOOR ? 'Reach floor ' + L.REKINDLE_FLOOR + ' on this descent to rekindle. You are on floor ' + S.maxFloor + '.'
       : 'Deeper floors give more Embers. Most delvers rekindle when progress slows down.';
@@ -1019,15 +1133,61 @@
     modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Rekindle now?</h2><p>Gold, floors and training reset to the start. You keep your companions, gear, relics, story and feats, and gain <b style="color:var(--ember)">' + fmt(e) + ' Embers</b> for +' + fmt(e * 10) + '% damage and gold.</p><div class="row" style="justify-content:center"><button class="btn ghost" id="m-no">Not yet</button><button class="btn" id="m-yes">Rekindle</button></div></div>', m => {
       m.querySelector('#m-no').onclick = closeModal;
       m.querySelector('#m-yes').onclick = () => {
-        const got = L.rekindle(S); closeModal(); sfx.relic(); save();
-        toast('flame', 'The lantern burns brighter', '+' + fmt(got) + ' Embers. The descent begins again.', 'feat');
+        const kind = L.skillPointsFor(S), got = L.rekindle(S); closeModal(); sfx.relic(); save();
+        toast('flame', 'The lantern burns brighter', '+' + fmt(got) + ' Embers and +' + kind + ' Kindling. The descent begins again.', 'feat');
         $('auto').checked = true; switchTab('party'); updatePanel(true); updateAbilities(true);
       };
     });
   });
 
+  // ---------- skill tree and Kindling ----------
+  const SK_ICON = { hp: 'shield', guard: 'shield', power: 'star', dps: 'sword', pdps: 'sword', cd: 'refresh', php: 'users', lantern: 'lantern', dur: 'flare', heal: 'cross', pheal: 'leaf', revive: 'cross', gold: 'coin', dodge: 'eye', loot: 'bag', chest: 'key', crit: 'flare', minion: 'skull' };
+  function updateSkills() {
+    const box = $('skills'); if (!box) return;
+    const cls = L.heroCls(S), k = S.kindling || 0;
+    $('kindcount').textContent = k ? k : '';
+    if (!cls) { box.innerHTML = ''; return; }
+    const tree = L.SKILL_TREES[cls], c = L.CLASSES[cls];
+    const node = sk => {
+      const r = (S.skills || {})[sk.id] || 0, st = L.canLearn(S, sk.id), cost = L.skillCost(sk);
+      const pips = '<span class="kp">' + Array.from({ length: sk.r }, (_, i) => '<i class="' + (i < r ? 'on' : '') + '"></i>').join('') + '</span>';
+      const btn = st === 'max' ? '<em class="kmax">Mastered</em>' : st === 'locked' ? '<em class="klock">' + icon('lock') + 'Learn the skill above</em>'
+        : '<button class="btn small' + (st === 'ok' ? '' : ' ghost') + '" data-learn="' + sk.id + '"' + (st === 'ok' ? '' : ' disabled') + '>' + (r ? 'Rank up' : 'Learn') + ' <span class="kcost">' + icon('flame') + cost + '</span></button>';
+      return '<div class="knode t' + sk.tier + (r ? ' got' : '') + (st === 'locked' ? ' lock' : '') + '"><div class="kic">' + icon(SK_ICON[sk.k] || 'star') + '</div><div class="ktx"><b>' + sk.n + '</b>' + pips + '<small>' + L.skillText(sk, r || 1) + (sk.r > 1 && r ? ' now' : '') + '</small>' + btn + '</div></div>';
+    };
+    const capNext = L.BAG_UPS_MAX - (S.bagUps || 0), bc = L.bagUpCost(S);
+    box.innerHTML = '<div class="khead"><div><h3>' + esc(L.memberById('you').name) + '’s ' + c.name + ' skills</h3><small>Your hero’s skills work while they are in the party. Kindling comes from rekindling.</small></div>' +
+      '<div class="kbal">' + icon('flame') + '<b>' + k + '</b><small>Kindling</small></div></div>' +
+      '<div class="ktree">' + tree.map(br => '<div class="kbranch"><h4>' + br.b + '</h4>' + br.s.map(node).join('<i class="klink"></i>') + '</div>').join('') + '</div>' +
+      '<div class="kfoot"><span>Spent ' + L.skillSpent(S) + ' of 36</span>' + (L.skillSpent(S) ? '<button class="btn ghost small" id="k-reset">Reset tree</button>' : '') + '</div>' +
+      '<h3 class="sub">Spend Kindling</h3><div class="kshop">' +
+      '<div class="kitem"><div class="kic">' + icon('bag') + '</div><div><b>Bigger pack</b><small>+' + L.BAG_STEP + ' bag slots. You have ' + L.bagCap(S) + '.</small></div>' +
+      (capNext > 0 ? '<button class="btn small" id="k-bag"' + (k >= bc ? '' : ' disabled') + '>' + bc + ' Kindling</button>' : '<em class="kmax">Full size</em>') + '</div>' +
+      '<div class="kitem"><div class="kic">' + icon('gear-trinket') + '</div><div><b>Rings and a second trinket</b><small>Every character can open rings 2 to 5 and a second trinket slot. Tap a locked slot on the Gear tab.</small></div><button class="btn ghost small" id="k-gear">Open Gear</button></div></div>';
+  }
+  $('skills') && $('skills').addEventListener('click', e => {
+    const b = e.target.closest('[data-learn]');
+    if (b) { if (L.learnSkill(S, b.dataset.learn)) { sfx.buy(); save(); updateSkills(); updateAbilities(true); } return; }
+    if (e.target.closest('#k-bag')) { if (L.buyBag(S)) { sfx.relic(); save(); toast('bag', 'Bigger pack', 'Your pack now holds ' + L.bagCap(S) + ' items.', ''); updateSkills(); } return; }
+    if (e.target.closest('#k-gear')) { switchTab('gear'); return; }
+    if (e.target.closest('#k-reset')) {
+      if (!campGate()) return;
+      modal('<div class="center"><h2>Reset your skill tree?</h2><p>All ' + L.skillSpent(S) + ' Kindling comes back to you so you can choose again. You can only do this at camp.</p><div class="row"><button class="btn ghost" id="r-no">Keep it</button><button class="btn" id="r-yes">Reset</button></div></div>', md => {
+        md.querySelector('#r-no').onclick = closeModal;
+        md.querySelector('#r-yes').onclick = () => { L.resetSkills(S); save(); closeModal(); updateSkills(); };
+      });
+    }
+  });
+
   // ---------- tabs ----------
-  let tab = 'party';
+  let tab = 'party', cx = 'journal';
+  $('codexseg').addEventListener('click', e => {
+    const b = e.target.closest('[data-cx]'); if (!b) return;
+    cx = b.dataset.cx;
+    document.querySelectorAll('#codexseg button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.cx').forEach(x => x.hidden = x.id !== 'cx-' + cx);
+    updatePanel(true);
+  });
   function switchTab(t) {
     tab = t;
     document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
@@ -1047,12 +1207,15 @@
     const now = Date.now();
     $('gold').textContent = fmt(S.gold);
     $('dps').textContent = fmt(L.totalDps(S, now));
-    $('embers').textContent = fmt(S.embers);
-    if (tab === 'party') { updateSeats(force); if (force) paintBoard(); }
+    $('embers').textContent = fmt(S.embers); $('kindcount').textContent = S.kindling ? S.kindling : '';
+    if (tab === 'party' || tab === 'camp') updateSeats(force);
+    if (tab === 'market' && force) paintBoard();
     if (tab === 'gear') updateGear(force);
-    if (tab === 'journal' && force) updateJournal();
-    if (tab === 'relics' && (force || lastRelicCount !== Object.keys(S.relics).length)) updateRelics();
-    if (tab === 'stats') { if (force || lastFeatCount !== L.featCount(S)) updateFeats(); updateLedger(); }
+    if (tab === 'codex') {
+      if (cx === 'journal' && force) updateJournal();
+      if (cx === 'relics' && (force || lastRelicCount !== Object.keys(S.relics).length)) updateRelics();
+      if (cx === 'stats') { if (force || lastFeatCount !== L.featCount(S)) updateFeats(); updateLedger(); }
+    }
     if (tab === 'rekindle') updateRekindle();
     lastRelicCount = Object.keys(S.relics).length; lastFeatCount = L.featCount(S);
     $('relcount').textContent = lastRelicCount + '/' + L.RELICS.length;
@@ -1449,11 +1612,11 @@
   }
   function chatNote(t, warn) { const n = $('chatnote'); n.textContent = t || 'Be kind. No web links. Ctrl+click an item to link it. Tap a name to mute or report.'; n.classList.toggle('warn', !!warn); }
   // Item links: Ctrl/Cmd+click an item (or use Link in chat) to drop it into the message.
-  const ITEM_TOKEN = /\[\[i:(tank|healer|rogue|mage|necro),(weapon|armor|trinket),(common|fine|rare|epic|set),([a-z]{0,8}),(\d{1,6}),(\d{1,2})\]\]/g;
+  const ITEM_TOKEN = /\[\[i:(tank|healer|rogue|mage|necro),(weapon|armor|trinket|main|off|head|neck|chest|robe|legs|feet|ring),(common|fine|rare|epic|set),([a-z]{0,8}),(\d{1,6}),(\d{1,2})\]\]/g;
   const tokenOf = it => '[[i:' + it.cls + ',' + it.slot + ',' + it.rar + ',' + (it.set || '') + ',' + it.ilvl + ',' + (it.up || 0) + ']]';
   const itemLabel = it => L.gearName(it) + (it.up ? ' +' + it.up : '');
   function itemFromToken(m) {
-    const it = { cls: m[1], slot: m[2], rar: m[3], set: m[4] || undefined, ilvl: +m[5], up: Math.min(+m[6], L.UP_MAX) };
+    const it = L.normItem({ cls: m[1], slot: m[2], rar: m[3], set: m[4] || undefined, ilvl: +m[5], up: Math.min(+m[6], L.UP_MAX) });
     if (it.set && !L.SETS.some(x => x.id === it.set && x.cls === it.cls)) return null;
     if (it.rar === 'set' && !it.set) return null;
     try { L.gearName(it); return it; } catch (e) { return null; }
@@ -1667,7 +1830,7 @@
     { id: 'abil', title: 'Abilities', text: 'Each class has a special move. They fire by themselves, or press keys 1 to 5 (or tap them) to use one right when you need it.', target: '#abilities', ready: () => true },
     { id: 'order', title: 'Marching order', text: 'The top of this list stands at the front. Keep your tank up front, healers in the middle so they reach everyone, and watch the back for ambushes.', target: '.formhead', tab: 'party', ready: () => S.party.filter(Boolean).length >= 2 },
     { id: 'boss', title: 'Guardians', text: 'Every fifth floor has a guardian. Beat it before the lantern oil runs out, or your party falls back to train and try again.', target: '#lanternwrap', ready: () => S.foe && S.foe.boss },
-    { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor and trinkets. Open Gear to see them. You put gear on at camp, at the top of the stair, or anywhere with a Campfire Draught. A green arrow marks an upgrade.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
+    { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor, trinkets and rings. Open Gear to see them. You put gear on at camp, at the top of the stair, or anywhere with a Campfire Draught. A green arrow marks an upgrade.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
     { id: 'camp', title: 'Camp', text: 'Swapping companions, training them and changing gear happen at camp. This bar takes you back up and down again, and its Store sells Campfire Draughts that make camp anywhere.', target: '#campbar', tab: 'party', ready: () => S.floor > 1 && S.maxFloorEver >= 4 },
     { id: 'map', title: 'Map of the Deep', text: 'See how far you have come, which guardians you have beaten, and travel back to any floor you have reached.', target: '#btn-map', ready: () => S.maxFloorEver >= 8 },
     { id: 'end', title: 'You are ready', text: 'That is the basics. The story will introduce new companions as you descend. Open the Guide (the ? at the top) any time for the details.', target: '#btn-guide', ready: () => true },
@@ -1717,7 +1880,10 @@
     ['Your party and classes', '<p>You lead a party of five. You meet companions in the story; tap any portrait to read about them.</p><ul><li><b>Tank</b>: takes the hits. Shield Wall cuts damage by 70%.</li><li><b>Healer</b>: keeps everyone standing. Lantern Hymn heals the party and lifts a fallen ally.</li><li><b>Rogue</b>: the most damage, and dodges a quarter of attacks. Backstab hits for 12 seconds of damage at once.</li><li><b>Mage</b>: Ember Storm quadruples damage for a few seconds. Save it for guardians.</li><li><b>Necromancer</b>: raises skeletons that fight and soak up blows, and heals the party as it hits.</li></ul><p>Abilities fire by themselves. Turn that off under the arena and press 1 to 5 to time them yourself.</p>'],
     ['Marching order', '<p>The Party list is your marching order. The top member stands at the front, nearest the monster. Use the arrows to move people, or Auto-arrange.</p><ul><li>A <b>tank</b> in the front two draws the attacks. Without one, whoever is in front gets hit most.</li><li>Heals get <b>15% weaker per step</b> between healer and patient, so healers belong in the middle.</li><li>Some monsters <b>ambush</b> from behind and hit the rear member hard. A tank at the back guards against it.</li></ul><p>The notes under the list tell you how your current order is doing.</p>'],
     ['Monsters and guardians', '<p>Monsters hit back. If your whole party falls, it retreats a floor, rests, and tries again in a little over a minute. Use that time to train and check gear.</p><p>Every 5th floor has a <b>guardian</b>. You must beat it before the lantern oil runs out. Guardians drop better gear and, from floor 10, sometimes a relic.</p><p>Soldiers from the Grand War alliances (marked with their banner) are tougher than normal monsters and drop more.</p>'],
-    ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and goes in a weapon, armor or trinket slot.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
+    ['The side panel', '<p><b>Party</b> is your marching order for the fight. <b>Camp</b> is the campfire: resting companions, camp jobs and training. <b>Gear</b> dresses your characters. <b>Skills</b> holds your hero’s skill tree and rekindling. <b>Market</b> has the Trading Post and the Players Guild. <b>Codex</b> keeps your journal, relics and records.</p>'],
+    ['Skills and Kindling', '<p>Every rekindle gives you <b>Kindling</b>: 2 at floor 50, plus 1 for every 10 floors deeper. Spend it in the Skills tab on your hero’s class tree. Each class has three branches of three skills, and a skill needs the one above it first.</p><p>Kindling also buys a bigger pack (+10 slots) and opens extra gear slots for any character: rings 2 to 5 and a second trinket. Tap a locked slot on the Gear tab. You can reset the skill tree for free at camp.</p>'],
+    ['Resting at camp', '<p>When you return to camp, or drink a Campfire Draught, the party sits down around the fire. Nobody fights while you rest, and everyone heals up. Press Descend to head back down.</p>'],
+    ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten and where you are. Tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
     ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Your own hero can train anywhere, and you can rearrange the marching order at any time.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
@@ -1741,6 +1907,13 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 12, date: 'November 22, 2026', title: 'Skill trees, Kindling and a full set of gear slots', items: [
+      'Every class now has a skill tree for your hero, with three branches of three skills each.',
+      'Rekindling gives Kindling: 2 at floor 50, plus 1 for every 10 floors deeper. If you rekindled before today, you already have 2 for each time.',
+      'Spend Kindling on skills, a bigger pack, extra rings (up to 5) and a second trinket slot for any character.',
+      'Gear now has real slots: main hand, offhand, helmet, trinket, chest, legs, feet and rings. Robes cover the chest and legs together. Your old weapons, armor and trinkets moved into their new slots.',
+      'At camp the party sits around a campfire. Nobody fights while you rest, and everyone heals up.',
+      'The side panel is split into Party, Camp, Gear, Skills, Market and Codex, so there is far less scrolling.'] },
     { v: 11, date: 'November 22, 2026', title: 'Camp jobs and rarer loot', items: [
       'Companions at the campfire can take camp jobs: Forager, Runesmith, Herbalist, Armorer, Prospector and Lamplighter.',
       'Each job helps the whole party all the time. It grows with the companion’s level and is stronger when it suits their class, so it pays to train your whole roster.',
@@ -1816,12 +1989,12 @@
   // Items and gold live in each player's save, so the client moves them; the server keeps
   // listings, offers and letters so both sides see the same thing.
   const trade = { view: 'market', cls: null, mine: false, list: null, mail: null, msg: '', busy: false };
-  const tradeItem = it => ({ cls: it.cls, slot: it.slot, rar: it.rar, set: it.set || undefined, ilvl: it.ilvl, up: it.up || 0 });
+  const tradeItem = it => L.normItem({ cls: it.cls, slot: it.slot, rar: it.rar, set: it.set || undefined, ilvl: it.ilvl, up: it.up || 0 });
   const fromServer = it => Object.assign(tradeItem(it), { uid: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) });
-  const bagFull = () => S.bag.length >= L.GEAR_CAP;
-  const tradeTile = it => '<div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>';
+  const bagFull = () => S.bag.length >= L.bagCap(S);
+  const tradeTile = it => (L.normItem(it), '<div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>');
   const tradeName = it => esc(L.gearName(it)) + (it.up ? ' +' + it.up : '');
-  const tradeSub = it => L.RARITY.find(r => r.id === it.rar).name + ' ' + L.CLASSES[it.cls].name.toLowerCase() + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it);
+  const tradeSub = it => (L.normItem(it), 0) || L.RARITY.find(r => r.id === it.rar).name + ' ' + L.CLASSES[it.cls].name.toLowerCase() + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it);
   const tradeErr = (e, what) => {
     const c = e && e.code;
     if (what === 'send' && e && e.status === 404) return 'That player could not be found. They may need to sign in again.';

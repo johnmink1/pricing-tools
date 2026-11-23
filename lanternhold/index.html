@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611230141">
+<link rel="stylesheet" href="style.css?v=202611230153">
 </head>
 <body>
 <div id="app">
@@ -58,6 +58,7 @@
       </div>
 
       <div class="foe">
+        <div class="restcard" id="restcard"></div>
         <div class="foename"><span id="foename">Cellar Gloop</span><span class="tag" id="foetag"></span></div>
         <div class="bar hp"><i id="hpbar"></i><span id="hptext">10 / 10</span></div>
         <div class="bar lantern" id="lanternwrap" hidden><i id="lanternbar"></i><span id="lanterntext">Lantern oil 30s</span></div>
@@ -72,19 +73,25 @@
       <nav class="tabs" role="tablist">
         <button class="onlyphone" data-go="arena"><svg><use href="#i-sword"/></svg><span>Fight</span></button>
         <button class="on" data-tab="party"><svg><use href="#i-users"/></svg><span>Party</span></button>
+        <button data-tab="camp"><svg><use href="#i-flame"/></svg><span>Camp</span></button>
         <button data-tab="gear"><svg><use href="#i-bag"/></svg><span>Gear</span><em id="gearcount"></em></button>
-        <button data-tab="journal"><svg><use href="#i-book"/></svg><span>Journal</span><em id="lorecount"></em></button>
-        <button data-tab="relics"><svg><use href="#i-relic"/></svg><span>Relics</span><em id="relcount"></em></button>
-        <button data-tab="rekindle"><svg><use href="#i-flame"/></svg><span>Rekindle</span></button>
-        <button data-tab="stats"><svg><use href="#i-star"/></svg><span>Records</span><em id="featcount"></em></button>
+        <button data-tab="rekindle"><svg><use href="#i-star"/></svg><span>Skills</span><em id="kindcount"></em></button>
+        <button data-tab="market"><svg><use href="#i-coin"/></svg><span>Market</span></button>
+        <button data-tab="codex"><svg><use href="#i-book"/></svg><span>Codex</span></button>
       </nav>
       <div class="tabbody" id="tab-party">
         <div id="campbar"></div>
         <div class="buybar"><span>Train</span><div class="seg" id="buyseg"><button data-n="1" class="on">x1</button><button data-n="10">x10</button><button data-n="25">x25</button><button data-n="max">Max</button></div></div>
-        <div class="formhead"><span><b>Marching order</b> <small>Top of the list stands at the front, nearest the monsters.</small></span><span class="fbtns"><button class="btn ghost small" id="f-recruit">Players Guild</button><button class="btn ghost small" id="f-auto">Auto-arrange</button></span></div>
+        <div class="formhead"><span><b>Marching order</b> <small>Top of the list stands at the front, nearest the monsters.</small></span><span class="fbtns"><button class="btn ghost small" id="f-recruit">Recruit players</button><button class="btn ghost small" id="f-auto">Auto-arrange</button></span></div>
         <div id="seats"></div>
         <details class="ftips"><summary id="fsum">Formation tips</summary><ul class="fnotes" id="fnotes"></ul></details>
+      </div>
+      <div class="tabbody" id="tab-camp" hidden>
+        <div id="campbar2"></div>
         <div id="benchwrap" class="camp"><h3 class="sub">Campfire</h3><p class="note">Companions resting by the fire work camp jobs that help the whole party, even while you are deep below. Train them here to make their jobs count for more.</p><div id="bench"></div><div id="campnext"></div></div>
+      </div>
+      <div class="tabbody" id="tab-market" hidden>
+        <div class="tradecard"><div class="kic"><svg><use href="#i-bag"/></svg></div><div><b>Trading Post</b><small>Buy and sell gear with other players, and send items by mail.</small></div><div class="tcbtns"><button class="btn small" id="m-market">Market</button><button class="btn ghost small" id="m-mail">Mailbox</button></div></div>
         <div id="boardwrap"></div>
       </div>
       <div class="tabbody" id="tab-gear" hidden>
@@ -94,28 +101,32 @@
         <div class="packbar"><h3 class="sub">Pack <em id="bagcount"></em></h3><button class="btn ghost small" id="g-scrap">Mass scrap</button></div>
         <div class="bag" id="bag"></div>
       </div>
-      <div class="tabbody" id="tab-journal" hidden>
-        <div id="journal"></div>
-      </div>
-      <div class="tabbody" id="tab-relics" hidden>
-        <p class="note">Guardians on floor 10 and below sometimes drop a relic. Relics stay with you forever, and a duplicate raises its level.</p>
-        <div class="relics" id="relics"></div>
-      </div>
       <div class="tabbody" id="tab-rekindle" hidden>
+        <div id="skills"></div>
         <div class="rekindle">
           <svg viewBox="0 0 32 32" class="bigflame" aria-hidden="true"><use href="#i-lantern"/></svg>
           <h2>Rekindle the Lantern</h2>
-          <p>Return to the surface and pour what you learned into the lantern. Gold, floors and training reset, and you gain <b>Embers</b>. Each Ember adds +10% damage and gold forever. Your companions, gear, relics, story and feats are kept.</p>
-          <div class="gain">You would gain <b id="embergain">0</b> Embers</div>
+          <p>Return to the surface and pour what you learned into the lantern. Gold, floors and training reset. You gain <b>Embers</b>, each adding +10% damage and gold forever, and <b>Kindling</b> to spend on your skill tree, bag space and extra gear slots. Your companions, gear, relics, story and feats are kept.</p>
+          <div class="gain">You would gain <b id="embergain">0</b> Embers and <b id="kindgain">0</b> Kindling</div>
           <p class="muted" id="rekindlenote">Reach floor 50 to rekindle.</p>
           <button class="btn big" id="btn-rekindle" disabled>Rekindle</button>
         </div>
       </div>
-      <div class="tabbody" id="tab-stats" hidden>
+      <div class="tabbody" id="tab-codex" hidden>
+        <div class="seg codexseg" id="codexseg"><button data-cx="journal" class="on">Journal <em id="lorecount"></em></button><button data-cx="relics">Relics <em id="relcount"></em></button><button data-cx="stats">Records <em id="featcount"></em></button></div>
+        <div class="cx" id="cx-journal">
+        <div id="journal"></div>
+      </div>
+        <div class="cx" id="cx-relics" hidden>
+        <p class="note">Guardians on floor 10 and below sometimes drop a relic. Relics stay with you forever, and a duplicate raises its level.</p>
+        <div class="relics" id="relics"></div>
+      </div>
+        <div class="cx" id="cx-stats" hidden>
         <h3 class="sub">Feats <small>each adds +2% party damage</small></h3>
         <div class="feats" id="feats"></div>
         <h3 class="sub">Ledger</h3>
         <dl class="ledger" id="ledger"></dl>
+      </div>
       </div>
     </aside>
   </main>
@@ -176,10 +187,10 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611230141";</script>
+<script>window.LH_BUILD = "202611230153";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611230141"></script>
-<script src="sprites.js?v=202611230141"></script>
-<script src="ui.js?v=202611230141"></script>
+<script src="core.js?v=202611230153"></script>
+<script src="sprites.js?v=202611230153"></script>
+<script src="ui.js?v=202611230153"></script>
 </body>
 </html>

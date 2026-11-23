@@ -1,4 +1,4 @@
-/* lh-build 202611231553 */
+/* lh-build 202611231614 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2074,8 +2074,8 @@
   }
   const friendly = e => ({
     NotAuthorizedException: 'That email and password don’t match.', UserNotFoundException: 'That email and password don’t match.',
-    UsernameExistsException: 'There is already an account with that email. Try signing in.', CodeMismatchException: 'That code isn’t right. Check the email and try again.',
-    ExpiredCodeException: 'That code has expired. Ask for a new one.', InvalidPasswordException: 'Please use a password of at least 8 characters.',
+    UsernameExistsException: 'There is already an account with that email. Try signing in.', CodeMismatchException: 'That code didn’t match. Only the code in your newest Lanternhold email works, so check for a later one (and your Spam or Junk folder).',
+    ExpiredCodeException: 'That code has expired. Tap “Send a new code” below.', InvalidPasswordException: 'Please use a password of at least 8 characters.',
     LimitExceededException: 'Too many tries. Please wait a few minutes.', TooManyRequestsException: 'Too many tries. Please wait a few minutes.',
     InvalidParameterException: 'Please check the email address.',
   })[e.code] || 'Something went wrong. Please try again.';
@@ -2092,7 +2092,7 @@
     const lead = {
       in: 'Sign in to keep your progress safe and play on any device. It is optional, and the game works the same without it.',
       up: 'Your save is stored with your account so you can pick it up anywhere.',
-      confirm: 'We sent a code to <b class="em"></b>. Enter it below.',
+      confirm: 'We sent a code to <b class="em"></b>. Enter it below. <span class="codeage"></span>',
       forgot: 'Enter your email and we will send you a code.',
       reset: 'We sent a code to <b class="em"></b>.',
     }[mode];
@@ -2100,18 +2100,29 @@
     const links = {
       in: '<button type="button" class="link" data-go="up">Create an account</button><button type="button" class="link" data-go="forgot">Forgot password?</button>',
       up: '<button type="button" class="link" data-go="in">I already have an account</button>',
-      confirm: '<button type="button" class="link" id="f-resend">Send a new code</button>',
+      confirm: '<button type="button" class="link" id="f-resend">Send a new code</button><button type="button" class="link" data-go="up">Use a different email</button>',
       forgot: '<button type="button" class="link" data-go="in">Back to sign in</button>', reset: '',
     }[mode];
     modal('<form class="auth" novalidate><h2>' + titles[mode] + '</h2><p>' + lead + '</p>' + (mode === 'in' || mode === 'up' ? '<button type="button" class="btn b2g" id="f-b2g">Continue with Born 2 Game</button><div class="or"><span>or use your email</span></div>' : '') + f +
       '<div class="err" id="f-err"></div><button class="btn" type="submit" id="f-go">' + btn + '</button><div class="links">' + links + '</div>' +
-      '<p class="credits">We only keep your email and game save. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a></p></form>', m => {
+      '<button type="button" class="btn ghost skipacct" id="f-skip">Play without an account</button>' +
+      '<p class="credits">An account is optional. It only keeps your save safe across devices. We only keep your email and game save. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a></p></form>', m => {
+        m.querySelector('#f-skip').onclick = () => { closeModal(); toast('user', 'Playing without an account', 'Your progress saves on this device. You can sign in any time from the top bar.', 'feat'); };
+        const ca = m.querySelector('.codeage'); if (ca) { const t = codeSent(email); ca.textContent = t ? 'The newest code was sent at ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '. Older codes stop working. It can take a few minutes, so check Spam or Junk too.' : 'It can take a few minutes, so check Spam or Junk too.'; }
         m.querySelectorAll('.em').forEach(x => x.textContent = email || '');
         const em = m.querySelector('#f-email'); if (em && email) em.value = email;
         const err = m.querySelector('#f-err'); if (note) { err.textContent = note; err.classList.add('ok'); }
         m.querySelectorAll('[data-go]').forEach(x => x.onclick = () => authForm(x.dataset.go, em ? em.value.trim() : email));
         const bg = m.querySelector('#f-b2g'); if (bg) bg.onclick = async () => { bg.disabled = true; try { await storeSignIn(); } catch (e) { bg.disabled = false; err.textContent = 'Could not reach the Born 2 Game store. Please try again.'; } };
-        const rs = m.querySelector('#f-resend'); if (rs) rs.onclick = async () => { try { await cognito('ResendConfirmationCode', { Username: email }); err.textContent = 'New code sent.'; err.classList.add('ok'); } catch (e) { err.textContent = friendly(e); } };
+        const rs = m.querySelector('#f-resend'); if (rs) {
+          const tick = () => { const w = Math.ceil((codeSent(email) + 60000 - Date.now()) / 1000); rs.disabled = w > 0; rs.textContent = w > 0 ? 'Send a new code (' + w + 's)' : 'Send a new code'; if (w > 0 && m.isConnected) setTimeout(tick, 1000); };
+          tick();
+          rs.onclick = async () => {
+            if (codeSent(email) + 60000 > Date.now()) return;
+            try { await cognito('ResendConfirmationCode', { Username: email }); codeSent(email, Date.now()); authForm('confirm', email, 'New code sent. Use the code in this newest email; earlier codes no longer work.'); }
+            catch (e) { err.textContent = friendly(e); }
+          };
+        }
         (m.querySelector('input') || {}).focus && m.querySelector('input').focus();
         m.querySelector('form').onsubmit = async ev => {
           ev.preventDefault(); err.textContent = ''; err.classList.remove('ok');
@@ -2123,13 +2134,13 @@
             if ((mode === 'up' || mode === 'reset') && pass.length < 8) throw { code: 'InvalidPasswordException' };
             if (mode === 'in') {
               try { takeTokens(await cognito('InitiateAuth', { AuthFlow: 'USER_PASSWORD_AUTH', AuthParameters: { USERNAME: mail, PASSWORD: pass } }), mail); }
-              catch (e) { if (e.code === 'UserNotConfirmedException') { await cognito('ResendConfirmationCode', { Username: mail }); pendingPass = pass; return authForm('confirm', mail); } throw e; }
+              catch (e) { if (e.code === 'UserNotConfirmedException') { pendingPass = pass; if (codeSent(mail) + 15 * 60000 < Date.now()) { await cognito('ResendConfirmationCode', { Username: mail }).catch(() => {}); codeSent(mail, Date.now()); } return authForm('confirm', mail, 'Finish setting up your account with the code we emailed you.'); } throw e; }
               closeModal(); toast('user', 'Signed in', 'Your progress will sync to your account.', 'feat'); reconcile();
             } else if (mode === 'up') {
               await cognito('SignUp', { Username: mail, Password: pass, UserAttributes: [{ Name: 'email', Value: mail }] });
-              pendingPass = pass; authForm('confirm', mail);
+              pendingPass = pass; codeSent(mail, Date.now()); authForm('confirm', mail);
             } else if (mode === 'confirm') {
-              await cognito('ConfirmSignUp', { Username: email, ConfirmationCode: v('#f-code') });
+              await cognito('ConfirmSignUp', { Username: email, ConfirmationCode: v('#f-code').replace(/\D/g, '') });
               if (pendingPass) {
                 takeTokens(await cognito('InitiateAuth', { AuthFlow: 'USER_PASSWORD_AUTH', AuthParameters: { USERNAME: email, PASSWORD: pendingPass } }), email);
                 pendingPass = ''; closeModal(); toast('user', 'Account ready', 'Your progress now syncs to your account.', 'feat'); reconcile();
@@ -2137,7 +2148,7 @@
             } else if (mode === 'forgot') {
               await cognito('ForgotPassword', { Username: mail }); authForm('reset', mail);
             } else if (mode === 'reset') {
-              await cognito('ConfirmForgotPassword', { Username: email, ConfirmationCode: v('#f-code'), Password: pass });
+              await cognito('ConfirmForgotPassword', { Username: email, ConfirmationCode: v('#f-code').replace(/\D/g, ''), Password: pass });
               authForm('in', email, 'Password changed. Sign in with your new password.');
             }
           } catch (e) { err.textContent = friendly(e); }
@@ -2146,6 +2157,12 @@
       });
   }
   let pendingPass = '';
+  // When we last asked Cognito to email a sign-up code to this address. Cognito only honors the newest code,
+  // so we never send a fresh one automatically while an earlier email may still be on its way.
+  function codeSent(mail, t) {
+    const k = 'lh_code_' + String(mail || '').toLowerCase();
+    try { if (t) localStorage.setItem(k, String(t)); return +localStorage.getItem(k) || 0; } catch (e) { return t || 0; }
+  }
   function openAccount() {
     if (!CL) return;
     if (!signedIn()) return authForm('in');
@@ -3581,6 +3598,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 53, date: 'November 23, 2026', title: 'Easier sign-up', items: [
+      'Fixed: confirming a new account could reject a correct-looking code after asking for several. The game no longer sends extra codes on its own, tells you when the newest one was sent, and ignores spaces in the code.',
+      'Every sign-in screen now has <b>Play without an account</b>. Accounts are optional and only keep your save safe across devices.'] },
     { v: 52, date: 'November 23, 2026', title: 'Auto-scrap and a cleaner pack', items: [
       'New: <b>Auto-scrap</b>. Tick the rarities you never want, and new drops of those turn straight into gold and Dust without taking pack space. Set pieces and upgrades for your party are always kept.',
       'The pack view has a tidy header: a space meter that turns red when the pack is full, and one <b>Bulk actions</b> menu for mass sell, merge and scrap.'] },

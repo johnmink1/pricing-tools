@@ -652,8 +652,8 @@ button.scene:hover{border-color:var(--accent)}
 .campbar small{display:block;color:var(--muted);font-size:12.5px}
 .cb-ic svg{width:24px;height:24px;color:var(--dim);display:block}.campbar.on .cb-ic svg{color:var(--ember);filter:drop-shadow(0 0 6px rgba(255,138,61,.6))}
 .campfire-ic svg{width:44px;height:44px;color:var(--ember);filter:drop-shadow(0 0 10px rgba(255,138,61,.6))}
-body:not(.incamp) [data-train]:not([data-train="you"]),body:not(.incamp) [data-unseat],body:not(.incamp) [data-seat],body:not(.incamp) [data-recruit],body:not(.incamp) [data-dismiss],body:not(.incamp) #g-best{opacity:.5;filter:saturate(.4);position:relative}
-body:not(.incamp) [data-train]:not([data-train="you"])::after,body:not(.incamp) [data-seat]::after,body:not(.incamp) [data-recruit]::after{content:"At camp";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#2a2119;color:var(--muted);border:1px solid var(--line2);border-radius:999px;padding:1px 6px;white-space:nowrap}
+body:not(.incamp) [data-train]:not(.anywhere),body:not(.incamp) [data-unseat],body:not(.incamp) [data-seat],body:not(.incamp) [data-recruit],body:not(.incamp) [data-dismiss],body:not(.incamp) #g-best{opacity:.5;filter:saturate(.4);position:relative}
+body:not(.incamp) [data-train]:not(.anywhere)::after,body:not(.incamp) [data-seat]::after,body:not(.incamp) [data-recruit]::after{content:"At camp";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#2a2119;color:var(--muted);border:1px solid var(--line2);border-radius:999px;padding:1px 6px;white-space:nowrap}
 .oilbtn{margin-top:6px;justify-self:start}
 .store .tile svg{width:34px;height:34px;color:var(--rc)}
 .pick[disabled]{opacity:.5;cursor:not-allowed}
@@ -872,3 +872,9 @@ body.resting .arena{cursor:default}
 .lboard .lbn{flex:1;min-width:0}
 .lboard .lbn small,.lboard .lbf small{display:block;color:var(--muted);font-size:12px}
 .lboard .lbf{text-align:right}
+/* specialization abilities */
+.knode.t3{border-color:#8a6524;background:linear-gradient(180deg,#2a1d10,#1a130e)}
+.knode.t3 .kic{color:#f2c14e}
+.skills.more{grid-template-columns:repeat(4,minmax(0,1fr))}
+.skill.spec{border-style:dashed}
+@media (min-width:1100px){.skills.more{grid-template-columns:repeat(4,minmax(0,1fr))}}

@@ -887,6 +887,96 @@ Resources:
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub 'integrations/${ProfileIntegration}'
 
+  ExchangeFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: exchange-tables
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:Query, dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:UpdateItem, dynamodb:ConditionCheckItem]
+                Resource: [!GetAtt TradeTable.Arn, !GetAtt WalletsTable.Arn]
+
+  ExchangeFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-exchange
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt ExchangeFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE: !Ref TradeTable
+          WALLETS: !Ref WalletsTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/exchange.js by infra/build.py
+          const d=require("@aws-sdk/client-dynamodb"),k=require("crypto"),g=new d.DynamoDBClient({}),{TABLE:u,WALLETS:f}=process.env,x=/(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn|retard)/i,n=(e,r)=>({statusCode:e,body:JSON.stringify(r)}),p={error:1},I=e=>k.createHash("sha256").update("lh:"+e).digest("hex").slice(0,16),t=e=>({S:String(e)}),c=e=>({N:String(e)}),N=e=>/^[A-Za-z][A-Za-z '\-]{1,15}$/.test(e)&&!x.test(e.replace(/[^a-z]/gi,"")),h=()=>Date.now().toString(36).padStart(9,"0")+k.randomBytes(3).toString("hex"),S=e=>({id:e.sk.S,seller:e.seller.S,name:e.name.S,n:+e.n.N,price:+e.price.N,at:+e.at.N}),y=(e,r)=>g.send(new d.QueryCommand(Object.assign({TableName:u,KeyConditionExpression:"pk = :p",ExpressionAttributeValues:{":p":t(e)}},r))),C=(e,r)=>({Update:{TableName:f,Key:{userId:t(e)},UpdateExpression:"SET bal = if_not_exists(bal, :g) + :n, own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":c(100),":n":c(r),":o":{SS:["f.plain"]}}}});exports.handler=async e=>{const r=e.requestContext.authorizer&&e.requestContext.authorizer.jwt&&e.requestContext.authorizer.jwt.claims;if(!r||!r.sub)return n(401,p);const o=I(r.sub),b=e.routeKey;let l={};if(e.body)try{l=JSON.parse(e.isBase64Encoded?Buffer.from(e.body,"base64").toString():e.body)}catch{return n(400,p)}try{if(b==="GET /sigils"){const[s,i]=await Promise.all([y("sig#",{Limit:60}),y("sigsell#"+o)]);return n(200,{me:o,listings:(s.Items||[]).map(S),mine:(i.Items||[]).map(S)})}if(b==="POST /sigils/list"){const s=Math.floor(+l.n),i=Math.floor(+l.price);if(!(s>=1&&s<=1e5&&i>=1&&i<1e15))return n(400,p);if(!N(String(l.name||"")))return n(400,{error:"name"});if((await y("sigsell#"+o,{Select:"COUNT"})).Count>=5)return n(400,{error:"full"});const m=String(Math.round(i/s*1e3)).padStart(18,"0")+"-"+h(),a={seller:t(o),u:t(r.sub),name:t(l.name),n:c(s),price:c(i),at:c(Date.now())};return await g.send(new d.TransactWriteItemsCommand({TransactItems:[{Update:{TableName:f,Key:{userId:t(r.sub)},UpdateExpression:"SET bal = bal - :n",ConditionExpression:"bal >= :n",ExpressionAttributeValues:{":n":c(s)}}},{Put:{TableName:u,Item:Object.assign({pk:t("sig#"),sk:t(m)},a)}},{Put:{TableName:u,Item:Object.assign({pk:t("sigsell#"+o),sk:t(m)},a)}}]})),n(200,{ok:!0,id:m})}if(b==="POST /sigils/buy"||b==="POST /sigils/cancel"){const s=String(l.id||""),i=b==="POST /sigils/buy";if(!/^\d{18}-[0-9a-z]{15}$/.test(s))return n(400,p);const m=await g.send(new d.GetItemCommand({TableName:u,Key:{pk:t("sig#"),sk:t(s)}}));if(!m.Item)return n(404,{error:"gone"});const a=S(m.Item);if(i?a.seller===o:a.seller!==o)return n(403,p);if(i&&!N(String(l.name||"")))return n(400,{error:"name"});const T=[{Delete:{TableName:u,Key:{pk:t("sig#"),sk:t(s)},ConditionExpression:"attribute_exists(sk)"}},{Delete:{TableName:u,Key:{pk:t("sigsell#"+a.seller),sk:t(s)}}},C(i?r.sub:m.Item.u.S,a.n)];i&&T.push({Put:{TableName:u,Item:{pk:t("inbox#"+a.seller),sk:t(h()),type:t("sale"),from:t(o),fromName:t(l.name),item:t(JSON.stringify({sig:a.n})),gold:t(a.price),at:c(Date.now()),ttl:c(Math.floor(Date.now()/1e3)+5184e3)}}}),await g.send(new d.TransactWriteItemsCommand({TransactItems:T}));const w=await g.send(new d.GetItemCommand({TableName:f,Key:{userId:t(r.sub)}}));return n(200,{ok:!0,n:a.n,price:a.price,bal:w.Item?+w.Item.bal.N:0})}}catch(s){if(s.name==="TransactionCanceledException")return n(409,{error:"state"});throw s}return n(404,p)};
+
+  ExchangeIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ExchangeFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  ExchangeInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ExchangeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  ExchangeGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /sigils
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ExchangeIntegration}'
+
+  ExchangeListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /sigils/list
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ExchangeIntegration}'
+
+  ExchangeBuyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /sigils/buy
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ExchangeIntegration}'
+
+  ExchangeCancelRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /sigils/cancel
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${ExchangeIntegration}'
+
   WardenFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -923,7 +1013,7 @@ Resources:
       Code:
         ZipFile: |
           // built from infra/lambda/warden.js by infra/build.py
-          const u=require("@aws-sdk/client-dynamodb"),d=new u.DynamoDBClient({}),{HEROES:f,WALLETS:h}=process.env,r=(n,o,s)=>({statusCode:n,headers:Object.assign({"content-type":"application/json"},s),body:JSON.stringify(o)}),p=n=>({S:String(n)}),y={covenant:"covenant",ascendancy:"radiant",tide:"tide"};let m=null,b=0;async function S(){if(m&&Date.now()-b<6e5)return m;const[n,o]=await Promise.all(["ranks","heroes"].map(e=>fetch("https://war.born2gamellc.com/api/"+e+".json").then(t=>t.json()))),s={},i=(e,t,l,w)=>s[e.toLowerCase()]||(s[e.toLowerCase()]={n:e,a:y[t]||t,r:l,lv:w,h:[]});for(const[e,t]of Object.entries(n.alliances||{}))for(const l of t.by_rank||[])for(const w of l.names||[])i(w,e,l.title,l.level);const c=(e,t)=>{e&&e.name&&i(e.name,e.alliance,"Veteran",0).h.push(t)},a=o.live||{};c(a.marshal,"Grand Marshal");for(const e of Object.values(a.champions||{}))c(e,"Alliance Champion");for(const e of o.hall||[]){c(e.marshal,"Grand Marshal, Season "+e.season);for(const t of Object.values(e.champions||{}))c(t,"Champion, Season "+e.season)}return m=Object.values(s),b=Date.now(),m}exports.handler=async n=>{const o=n.routeKey;if(o==="GET /war")try{return r(200,{c:await S()},{"cache-control":"public, max-age=300"})}catch{return r(502,{error:"war"})}const s=n.requestContext.authorizer&&n.requestContext.authorizer.jwt&&n.requestContext.authorizer.jwt.claims;if(!s||!String(s["cognito:groups"]||"").includes("admins"))return r(403,{error:"admin only"});let i={};if(n.body)try{i=JSON.parse(n.isBase64Encoded?Buffer.from(n.body,"base64").toString():n.body)}catch{return r(400,{error:"json"})}const c=async a=>(await d.send(new u.GetItemCommand({TableName:f,Key:{pid:p(a)}}))).Item;try{if(o==="GET /admin/links"){const e=await d.send(new u.ScanCommand({TableName:f,FilterExpression:"attribute_exists(wl)"}));return r(200,{links:(e.Items||[]).map(t=>({id:t.pid.S,name:t.name?t.name.S:"",wl:t.wl.S,wv:!!(t.wv&&t.wv.N==="1")}))})}const a=String(i.id||"");if(!/^[0-9a-f]{16}$/.test(a))return r(400,{error:"id"});if(o==="POST /admin/verify"){const e=await c(a);if(!e||!e.u||!e.wl)return r(404,{error:"link"});const t=i.ok?{UpdateExpression:"SET wv = :one",ExpressionAttributeValues:{":one":{N:"1"}}}:{UpdateExpression:"REMOVE wl, wv"};return await d.send(new u.UpdateItemCommand({TableName:f,Key:{pid:p(a)},...t})),await d.send(new u.UpdateItemCommand({TableName:h,Key:{userId:e.u},...t})),r(200,{ok:!0})}if(o==="POST /admin/grant"){const e=Math.trunc(Number(i.n)||0),t=await c(a);if(!e||Math.abs(e)>1e5)return r(400,{error:"amount"});if(!t||!t.u)return r(404,{error:"player"});const l=await d.send(new u.UpdateItemCommand({TableName:h,Key:{userId:t.u},ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = if_not_exists(bal, :g) + :n, own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":{N:"100"},":n":{N:String(e)},":o":{SS:["f.plain"]}}}));return r(200,{ok:!0,bal:+l.Attributes.bal.N})}}catch(a){if(a.name==="ConditionalCheckFailedException")return r(409,{error:"state"});throw a}return r(404,{error:"not found"})};
+          const u=require("@aws-sdk/client-dynamodb"),d=new u.DynamoDBClient({}),{HEROES:w,WALLETS:h}=process.env,r=(a,o,s)=>({statusCode:a,headers:Object.assign({"content-type":"application/json"},s),body:JSON.stringify(o)}),p=a=>({S:String(a)}),b={covenant:"covenant",ascendancy:"radiant",tide:"tide"};let m=null,y=0;async function S(){if(m&&Date.now()-y<6e5)return m;const[a,o]=await Promise.all(["ranks","heroes"].map(e=>fetch("https://war.born2gamellc.com/api/"+e+".json").then(t=>t.json()))),s={},i=(e,t,l,f)=>s[e.toLowerCase()]||(s[e.toLowerCase()]={n:e,a:b[t]||t,r:l,lv:f,h:[]});for(const[e,t]of Object.entries(a.alliances||{}))for(const l of t.by_rank||[])for(const f of l.names||[])i(f,e,l.title,l.level);const c=(e,t)=>{e&&e.name&&i(e.name,e.alliance,"Veteran",0).h.push(t)},n=o.live||{};c(n.marshal,"Grand Marshal");for(const e of Object.values(n.champions||{}))c(e,"Alliance Champion");for(const e of Object.values(s))e.a===b[n.nexus]&&e.lv>=2&&e.h.push("Nexus Holder");for(const e of(o.hall||[]).filter(t=>!t.replay)){c(e.marshal,"Grand Marshal, Season "+e.season);for(const t of Object.values(e.champions||{}))c(t,"Champion, Season "+e.season)}return m=Object.values(s),y=Date.now(),m}exports.handler=async a=>{const o=a.routeKey;if(o==="GET /war")try{return r(200,{c:await S()},{"cache-control":"public, max-age=300"})}catch{return r(502,{error:"war"})}const s=a.requestContext.authorizer&&a.requestContext.authorizer.jwt&&a.requestContext.authorizer.jwt.claims;if(!s||!String(s["cognito:groups"]||"").includes("admins"))return r(403,{error:"admin only"});let i={};if(a.body)try{i=JSON.parse(a.isBase64Encoded?Buffer.from(a.body,"base64").toString():a.body)}catch{return r(400,{error:"json"})}const c=async n=>(await d.send(new u.GetItemCommand({TableName:w,Key:{pid:p(n)}}))).Item;try{if(o==="GET /admin/links"){const e=await d.send(new u.ScanCommand({TableName:w,FilterExpression:"attribute_exists(wl)"}));return r(200,{links:(e.Items||[]).map(t=>({id:t.pid.S,name:t.name?t.name.S:"",wl:t.wl.S,wv:!!(t.wv&&t.wv.N==="1")}))})}const n=String(i.id||"");if(!/^[0-9a-f]{16}$/.test(n))return r(400,{error:"id"});if(o==="POST /admin/verify"){const e=await c(n);if(!e||!e.u||!e.wl)return r(404,{error:"link"});const t=i.ok?{UpdateExpression:"SET wv = :one",ExpressionAttributeValues:{":one":{N:"1"}}}:{UpdateExpression:"REMOVE wl, wv"};return await d.send(new u.UpdateItemCommand({TableName:w,Key:{pid:p(n)},...t})),await d.send(new u.UpdateItemCommand({TableName:h,Key:{userId:e.u},...t})),r(200,{ok:!0})}if(o==="POST /admin/grant"){const e=Math.trunc(Number(i.n)||0),t=await c(n);if(!e||Math.abs(e)>1e5)return r(400,{error:"amount"});if(!t||!t.u)return r(404,{error:"player"});const l=await d.send(new u.UpdateItemCommand({TableName:h,Key:{userId:t.u},ReturnValues:"ALL_NEW",UpdateExpression:"SET bal = if_not_exists(bal, :g) + :n, own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":{N:"100"},":n":{N:String(e)},":o":{SS:["f.plain"]}}}));return r(200,{ok:!0,bal:+l.Attributes.bal.N})}}catch(n){if(n.name==="ConditionalCheckFailedException")return r(409,{error:"state"});throw n}return r(404,{error:"not found"})};
 
   WardenIntegration:
     Type: AWS::ApiGatewayV2::Integration

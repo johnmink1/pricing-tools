@@ -17,7 +17,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611230324">
+<link rel="stylesheet" href="style.css?v=202611230336">
 </head>
 <body>
 <div id="app">
@@ -29,7 +29,7 @@
     <div class="purse">
       <div class="stat gold" title="Gold"><svg viewBox="0 0 24 24"><use href="#i-coin"/></svg><span id="gold">0</span></div>
       <div class="stat dps" title="Party damage per second"><svg viewBox="0 0 24 24"><use href="#i-sword"/></svg><span id="dps">0</span><small>/s</small></div>
-      <div class="stat ember" title="Embers: +10% damage and gold each"><svg viewBox="0 0 24 24"><use href="#i-flame"/></svg><span id="embers">0</span></div>
+      <div class="stat ember" title="Embers: +4% damage and gold each"><svg viewBox="0 0 24 24"><use href="#i-flame"/></svg><span id="embers">0</span></div>
       <button class="stat sigils" id="sigils" title="Sigils: spend them on profile looks" hidden><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l3 5 6 1-4 4 1 6-6-3-6 3 1-6-4-4 6-1z"/></svg><span id="sigilct">0</span></button>
     </div>
     <a class="support" id="support" href="#" target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24"><use href="#i-cup"/></svg><span>Support the game</span></a>
@@ -103,7 +103,7 @@
         <div id="benchwrap" class="camp"><h3 class="sub">Campfire</h3><p class="note">Companions resting by the fire work camp jobs that help the whole party, even while you are deep below. Train them here to make their jobs count for more.</p><div id="bench"></div><div id="campnext"></div></div>
       </div>
       <div class="tabbody" id="tab-market" hidden>
-        <div class="seg mktseg" id="mktseg"><button data-mv="market" class="on">Market</button><button data-mv="mail">Mailbox <em id="mailn"></em></button><button data-mv="guild">Players Guild</button></div>
+        <div class="seg mktseg" id="mktseg"><button data-mv="market" class="on">Market</button><button data-mv="mail">Mailbox <em id="mailn"></em></button><button data-mv="sigils">Sigils</button><button data-mv="guild">Players Guild</button></div>
         <div id="tradebox"></div>
         <div id="boardwrap" hidden></div>
       </div>
@@ -119,7 +119,7 @@
         <div class="rekindle">
           <svg viewBox="0 0 32 32" class="bigflame" aria-hidden="true"><use href="#i-lantern"/></svg>
           <h2>Rekindle the Lantern</h2>
-          <p>Return to the surface and pour what you learned into the lantern. Gold, floors and training reset. You gain <b>Embers</b>, each adding +10% damage and gold forever, and <b>Kindling</b> to spend on your skill tree, bag space and extra gear slots. Your companions, gear, relics, story and feats are kept.</p>
+          <p>Return to the surface and pour what you learned into the lantern. Gold, floors and training reset. You gain <b>Embers</b>, each adding +4% damage and gold forever, and <b>Kindling</b> to spend on your skill tree, bag space and extra gear slots. Your companions, gear, relics, story and feats are kept.</p>
           <div class="gain">You would gain <b id="embergain">0</b> Embers and <b id="kindgain">0</b> Kindling</div>
           <p class="muted" id="rekindlenote">Reach floor 50 to rekindle.</p>
           <button class="btn big" id="btn-rekindle" disabled>Rekindle</button>
@@ -203,10 +203,10 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611230324";</script>
+<script>window.LH_BUILD = "202611230336";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611230324"></script>
-<script src="sprites.js?v=202611230324"></script>
-<script src="ui.js?v=202611230324"></script>
+<script src="core.js?v=202611230336"></script>
+<script src="sprites.js?v=202611230336"></script>
+<script src="ui.js?v=202611230336"></script>
 </body>
 </html>

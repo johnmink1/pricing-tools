@@ -21,14 +21,16 @@
   }
 
   // ---------- formatting ----------
-  const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc', 'UDc', 'DDc', 'TDc', 'QaDc', 'QiDc'];
+  // Plain numbers with commas. Past a million, words instead of letters: 2.4 million, 1.3 billion.
+  const BIG = ['', '', 'million', 'billion', 'trillion', 'quadrillion', 'quintillion', 'sextillion', 'septillion', 'octillion', 'nonillion', 'decillion'];
   function fmt(n) {
     if (!isFinite(n)) return '∞';
-    if (n < 1000) return n < 10 && n % 1 > 0.05 ? n.toFixed(1) : Math.floor(n).toLocaleString('en-US');
+    if (n < 0) return '-' + fmt(-n);
+    if (n < 1e6) return n < 10 && n % 1 > 0.05 ? n.toFixed(1) : Math.floor(n).toLocaleString('en-US');
     const e = Math.floor(Math.log10(n) / 3);
-    if (S.settings.notation === 'short' && e < SUF.length) {
+    if (S.settings.notation !== 'sci' && e < BIG.length) {
       const v = n / Math.pow(1000, e);
-      return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v)) + SUF[e];
+      return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v)) + ' ' + BIG[e];
     }
     return n.toExponential(2).replace('e+', 'e');
   }
@@ -1186,7 +1188,7 @@
       ['Critical chance', Math.round(L.critChance(S) * 100) + '%'], ['Lantern oil per guardian', Math.round(L.lanternTime(S)) + 's'],
       ['Foes defeated', fmt(st.kills)], ['Guardians defeated', fmt(st.bossKills)], ['Chests opened', fmt(st.chests)],
       ['Strikes', fmt(st.clicks)], ['Critical strikes', fmt(st.crits)], ['Gold earned', fmt(st.goldEarned)],
-      ['Embers', fmt(S.embers) + ' (+' + fmt(S.embers * 10) + '%)'], ['Times rekindled', st.rekindles], ['Time played', fmtTime(st.playTime)],
+      ['Embers', fmt(S.embers) + ' (+' + fmt(S.embers * 4) + '%)'], ['Times rekindled', st.rekindles], ['Time played', fmtTime(st.playTime)],
     ];
     $('ledger').innerHTML = rows.map(r => '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>').join('');
   }
@@ -1201,7 +1203,7 @@
   }
   $('btn-rekindle').addEventListener('click', () => {
     const e = L.embersFor(S); if (e <= 0) return;
-    modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Rekindle now?</h2><p>Gold, floors and training reset to the start. You keep your companions, gear, relics, story and feats, and gain <b style="color:var(--ember)">' + fmt(e) + ' Embers</b> for +' + fmt(e * 10) + '% damage and gold.</p><div class="row" style="justify-content:center"><button class="btn ghost" id="m-no">Not yet</button><button class="btn" id="m-yes">Rekindle</button></div></div>', m => {
+    modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Rekindle now?</h2><p>Gold, floors and training reset to the start. You keep your companions, gear, relics, story and feats, and gain <b style="color:var(--ember)">' + fmt(e) + ' Embers</b> for +' + fmt(e * 4) + '% damage and gold.</p><div class="row" style="justify-content:center"><button class="btn ghost" id="m-no">Not yet</button><button class="btn" id="m-yes">Rekindle</button></div></div>', m => {
       m.querySelector('#m-no').onclick = closeModal;
       m.querySelector('#m-yes').onclick = () => {
         const kind = L.skillPointsFor(S), got = L.rekindle(S); closeModal(); sfx.relic(); save();
@@ -1499,7 +1501,7 @@
       if (S.hero && S.autoTrain && now - (logic.lastAuto || 0) > 1000) { logic.lastAuto = now; if (L.autoTrain(S, camp())) updateSeats(true); }
       updatePanel(false);
       const got = L.checkFeats(S);
-      got.forEach(f => toast('star', 'Feat earned: ' + f.name, f.desc + ' (+2% party damage)', 'feat'));
+      got.forEach(f => toast('star', 'Feat earned: ' + f.name, f.desc + ' (+1% party damage)', 'feat'));
     }
     if (now - lastSave > 10000) { lastSave = now; save(); }
   }
@@ -1561,7 +1563,7 @@
       if (!prof) loadProfile();
       const n = r && r.recruits;
       if (n > 0) {
-        const g = Math.max(100, L.offlineGoldPerSec(S) * 600) * n;
+        const g = Math.max(20, L.offlineGoldPerSec(S) * 600) * n;
         S.gold += g; S.stats.goldEarned += g;
         toast('user', 'Your hero was recruited', n + (n === 1 ? ' player' : ' players') + ' took ' + S.hero.name + ' into their party. +' + fmt(g) + ' gold.', 'feat');
       }
@@ -2517,8 +2519,8 @@
     ['Resting at camp', '<p>When you return to camp, or drink a Campfire Draught, the party sits down around the fire. Nobody fights while you rest, and everyone heals up. Press Descend to head back down.</p>'],
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten, where you are and where other delvers have reached. Tap a region to zoom in on its ten floors and read its dossier (its history, who holds it, its monsters and its guardian), then tap a floor you have reached to travel there.</p>'],
-    ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
-    ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
+    ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 4% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
+    ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset. You can also trade Sigils with other players for gold on the <b>Sigils</b> page of the Trading Post.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
     ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
     ['Camp jobs', '<p>Companions resting at the campfire can each take a <b>camp job</b> that helps the whole party all the time, even deep below:</p><ul><li><b>Forager</b>: more gear drops (rogues are best)</li><li><b>Runesmith</b>: party damage (mages)</li><li><b>Herbalist</b>: healing (healers)</li><li><b>Armorer</b>: party health (tanks)</li><li><b>Prospector</b>: gold (rogues)</li><li><b>Lamplighter</b>: more lantern oil against guardians (necromancers)</li></ul><p>The bonus grows with the companion’s level, and is half again bigger when the job suits their class. Train them at camp now and then to keep it climbing. A companion who joins your party leaves their job.</p>'],
     ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
@@ -2540,6 +2542,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 23, date: 'November 23, 2026', title: 'Smaller numbers and the Sigil exchange', items: [
+      'Gold, damage, health and prices have been rescaled. Numbers now stay small and plain, written out in full with commas instead of letters like K or M. The pace of the climb is about the same.',
+      'Your gold was converted so it still buys the same amount of training. Your levels, floors, gear and Embers are unchanged.',
+      'Embers now give +4% damage and gold each, and relics and gear percentages are smaller to match the new scale. Your party is just as strong for its depth as before.',
+      'New in the Trading Post: the Sigil exchange. Sell Sigils to other players for gold, or buy theirs. Listings are sorted by the best price per Sigil.',
+      'Gear listed on the market before this update is hidden from shoppers. If you had something listed, take it down from My listings and list it again at a new price.'] },
     { v: 22, date: 'November 23, 2026', title: 'Grand War auras', items: [
       'Verified Grand War commanders now carry an aura for their hero’s class. Tanks get the Bulwark Aura (party health, less damage taken), healers the Mending Aura (healing), rogues the Shadow Aura (gold, critical hits), mages the Ember Aura (party damage, critical hits) and necromancers the Grave Aura (party damage, gear drops).',
       'The aura grows with your rank on the Grand War ladder, from 2% at Recruit to 10% at the top rank. Past seasons as Grand Marshal or champion make it a quarter stronger each.',
@@ -2677,14 +2685,17 @@
   const trade = { view: 'market', cls: null, mine: false, list: null, mail: null, msg: '', busy: false, slot: 'all', rar: 'all', sort: 'cheap' };
   const tradeItem = it => L.normItem({ cls: it.cls, slot: it.slot, rar: it.rar, set: it.set || undefined, jset: it.jset || undefined, aff: it.aff || undefined, ilvl: it.ilvl, up: it.up || 0 });
   const fromServer = it => Object.assign(tradeItem(it), { uid: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) });
+  // Letters and listings from before the gold rescale are shown and paid in today's gold.
+  const nowGold = (g, at) => at && at < L.ECON_AT ? Math.max(1, Math.round(L.regold(g, L.lvl(S, 'you')))) : g;
   const bagFull = () => L.packCount(S) >= L.bagCap(S);
-  const tradeTile = it => (L.normItem(it), '<div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>');
-  const tradeName = it => esc(L.gearName(it)) + (it.up ? ' +' + it.up : '');
+  const tradeTile = it => it.sig ? '<div class="tile sigtile">' + sigil + '</div>' : (L.normItem(it), '<div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>');
+  const tradeName = it => it.sig ? it.sig.toLocaleString() + ' ' + TOKEN : esc(L.gearName(it)) + (it.up ? ' +' + it.up : '');
   const tradeSub = it => (L.normItem(it), 0) || L.RARITY.find(r => r.id === it.rar).name + ' ' + L.CLASSES[it.cls].name.toLowerCase() + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it);
   const tradeErr = (e, what) => {
     const c = e && e.code;
     if (what === 'send' && e && e.status === 404) return 'That player could not be found. They may need to sign in again.';
     if (what === 'send' && e && e.status === 400) return 'That offer could not be sent. You may have 20 offers waiting already.';
+    if (what === 'sig') return c === 'full' ? 'You have 5 Sigil listings already. Take one down first.' : c === 'state' ? 'You do not have that many Sigils.' : c === 'gone' || (e && e.status === 404) ? 'Someone else bought those Sigils first.' : e && e.status === 401 ? 'Sign in again to trade.' : 'The Sigil exchange could not be reached. Try again in a moment.';
     return c === 'full' ? (what === 'list' ? 'You have 10 items listed already. Cancel one first.' : 'You have 20 offers waiting already. Recall one first.')
       : c === 'gone' || (e && e.status === 404) ? 'That is no longer available.'
       : c === 'nobody' ? 'That player has not published a hero yet.'
@@ -2700,13 +2711,34 @@
 
   async function loadMarket() {
     trade.list = null; trade.msg = 'Opening the stalls…'; paintTrade();
-    try { const r = await chatCall('GET', '/market?' + (trade.mine ? 'mine=1' : 'cls=' + trade.cls)); trade.list = r.listings || []; trade.me = r.me; trade.msg = ''; }
+    try { const r = await chatCall('GET', '/market?' + (trade.mine ? 'mine=1' : 'cls=' + trade.cls)); trade.list = (r.listings || []).filter(l => trade.mine || !(l.at < L.ECON_AT)).map(l => Object.assign(l, { price: nowGold(l.price, l.at) })); trade.me = r.me; trade.msg = ''; }
     catch (e) { trade.msg = tradeErr(e); }
     paintTrade();
   }
+  async function loadSigils() {
+    trade.sig = null; trade.msg = 'Opening the Sigil exchange…'; paintTrade();
+    try { trade.sig = await chatCall('GET', '/sigils'); trade.msg = ''; if (!prof) await loadProfile(); } catch (e) { trade.msg = tradeErr(e, 'sig'); }
+    paintTrade();
+  }
+  // The Sigil exchange: cheapest gold per Sigil first. Buying moves the Sigils to your account and the gold to the seller's mailbox.
+  function sigilsView() {
+    let h = '<div class="sigex"><div class="sigbal">' + sigil + '<span>You have <b>' + (prof ? prof.bal.toLocaleString() : '…') + '</b> ' + TOKEN + '</span><button class="btn small ghost" id="s-get">Get Sigils</button></div>';
+    if (trade.msg) h += '<p class="note">' + esc(trade.msg) + '</p>';
+    const x = trade.sig;
+    if (x) {
+      const per = l => l.price / l.n, pf = v => v >= 100 ? fmt(Math.round(v)) : (Math.round(v * 10) / 10).toLocaleString();
+      const others = x.listings.filter(l => l.seller !== x.me);
+      h += '<h3 class="sub">For sale</h3>' + (others.length ? '<div class="tlist">' + others.map(l => '<div class="trow"><div class="tile sigtile">' + sigil + '</div><div class="tinfo"><b>' + l.n.toLocaleString() + ' ' + TOKEN + '</b><small>From ' + esc(l.name) + ' &middot; ' + pf(per(l)) + ' gold each</small></div><div class="tact"><span class="price">' + icon('coin') + fmt(l.price) + '</span><button class="btn small" data-sbuy="' + l.id + '"' + (l.price > S.gold ? ' disabled title="Not enough gold"' : '') + '>Buy</button></div></div>').join('') + '</div>'
+        : '<div class="mkempty">' + sigil + '<b>No Sigils for sale right now</b><small>Check back later, or sell some of your own below.</small></div>');
+      h += '<h3 class="sub">Sell Sigils</h3><div class="sigform"><label>Sigils<input id="s-n" type="number" min="1" step="1" value="100"></label><label>Total price in gold<input id="s-p" type="number" min="1" step="1" placeholder="' + (others[0] ? Math.round(per(others[0]) * 100) : 100) + '"></label><button class="btn small" id="s-list">List for sale</button></div>' +
+        '<p class="note small">Your Sigils are held while they are listed. Take a listing down any time to get them back. When they sell, the gold arrives in your mailbox.' + (others[0] ? ' The cheapest listing right now is ' + pf(per(others[0])) + ' gold per Sigil.' : '') + '</p>';
+      if (x.mine.length) h += '<h3 class="sub">Your listings</h3><div class="tlist">' + x.mine.map(l => '<div class="trow"><div class="tile sigtile">' + sigil + '</div><div class="tinfo"><b>' + l.n.toLocaleString() + ' ' + TOKEN + '</b><small>' + pf(per(l)) + ' gold each</small></div><div class="tact"><span class="price">' + icon('coin') + fmt(l.price) + '</span><button class="btn ghost small" data-scancel="' + l.id + '">Take down</button></div></div>').join('') + '</div>';
+    }
+    return h + '</div>';
+  }
   async function loadMail(quiet) {
     if (!quiet) { trade.msg = 'Checking your mail…'; paintTrade(); }
-    try { trade.mail = await chatCall('GET', '/mail'); trade.msg = ''; } catch (e) { if (!quiet) trade.msg = tradeErr(e); }
+    try { trade.mail = await chatCall('GET', '/mail'); for (const l of trade.mail.inbox.concat(trade.mail.outbox)) if (l.type === 'offer') l.price = nowGold(l.price, l.at); trade.msg = ''; } catch (e) { if (!quiet) trade.msg = tradeErr(e); }
     const n = trade.mail ? trade.mail.inbox.length : 0;
     $('tradedot').hidden = !n; $('tradedot').textContent = n > 9 ? '9+' : n; if ($('mailn')) $('mailn').textContent = n ? n : '';
     if (!quiet) paintTrade();
@@ -2725,7 +2757,7 @@
     if (!trade.cls) { const m = L.memberById('you'); trade.cls = m ? m.cls : 'tank'; }
     paintTrade();
     if (!CL || !signedIn()) return;
-    if (trade.view === 'market') loadMarket(); else loadMail();
+    if (trade.view === 'market') loadMarket(); else if (trade.view === 'sigils') loadSigils(); else loadMail();
   }
   const SLOT_FILTER = [['all', 'All slots'], ['main', 'Main hand'], ['off', 'Offhand'], ['head', 'Helmet'], ['neck', 'Trinket'], ['chest', 'Chest'], ['robe', 'Robe'], ['legs', 'Legs'], ['feet', 'Feet'], ['ring', 'Ring']];
   const RAR_FILTER = [['all', 'Any rarity'], ['fine', 'Fine and up'], ['rare', 'Rare and up'], ['epic', 'Epic and set']];
@@ -2750,6 +2782,7 @@
     let h = '';
     if (!CL) h = '<p class="note">The Trading Post is not available right now. Try again later.</p>';
     else if (!signedIn()) h = '<div class="mkempty">' + icon('lock') + '<b>Sign in to trade</b><small>The market and mailbox need a free account so other players can see your listings.</small><button class="btn small" id="t-signin">Sign in</button></div>';
+    else if (trade.view === 'sigils') h += sigilsView();
     else if (trade.view === 'market') {
       h += '<div class="whoseg tradecls">' + L.CLASS_ORDER.map(c => '<button class="whochip c-' + c + (!trade.mine && trade.cls === c ? ' on' : '') + '" data-tc="' + c + '"><img src="' + SP.spriteURL(c, 2) + '" alt=""><span>' + L.CLASSES[c].name + '</span></button>').join('') +
         '<button class="whochip' + (trade.mine ? ' on' : '') + '" data-tc="mine"><span>My listings</span></button></div>';
@@ -2777,7 +2810,7 @@
           const what = l.type === 'sale' ? esc(l.fromName) + ' bought your ' + tradeName(l.item) + '.'
             : l.type === 'payment' ? esc(l.fromName) + ' accepted your offer and paid for ' + tradeName(l.item) + '.'
             : esc(l.fromName) + ' declined your offer. Your ' + tradeName(l.item) + ' came back.';
-          return '<div class="trow">' + tradeTile(l.item) + '<div class="tinfo"><b>' + (l.type === 'return' ? 'Returned' : 'Gold for you') + '</b><small>' + what + '</small></div><div class="tact">' + (l.gold ? '<span class="price">' + icon('coin') + fmt(l.gold) + '</span>' : '') + '<button class="btn small" data-tclaim="' + l.id + '">Collect</button></div></div>';
+          return '<div class="trow">' + tradeTile(l.item) + '<div class="tinfo"><b>' + (l.type === 'return' ? 'Returned' : 'Gold for you') + '</b><small>' + what + '</small></div><div class="tact">' + (l.gold ? '<span class="price">' + icon('coin') + fmt(nowGold(l.gold, l.at)) + '</span>' : '') + '<button class="btn small" data-tclaim="' + l.id + '">Collect</button></div></div>';
         }).join('') + offers.map(l => '<div class="trow">' + tradeTile(l.item) + '<div class="tinfo"><b class="r-' + l.item.rar + '">' + tradeName(l.item) + '</b><small>' + tradeSub(l.item) + '</small><small>From ' + esc(l.fromName) + (l.note ? ': “' + esc(l.note) + '”' : '') + '</small></div><div class="tact">' +
           (l.price ? '<span class="price">' + icon('coin') + fmt(l.price) + '</span>' : '<span class="gift">Gift</span>') +
           '<button class="btn small" data-taccept="' + l.id + '"' + (l.price > S.gold ? ' disabled title="Not enough gold"' : '') + '>' + (l.price ? 'Pay and take' : 'Accept') + '</button><button class="btn ghost small" data-tdecline="' + l.id + '">Decline</button></div></div>').join('') + '</div>';
@@ -2839,6 +2872,24 @@
     const t = e.target.closest('button'); if (!t) return;
     const d = t.dataset;
     if (t.id === 't-signin') { authForm('in'); return; }
+    if (t.id === 's-get') { getSigils(); return; }
+    if (t.id === 's-list') tradeAct(async () => {
+      const n = Math.floor(+$('s-n').value), p = Math.floor(+$('s-p').value);
+      if (!(n >= 1) || !(p >= 1)) { toast('lock', 'Check the numbers', 'Enter how many Sigils to sell and a total price in gold.', 'warn'); return; }
+      if (prof && n > prof.bal) { toast('lock', 'Not enough Sigils', 'You have ' + prof.bal.toLocaleString() + ' ' + TOKEN + '.', 'warn'); return; }
+      await chatCall('POST', '/sigils/list', { n, price: p, name: S.hero.name });
+      if (prof) prof.bal -= n; sfx.coin(); toast('coin', 'Listed', n.toLocaleString() + ' ' + TOKEN + ' for ' + fmt(p) + ' gold.', ''); loadSigils();
+    }, 'sig');
+    if (d.sbuy) tradeAct(async () => {
+      const l = trade.sig && trade.sig.listings.find(x => x.id === d.sbuy); if (!l || l.price > S.gold) return;
+      const r = await chatCall('POST', '/sigils/buy', { id: l.id, name: S.hero.name });
+      S.gold -= r.price; if (prof) prof.bal = r.bal; afterTrade(); sfx.coin();
+      toast('coin', 'Sigils bought', '+' + r.n.toLocaleString() + ' ' + TOKEN + ' for ' + fmt(r.price) + ' gold.', 'feat'); loadSigils();
+    }, 'sig');
+    if (d.scancel) tradeAct(async () => {
+      const r = await chatCall('POST', '/sigils/cancel', { id: d.scancel });
+      if (prof) prof.bal = r.bal; toast('coin', 'Listing taken down', r.n.toLocaleString() + ' ' + TOKEN + ' are back in your account.', ''); loadSigils();
+    }, 'sig');
     if (d.tview) { listingModal(d.tview); return; }
     if (d.tc) { if (d.tc === 'mine') trade.mine = true; else { trade.mine = false; trade.cls = d.tc; } loadMarket(); return; }
     if (d.tclaim || t.id === 't-claimall') tradeAct(async () => {
@@ -2849,7 +2900,7 @@
         if (l.type === 'return' && bagFull()) { toast('bag', 'Your pack is full', 'Salvage something to collect returned gear.', 'warn'); break; }
         const r = await chatCall('POST', '/mail/claim', { id });
         const L2 = r.letter;
-        if (L2.type === 'return') { S.bag.push(fromServer(L2.item)); items++; } else { S.gold += L2.gold; S.stats.goldEarned += L2.gold; gold += L2.gold; }
+        if (L2.type === 'return') { S.bag.push(fromServer(L2.item)); items++; } else { const g2 = nowGold(L2.gold, L2.at); S.gold += g2; S.stats.goldEarned += g2; gold += g2; }
       }
       afterTrade(); sfx.coin();
       toast('coin', 'Collected', [gold ? '+' + fmt(gold) + ' gold' : '', items ? items + (items === 1 ? ' item' : ' items') + ' back in your pack' : ''].filter(Boolean).join(', ') || 'Done.', 'feat');

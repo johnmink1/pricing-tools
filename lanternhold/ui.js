@@ -1,4 +1,4 @@
-/* lh-build 202611232223 */
+/* lh-build 202611232231 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -98,7 +98,7 @@
   });
   document.addEventListener('pointerout', e => { if (tipFor && !tipFor.contains(e.relatedTarget)) { clearTimeout(tipHide); tipHide = setTimeout(hideTip, 60); } });
   document.addEventListener('click', e => {
-    const i = e.target.closest('.tipi');
+    const i = e.target.closest('.tipi') || (!fine.matches && e.target.closest('.trait[data-tip]'));
     if (i) { e.preventDefault(); e.stopPropagation(); if (tipFor === i) hideTip(); else { showTip(i); clearTimeout(tipHide); tipHide = setTimeout(hideTip, 5000); } return; }
     if (!fine.matches) hideTip();
   }, true);
@@ -1039,8 +1039,17 @@
   function traitChips(id, compact) {
     const st = L.traitState(S, id); if (!st) return '';
     const t = st.t, chip = (kind, on) => { const x = L.traitText(kind, t[kind]), w = kind === 'pos' ? L.POS_NAME[t.pos.at].toLowerCase() + ' seat' : kind === 'kin' ? 'with a ' + L.CLASSES[t.kin.cls].name.toLowerCase() : 'at camp';
+      const tip = x.name + ' (' + x.grade + '). ' + x.fx + ' ' + w + '.' + (on ? ' Working now.' : ' Not working right now.');
+      // In the marching order only a working trait shows its effect; the others are just a name, with details on hover or tap.
+      if (compact === 'seat') return '<span class="trait g' + t[kind].g + (on ? ' on' : ' off') + '" data-tip="' + esc(tip) + '" tabindex="0"><b>' + esc(x.name) + '</b>' + (on ? ' ' + esc(x.fx) : '') + '</span>';
       return '<span class="trait g' + t[kind].g + (on ? ' on' : '') + '" title="' + esc(x.name + ' (' + x.grade + '). ' + x.when + ': ' + x.fx + '.') + '">' + (compact ? '<b>' + esc(x.name) + '</b>' : '<b>' + esc(x.name) + '</b> ' + esc(x.fx) + ' <i>' + esc(w) + '</i>') + '</span>'; };
-    return '<div class="traits">' + chip('pos', st.pos) + chip('kin', st.kin) + chip('camp', st.camp) + '</div>';
+    const ks = ['pos', 'kin', 'camp'];
+    if (compact === 'seat') {
+      // working traits show their effect; the idle ones share one quiet chip, with details on hover or tap
+      const on = ks.filter(k => st[k]), off = ks.filter(k => !st[k]), tx = k => L.traitText(k, t[k]);
+      return '<div class="traits slim">' + on.map(k => chip(k, true)).join('') + (off.length ? '<span class="trait off" tabindex="0" data-tip="' + esc('Not working right now. ' + off.map(k => tx(k).name + ': ' + tx(k).fx + ' (' + tx(k).when.toLowerCase() + ')').join('. ') + '.') + '">' + off.map(k => esc(tx(k).name)).join(' · ') + '</span>' : '') + '</div>';
+    }
+    return '<div class="traits">' + ks.map(k => chip(k, st[k])).join('') + '</div>';
   }
   function updateSeats(force) {
     const now = Date.now();
@@ -1062,15 +1071,14 @@
       if (!guest) {
         const n = buyN() === 'max' ? Math.max(1, L.maxAffordable(S, id)) : buyN();
         const cost = L.trainCost(S, id, n);
-        btn = '<button class="buy anywhere" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button>' + '<button class="autot' + ((S.autoTrain || {})[id] && L.passOn(S) ? ' on' : '') + (L.passOn(S) ? '' : ' locked') + '" data-autot="' + id + '" title="Auto-train: spend gold on this character automatically" aria-pressed="' + !!(S.autoTrain || {})[id] + '">' + icon('refresh') + 'Auto</button>';
+        btn = '<button class="buy anywhere" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button>' + '<div class="minirow"><button class="autot' + ((S.autoTrain || {})[id] && L.passOn(S) ? ' on' : '') + (L.passOn(S) ? '' : ' locked') + '" data-autot="' + id + '" title="Auto-train: spend gold on this character automatically" aria-pressed="' + !!(S.autoTrain || {})[id] + '">' + icon('refresh') + 'Auto</button>' + (id !== 'you' ? '<button class="rest icon" data-unseat="' + i + '" title="Send ' + esc(m.name) + ' to the campfire to free this seat" aria-label="Send ' + esc(m.name) + ' to the campfire">' + icon('flame') + '</button>' : '') + '</div>';
       } else btn = '<button class="btn ghost small" data-dismiss="' + id + '">Dismiss</button>';
       const mv = '<div class="mv"><button class="mini up" data-move="' + i + ':-1"' + (i === 0 ? ' disabled' : '') + ' title="Move forward" aria-label="Move ' + esc(m.name) + ' forward">&#9650;</button><button class="mini dn" data-move="' + i + ':1"' + (i === L.PARTY_SIZE - 1 ? ' disabled' : '') + ' title="Move back" aria-label="Move ' + esc(m.name) + ' back">&#9660;</button></div>';
       html += '<div class="seat' + (down ? ' down' : '') + (m.player ? ' mine' : '') + '"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span>' + mv + portrait(id) +
         '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
         '<div class="lv">' + (down ? 'Fallen. Back up in ' + Math.ceil((down - now) / 1000) + 's' : memberStatsLine(id, now)) + '</div>' +
-        traitChips(id) +
-        '<div class="hpbar"><i data-hp="' + id + '"></i></div></div><div class="acts">' + btn +
-        (id !== 'you' && !guest ? '<button class="rest" data-unseat="' + i + '" title="Send ' + esc(m.name) + ' to the campfire to free this seat">To campfire</button>' : '') + '</div></div>';
+        traitChips(id, 'seat') +
+        '<div class="hpbar"><i data-hp="' + id + '"></i></div></div><div class="acts">' + btn + '</div></div>';
     }
     if (html !== seatsHtml) {
       box.innerHTML = html; seatsHtml = html;
@@ -4015,6 +4023,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 71, date: 'November 23, 2026', title: 'A calmer marching order', items: [
+      'The Party tab is easier to read. Each companion shows only the traits that are working right now, with their effect. The others share one quiet line, and you can hover or tap it to see what they would do.',
+      'Send to campfire is now a small flame button next to Auto, and on phones the Train, Auto and campfire buttons sit in one row under each companion.'] },
     { v: 70, date: 'November 23, 2026', title: 'Raise your colors', items: [
       'The Wardrobe has a new Banners tab with 11 war banners, from the free Delver’s Pennant to the gold-fringed Last Lantern.',
       'Your banner flies behind your party and shows on your hero card in the Ember Ring, on challenger cards, in the standings, on your Players Guild card and next to your name in chat.',

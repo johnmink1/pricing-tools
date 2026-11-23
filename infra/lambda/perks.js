@@ -53,23 +53,16 @@ exports.handler = async (e) => {
   // Lantern Pass: 500 Sigils for 30 days of convenience perks, stacking onto any time left.
   // The same route sells a stat reset ({ what: 'respec' }) for 50 Sigils.
   if (e.routeKey === 'POST /store/pass') {
-    const K = { userId: S(cl.sub) }, w = (await db.send(new D.GetItemCommand({ TableName: W, Key: K }))).Item;
-    if (b.what === 'respec') {
-      const bal = w && w.bal ? +w.bal.N : 100;
-      if (bal < 50) return res(400, { error: 'funds' });
-      try { await db.send(new D.UpdateItemCommand({ TableName: W, Key: K, UpdateExpression: 'SET bal = if_not_exists(bal, :g) - :c, own = if_not_exists(own, :o)', ConditionExpression: 'attribute_not_exists(bal) OR bal >= :c',
-        ExpressionAttributeValues: { ':g': N(100), ':c': N(50), ':o': { SS: ['f.plain'] } } })); }
-      catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'state' }); throw x; }
-      return res(200, { ok: true, bal: bal - 50 });
-    }
+    const K = { userId: S(cl.sub) }, w = (await db.send(new D.GetItemCommand({ TableName: W, Key: K }))).Item, rs = b.what === 'respec', c = rs ? 50 : 500;
     const bal = w && w.bal ? +w.bal.N : 100, was = w && w.pass ? +w.pass.N : 0, until = Math.max(Date.now(), was) + 2592e6;
-    if (bal < 500) return res(400, { error: 'funds' });
+    if (bal < c) return res(400, { error: 'funds' });
+    const v = { ':g': N(100), ':c': N(c), ':o': { SS: ['f.plain'] } };
+    if (!rs) { v[':p'] = N(until); if (was) v[':w'] = N(was); }
     try {
-      await db.send(new D.UpdateItemCommand({ TableName: W, Key: K, UpdateExpression: 'SET bal = if_not_exists(bal, :g) - :c, pass = :p, own = if_not_exists(own, :o)',
-        ConditionExpression: (was ? 'pass = :w' : 'attribute_not_exists(pass)') + ' AND (attribute_not_exists(bal) OR bal >= :c)',
-        ExpressionAttributeValues: Object.assign({ ':g': N(100), ':c': N(500), ':p': N(until), ':o': { SS: ['f.plain'] } }, was ? { ':w': N(was) } : {}) }));
+      await db.send(new D.UpdateItemCommand({ TableName: W, Key: K, UpdateExpression: 'SET bal = if_not_exists(bal, :g) - :c, own = if_not_exists(own, :o)' + (rs ? '' : ', pass = :p'),
+        ConditionExpression: (rs ? '' : (was ? 'pass = :w' : 'attribute_not_exists(pass)') + ' AND ') + '(attribute_not_exists(bal) OR bal >= :c)', ExpressionAttributeValues: v }));
     } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'state' }); throw x; }
-    return res(200, { ok: true, pass: until, bal: bal - 500 });
+    return res(200, rs ? { ok: true, bal: bal - c } : { ok: true, pass: until, bal: bal - c });
   }
   return res(404, { error: 1 });
 };

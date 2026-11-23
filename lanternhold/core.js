@@ -7,7 +7,7 @@
   const BOSS_EVERY = 5;
   const BASE_LANTERN = 30;
   const COST_GROWTH = 1.07;
-  const REKINDLE_FLOOR = 25;
+  const REKINDLE_FLOOR = 50;
   const PARTY_SIZE = 5;
   const REVIVE_TIME = 15;
   const RETRY_AFTER = 75;
@@ -260,10 +260,12 @@
     if (f > 140) hp *= Math.pow(1.04, f - 140);
     return hp;
   }
-  const foeHp = (f, boss) => baseHp(f) * (boss ? 9 : 1);
+  // Difficulty curve: the first floors are gentle, then monsters toughen faster than the gold they drop.
+  const tough = f => (f <= 10 ? 0.8 + 0.02 * f : 1) * (f > 15 ? Math.pow(1.012, f - 15) : 1) * (f > 40 ? Math.pow(1.012, f - 40) : 1);
+  const foeHp = (f, boss) => baseHp(f) * tough(f) * (boss ? 9 : 1);
   const foeGold = (f, boss) => (1 + baseHp(f) / 40) * (boss ? 5 : 1);
   // Foe damage per second. Grows a little slower than foe health, so a well-kept party can hold.
-  const foeDps = (f, boss) => 1.1 * Math.pow(1.205, f - 1) * (f > 60 ? Math.pow(1.025, f - 60) : 1) * (boss ? 2.2 : 1);
+  const foeDps = (f, boss) => 1.1 * Math.pow(1.205, f - 1) * (f > 60 ? Math.pow(1.025, f - 60) : 1) * Math.sqrt(tough(f)) * (boss ? 2.2 : 1);
   const FOE_SWING = 1.6;
 
   function relicVal(s, id) { const r = RELICS.find(x => x.id === id); return (s.relics[id] || 0) * r.per; }
@@ -324,7 +326,7 @@
   function embersFor(s) {
     const f = s.maxFloor;
     if (f < REKINDLE_FLOOR) return 0;
-    return Math.floor(Math.pow(f - 20, 1.3) / 8 * (1 + relicVal(s, 'heart')));
+    return Math.floor(Math.pow(f - 40, 1.25) / 10 * (1 + relicVal(s, 'heart')));
   }
 
 
@@ -374,20 +376,21 @@
       const set = SETS.find(x => x.cls === cls);
       return { uid: Date.now().toString(36) + (uidSeq++), cls, slot, rar: 'set', set: set.id, ilvl: f, up: 0 };
     }
-    const boost = (opts && opts.boost) || 0;
-    const p = r() + boost * 0.25;
-    rar = p > 0.985 ? 'epic' : p > 0.88 ? 'rare' : p > 0.6 ? 'fine' : 'common';
+    // Rarity odds start stingy and open up with depth (d reaches 1 at floor 80).
+    const boost = (opts && opts.boost) || 0, d = Math.min(1, f / 80);
+    const p = r() + boost * 0.15 * d;
+    rar = p > 0.995 - 0.03 * d ? 'epic' : p > 0.94 - 0.08 * d ? 'rare' : p > 0.7 - 0.12 * d ? 'fine' : 'common';
     return { uid: Date.now().toString(36) + (uidSeq++), cls, slot, rar, ilvl: f, up: 0 };
   }
   function dropGear(s, foe, rng, events) {
     const r = rng || Math.random, f = s.floor, loot = 1 + campBonus(s, 'loot');
     let it = null;
     if (foe.boss) {
-      if (f >= 15 && r() < 0.14) it = rollGear(s, f, { set: true }, r);
-      else it = rollGear(s, f, { boost: 1 }, r);
-    } else if (foe.chest) { if (r() < 0.6 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
-    else if (foe.elite) { if (r() < 0.3 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
-    else if (r() < 0.025 * loot) it = rollGear(s, f, null, r);
+      if (f >= 15 && r() < 0.06 * loot) it = rollGear(s, f, { set: true }, r);
+      else if (r() < 0.6 * loot) it = rollGear(s, f, { boost: 1 }, r);
+    } else if (foe.chest) { if (r() < 0.4 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
+    else if (foe.elite) { if (r() < 0.15 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
+    else if (r() < 0.012 * loot) it = rollGear(s, f, null, r);
     if (!it) return;
     if (s.bag.length >= GEAR_CAP) {
       // full bag: the lowest value common item gets sold automatically
@@ -402,9 +405,11 @@
   function equipped(s, id) { return (s.gear[id] || {}); }
   function itemOf(s, uid) { return s.bag.find(x => x.uid === uid); }
   function wearer(s, uid) { for (const id in s.gear) for (const sl of SLOTS) if (s.gear[id][sl] === uid) return id; return null; }
+  const reqLevel = it => Math.max(1, Math.floor(it.ilvl * 1.5));
+  const canWear = (s, id, it) => lvl(s, id) >= reqLevel(it);
   function equip(s, id, uid) {
     const it = itemOf(s, uid); if (!it) return false;
-    const m = memberById(id); if (!m || m.guest || m.cls !== it.cls) return false;
+    const m = memberById(id); if (!m || m.guest || m.cls !== it.cls || !canWear(s, id, it)) return false;
     const prev = wearer(s, uid); if (prev) delete s.gear[prev][it.slot];
     s.gear[id] = s.gear[id] || {};
     const before = maxHpOf(s, id);
@@ -433,7 +438,7 @@
     const g = equipped(s, id), out = {};
     for (const sl of SLOTS) {
       const cur = g[sl] && itemOf(s, g[sl]); let best = null, bp = cur ? gearPct(cur) : 0;
-      for (const it of s.bag) if (it.cls === m.cls && it.slot === sl && !wearer(s, it.uid) && gearPct(it) > bp) { best = it; bp = gearPct(it); }
+      for (const it of s.bag) if (it.cls === m.cls && it.slot === sl && !wearer(s, it.uid) && canWear(s, id, it) && gearPct(it) > bp) { best = it; bp = gearPct(it); }
       if (best) out[sl] = best;
     }
     return out;
@@ -579,7 +584,7 @@
   ];
   function jobValue(s, job, id) {
     const m = memberById(id); if (!m) return 0;
-    return job.base * Math.sqrt(Math.max(1, lvl(s, id))) * (m.cls === job.aff ? 1.5 : 1);
+    return job.base * Math.sqrt(Math.max(1, lvl(s, id))) * (m.cls === job.aff ? 1.5 : 1) * (1 + (m.tier || 0));
   }
   const jobFree = (s, id) => id && id !== 'you' && s.unlocked.includes(id) && !s.party.includes(id) && !isGuest(s, id);
   function campBonus(s, stat) {
@@ -974,7 +979,7 @@
   }
 
   const api = {
-    JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
+    reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,

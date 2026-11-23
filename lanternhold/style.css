@@ -1,4 +1,4 @@
-/* lh-build 202611231444 */
+/* lh-build 202611231445 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1498,3 +1498,11 @@ h3.sub .tipi{vertical-align:2px}
 @media (min-width:721px) and (max-width:1366px){.tabs button svg{display:none}}
 @media (min-width:721px){#tabadmin span{display:none}#tabadmin svg{display:block}}
 @media (max-width:560px){.rfinfo small.dim{display:none}.ringfoe{grid-template-columns:44px 1fr auto}.rffig{height:44px}.rffig .ringspr{width:40px;height:40px}}
+.hudchip .ql{font:inherit;color:inherit;margin:0}
+@media (max-width:560px){
+  .top{row-gap:2px}
+  .top::after{content:"";order:2;flex-basis:100%;height:0}
+  .top .purse{order:3;flex:1 1 0;width:auto}
+  .top .hudchip{order:4;height:40px;padding:0 10px}
+  .top .hudchip .ql{display:none}
+}

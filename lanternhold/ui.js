@@ -1,4 +1,4 @@
-/* lh-build 202611231444 */
+/* lh-build 202611231445 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2325,7 +2325,7 @@
   function paintQuests() {
     const q = L.questState(S), b = $('quests'); if (!b) return;
     const n = q.filter(x => x.got).length, rd = questsReady(), all = n === 3 && (S.daily.got & 8);
-    $('questct').textContent = rd ? 'Claim ' + rd : all ? 'Quests done' : 'Quests ' + n + '/3';
+    $('questct').innerHTML = rd ? 'Claim ' + rd : '<small class="ql">Quests </small>' + (all ? 'done' : n + '/3');
     b.classList.toggle('ready', rd > 0); b.classList.toggle('done', !rd && !!all);
     b.title = rd ? 'Daily quests: ' + rd + (rd === 1 ? ' reward' : ' rewards') + ' ready to claim' : all ? 'Daily quests: all done for today' : 'Daily quests: ' + n + ' of 3 done';
   }
@@ -3305,6 +3305,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 45, date: 'November 23, 2026', title: 'A cleaner screen', items: [
+      'The top bar is tidier. Gold, damage, Embers and Sigils now sit together in one strip.',
+      'Hover over almost anything to see what it does. On a phone, tap the small i badges.',
+      'The camp bar, marching order, campfire and banner sections are shorter, with the details in tooltips.'] },
     { v: 44, date: 'November 23, 2026', title: 'The Ember Ring: duels between players', items: [
       'Open the new PvP tab to duel other players\u2019 heroes one on one. Only your own hero fights: no companions, tonics or Sigils.',
       'Wins earn Laurels and rating. Climb from Ashen through Ironclad, Emberborn, Gilded and Lanternsworn to Riftbreaker on the Ring standings.',

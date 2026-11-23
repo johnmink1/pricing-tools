@@ -1,4 +1,4 @@
-/* lh-build 202611231544 */
+/* lh-build 202611231553 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -319,7 +319,7 @@
       mode: null, hero: null, guests: [],
       unlocked: [], levels: {}, party: [null, null, null, null, null],
       hp: {}, down: {}, abil: {}, minions: [], items: { draught: 1, oil: 0 }, campUntil: 0, jobs: {},
-      skills: {}, kindling: 0, bagUps: 0, unlocks: {}, kup: {}, autoTrain: {},
+      skills: {}, kindling: 0, bagUps: 0, autoScrap: { on: false, r: ['common'], up: false }, unlocks: {}, kup: {}, autoTrain: {},
       relics: {}, embers: 0, feats: {},
       bag: [], gear: {}, lore: { hold: 1 },
       story: { seen: {}, queue: [] },
@@ -849,6 +849,10 @@
     else if (foe.elite) { if (r() < 0.15 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
     else if (r() < 0.012 * loot) it = rollGear(s, f, null, r);
     if (!it) return;
+    if (autoScrapHit(s, it)) {
+      const g = salvageValue(it), d = dustValue(it); s.gold += g; s.dust = (s.dust || 0) + d;
+      events && events.push({ type: 'autoscrap', item: it, gold: g, dust: d }); return;
+    }
     if (packCount(s) >= bagCap(s)) {
       // full bag: the lowest value common item gets sold automatically
       const worst = s.bag.filter(x => x.rar === 'common' && !x.lk && !wearer(s, x.uid)).sort((a, b) => gearPct(a) - gearPct(b))[0];
@@ -858,6 +862,23 @@
     s.bag.push(it);
     if (it.set) { s.lore['set_' + it.set] = Date.now(); }
     events && events.push({ type: 'loot', item: it });
+  }
+  // Auto-scrap (John, 2026-11-23): drops of the ticked rarities are scrapped on pickup for gold and Dust.
+  // Set and job-set pieces are always kept, and so is anything that would beat what a companion wears
+  // unless the player turns that guard off. s.autoScrap = { on, r: [rarity ids], up: scrap upgrades too }.
+  function isUpgrade(s, it) {
+    return s.unlocked.some(id => {
+      const m = memberById(id); if (!m || m.cls !== it.cls || isGuest(s, id)) return false;
+      const r = replaces(s, id, it);
+      if (r.length) return itemScore(it) > r.reduce((a, x) => a + itemScore(x), 0);
+      // an open slot only counts if the pack has no spare piece at least this good to fill it
+      return !s.bag.some(x => x.cls === it.cls && x.slot === it.slot && !wearer(s, x.uid) && itemScore(x) >= itemScore(it));
+    });
+  }
+  function autoScrapHit(s, it) {
+    const a = s.autoScrap;
+    if (!a || !a.on || !a.r || !a.r.includes(it.rar) || it.set || it.jset || it.rar === 'set') return false;
+    return !!a.up || !isUpgrade(s, it);
   }
   function equipped(s, id) { return (s.gear[id] || {}); }
   function itemOf(s, uid) { return s.bag.find(x => x.uid === uid); }
@@ -1834,7 +1855,7 @@
     s.items = Object.assign({ draught: 1, oil: 0 }, o.items || {}); s.tonic = o.tonic || {}; s.campUntil = o.campUntil || 0; s.jobs = o.jobs || {};
     // Skill trees arrived after some players had already rekindled: 2 points for each past rekindle.
     s.kup = o.kup || {}; s.autoTrain = o.autoTrain || {}; s.skills = o.skills || {}; s.kindling = o.kindling != null ? o.kindling : 2 * ((o.stats && o.stats.rekindles) || 0);
-    s.bagUps = o.bagUps || 0; s.boh = !!o.boh; s.traits = o.traits || {}; s.goblin = o.goblin && o.goblin.item ? { item: normItem(o.goblin.item), floor: o.goblin.floor || 1, at: o.goblin.at || 0 } : null; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0; s.dust = o.dust || 0;
+    s.bagUps = o.bagUps || 0; s.boh = !!o.boh; s.traits = o.traits || {}; s.goblin = o.goblin && o.goblin.item ? { item: normItem(o.goblin.item), floor: o.goblin.floor || 1, at: o.goblin.at || 0 } : null; s.unlocks = o.unlocks || {}; s.campReturn = o.campReturn || 0; s.dust = o.dust || 0; s.autoScrap = o.autoScrap && Array.isArray(o.autoScrap.r) ? { on: !!o.autoScrap.on, r: o.autoScrap.r.filter(x => typeof x === 'string'), up: !!o.autoScrap.up } : { on: false, r: ['common'], up: false };
     if (s.hero) s.mode = 'multi'; // every game is multiplayer now; story companions stay at camp
     s.bag = (o.bag || []).map(normItem); s.gear = o.gear || {};
     const OLD = { weapon: 'main', armor: 'chest', trinket: 'neck' };
@@ -1851,7 +1872,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

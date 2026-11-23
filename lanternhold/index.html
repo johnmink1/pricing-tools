@@ -6,19 +6,51 @@
 <title>Lanternhold: A Grand War Front</title>
 <meta name="author" content="Born 2 Game, LLC">
 <meta name="description" content="Lanternhold is a free idle dungeon crawler set on a hidden front of the Grand War. Lead a party of five, pledge to an alliance, loot class gear and sets, and carry the lantern down to the Nyx Rift.">
-<link rel="canonical" href="https://tools.born2develop.com/lanternhold/">
+<link rel="canonical" href="https://lanternhold.born2gamellc.com/">
 <meta property="og:title" content="Lanternhold: A Grand War Front">
 <meta property="og:site_name" content="Born 2 Game">
 <meta property="og:description" content="A free idle dungeon crawler on a hidden front of the Grand War. Party of five, story chapters, class gear and sets.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://tools.born2develop.com/lanternhold/">
+<meta property="og:url" content="https://lanternhold.born2gamellc.com/">
 <meta property="og:image" content="https://tools.born2develop.com/press/lanternhold/img/og-1200x630.png">
 <meta name="theme-color" content="#04070d">
+<script>
+/* Lanternhold moved to lanternhold.born2gamellc.com. On the old address, hand this device's progress over in the
+   URL hash and go there; the new address restores it before the game starts. Sign-in tokens never travel. */
+(function () {
+  var NEW = 'https://lanternhold.born2gamellc.com/', SAVE = 'lanternhold.save.v1';
+  var KEYS = [SAVE, 'lanternhold.epoch', 'lanternhold.muted', 'lanternhold.wiped', 'lh_ref'];
+  var ls; try { ls = window.localStorage; } catch (e) { return; }
+  var pt = function (s) { try { return (JSON.parse(s).stats || {}).playTime || 0; } catch (e) { return -1; } };
+  if (location.hostname === 'tools.born2develop.com') {
+    // Let a store sign-in or checkout that returns here finish first; the next visit moves.
+    if (/^#code=|[?&]store=/.test(location.hash + location.search)) return;
+    var go = function () {
+      var o = {}; KEYS.forEach(function (k) { var v = ls.getItem(k); if (v != null) o[k] = v; });
+      location.replace(NEW + location.search + '#lhmove=' + encodeURIComponent(JSON.stringify(o)));
+    };
+    // Only move once the new address can restore saves.
+    fetch(NEW + 'index.html', { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (t) { if (t.indexOf('lhmove') > 0) go(); }).catch(function () {});
+    return;
+  }
+  if (location.hash.indexOf('#lhmove=') !== 0) return;
+  try {
+    var o = JSON.parse(decodeURIComponent(location.hash.slice(8)));
+    Object.keys(o).forEach(function (k) {
+      if (KEYS.indexOf(k) < 0 || typeof o[k] !== 'string') return;
+      var cur = ls.getItem(k);
+      if (k === SAVE ? pt(o[k]) > pt(cur || '') : cur == null) ls.setItem(k, o[k]);
+    });
+  } catch (e) {}
+  history.replaceState(null, '', location.pathname + location.search);
+})();
+</script>
 <script>try{var r=new URLSearchParams(location.search).get("ref");if(r&&/^[a-z0-9_-]{1,24}$/i.test(r)&&!localStorage.getItem("lh_ref"))localStorage.setItem("lh_ref",r.toLowerCase())}catch(e){}</script>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611230521">
+<link rel="stylesheet" href="style.css?v=202611230535">
 </head>
 <body>
 <div id="app">
@@ -208,11 +240,11 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611230521";</script>
+<script>window.LH_BUILD = "202611230535";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611230521"></script>
-<script src="sprites.js?v=202611230521"></script>
-<script src="vector.js?v=202611230521"></script>
-<script src="ui.js?v=202611230521"></script>
+<script src="core.js?v=202611230535"></script>
+<script src="sprites.js?v=202611230535"></script>
+<script src="vector.js?v=202611230535"></script>
+<script src="ui.js?v=202611230535"></script>
 </body>
 </html>

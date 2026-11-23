@@ -2937,6 +2937,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 33, date: 'November 23, 2026', title: 'A new home', items: [
+      'Lanternhold now lives at lanternhold.born2gamellc.com. The old address brings you here, along with the progress saved on your device.',
+      'If you play with an account, sign in once more here. Your saved progress is waiting.'] },
     { v: 32, date: 'November 23, 2026', title: 'Bag of Holding', items: [
       'New in the store: the Bag of Holding. Buy it once for 6,500 Sigils and your pack never fills up again, so loot is never sold off for lack of space.',
       'Find it on the Gear tab next to your pack, under Market and Sigils, or in your profile.'] },

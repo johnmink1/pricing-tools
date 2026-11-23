@@ -578,8 +578,8 @@
           };
         };
         m.querySelector('#s-reset').onclick = () => {
-          m.querySelector('#s-extra').innerHTML = '<p style="color:#ff9c88">This erases everything, including Embers and relics. It cannot be undone.</p><div class="row"><button class="btn danger" id="s-doreset">Yes, erase it all</button></div>';
-          m.querySelector('#s-doreset').onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} S = L.newState(); location.reload(); };
+          m.querySelector('#s-extra').innerHTML = '<p style="color:#ff9c88">This erases everything, including Embers and relics' + (signedIn() ? ' and the save stored with your account' : '') + '. It cannot be undone.</p><div class="row"><button class="btn danger" id="s-doreset">Yes, erase it all</button></div>';
+          m.querySelector('#s-doreset').onclick = async () => { await eraseCloud(); try { localStorage.removeItem(SAVE_KEY); } catch (e) {} S = L.newState(); location.reload(); };
         };
       });
   }
@@ -609,6 +609,180 @@
       got.forEach(f => toast('star', 'Feat earned: ' + f.name, f.desc + ' (+2% party damage)', 'feat'));
     }
     if (now - lastSave > 10000) { lastSave = now; save(); }
+  }
+
+  // ---------- optional accounts and cloud saves (AWS Cognito + API) ----------
+  // Switched on by window.LH_CLOUD in index.html. Guests can always play without an account.
+  const CL = window.LH_CLOUD && window.LH_CLOUD.clientId ? window.LH_CLOUD : null;
+  const TOK_KEY = 'lanternhold.session.v1';
+  let sess = null, lastCloud = 0;
+  try { sess = JSON.parse(localStorage.getItem(TOK_KEY) || 'null'); } catch (e) {}
+  const signedIn = () => !!(sess && sess.refresh);
+  function storeSess() { try { sess ? localStorage.setItem(TOK_KEY, JSON.stringify(sess)) : localStorage.removeItem(TOK_KEY); } catch (e) {} }
+  function saveObj() { S.lastSeen = Date.now(); const o = Object.assign({}, S); delete o.foe; delete o._frenzyAcc; return o; }
+  function summary(o) { return 'Floor ' + (o.maxFloorEver || 1) + ', ' + fmt(o.embers || 0) + ' Embers, ' + fmtTime((o.stats && o.stats.playTime) || 0) + ' played'; }
+  function claims(jwt) { try { return JSON.parse(decodeURIComponent(escape(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); } catch (e) { return {}; } }
+
+  async function cognito(action, body) {
+    const r = await fetch('https://cognito-idp.' + CL.region + '.amazonaws.com/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': 'AWSCognitoIdentityProviderService.' + action },
+      body: JSON.stringify(Object.assign({ ClientId: CL.clientId }, body)),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(j.message || 'Something went wrong'); e.code = (j.__type || '').split('#').pop(); throw e; }
+    return j;
+  }
+  function takeTokens(res, email) {
+    const t = res.AuthenticationResult;
+    sess = { id: t.IdToken, exp: Date.now() + (t.ExpiresIn - 60) * 1000, refresh: t.RefreshToken || (sess && sess.refresh), email: email || (sess && sess.email) || claims(t.IdToken).email };
+    storeSess(); paintAccount();
+  }
+  async function idToken() {
+    if (!signedIn()) return null;
+    if (sess.id && sess.exp > Date.now()) return sess.id;
+    try { takeTokens(await cognito('InitiateAuth', { AuthFlow: 'REFRESH_TOKEN_AUTH', AuthParameters: { REFRESH_TOKEN: sess.refresh } })); return sess.id; }
+    catch (e) { if (e.code === 'NotAuthorizedException') { sess = null; storeSess(); paintAccount(); } return null; }
+  }
+  async function api(method, body) {
+    const tok = await idToken(); if (!tok) throw new Error('signed out');
+    const r = await fetch(CL.api.replace(/\/$/, '') + '/save', { method, headers: { Authorization: tok, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error('cloud ' + r.status);
+    return r.json();
+  }
+  async function pushCloud(quiet) {
+    if (!CL || !signedIn()) return;
+    try {
+      const o = saveObj();
+      await api('PUT', { data: JSON.stringify(o), floor: o.maxFloorEver });
+      lastCloud = Date.now();
+      if (!quiet) toast('star', 'Progress synced', 'Your save is stored with your account.', 'feat');
+    } catch (e) { if (!quiet) toast('lock', 'Could not sync right now', 'Your progress is still saved on this device.', 'warn'); }
+  }
+  async function reconcile() {
+    let rec; try { rec = await api('GET'); } catch (e) { return; }
+    const local = saveObj();
+    if (!rec) { await pushCloud(false); return; }
+    let cloud; try { cloud = JSON.parse(rec.data); } catch (e) { await pushCloud(true); return; }
+    const ct = (cloud.stats && cloud.stats.playTime) || 0;
+    if (Math.abs(ct - local.stats.playTime) < 5) { lastCloud = Date.now(); return; }
+    if (!local.stats.kills && !local.embers) { useSave(cloud); return; }
+    $('modal').dataset.lock = '1';
+    modal('<h2>Choose a save</h2><p>Your account already has progress, and this device has different progress. Which one do you want to keep? The other is replaced.</p>' +
+      '<div class="choice"><button class="pick" id="c-cloud"><b>Account save</b><small>' + summary(cloud) + '</small></button>' +
+      '<button class="pick" id="c-local"><b>This device</b><small>' + summary(local) + '</small></button></div>', m => {
+        m.querySelector('#c-cloud').onclick = () => { delete $('modal').dataset.lock; closeModal(); useSave(cloud); };
+        m.querySelector('#c-local').onclick = () => { delete $('modal').dataset.lock; closeModal(); pushCloud(false); };
+      });
+  }
+  function useSave(o) {
+    S = L.migrate(o); S.lastSeen = Date.now();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(saveObj())); } catch (e) {}
+    location.reload();
+  }
+  function paintAccount() {
+    const b = $('btn-account'); if (!b) return;
+    if (signedIn()) { b.innerHTML = '<span class="avatar">' + ((sess.email || '?')[0].toUpperCase()) + '</span>'; b.setAttribute('aria-label', 'Account'); b.title = 'Signed in. Progress syncs.'; }
+    else { b.innerHTML = icon('user') + '<span>Sign in</span>'; b.setAttribute('aria-label', 'Sign in'); b.title = 'Sign in to sync your progress'; }
+  }
+  const friendly = e => ({
+    NotAuthorizedException: 'That email and password don’t match.', UserNotFoundException: 'That email and password don’t match.',
+    UsernameExistsException: 'There is already an account with that email. Try signing in.', CodeMismatchException: 'That code isn’t right. Check the email and try again.',
+    ExpiredCodeException: 'That code has expired. Ask for a new one.', InvalidPasswordException: 'Please use a password of at least 8 characters.',
+    LimitExceededException: 'Too many tries. Please wait a few minutes.', TooManyRequestsException: 'Too many tries. Please wait a few minutes.',
+    InvalidParameterException: 'Please check the email address.',
+  })[e.code] || 'Something went wrong. Please try again.';
+
+  function authForm(mode, email, note) {
+    const titles = { in: 'Sign in', up: 'Create an account', confirm: 'Check your email', forgot: 'Reset your password', reset: 'Choose a new password' };
+    const f = {
+      in: '<input id="f-email" type="email" autocomplete="email" placeholder="Email" required><input id="f-pass" type="password" autocomplete="current-password" placeholder="Password" required>',
+      up: '<input id="f-email" type="email" autocomplete="email" placeholder="Email" required><input id="f-pass" type="password" autocomplete="new-password" placeholder="Password (8 or more characters)" minlength="8" required>',
+      confirm: '<input id="f-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" required>',
+      forgot: '<input id="f-email" type="email" autocomplete="email" placeholder="Email" required>',
+      reset: '<input id="f-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" required><input id="f-pass" type="password" autocomplete="new-password" placeholder="New password (8 or more characters)" minlength="8" required>',
+    }[mode];
+    const lead = {
+      in: 'Sign in to keep your progress safe and play on any device. It is optional, and the game works the same without it.',
+      up: 'Your save is stored with your account so you can pick it up anywhere.',
+      confirm: 'We sent a code to <b class="em"></b>. Enter it below.',
+      forgot: 'Enter your email and we will send you a code.',
+      reset: 'We sent a code to <b class="em"></b>.',
+    }[mode];
+    const btn = { in: 'Sign in', up: 'Create account', confirm: 'Confirm', forgot: 'Send code', reset: 'Save password' }[mode];
+    const links = {
+      in: '<button type="button" class="link" data-go="up">Create an account</button><button type="button" class="link" data-go="forgot">Forgot password?</button>',
+      up: '<button type="button" class="link" data-go="in">I already have an account</button>',
+      confirm: '<button type="button" class="link" id="f-resend">Send a new code</button>',
+      forgot: '<button type="button" class="link" data-go="in">Back to sign in</button>', reset: '',
+    }[mode];
+    modal('<form class="auth" novalidate><h2>' + titles[mode] + '</h2><p>' + lead + '</p>' + f +
+      '<div class="err" id="f-err"></div><button class="btn" type="submit" id="f-go">' + btn + '</button><div class="links">' + links + '</div>' +
+      '<p class="credits">We only keep your email and game save. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a></p></form>', m => {
+        m.querySelectorAll('.em').forEach(x => x.textContent = email || '');
+        const em = m.querySelector('#f-email'); if (em && email) em.value = email;
+        const err = m.querySelector('#f-err'); if (note) { err.textContent = note; err.classList.add('ok'); }
+        m.querySelectorAll('[data-go]').forEach(x => x.onclick = () => authForm(x.dataset.go, em ? em.value.trim() : email));
+        const rs = m.querySelector('#f-resend'); if (rs) rs.onclick = async () => { try { await cognito('ResendConfirmationCode', { Username: email }); err.textContent = 'New code sent.'; err.classList.add('ok'); } catch (e) { err.textContent = friendly(e); } };
+        (m.querySelector('input') || {}).focus && m.querySelector('input').focus();
+        m.querySelector('form').onsubmit = async ev => {
+          ev.preventDefault(); err.textContent = ''; err.classList.remove('ok');
+          const go = m.querySelector('#f-go'); go.disabled = true;
+          const v = id => { const x = m.querySelector(id); return x ? x.value.trim() : ''; };
+          const mail = v('#f-email') || email, pass = m.querySelector('#f-pass') ? m.querySelector('#f-pass').value : '';
+          try {
+            if ((mode === 'in' || mode === 'up' || mode === 'forgot') && !/^\S+@\S+\.\S+$/.test(mail)) throw { code: 'InvalidParameterException' };
+            if ((mode === 'up' || mode === 'reset') && pass.length < 8) throw { code: 'InvalidPasswordException' };
+            if (mode === 'in') {
+              try { takeTokens(await cognito('InitiateAuth', { AuthFlow: 'USER_PASSWORD_AUTH', AuthParameters: { USERNAME: mail, PASSWORD: pass } }), mail); }
+              catch (e) { if (e.code === 'UserNotConfirmedException') { await cognito('ResendConfirmationCode', { Username: mail }); pendingPass = pass; return authForm('confirm', mail); } throw e; }
+              closeModal(); toast('user', 'Signed in', 'Your progress will sync to your account.', 'feat'); reconcile();
+            } else if (mode === 'up') {
+              await cognito('SignUp', { Username: mail, Password: pass, UserAttributes: [{ Name: 'email', Value: mail }] });
+              pendingPass = pass; authForm('confirm', mail);
+            } else if (mode === 'confirm') {
+              await cognito('ConfirmSignUp', { Username: email, ConfirmationCode: v('#f-code') });
+              if (pendingPass) {
+                takeTokens(await cognito('InitiateAuth', { AuthFlow: 'USER_PASSWORD_AUTH', AuthParameters: { USERNAME: email, PASSWORD: pendingPass } }), email);
+                pendingPass = ''; closeModal(); toast('user', 'Account ready', 'Your progress now syncs to your account.', 'feat'); reconcile();
+              } else authForm('in', email, 'Email confirmed. Sign in to continue.');
+            } else if (mode === 'forgot') {
+              await cognito('ForgotPassword', { Username: mail }); authForm('reset', mail);
+            } else if (mode === 'reset') {
+              await cognito('ConfirmForgotPassword', { Username: email, ConfirmationCode: v('#f-code'), Password: pass });
+              authForm('in', email, 'Password changed. Sign in with your new password.');
+            }
+          } catch (e) { err.textContent = friendly(e); }
+          finally { go.disabled = false; }
+        };
+      });
+  }
+  let pendingPass = '';
+  function openAccount() {
+    if (!CL) return;
+    if (!signedIn()) return authForm('in');
+    modal('<h2>Your account</h2><p>Signed in as <b class="em" style="color:var(--text)"></b>. Your progress syncs every minute and whenever you leave the game.</p>' +
+      '<div class="row"><button class="btn" id="a-sync">Sync now</button><button class="btn ghost" id="a-out">Sign out</button></div>' +
+      '<p class="credits"><a href="privacy.html" target="_blank" rel="noopener">Privacy</a> &middot; Erase progress in Settings also deletes the save stored with your account.</p>' +
+      '<div class="row"><button class="btn ghost" id="a-close">Done</button></div>', m => {
+        m.querySelector('.em').textContent = sess.email || '';
+        m.querySelector('#a-sync').onclick = () => pushCloud(false);
+        m.querySelector('#a-out').onclick = async () => {
+          await pushCloud(true);
+          try { await cognito('RevokeToken', { Token: sess.refresh }); } catch (e) {}
+          sess = null; storeSess(); paintAccount(); closeModal(); toast('user', 'Signed out', 'Your progress stays on this device too.', '');
+        };
+        m.querySelector('#a-close').onclick = closeModal;
+      });
+  }
+  async function eraseCloud() { if (CL && signedIn()) { try { await api('DELETE'); } catch (e) {} } }
+  if (CL) {
+    $('btn-account').hidden = false; paintAccount();
+    $('btn-account').addEventListener('click', openAccount);
+    if (signedIn()) setTimeout(reconcile, 800);
+    setInterval(() => { if (signedIn() && Date.now() - lastCloud > 60000) pushCloud(true); }, 15000);
+    document.addEventListener('visibilitychange', () => { if (document.hidden && signedIn()) pushCloud(true); });
   }
 
   // ---------- support link ----------

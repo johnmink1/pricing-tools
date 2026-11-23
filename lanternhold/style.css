@@ -32,6 +32,27 @@ svg{display:block}
 .support{display:flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:10px;border:1px solid #6a4a1a;background:linear-gradient(180deg,#3d2c14,#2a1e0e);color:#f6dca0;font-weight:700;font-size:15px;text-decoration:none;white-space:nowrap}
 .support:hover{border-color:var(--gold);color:#fff3dc}
 .support svg{width:20px;height:20px;color:var(--gold)}
+.account{display:flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-weight:700;font-size:15px;white-space:nowrap}
+.account:hover{border-color:var(--line2)}
+.account svg{width:20px;height:20px;color:var(--muted)}
+.account .avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 40% 35%,#ffe39a,#c8952a);color:#3a2206;font-weight:800;font-size:15px}
+.account:has(.avatar){padding:0 6px}
+.auth{display:grid;gap:10px}
+.auth h2{margin-bottom:2px}
+.auth p{margin:0 0 4px}
+.auth input{width:100%;background:var(--bg2);color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;font:inherit;font-size:16px}
+.auth input:focus{outline:none;border-color:var(--accent)}
+.auth .err{min-height:20px;color:#ff9c88;font-size:14px}
+.auth .err.ok{color:var(--good)}
+.auth .links{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.link{background:none;border:0;padding:4px 0;color:var(--accent);font-weight:700;font-size:14px}
+.link:hover{text-decoration:underline}
+.credits a{color:var(--muted)}
+.choice{display:grid;gap:10px;margin-top:6px}
+.pick{text-align:left;background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:14px 16px}
+.pick:hover{border-color:var(--accent)}
+.pick b{display:block;font-size:17px}
+.pick small{color:var(--muted);font-size:14px}
 .iconbtn{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:40px;height:40px;display:grid;place-items:center;color:var(--muted)}
 .iconbtn:hover{color:var(--text);border-color:var(--line2)}
 .iconbtn svg{width:22px;height:22px}
@@ -204,6 +225,8 @@ svg{display:block}
   .iconbtn{margin-left:0}
   .support{margin-left:auto;padding:0 11px}
   .support span{display:none}
+  .account span:not(.avatar){display:none}
+  .account{padding:0 10px}
   .support:not([hidden])+.iconbtn{margin-left:0}
   .floorinfo{min-width:0}
   .floorname b{font-size:24px}

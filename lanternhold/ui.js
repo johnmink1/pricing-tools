@@ -518,6 +518,10 @@
         const it = e.item;
         if (it.rar !== 'common') { toast('gear-trinket', L.gearName(it), L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' for a ' + L.CLASSES[it.cls].name, 'loot ' + it.rar); sfx.relic(); }
         floatText(L.gearName(it), 'skill', FOE_X, 0.2);
+      } else if (e.type === 'sigil') {
+        sfx.relic(); floatText('+' + e.n + ' Sigils', 'skill', FOE_X, 0.15);
+        toast('star', 'Sigils found!', (e.chest ? 'A chest' : 'The guardian') + ' held ' + e.n + (e.n === 1 ? ' Sigil' : ' Sigils') + '. ' + (signedIn() ? 'They go straight to your wallet.' : 'Sign in to keep them in your wallet.'), 'relic');
+        claimFound();
       } else if (e.type === 'lore') {
         const lo = L.LORE.find(x => x.id === e.id); toast('book', 'New journal entry', lo.title, 'feat');
       } else if (e.type === 'relic') {
@@ -2018,6 +2022,46 @@
         };
       });
   }
+  // ---------- Sigils earned in play: rare finds and daily quests ----------
+  let claiming = false;
+  async function claimFound() {
+    if (claiming || !(S.sigPend > 0) || !CL || !signedIn()) return;
+    claiming = true;
+    try {
+      const n = S.sigPend, r = await papi('POST', '/sigils/earn', { kind: 'drop', n });
+      S.sigPend = Math.max(0, (S.sigPend || 0) - n) + (n - r.add); if (prof) prof.bal = r.bal; save();
+      if (r.add < n) toast('star', 'Daily find limit reached', 'You can bank up to ' + L.SIGIL_DROP_DAY + ' found Sigils a day. The rest are saved for tomorrow.', '');
+    } catch (e) {}
+    claiming = false;
+  }
+  const questsReady = () => { const q = L.questState(S); const got = S.daily.got; return q.filter(x => x.done && !x.got).length + (q.every(x => x.got) && !(got & 8) ? 1 : 0); };
+  function paintQuests() {
+    const q = L.questState(S), b = $('quests'); if (!b) return;
+    $('questct').textContent = q.filter(x => x.got).length + '/3'; b.classList.toggle('ready', questsReady() > 0);
+  }
+  function openQuests() {
+    const q = L.questState(S), got = S.daily.got, allGot = q.every(x => x.got), msLeft = Date.parse(L.questDay() + 'T00:00:00Z') + 864e5 - Date.now();
+    const pct = v => (Math.round(v * 10000) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + '%';
+    const row = x => '<li class="quest' + (x.got ? ' got' : x.done ? ' done' : '') + '"><div><b>' + esc(x.text) + '</b><div class="qbar"><i style="width:' + Math.round(x.have / x.n * 100) + '%"></i></div><small>' + x.have.toLocaleString('en-US') + ' / ' + x.n.toLocaleString('en-US') + '</small></div>' +
+      (x.got ? '<span class="qok">' + sigil + '+' + L.QUEST_REWARD + '</span>' : '<button class="btn small" data-q="' + x.i + '"' + (x.done ? '' : ' disabled') + '>' + sigil + ' Claim ' + L.QUEST_REWARD + '</button>') + '</li>';
+    modal('<div class="maphead"><div><h2>Daily quests</h2><small>New quests in ' + Math.max(1, Math.floor(msLeft / 36e5)) + 'h ' + Math.floor(msLeft % 36e5 / 6e4) + 'm. Same quests for every hero.</small></div><button class="iconbtn" id="dq-x" aria-label="Close">&times;</button></div>' +
+      '<ul class="quests">' + q.map(row).join('') +
+      '<li class="quest bonus' + (got & 8 ? ' got' : allGot ? ' done' : '') + '"><div><b>Finish all three</b><small>A bonus for clearing the day.</small></div>' + (got & 8 ? '<span class="qok">' + sigil + '+' + L.QUEST_BONUS + '</span>' : '<button class="btn small" data-q="3"' + (allGot ? '' : ' disabled') + '>' + sigil + ' Claim ' + L.QUEST_BONUS + '</button>') + '</li></ul>' +
+      (signedIn() ? '' : '<p class="note">Sign in to claim quest rewards. Your progress still counts.</p>') +
+      '<h3 class="sub">Finding Sigils</h3><p class="note">Now and then a treasure chest or a guardian holds 1 to 3 Sigils. Your odds: <b>' + pct(L.sigilChance(S, 'chest')) + '</b> per chest and <b>' + pct(L.sigilChance(S, 'boss')) + '</b> per guardian. Every 30 floors of your deepest descent adds 0.01%, up to 0.05%, and the Kindling upgrade Sigil Sense adds 0.01% per rank. You can bank up to ' + L.SIGIL_DROP_DAY + ' found Sigils a day.</p>' +
+      '<div class="row"><button class="btn ghost" id="dq-ok">Close</button></div>', md => {
+        md.querySelector('#dq-x').onclick = closeModal; md.querySelector('#dq-ok').onclick = closeModal;
+        md.querySelectorAll('[data-q]').forEach(btn => btn.onclick = async () => {
+          if (!signedIn()) { toast('user', 'Sign in first', 'Quest rewards go to your account wallet.', 'warn'); return; }
+          const i = +btn.dataset.q; btn.disabled = true;
+          try { const r = await papi('POST', '/sigils/earn', { kind: 'quest', i }); S.daily.got = r.mask; if (prof) prof.bal = r.bal; save(); sfx.buy(); toast('star', '+' + r.add + (r.add === 1 ? ' Sigil' : ' Sigils'), i === 3 ? 'All three quests done. See you tomorrow!' : 'Quest complete.', 'feat'); }
+          catch (e) { if (e.code === 'claimed') { S.daily.got |= 1 << i; save(); } else toast('lock', 'Could not claim', 'Try again in a moment.', 'warn'); }
+          paintQuests(); openQuests();
+        });
+      });
+  }
+  $('quests').addEventListener('click', openQuests);
+  setInterval(() => { paintQuests(); claimFound(); }, 5000); setTimeout(paintQuests, 500);
   // ---------- server resets and the admin tab ----------
   // A server wipe bumps a public "epoch". Saves started before it reset to a new game.
   const EPOCH_KEY = 'lanternhold.epoch';
@@ -2688,6 +2732,7 @@
     ['Gear and sets', '<p>Gear drops from monsters, chests and guardians. Each piece fits one class and one slot: main hand, offhand, helmet, trinket, chest, legs, feet or ring. Robes cover the chest and the legs together. Every character starts with one trinket slot and one ring slot. Spend Kindling to open a second trinket slot and up to five rings.</p><p>In the Gear tab, pick a companion to see their three gear slots and the pieces in your pack that fit them. A green arrow marks an upgrade, a gold letter shows who is wearing a piece, and +N shows its upgrade level. Tap any piece for details. and <b>Equip best</b> does it all at once. Upgrade pieces with gold, or salvage what you do not need.</p><p>Every piece has a <b>level requirement</b> (the number in its corner). A companion must reach that level to wear it, so keep training.</p><p><b>Rarity</b> is hard to come by. Near the top of the stair almost everything is common, and a rare or epic piece is a real find. The deeper you go, the better the odds. Guardians drop gear more than half the time, chests often, war elites sometimes and ordinary monsters rarely. A <b>Forager</b> at camp improves all of it.</p><p>From floor 15, guardians can drop <b>set pieces</b>. Two or three pieces of a class set give extra bonuses.</p>'],
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten, where you are and where other delvers have reached. Tap a region to zoom in on its ten floors and read its dossier (its history, who holds it, its monsters and its guardian), then tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 50 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 4% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
+    ['Earning Sigils', '<p>You can earn Sigils without spending money. <b>Daily quests</b> (the counter at the top) pay 1 Sigil each and 2 more for finishing all three. Treasure chests and guardians sometimes hold 1 to 3 Sigils. Going deeper and the Kindling upgrade <b>Sigil Sense</b> raise those odds. You can also sell gear for gold and buy Sigils from other players on the exchange.</p>'],
     ['Mercy’s Blessing', '<p>Real donations to the Grand War’s Mercy Corps bless every hero in Lanternhold: +10% gold, +10% party health and +20% healing. Each $10 given, 5 food items or toy donated adds 2 hours, up to 7 days ahead. While it burns, a green heart at the top shows the time left. Tap it to see how to give.</p>'],
     ['Your profile and Sigils', '<p>Tap your hero’s portrait and press <b>Customize profile</b> to set up the card other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. You need to be signed in. Want more Sigils? Press <b>Get Sigils</b>, sign in once with your Born 2 Game store account, and buy a pack. It lands in your wallet within a minute.</p><p><b>Sigils</b> buy those looks. Every account starts with 100. Looks never change your power, and they stay with your account even if the server is reset. You can also trade Sigils with other players for gold on the <b>Sigils</b> page of the Trading Post.</p><p>Play in the Grand War? On the <b>Grand War</b> tab of your profile, pick your commander name. Once the Born 2 Game team confirms it is you, your war rank, alliance and honors appear on your card.</p><p>A verified commander’s hero also carries a <b>Grand War aura</b> for their class: Bulwark (tank), Mending (healer), Shadow (rogue), Ember (mage) or Grave (necromancer). It runs from 2% at the bottom of the war ladder to 10% at the top, and honors add more: Grand Marshal +5% party damage, Alliance Champion +5% party health, Nexus Holder +10% gold. Auras are earned in the war and can never be bought.</p>'],
     ['Camp and the store', '<p>Party changes happen at <b>camp</b>, at the top of the stair on floor 1. That means swapping companions, recruiting players, training companions and changing or upgrading gear. Anyone in your party can train anywhere, even deep in the dungeon, and you can rearrange the marching order at any time. Companions resting at the campfire train at camp.</p><p>The camp bar at the top of the Party and Gear tabs has <b>Return to camp</b>. The climb is free in the first ten floors, then costs gold that grows with depth. When you are done, press <b>Descend</b> to go straight back to the floor you left.</p><p>A <b>Campfire Draught</b> makes camp wherever you are for 60 seconds. <b>Lantern Oil</b> gives you 15 more seconds against a guardian. Buy both from the <b>Store</b> on the camp bar. Prices follow how much gold you earn.</p>'],
@@ -2711,6 +2756,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 27, date: 'November 23, 2026', title: 'Daily quests and Sigils in the deep', items: [
+      'New: daily quests. Three quests a day, the same for every hero. Each one pays 1 Sigil, and finishing all three pays 2 more. Tap the quest counter at the top of the screen.',
+      'Treasure chests and guardians can now hold 1 to 3 Sigils. It is rare: about 0.05% per chest and 0.1% per guardian to start.',
+      'Your odds grow as you go deeper (+0.01% for every 30 floors, up to +0.05%) and with the new Kindling upgrade Sigil Sense (+0.01% per rank, 5 ranks).',
+      'Found Sigils go straight to your wallet when you are signed in. Up to 15 found Sigils can be banked each day.'] },
     { v: 26, date: 'November 23, 2026', title: 'The Lantern Pass and Born 2 Game sign-in', items: [
       'You can now sign in with your Born 2 Game store account. Press Continue with Born 2 Game on the sign-in screen. If you already linked your store account to a hero, it opens that hero.',
       'New: the Lantern Pass. For 500 Sigils you get 30 days of convenience: the Auto-train buttons, 10 extra bag slots and 4 more hours of offline earnings. It never adds power.',

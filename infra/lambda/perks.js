@@ -28,6 +28,28 @@ exports.handler = async (e) => {
   if (e.routeKey === 'GET /mercy') { try { return Object.assign(res(200, await getMercy()), { headers: { 'cache-control': 'public, max-age=120' } }); } catch (x) { return res(502, { error: 'mercy' }); } }
   const cl = e.requestContext.authorizer && e.requestContext.authorizer.jwt && e.requestContext.authorizer.jwt.claims;
   if (!cl || !cl.sub) return res(401, { error: 1 });
+  let b = {}; try { b = JSON.parse(e.isBase64Encoded ? Buffer.from(e.body || '', 'base64').toString() : e.body || '{}'); } catch (x) { return res(400, { error: 1 }); }
+  // Sigils earned in play: daily quests (1 each, 2 more for all three) and rare finds, at most 15 found per UTC day.
+  if (e.routeKey === 'POST /sigils/earn') {
+    const K = { userId: S(cl.sub) }, w = (await db.send(new D.GetItemCommand({ TableName: W, Key: K, ConsistentRead: true }))).Item, day = new Date().toISOString().slice(0, 10);
+    const same = !!(w && w.ed && w.ed.S === day), mask = same ? +w.eq.N : 0, dn = same ? +w.en.N : 0, bal = w && w.bal ? +w.bal.N : 100;
+    let add = 0, nm = mask, nd = dn;
+    if (b.kind === 'quest') {
+      const i = b.i | 0;
+      if (i < 0 || i > 3 || (i === 3 && (mask & 7) !== 7)) return res(400, { error: 1 });
+      if (mask & (1 << i)) return res(409, { error: 'claimed', bal, mask });
+      add = i === 3 ? 2 : 1; nm = mask | (1 << i);
+    } else if (b.kind === 'drop') {
+      add = Math.max(0, Math.min(b.n | 0, 15 - dn)); nd = dn + add;
+      if (!add) return res(200, { ok: true, add: 0, bal, mask });
+    } else return res(400, { error: 1 });
+    try {
+      await db.send(new D.UpdateItemCommand({ TableName: W, Key: K, UpdateExpression: 'SET bal = if_not_exists(bal, :g) + :a, ed = :d, eq = :m, en = :n, own = if_not_exists(own, :o)',
+        ConditionExpression: same ? 'ed = :d AND eq = :om AND en = :on' : 'attribute_not_exists(ed) OR ed <> :d',
+        ExpressionAttributeValues: Object.assign({ ':g': N(100), ':a': N(add), ':d': S(day), ':m': N(nm), ':n': N(nd), ':o': { SS: ['f.plain'] } }, same ? { ':om': N(mask), ':on': N(dn) } : {}) }));
+    } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'state' }); throw x; }
+    return res(200, { ok: true, add, bal: bal + add, mask: nm });
+  }
   // Lantern Pass: 500 Sigils for 30 days of convenience perks, stacking onto any time left.
   if (e.routeKey === 'POST /store/pass') {
     const K = { userId: S(cl.sub) }, w = (await db.send(new D.GetItemCommand({ TableName: W, Key: K }))).Item;

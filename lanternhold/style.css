@@ -1151,3 +1151,17 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .auth .b2g{width:100%;background:linear-gradient(180deg,#8b5cf6,#6d28d9);color:#fff;border-color:#7c3aed}
 .auth .or{display:flex;align-items:center;gap:10px;margin:12px 0 4px;color:var(--muted);font-size:13px}
 .auth .or::before,.auth .or::after{content:'';flex:1;height:1px;background:var(--line2)}
+/* Daily quests */
+.stat.quests{color:var(--gold);cursor:pointer;font:inherit;font-weight:800;font-size:15px;position:relative}
+.stat.quests svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8}
+.stat.quests.ready::after{content:'';position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--violet);box-shadow:0 0 8px var(--violet)}
+.quests{list-style:none;padding:0;margin:8px 0 12px;display:grid;gap:8px}
+.quest{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--panel)}
+.quest>div{flex:1;min-width:0}.quest b{display:block}.quest small{color:var(--muted);font-size:12px}
+.quest.done{border-color:var(--gold)}.quest.got{opacity:.7}
+.quest .sigil{width:14px;height:14px;vertical-align:-2px;margin-right:2px}
+.qbar{height:6px;border-radius:6px;background:var(--line);margin:6px 0 3px;overflow:hidden}.qbar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#ffd970)}
+.qok{color:var(--violet);font-weight:800;white-space:nowrap}
+.quest.bonus{background:linear-gradient(180deg,rgba(232,121,249,.08),var(--panel))}
+@media (max-width:560px){.stat.quests{font-size:13px}}
+.stat.quests{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}

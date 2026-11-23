@@ -1,4 +1,4 @@
-/* lh-build 202611231526 */
+/* lh-build 202611231531 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1540,3 +1540,5 @@ a.iconbtn{text-decoration:none}
 .mmrow{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;background:#0e121a;border:1px solid var(--line);font-size:13px}
 .mmrow b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mmrow em{font-style:normal;color:#ff9c88;font-size:12px}
 .mmcap{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.taptip{position:absolute;right:10px;bottom:10px;margin:0;width:20px;height:20px;font-size:12px;background:rgba(4,7,13,.6);z-index:2}
+body.resting .taptip{display:none}

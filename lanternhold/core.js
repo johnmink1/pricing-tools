@@ -1,4 +1,4 @@
-/* lh-build 202611231438 */
+/* lh-build 202611231442 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -1179,13 +1179,18 @@
   const jobText = (job, v) => job.stat === 'lamp' ? '+' + v.toFixed(1) + 's ' + job.fmt : '+' + Math.round(v * 100) + '% ' + job.fmt;
 
   // ---------- camp, store and consumables ----------
-  // Party changes (swapping, recruiting, training companions, gear) only happen at camp: floor 1,
-  // or anywhere while a Campfire Draught burns.
+  // Two kinds of camp (John, 2026-11-23):
+  // - The main camp on floor 1 does everything: swap companions, recruit, train camp companions, change gear.
+  //   Going back costs your place: you come back down at the top of the region you left (floor 99 -> 91).
+  // - A Campfire Draught makes a field camp anywhere: change your party's gear and carry on from the same floor,
+  //   but no companion swaps or camp training.
   const CAMP_FLOOR = 1, DRAUGHT_TIME = 60, OIL_TIME = 15;
   const atCamp = (s, now) => s.floor <= CAMP_FLOOR || (s.campUntil || 0) > (now || Date.now());
+  const atMainCamp = s => s.floor <= CAMP_FLOOR;
+  const regionTop = f => Math.max(2, Math.floor((Math.max(1, f) - 1) / 10) * 10 + 1);
   const campLeft = (s, now) => Math.max(0, ((s.campUntil || 0) - (now || Date.now())) / 1000);
   const SHOP = [
-    { id: 'draught', name: 'Campfire Draught', icon: 'flame', desc: 'Drink it anywhere to make camp for ' + DRAUGHT_TIME + ' seconds. Swap companions, recruit players, train and change gear without the walk back up.' },
+    { id: 'draught', name: 'Campfire Draught', icon: 'flame', desc: 'Drink it anywhere to make a field camp for ' + DRAUGHT_TIME + ' seconds. Change your party\'s gear and keep your place on the floor. Companion swaps still need the main camp.' },
     { id: 'oil', name: 'Flask of Lantern Oil', icon: 'oil', desc: 'Pour it during a guardian fight for ' + OIL_TIME + ' more seconds before the lantern gutters.' },
   ].concat(TONICS);
   function shopPrice(s, id) {
@@ -1194,12 +1199,9 @@
     if (t) return Math.max(60, Math.round(income * t.mult));
     return Math.max(id === 'draught' ? 40 : 25, Math.round(income * (id === 'draught' ? 2 : 1.5)));
   }
-  // The walk back up to camp has a price: free in the first ten floors, then a few minutes of income that grows with depth.
+  // The walk back up to the main camp is free in gold; its price is restarting at the top of the region.
   const CAMP_FREE_FLOOR = 10;
-  function campCost(s) {
-    if (s.floor <= CAMP_FREE_FLOOR) return 0;
-    return Math.max(30, Math.round(offlineGoldPerSec(s) * 60 * (2.5 + s.floor / 60)));
-  }
+  const campCost = s => 0;
   function buyShop(s, id, n) {
     n = n || 1; const c = shopPrice(s, id) * n;
     if (!SHOP.some(x => x.id === id) || c > s.gold) return false;
@@ -1749,7 +1751,7 @@
 
   const api = {
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
-    CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, TRAIT_FX, CAMP_TRAITS, traitsOf, traitState, traitVal, traitText, campTrait, tonicById, tonicLeft, tonicVal, drinkTonic,
+    CAMP_FLOOR, atCamp, atMainCamp, regionTop, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, TRAIT_FX, CAMP_TRAITS, traitsOf, traitState, traitVal, traitText, campTrait, tonicById, tonicLeft, tonicVal, drinkTonic,
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,

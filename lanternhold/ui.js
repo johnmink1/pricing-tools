@@ -1,4 +1,4 @@
-/* lh-build 202611231438 */
+/* lh-build 202611231442 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -612,56 +612,57 @@
   const seatLeft = {};
   function sendOff(i, id, title, text) { seatLeft[i] = L.memberById(id).name; try { leaveArena(id); } catch (e) {} toast('flame', title, text, ''); }
   // ---------- camp: party changes happen at the top of the stair ----------
+  // camp(): any camp, where gear can change (main camp or a Draught). mainCamp(): floor 1, where everything can change.
   const camp = () => L.atCamp(S, Date.now());
-  function campGate() { if (camp()) return true; campModal(); return false; }
+  const mainCamp = () => L.atMainCamp(S);
+  function campGate(full) { if (full ? mainCamp() : camp()) return true; campModal(full); return false; }
+  // Where Descend takes you: the top of the region you climbed up from.
+  const backTo = () => Math.min(S.maxFloor, L.regionTop(S.campReturn || S.maxFloor));
   function goCamp() {
-    const cost = L.campCost(S);
-    if (cost > S.gold) { toast('coin', 'Not enough gold for the climb', 'Returning to camp from floor ' + S.floor + ' costs ' + fmt(cost) + ' gold. A Campfire Draught from the store is cheaper for a quick change.', 'warn'); return; }
-    S.gold -= cost;
     S.campReturn = Math.max(S.campReturn || 0, S.floor);
     L.gotoFloor(S, L.CAMP_FLOOR); S.autoAdvance = false; $('auto').checked = false;
     closeModal(); save(); updateStage(); updatePanel(true); sfx.buy();
-    toast('flame', 'Back at camp', 'Change your party, train and gear up. Then press Descend to head back down.', 'feat');
+    toast('flame', 'Back at the main camp', 'Swap companions, recruit, train and gear up. Descend takes you to floor ' + backTo() + ', the top of the region you left.', 'feat');
   }
   function descend() {
-    const f = Math.min(S.maxFloor, Math.max(2, S.campReturn || S.maxFloor));
-    L.gotoFloor(S, f); S.autoAdvance = f >= S.maxFloor; $('auto').checked = S.autoAdvance; S.campReturn = 0;
+    const f = backTo();
+    L.gotoFloor(S, f); S.autoAdvance = true; $('auto').checked = true; S.campReturn = 0;
     save(); updateStage(); updatePanel(true);
-    toast('map', 'Down to floor ' + f, L.biomeOf(f).name + '.', '');
+    toast('map', 'Down to floor ' + f, L.biomeOf(f).name + '. The party fights its way back down from here.', '');
   }
   function drinkDraught() {
     if (!L.useDraught(S, Date.now())) { openStore(); return; }
     closeModal(); sfx.relic(); save(); updatePanel(true);
-    toast('flame', 'You make camp', 'For 60 seconds the party rests and heals, and you can swap companions, recruit, train and change gear right here.', 'feat');
+    toast('flame', 'You make a field camp', 'For ' + Math.round(L.campLeft(S, Date.now())) + ' seconds the party rests and you can change their gear right here, then carry on from floor ' + S.floor + '.', 'feat');
   }
-  function campModal() {
-    const n = (S.items && S.items.draught) || 0;
-    modal('<div class="center"><div class="campfire-ic">' + icon('flame') + '</div><h2>That happens at camp</h2><p>Swapping companions, recruiting players, training companions resting at the campfire and changing gear all happen at camp, at the top of the stair.</p></div>' +
-      '<div class="choice"><button class="pick" id="c-go"><b>Return to camp</b><small>Travel up to floor 1' + (L.campCost(S) ? ' for ' + fmt(L.campCost(S)) + ' gold' : ', free this close to the top') + '. You can head straight back down to floor ' + S.floor + ' afterwards.</small></button>' +
-      '<button class="pick" id="c-drink"' + (n ? '' : ' disabled') + '><b>Drink a Campfire Draught (' + n + ' left)</b><small>Make camp right here for 60 seconds.</small></button>' +
+  function campModal(full) {
+    const n = (S.items && S.items.draught) || 0, back = Math.min(S.maxFloor, L.regionTop(Math.max(S.campReturn || 0, S.floor)));
+    modal('<div class="center"><div class="campfire-ic">' + icon('flame') + '</div><h2>' + (full ? 'That needs the main camp' : 'That happens at camp') + '</h2><p>' + (full ? 'Swapping companions, recruiting players and training companions resting by the fire happen at the main camp on floor 1.' : 'Changing gear happens at camp. A Campfire Draught makes a field camp right here, so you keep your place.') + '</p></div>' +
+      '<div class="choice"><button class="pick" id="c-go"><b>Return to the main camp</b><small>Do everything there. When you head back down you start at floor ' + back + ', the top of this region.</small></button>' +
+      (full ? '' : '<button class="pick" id="c-drink"' + (n ? '' : ' disabled') + '><b>Drink a Campfire Draught (' + n + ' left)</b><small>Change your party\'s gear here for 60 seconds and carry on from floor ' + S.floor + '.</small></button>') +
       '<button class="pick" id="c-store"><b>Visit the store</b><small>Buy Campfire Draughts and Lantern Oil.</small></button></div>' +
       '<div class="row"><button class="btn ghost" id="c-x">Not now</button></div>', md => {
-        md.querySelector('#c-go').onclick = goCamp; md.querySelector('#c-drink').onclick = drinkDraught;
+        md.querySelector('#c-go').onclick = goCamp; const dr = md.querySelector('#c-drink'); if (dr) dr.onclick = drinkDraught;
         md.querySelector('#c-store').onclick = openStore; md.querySelector('#c-x').onclick = closeModal;
       });
   }
   function campBarHtml() {
     const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now());
-    if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>At camp</b><small>Swap companions, recruit, train and change gear.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + Math.min(S.maxFloor, Math.max(2, S.campReturn || S.maxFloor)) + '</button>' : '') + '<button class="btn ghost small" data-camp="store">Store</button></div>';
-    if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Camp made: ' + Math.ceil(left) + 's</b><small>A Campfire Draught is burning. Make your changes now.</small></div><button class="btn ghost small" data-camp="store">Store</button></div>';
-    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Swap companions and gear at camp. Training works anywhere.</small></div><button class="btn small" data-camp="go"' + (L.campCost(S) > S.gold ? ' disabled' : '') + '>Return to camp' + (L.campCost(S) ? ' · ' + fmt(L.campCost(S)) : '') + '</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
+    if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>At the main camp</b><small>Swap companions, recruit, train and change gear.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + backTo() + '</button>' : '') + '<button class="btn ghost small" data-camp="store">Store</button></div>';
+    if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Field camp: ' + Math.ceil(left) + 's</b><small>Change your party\'s gear now. You carry on from floor ' + S.floor + ' when it burns out.</small></div><button class="btn ghost small" data-camp="store">Store</button></div>';
+    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Draught: change gear here and keep going. Main camp: change everything, then restart at floor ' + Math.min(S.maxFloor, L.regionTop(S.floor)) + '.</small></div><button class="btn small" data-camp="go">Return to camp</button><button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + '>Draught (' + n + ')</button><button class="btn ghost small" data-camp="store">Store</button></div>';
   }
   let campWas = null;
   function paintCamp() {
     const h = campBarHtml();
     for (const id of ['campbar', 'campbar2', 'gearcamp']) { const el = $(id); if (el && el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; } }
-    const c = camp(); if (campWas !== null && c !== campWas) { campWas = c; updateSeats(true); paintBoard(); updateGear(true); } campWas = c;
-    document.body.classList.toggle('incamp', c);
+    const c = camp(), cw = c + '|' + mainCamp(); if (campWas !== null && cw !== campWas) { campWas = cw; updateSeats(true); paintBoard(); updateGear(true); } campWas = cw;
+    document.body.classList.toggle('incamp', mainCamp()); document.body.classList.toggle('gearok', c);
     const rc = $('restcard');
     if (rc) {
       const left = L.campLeft(S, Date.now());
       const r = left > 0 && S.floor > L.CAMP_FLOOR ? '<div><b>Resting by the fire, ' + Math.ceil(left) + 's</b><small>The party heals up. The fight waits until the draught burns out.</small></div>'
-        : '<div><b>Resting at camp</b><small>The party heals by the fire. Nobody fights while you rest.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + Math.min(S.maxFloor, Math.max(2, S.campReturn || S.maxFloor)) + '</button>' : '');
+        : '<div><b>Resting at camp</b><small>The party heals by the fire. Nobody fights while you rest.</small></div>' + (S.maxFloor > 1 ? '<button class="btn small" data-camp="down">Descend to floor ' + backTo() + '</button>' : '');
       if (rc.dataset.h !== r) { rc.innerHTML = r; rc.dataset.h = r; }
     }
   }
@@ -817,7 +818,7 @@
     if (t.dataset.autot && !L.passOn(S)) { openPass(); return; }
     if (t.dataset.autot) { const id = t.dataset.autot; S.autoTrain = S.autoTrain || {}; S.autoTrain[id] = !S.autoTrain[id]; if (!S.autoTrain[id]) delete S.autoTrain[id]; sfx.buy(); updateSeats(true); if (S.autoTrain[id]) toast('refresh', 'Auto-train on', L.memberById(id).name + ' will train whenever you have the gold' + (S.party.includes(id) ? '.' : ' and you are at camp.'), ''); return; }
     if (t.id === 'f-auto') { L.autoFormation(S); S.formationManual = false; sfx.buy(); updateSeats(true); updateAbilities(true); toast('shield', 'Party arranged', 'Tank in front, rogue behind it, healers in the middle where they reach everyone, casters at the back.', ''); return; }
-    if ((t.dataset.train && !S.party.includes(t.dataset.train)) || t.dataset.unseat || t.dataset.seat || t.dataset.dismiss || t.dataset.job || t.dataset.jobfor) { if (!campGate()) return; }
+    if ((t.dataset.train && !S.party.includes(t.dataset.train)) || t.dataset.unseat || t.dataset.seat || t.dataset.dismiss || t.dataset.job || t.dataset.jobfor) { if (!campGate(true)) return; }
     if (t.dataset.job) { jobModal(t.dataset.job); return; }
     if (t.dataset.jobfor) { jobForModal(t.dataset.jobfor); return; }
     if (t.dataset.train) { if (L.train(S, t.dataset.train, buyN())) { sfx.buy(); updateSeats(true); } }
@@ -963,7 +964,7 @@
   }
   // Accepted heroes wait in S.joinQ until the party is at camp.
   function drainJoins() {
-    if (!(S.joinQ || []).length || !camp() || !$('modal').hidden) return;
+    if (!(S.joinQ || []).length || !mainCamp() || !$('modal').hidden) return;
     const g = S.joinQ.shift();
     if (!(S.guests || []).some(x => x.id === 'p_' + g.id)) seatGuest(g);
     paintBoard();
@@ -979,7 +980,7 @@
       for (const id of Object.keys(S.sentInv)) if (!(r.sent || []).includes(id)) delete S.sentInv[id];
       for (const id of r.sent || []) if (!inv.sent[id]) inv.sent[id] = S.sentInv[id] || { id };
       for (const id of Object.keys(inv.sent)) if (!(r.sent || []).includes(id)) delete inv.sent[id];
-      for (const g of r.acc || []) { S.joinQ = (S.joinQ || []).filter(x => x.id !== g.id); S.joinQ.push(g); if (!camp()) toast('users', g.name + ' accepted your invite', 'Their hero joins your party when you are back at camp.', 'feat'); }
+      for (const g of r.acc || []) { S.joinQ = (S.joinQ || []).filter(x => x.id !== g.id); S.joinQ.push(g); if (!mainCamp()) toast('users', g.name + ' accepted your invite', 'Their hero joins your party when you are back at the main camp.', 'feat'); }
       for (const g of r.dec || []) toast('user', g.name + ' declined your invite', 'Try another hero in the Players Guild.', '');
       paintBoard();
     } catch (e) {}
@@ -1041,14 +1042,14 @@
     return d > 0 ? '<span class="cmp up">&#9650; ' + d + '% better</span>' : d < 0 ? '<span class="cmp down">&#9660; ' + (-d) + '% worse</span>' : '<span class="cmp eq">Same</span>';
   }
   // Away from camp you only see the party you brought down; the campfire roster stays hidden.
-  const gearOwners = () => { const inCamp = camp(); return S.unlocked.filter(id => { const m = L.memberById(id); return m && !m.guest && (inCamp || S.party.includes(id)); }); };
+  const gearOwners = () => { const inCamp = mainCamp(); return S.unlocked.filter(id => { const m = L.memberById(id); return m && !m.guest && (inCamp || S.party.includes(id)); }); };
   let whoRestOpen = false;
   function updateGear(force) {
     const who = gearOwners();
     if (!who.includes(gearWho)) gearWho = who[0];
     $('gearcount').textContent = L.packCount(S) || '';
     if (!gearWho) return;
-    const key = gearWho + '|' + camp() + '|' + S.party.join() + '|' + S.bag.length + '|' + JSON.stringify(S.gear) + '|' + S.bag.map(x => x.up + (x.lk ? 'L' : '')).join('') + '|' + S.unlocked.length + '|' + Math.floor(S.gold);
+    const key = gearWho + '|' + camp() + mainCamp() + '|' + S.party.join() + '|' + S.bag.length + '|' + JSON.stringify(S.gear) + '|' + S.bag.map(x => x.up + (x.lk ? 'L' : '')).join('') + '|' + S.unlocked.length + '|' + Math.floor(S.gold);
     if (!force && key === gearKey) return; gearKey = key;
     { const chip = id => {
         const m = L.memberById(id), n = Object.keys(L.betterFor(S, id)).length;
@@ -1260,7 +1261,7 @@
       '<div class="row">' + (guest ? '' : '<button class="btn ghost" id="p-gear">Manage gear</button>') + (!inParty && !guest ? '<button class="btn" id="p-seat">Bring along</button>' : '') + '<button class="btn ghost" id="p-close">Close</button></div></div>', md => {
         const box = md.querySelector('.profspr'); try { const img = SP.render(m.cls, 5, m.hue || 0); if (img) box.appendChild(img); } catch (e) {}
         const g = md.querySelector('#p-gear'); if (g) g.onclick = () => { closeModal(); gearWho = id; switchTab('gear'); };
-        const st = md.querySelector('#p-seat'); if (st) st.onclick = () => { closeModal(); if (campGate()) pickSeat(id); };
+        const st = md.querySelector('#p-seat'); if (st) st.onclick = () => { closeModal(); if (campGate(true)) pickSeat(id); };
         md.querySelector('#p-close').onclick = closeModal;
         const lk = md.querySelector('#p-looks'); if (lk) lk.onclick = openProfileEditor;
         if (id === 'you' && CL && signedIn() && !prof) Promise.all([loadProfile(), loadWar()]).then(() => { const c = md.querySelector('#p-card'); if (c && prof) c.innerHTML = looksCard({ name: m.name, cls: m.cls, level: lv, floor: S.maxFloorEver, pf: prof.pf, w: prof.wv ? prof.wl : '' }); const au = md.querySelector('#p-aura'); if (au && !au.innerHTML && L.warAura(S)) au.innerHTML = '<h3 class="sub">Grand War aura</h3>' + auraBox(); });
@@ -1413,7 +1414,7 @@
     if (e.target.closest('#k-gear')) { switchTab('gear'); return; }
     const ku = e.target.closest('[data-kup]'); if (ku) { if (L.buyKup(S, ku.dataset.kup)) { sfx.relic(); save(); updateSkills(); } return; }
     if (e.target.closest('#k-respec')) {
-      if (!campGate()) return;
+      if (!campGate(true)) return;
       const cur = L.heroCls(S), back = L.skillSpent(S), left = (S.kindling || 0) + back - L.CLASS_CHANGE_COST;
       modal('<div class="center"><h2>Change your class</h2><p>Pick a new class for ' + esc(L.memberById('you').name) + '. Your ' + back + ' tree Kindling comes back, the change costs ' + L.CLASS_CHANGE_COST + ', and you keep ' + left + ' to spend on the new tree. Gear your hero is wearing goes back to the pack. Pack size, gear slots and Kindling upgrades stay.</p>' +
         '<div class="respecs">' + L.CLASS_ORDER.filter(c => c !== cur).map(c => '<button class="btn ghost" data-newcls="' + c + '">' + icon(CLASS_ICON[c]) + '<span>' + L.CLASSES[c].name + '</span></button>').join('') + '</div><div class="row"><button class="btn ghost" id="r-no">Cancel</button></div></div>', md => {
@@ -1427,7 +1428,7 @@
       return;
     }
     if (e.target.closest('#k-reset')) {
-      if (!campGate()) return;
+      if (!campGate(true)) return;
       modal('<div class="center"><h2>Reset your skill tree?</h2><p>All ' + L.skillSpent(S) + ' Kindling comes back to you so you can choose again. You can only do this at camp.</p><div class="row"><button class="btn ghost" id="r-no">Keep it</button><button class="btn" id="r-yes">Reset</button></div></div>', md => {
         md.querySelector('#r-no').onclick = closeModal;
         md.querySelector('#r-yes').onclick = () => { L.resetSkills(S); save(); closeModal(); updateSkills(); };
@@ -1702,7 +1703,7 @@
     checkStory();
     if (now - lastSlow > 250) {
       lastSlow = now;
-      if (S.hero && S.autoTrain && now - (logic.lastAuto || 0) > 1000) { logic.lastAuto = now; if (L.autoTrain(S, camp())) updateSeats(true); }
+      if (S.hero && S.autoTrain && now - (logic.lastAuto || 0) > 1000) { logic.lastAuto = now; if (L.autoTrain(S, mainCamp())) updateSeats(true); }
       updatePanel(false);
       const got = L.checkFeats(S);
       got.forEach(f => toast('star', 'Feat earned: ' + f.name, f.desc + ' (+1% party damage)', 'feat'));
@@ -3015,8 +3016,8 @@
     { id: 'abil', title: 'Abilities', text: 'Each class has a special move. They fire by themselves, or press keys 1 to 5 (or tap them) to use one right when you need it.', target: '#abilities', ready: () => true },
     { id: 'order', title: 'Marching order', text: 'The top of this list stands at the front. Keep your tank up front, healers in the middle so they reach everyone, and watch the back for ambushes.', target: '.formhead', tab: 'party', ready: () => S.party.filter(Boolean).length >= 2 },
     { id: 'boss', title: 'Guardians', text: 'Every fifth floor has a guardian. Beat it before the lantern oil runs out, or your party falls back to train and try again.', target: '#lanternwrap', ready: () => S.foe && S.foe.boss },
-    { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor, trinkets and rings. Open Gear to see them. You put gear on at camp, at the top of the stair, or anywhere with a Campfire Draught. A green arrow marks an upgrade.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
-    { id: 'camp', title: 'Camp', text: 'Swapping companions, training them and changing gear happen at camp. This bar takes you back up and down again, and its Store sells Campfire Draughts that make camp anywhere.', target: '#campbar', tab: 'party', ready: () => S.floor > 1 && S.maxFloorEver >= 4 },
+    { id: 'gear', title: 'You found gear', text: 'Monsters drop weapons, armor, trinkets and rings. Open Gear to see them. You change gear at the main camp on floor 1, or anywhere with a Campfire Draught. A green arrow marks an upgrade.', target: '.tabs [data-tab="gear"]', ready: () => S.bag.length > 0, done: () => tab === 'gear', noNext: true },
+    { id: 'camp', title: 'Camp', text: 'The main camp on floor 1 is where you swap companions and train them; going back restarts you at the top of the region. A Campfire Draught from the Store lets you change gear right where you are.', target: '#campbar', tab: 'party', ready: () => S.floor > 1 && S.maxFloorEver >= 4 },
     { id: 'traits', title: 'Companion traits', text: 'Each companion has three traits: one for a party seat, one for a class they like fighting beside, and one for resting at camp. Working traits glow gold, so try moving people around.', target: '#seats .traits', tab: 'party', ready: () => S.unlocked.length >= 3 && !!document.querySelector('#seats .traits') },
     { id: 'map', title: 'Map of the Deep', text: 'See how far you have come, which guardians you have beaten, and travel back to any floor you have reached.', target: '#btn-map', ready: () => S.maxFloorEver >= 8 },
     { id: 'stats', title: 'Your character', text: 'Your hero earns XP from every fight. Each level brings a stat point. Open Skills and spend it on Strength, Wisdom, Luck and the rest. Your class favours two of them.', target: '.tabs [data-tab="rekindle"]', ready: () => !!S.hero && L.heroPoints(S) > 0 },
@@ -3175,11 +3176,10 @@
         'Duplicates level a relic up. They stay through rekindling.']],
     ] },
     { id: 'camp', name: 'Camp', icon: 'flame', topics: [
-      ['Camp', 'i:flame', 'The top of the stair, floor 1. Party and gear changes happen here.', [
-        '<b>Return to camp</b> on the camp bar. Free in the first 10 floors, then costs gold.',
-        '<b>Descend</b> takes you straight back to the floor you left.',
-        'The party rests and heals while at camp.',
-        'Training works anywhere.']],
+      ['Main camp or a Draught', 'i:flame', 'Two ways to make changes in the Deep.', [
+        '<b>Main camp</b> (floor 1): swap companions, recruit, train camp companions and change gear. <b>Descend</b> restarts you at the top of the region you left, so floor 99 becomes 91.',
+        '<b>Campfire Draught</b>: a field camp for 60 seconds. Change your party\'s gear and keep your floor. No companion swaps.',
+        'The party rests and heals at either. Training party members works anywhere.']],
       ['Camp jobs', 'i:hammer', 'Resting companions can take a job that helps the whole party.', [
         '<b>Forager</b>: gear drops. <b>Runesmith</b>: damage. <b>Herbalist</b>: healing.',
         '<b>Armorer</b>: health. <b>Prospector</b>: gold. <b>Lamplighter</b>: lantern oil.',
@@ -3188,7 +3188,7 @@
         'Combat: <b>+15% damage</b>, <b>+15% health</b>, <b>+20% healing</b>, <b>+5% crit</b> (gold only).',
         'Speed-ups: <b>+15% gold</b>, <b>+15% gear drops</b>, <b>+25% hero XP</b> (gold or Sigils).',
         'Different tonics stack. The same one adds time, up to an hour. Tap one above your abilities to drink.',
-        '<b>Campfire Draught</b>: camp anywhere for 60 seconds. <b>Lantern Oil</b>: +15 seconds against a guardian.']],
+        '<b>Campfire Draught</b>: change gear anywhere for 60 seconds and keep your floor. <b>Lantern Oil</b>: +15 seconds against a guardian.']],
     ] },
     { id: 'grow', name: 'Getting stronger', icon: 'star', topics: [
       ['Your character', 'i:user', 'Your hero earns XP from every fight and gets a stat point each level.', [
@@ -3266,11 +3266,15 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 43, date: 'November 23, 2026', title: 'The Ember Ring: duels between players', items: [
+    { v: 44, date: 'November 23, 2026', title: 'The Ember Ring: duels between players', items: [
       'Open the new PvP tab to duel other players\u2019 heroes one on one. Only your own hero fights: no companions, tonics or Sigils.',
       'Wins earn Laurels and rating. Climb from Ashen through Ironclad, Emberborn, Gilded and Lanternsworn to Riftbreaker on the Ring standings.',
       'Spend Laurels on the Ringwarden kit, a separate set of PvP gear with 15 ranks per piece. Its Edge and Resolve count only in the Ring.',
       'You get 10 challenges, and one returns every 30 minutes. Your hero also defends while you are away and earns Laurels for every challenger it beats.'] },
+    { v: 43, date: 'November 23, 2026', title: 'Main camp and field camps', items: [
+      'Return to camp now takes you to the main camp with no gold cost. Swap companions, recruit, train and change gear there.',
+      'When you head back down you start at the top of the region you left. Floor 99 takes you back to floor 91.',
+      'A Campfire Draught makes a field camp right where you are. Change your party\'s gear for 60 seconds and keep your floor. Companion swaps need the main camp.'] },
     { v: 42, date: 'November 23, 2026', title: 'Mass sell', items: [
       'New Mass sell button next to Mass scrap in your Gear tab. Pick rarities and list many pieces on the market at once, each at its current value.',
       'Worn and locked items are never listed. You can keep the best piece of each kind and anything you have upgraded.',

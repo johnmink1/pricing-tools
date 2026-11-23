@@ -1,7 +1,9 @@
-const { DynamoDBClient, UpdateItemCommand, ScanCommand } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBClient, UpdateItemCommand, ScanCommand, PutItemCommand } = require('@aws-sdk/client-dynamodb');
 const crypto = require('crypto');
 const db = new DynamoDBClient({});
-const T = process.env.TABLE;
+const T = process.env.TABLE, CH = process.env.CHAT;
+const SIDE_NAME = { covenant: 'the Iron Covenant', radiant: 'the Radiant Ascendancy', tide: 'the Devouring Tide', mercy: 'the Mercy Corps', unsworn: 'the Unsworn' };
+const CLS_NAME = { tank: 'tank', healer: 'healer', rogue: 'rogue', mage: 'mage', necro: 'necromancer' };
 const CLS = ['tank', 'healer', 'rogue', 'mage', 'necro'];
 const SIDES = ['covenant', 'radiant', 'tide', 'mercy', 'unsworn'];
 const BAD = /(fuck|shit|cunt|nigg|fag|rape|nazi|hitler|bitch|whore|dick|cock|puss|slut|porn)/i;
@@ -29,6 +31,12 @@ exports.handler = async (e) => {
         ExpressionAttributeValues: { ':n': { S: name }, ':c': { S: b.cls }, ':l': { N: String(level) }, ':f': { N: String(floor) }, ':s': { S: side }, ':t': { N: String(Date.now()) }, ':z': { N: '0' }, ':u': { S: cl.sub } },
         ReturnValues: 'UPDATED_OLD' }));
     } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(403, { error: 'banned' }); throw x; }
+    // A brand-new hero is announced in Global chat with their alliance.
+    if (CH && !(r.Attributes && r.Attributes.name)) {
+      const now = Date.now();
+      try { await db.send(new PutItemCommand({ TableName: CH, Item: { pk: { S: 'global' }, sk: { S: now.toString(36).padStart(9, '0') + crypto.randomBytes(3).toString('hex') }, from: { S: 'sys' }, name: { S: 'Lanternhold' }, cls: { S: 'sys-' + side },
+        text: { S: name + ' took up the lantern for ' + SIDE_NAME[side] + ' as a ' + CLS_NAME[b.cls] + '. Welcome to the deep!' }, ttl: { N: String(Math.floor(now / 1000) + 7 * 86400) } } })); } catch (x) {}
+    }
     const old = r.Attributes && r.Attributes.recruits;
     return res(200, { ok: true, id: me, recruits: old ? Number(old.N) : 0 });
   }

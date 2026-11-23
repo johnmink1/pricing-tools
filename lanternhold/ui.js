@@ -727,7 +727,11 @@
       (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>No ' + L.CLASSES[it.cls].name + ' in your roster yet</button>') +
       '<button class="btn ghost" id="i-up"' + (maxed || cost > S.gold ? ' disabled' : '') + '>' + (maxed ? 'Fully upgraded' : 'Upgrade for ' + fmt(cost) + ' gold') + '</button>' +
       '<button class="btn danger" id="i-sell">Salvage for ' + fmt(L.salvageValue(it)) + '</button></div>' +
+      (CL ? '<div class="row"><button class="btn ghost" id="i-mkt">Sell on market</button><button class="btn ghost" id="i-send">Send to a player</button></div>' : '') +
       '<div class="row">' + (CL ? '<button class="btn ghost" id="i-link">Link in chat</button>' : '') + '<button class="btn ghost" id="i-close">Close</button></div>', md => {
+        const gate = f => () => { if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
+        const mk = md.querySelector('#i-mkt'); if (mk) mk.onclick = gate(sellItem);
+        const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
         const lk = md.querySelector('#i-link'); if (lk) lk.onclick = () => { closeModal(); linkItem(it); };
         const re = () => { updateGear(true); updateSeats(true); itemModal(uid); };
         const on = md.querySelector('#i-on'); if (on) on.onclick = () => { L.equip(S, gearWho, uid); sfx.buy(); re(); };
@@ -1566,6 +1570,7 @@
     ['Story, journal and map', '<p>The story unfolds as you go deeper, and new companions join along the way. Replay scenes and read everything you have learned in the <b>Journal</b>.</p><p>The <b>Map of the Deep</b> (under the floor number) shows every region, the guardians you have beaten and where you are. Tap a floor you have reached to travel there.</p>'],
     ['Relics and rekindling', '<p><b>Relics</b> are permanent bonuses that guardians sometimes drop. Duplicates level them up.</p><p>From floor 25 you can <b>rekindle</b> the lantern: start again from floor 1 and earn <b>Embers</b>. Each Ember adds 10% damage and gold forever. Your companions, gear, relics and lore stay; levels reset. Rekindle when progress slows down.</p>'],
     ['Campfire and Players Guild', '<p>Your party has five seats, and there are two ways to fill them, both in the Party tab.</p><p><b>Campfire</b>: story companions join you as the story moves forward and rest by the fire. Press <b>Bring along</b> to seat one, or <b>To campfire</b> on a seat to send them back. The Campfire also shows who joins next.</p><p><b>Players Guild</b>: heroes made by other players, stronger than story companions. Sign in with a free account, press <b>Browse the guild</b>, then <b>Recruit</b> to fill an empty seat. Heroes marked <b>Online now</b> belong to players who are playing right now. Press <b>Dismiss</b> on their seat to let them go. Your own hero is in the guild too, and you earn gold each time someone recruits it.</p>'],
+    ['Trading Post: market and mail', '<p>Open the <b>Trading Post</b> (the bag button at the top) to trade gear with other players. It needs a free account.</p><p><b>Market</b>: browse gear by class and buy it for gold. To sell, tap an item in your Gear tab and choose <b>Sell on market</b>. Listings last a week, and you can take yours down any time. When something sells, the gold arrives in your mailbox.</p><p><b>Mail</b>: tap an item and choose <b>Send to a player</b> to send it to someone you have recruited or chatted with. Leave the price at 0 for a gift, or set a price they pay if they accept. They can decline, and you can take an offer back until they answer.</p><p>Gold and gear are in-game only and have no real-money value.</p>'],
     ['Multiplayer and chat', '<p>With a free account your progress is saved online and works on any device.</p><p>Once you sign in, your hero appears on a board where other players can recruit it, and you earn gold each time. You can recruit their heroes too. Player heroes are stronger than story companions.</p><p><b>Chat</b> (the speech bubble) has Global, Trade and Party channels. Ctrl+click an item to link it. Tap a name to mute or report. No web links, and be kind.</p>'],
     ['Controls', '<ul><li><b>Tap the arena, Space or Enter</b>: strike</li><li><b>1 to 5</b>: use an ability</li><li><b>Ctrl+click an item</b>: link it in chat</li><li><b>Arrows on the floor header</b>: move between floors you have reached</li></ul>'],
   ];
@@ -1583,6 +1588,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 9, date: 'November 22, 2026', title: 'The Trading Post', items: [
+      'A market: list gear for gold, browse what other players are selling, and buy it.',
+      'Player mail: send gear to players you have recruited or chatted with, as a gift or with a price they can accept or decline.',
+      'Sales and payments arrive in your mailbox. A badge on the bag button shows new mail.'] },
     { v: 8, date: 'November 22, 2026', title: 'A cleaner look', items: [
       'New gear screen: see each companion holding their gear, with weapon, armor and trinket slots and your pack laid out as an inventory grid.',
       'Hand-drawn pixel icons for every weapon, armor and trinket, framed in their rarity colour.',
@@ -1631,6 +1640,195 @@
   // Show once after an update, when nothing else is on screen. Brand-new players get the tutorial instead.
   if (S.hero && !S.seenNotes && S.tut && !S.tut.done) S.seenNotes = NOTES_V;
   setInterval(() => { if (S.hero && (S.seenNotes || 0) < NOTES_V && $('modal').hidden && !sceneOpen && !(S.tut && !S.tut.done)) openNotes(); }, 3000);
+  // ---------- trading post: market and player mail ----------
+  // Items and gold live in each player's save, so the client moves them; the server keeps
+  // listings, offers and letters so both sides see the same thing.
+  const trade = { view: 'market', cls: null, mine: false, list: null, mail: null, msg: '', busy: false };
+  const tradeItem = it => ({ cls: it.cls, slot: it.slot, rar: it.rar, set: it.set || undefined, ilvl: it.ilvl, up: it.up || 0 });
+  const fromServer = it => Object.assign(tradeItem(it), { uid: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) });
+  const bagFull = () => S.bag.length >= L.GEAR_CAP;
+  const tradeTile = it => '<div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>';
+  const tradeName = it => esc(L.gearName(it)) + (it.up ? ' +' + it.up : '');
+  const tradeSub = it => L.RARITY.find(r => r.id === it.rar).name + ' ' + L.CLASSES[it.cls].name.toLowerCase() + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it);
+  const tradeErr = (e, what) => {
+    const c = e && e.code;
+    if (what === 'send' && e && e.status === 404) return 'That player could not be found. They may need to sign in again.';
+    if (what === 'send' && e && e.status === 400) return 'That offer could not be sent. You may have 20 offers waiting already.';
+    return c === 'full' ? (what === 'list' ? 'You have 10 items listed already. Cancel one first.' : 'You have 20 offers waiting already. Recall one first.')
+      : c === 'gone' || (e && e.status === 404) ? 'That is no longer available.'
+      : c === 'nobody' ? 'That player has not published a hero yet.'
+      : e && e.status === 401 ? 'Sign in again to trade.' : 'The Trading Post could not be reached. Try again in a moment.';
+  };
+  function takeFromBag(uid) {
+    const it = L.itemOf(S, uid); if (!it) return null;
+    const w = L.wearer(S, uid); if (w) L.unequip(S, w, it.slot);
+    S.bag = S.bag.filter(x => x.uid !== uid);
+    return it;
+  }
+  function afterTrade() { save(); try { pushCloud(true); } catch (e) {} updateGear(true); updateSeats(true); }
+
+  async function loadMarket() {
+    trade.list = null; trade.msg = 'Opening the stalls…'; paintTrade();
+    try { const r = await chatCall('GET', '/market?' + (trade.mine ? 'mine=1' : 'cls=' + trade.cls)); trade.list = r.listings || []; trade.me = r.me; trade.msg = ''; }
+    catch (e) { trade.msg = tradeErr(e); }
+    paintTrade();
+  }
+  async function loadMail(quiet) {
+    if (!quiet) { trade.msg = 'Checking your mail…'; paintTrade(); }
+    try { trade.mail = await chatCall('GET', '/mail'); trade.msg = ''; } catch (e) { if (!quiet) trade.msg = tradeErr(e); }
+    const n = trade.mail ? trade.mail.inbox.length : 0;
+    $('tradedot').hidden = !n; $('tradedot').textContent = n > 9 ? '9+' : n;
+    if (!quiet) paintTrade();
+  }
+
+  function openTrade(view) {
+    if (!CL) return;
+    if (!signedIn()) { toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; }
+    if (view) trade.view = view;
+    if (!trade.cls) { const m = L.memberById(gearWho || 'you'); trade.cls = m ? m.cls : 'tank'; }
+    paintTrade();
+    if (trade.view === 'market') loadMarket(); else loadMail();
+  }
+  function paintTrade() {
+    const seg = '<div class="seg tradeseg"><button data-tv="market"' + (trade.view === 'market' ? ' class="on"' : '') + '>Market</button><button data-tv="mail"' + (trade.view === 'mail' ? ' class="on"' : '') + '>Mailbox' + (trade.mail && trade.mail.inbox.length ? ' <em>' + trade.mail.inbox.length + '</em>' : '') + '</button></div>';
+    let h = '<div class="maphead"><div><h2>Trading Post</h2><small>Trade gear with other players for gold. To sell or send something, tap it in your Gear tab.</small></div><button class="iconbtn" id="t-x" aria-label="Close">&times;</button></div>' + seg;
+    if (trade.view === 'market') {
+      h += '<div class="whoseg tradecls">' + L.CLASS_ORDER.map(c => '<button class="whochip c-' + c + (!trade.mine && trade.cls === c ? ' on' : '') + '" data-tc="' + c + '"><img src="' + SP.spriteURL(c, 2) + '" alt=""><span>' + L.CLASSES[c].name + '</span></button>').join('') +
+        '<button class="whochip' + (trade.mine ? ' on' : '') + '" data-tc="mine"><span>My listings</span></button></div>';
+      if (trade.msg) h += '<p class="note">' + esc(trade.msg) + '</p>';
+      if (trade.list) {
+        h += trade.list.length ? '<div class="tlist">' + trade.list.map(l => {
+          const mine = trade.mine || l.seller === trade.me;
+          return '<div class="trow">' + tradeTile(l.item) + '<div class="tinfo"><b class="r-' + l.item.rar + '">' + tradeName(l.item) + '</b><small>' + tradeSub(l.item) + '</small><small>' + (mine ? 'Your listing' : 'Sold by ' + esc(l.name)) + '</small></div>' +
+            '<div class="tact"><span class="price">' + icon('coin') + fmt(l.price) + '</span>' +
+            (mine ? '<button class="btn ghost small" data-tcancel="' + l.id + '" data-tcls="' + l.cls + '">Take down</button>' : '<button class="btn small" data-tbuy="' + l.id + '" data-tcls="' + l.cls + '"' + (l.price > S.gold ? ' disabled title="Not enough gold"' : '') + '>Buy</button>') + '</div></div>';
+        }).join('') + '</div>' : '<p class="note">' + (trade.mine ? 'You have nothing for sale. Tap an item in your Gear tab and choose Sell on market.' : 'No ' + L.CLASSES[trade.cls].name.toLowerCase() + ' gear for sale right now.') + '</p>';
+      }
+    } else {
+      if (trade.msg) h += '<p class="note">' + esc(trade.msg) + '</p>';
+      const mb = trade.mail;
+      if (mb) {
+        const letters = mb.inbox.filter(l => l.type !== 'offer'), offers = mb.inbox.filter(l => l.type === 'offer');
+        h += '<h3 class="sub">Inbox</h3>';
+        if (!mb.inbox.length) h += '<p class="note">Nothing new. Players can send you gear as a gift or with a price you can accept.</p>';
+        if (letters.length > 1) h += '<div class="row"><button class="btn small" id="t-claimall">Collect all (' + letters.length + ')</button></div>';
+        h += '<div class="tlist">' + letters.map(l => {
+          const what = l.type === 'sale' ? esc(l.fromName) + ' bought your ' + tradeName(l.item) + '.'
+            : l.type === 'payment' ? esc(l.fromName) + ' accepted your offer and paid for ' + tradeName(l.item) + '.'
+            : esc(l.fromName) + ' declined your offer. Your ' + tradeName(l.item) + ' came back.';
+          return '<div class="trow">' + tradeTile(l.item) + '<div class="tinfo"><b>' + (l.type === 'return' ? 'Returned' : 'Gold for you') + '</b><small>' + what + '</small></div><div class="tact">' + (l.gold ? '<span class="price">' + icon('coin') + fmt(l.gold) + '</span>' : '') + '<button class="btn small" data-tclaim="' + l.id + '">Collect</button></div></div>';
+        }).join('') + offers.map(l => '<div class="trow">' + tradeTile(l.item) + '<div class="tinfo"><b class="r-' + l.item.rar + '">' + tradeName(l.item) + '</b><small>' + tradeSub(l.item) + '</small><small>From ' + esc(l.fromName) + (l.note ? ': “' + esc(l.note) + '”' : '') + '</small></div><div class="tact">' +
+          (l.price ? '<span class="price">' + icon('coin') + fmt(l.price) + '</span>' : '<span class="gift">Gift</span>') +
+          '<button class="btn small" data-taccept="' + l.id + '"' + (l.price > S.gold ? ' disabled title="Not enough gold"' : '') + '>' + (l.price ? 'Pay and take' : 'Accept') + '</button><button class="btn ghost small" data-tdecline="' + l.id + '">Decline</button></div></div>').join('') + '</div>';
+        if (mb.outbox.length) h += '<h3 class="sub">Waiting for an answer</h3><div class="tlist">' + mb.outbox.map(l => '<div class="trow">' + tradeTile(l.item) + '<div class="tinfo"><b class="r-' + l.item.rar + '">' + tradeName(l.item) + '</b><small>To ' + esc(l.toName) + (l.price ? ' for ' + fmt(l.price) + ' gold' : ' as a gift') + '</small></div><div class="tact"><button class="btn ghost small" data-trecall="' + l.id + '">Take back</button></div></div>').join('') + '</div>';
+      }
+    }
+    h += '<p class="note small">Trades are between players. Gold and gear are in-game only and have no real-money value.</p>';
+    if ($('modal').hidden || !$('modalbody').querySelector('.tradepost')) modal('<div class="tradepost"></div>', md => md.className = 'sheet wide');
+    const box = $('modalbody').querySelector('.tradepost'); if (box) box.innerHTML = h;
+  }
+  async function tradeAct(fn, what) {
+    if (trade.busy) return; trade.busy = true;
+    try { await fn(); } catch (e) { toast('lock', 'Trade did not go through', tradeErr(e, what), 'warn'); }
+    trade.busy = false;
+  }
+  $('modalbody').addEventListener('click', e => {
+    if (!$('modalbody').querySelector('.tradepost')) return;
+    const t = e.target.closest('button'); if (!t) return;
+    const d = t.dataset;
+    if (t.id === 't-x') { closeModal(); return; }
+    if (d.tv) { trade.view = d.tv; trade.msg = ''; paintTrade(); d.tv === 'market' ? loadMarket() : loadMail(); return; }
+    if (d.tc) { if (d.tc === 'mine') trade.mine = true; else { trade.mine = false; trade.cls = d.tc; } loadMarket(); return; }
+    if (d.tbuy) tradeAct(async () => {
+      const l = trade.list.find(x => x.id === d.tbuy); if (!l) return;
+      if (bagFull()) { toast('bag', 'Your pack is full', 'Salvage something first.', 'warn'); return; }
+      if (l.price > S.gold) return;
+      const r = await chatCall('POST', '/market/buy', { id: l.id, cls: l.cls, name: S.hero.name });
+      S.gold -= r.price; S.bag.push(fromServer(r.item)); afterTrade(); sfx.coin();
+      toast('bag', 'Bought ' + L.gearName(r.item), 'It is in your pack now.', 'feat'); loadMarket();
+    });
+    if (d.tcancel) tradeAct(async () => {
+      if (bagFull()) { toast('bag', 'Your pack is full', 'Salvage something first, then take your listing down.', 'warn'); return; }
+      const r = await chatCall('POST', '/market/cancel', { id: d.tcancel, cls: d.tcls });
+      S.bag.push(fromServer(r.item)); afterTrade(); toast('bag', 'Listing taken down', 'The item is back in your pack.', ''); loadMarket();
+    });
+    if (d.tclaim || t.id === 't-claimall') tradeAct(async () => {
+      const ids = d.tclaim ? [d.tclaim] : trade.mail.inbox.filter(l => l.type !== 'offer').map(l => l.id);
+      let gold = 0, items = 0;
+      for (const id of ids) {
+        const l = trade.mail.inbox.find(x => x.id === id);
+        if (l.type === 'return' && bagFull()) { toast('bag', 'Your pack is full', 'Salvage something to collect returned gear.', 'warn'); break; }
+        const r = await chatCall('POST', '/mail/claim', { id });
+        const L2 = r.letter;
+        if (L2.type === 'return') { S.bag.push(fromServer(L2.item)); items++; } else { S.gold += L2.gold; S.stats.goldEarned += L2.gold; gold += L2.gold; }
+      }
+      afterTrade(); sfx.coin();
+      toast('coin', 'Collected', [gold ? '+' + fmt(gold) + ' gold' : '', items ? items + (items === 1 ? ' item' : ' items') + ' back in your pack' : ''].filter(Boolean).join(', ') || 'Done.', 'feat');
+      loadMail();
+    });
+    if (d.taccept) tradeAct(async () => {
+      const l = trade.mail.inbox.find(x => x.id === d.taccept); if (!l) return;
+      if (bagFull()) { toast('bag', 'Your pack is full', 'Salvage something first.', 'warn'); return; }
+      if (l.price > S.gold) return;
+      await chatCall('POST', '/mail/accept', { id: l.id });
+      S.gold -= l.price; S.bag.push(fromServer(l.item)); afterTrade(); sfx.coin();
+      toast('bag', L.gearName(l.item) + ' is yours', l.price ? 'You paid ' + fmt(l.price) + ' gold.' : 'A gift from ' + l.fromName + '.', 'feat'); loadMail();
+    });
+    if (d.tdecline) tradeAct(async () => { await chatCall('POST', '/mail/decline', { id: d.tdecline }); toast('bag', 'Offer declined', 'The item goes back to its sender.', ''); loadMail(); });
+    if (d.trecall) tradeAct(async () => {
+      if (bagFull()) { toast('bag', 'Your pack is full', 'Salvage something first.', 'warn'); return; }
+      const r = await chatCall('POST', '/mail/recall', { id: d.trecall });
+      S.bag.push(fromServer(r.letter.item)); afterTrade(); toast('bag', 'Offer taken back', 'The item is back in your pack.', ''); loadMail();
+    });
+  });
+
+  // Sell or send, from the item window
+  function sellItem(uid) {
+    const it = L.itemOf(S, uid); if (!it) return;
+    const sug = Math.max(10, Math.round(L.salvageValue(it) * 3));
+    modal('<div class="itemhead r-' + it.rar + '">' + tradeTile(it) + '<div><h2>Sell ' + tradeName(it) + '</h2><small>' + tradeSub(it) + '</small></div></div>' +
+      '<p>Set a price in gold. Other players can buy it for a week. If nobody does, take it down from the market to get it back.</p>' +
+      '<label class="field">Price<input id="t-price" type="number" min="1" step="1" inputmode="numeric" value="' + sug + '"></label><small class="note">Salvage value is ' + fmt(L.salvageValue(it)) + ' gold.</small>' +
+      (L.wearer(S, uid) ? '<p class="note">' + esc(L.memberById(L.wearer(S, uid)).name) + ' will take it off.</p>' : '') +
+      '<div class="row"><button class="btn" id="t-sell">List for sale</button><button class="btn ghost" id="t-cancel">Cancel</button></div>', md => {
+        md.querySelector('#t-cancel').onclick = () => itemModal(uid);
+        md.querySelector('#t-sell').onclick = () => tradeAct(async () => {
+          const price = Math.floor(+md.querySelector('#t-price').value);
+          if (!(price >= 1)) { md.querySelector('#t-price').focus(); return; }
+          await chatCall('POST', '/market/list', { item: tradeItem(it), price, name: S.hero.name });
+          takeFromBag(uid); afterTrade(); closeModal(); sfx.buy();
+          toast('coin', 'Listed for ' + fmt(price) + ' gold', 'You will get mail when it sells.', 'feat');
+        }, 'list');
+      });
+  }
+  function sendItem(uid) {
+    const it = L.itemOf(S, uid); if (!it) return;
+    const people = new Map();
+    for (const g of S.guests || []) people.set(g.id.slice(2), g.name);
+    for (const k in chat.msgs) for (const m of chat.msgs[k] || []) if (m.from && m.from !== chat.me && !chat.muted.has(m.from)) people.set(m.from, m.name);
+    const list = [...people].slice(-12).reverse();
+    let to = list.length ? list[0][0] : null;
+    modal('<div class="itemhead r-' + it.rar + '">' + tradeTile(it) + '<div><h2>Send ' + tradeName(it) + '</h2><small>' + tradeSub(it) + '</small></div></div>' +
+      (list.length ? '<p>Send it to a player you have recruited or chatted with. Leave the price at 0 to make it a gift. With a price, they pay it if they accept.</p><div class="choice" id="t-to">' + list.map(([pid, nm], i) => '<button class="pick' + (i ? '' : ' on') + '" data-to="' + pid + '"><b>' + esc(nm) + '</b></button>').join('') + '</div>' +
+        '<label class="field">Price in gold<input id="t-price" type="number" min="0" step="1" inputmode="numeric" value="0"></label><label class="field">Note (optional)<input id="t-note" maxlength="80" placeholder="Thanks for the run!"></label>' +
+        '<div class="row"><button class="btn" id="t-send">Send</button><button class="btn ghost" id="t-cancel">Cancel</button></div>'
+        : '<p>You can send gear to players you have recruited from the Players Guild or chatted with. Say hello in chat first, then try again.</p><div class="row"><button class="btn ghost" id="t-cancel">Back</button></div>'), md => {
+        md.querySelector('#t-cancel').onclick = () => itemModal(uid);
+        const tb = md.querySelector('#t-to'); if (tb) tb.onclick = e => { const b = e.target.closest('[data-to]'); if (!b) return; to = b.dataset.to; tb.querySelectorAll('.pick').forEach(x => x.classList.toggle('on', x === b)); };
+        const sb = md.querySelector('#t-send'); if (sb) sb.onclick = () => tradeAct(async () => {
+          const price = Math.max(0, Math.floor(+md.querySelector('#t-price').value || 0));
+          const r = await chatCall('POST', '/mail/send', { to, item: tradeItem(it), price, note: md.querySelector('#t-note').value.trim() });
+          takeFromBag(uid); afterTrade(); closeModal(); sfx.buy();
+          toast('bag', 'Sent to ' + r.toName, price ? 'They can pay ' + fmt(price) + ' gold to take it, or send it back.' : 'A gift. It is theirs as soon as they accept.', 'feat');
+        }, 'send');
+      });
+  }
+  if (CL) {
+    $('btn-trade').hidden = false;
+    $('btn-trade').addEventListener('click', () => openTrade());
+    setInterval(() => { if (signedIn() && !document.hidden) loadMail(true); }, 90000);
+    setTimeout(() => { if (signedIn()) loadMail(true); }, 4000);
+  }
   // ---------- boot ----------
   resize();
   window.addEventListener('resize', resize);

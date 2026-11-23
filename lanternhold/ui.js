@@ -2436,19 +2436,32 @@
 
   // ---------- update available ----------
   // version.json is stamped on every release; if it differs from this page's build, offer a refresh.
+  // Updates are mandatory: when a new build is out, the game saves, counts down and reloads, so nobody plays on old code.
+  let updating = false;
+  async function loadBuild(b) {
+    try { save(); } catch (e) {}
+    try { if (typeof pushCloud === 'function' && signedIn()) await Promise.race([pushCloud(true), new Promise(r => setTimeout(r, 4000))]); } catch (e) {}
+    // A fresh query string skips any cached copy of the page.
+    location.replace(location.pathname + '?u=' + encodeURIComponent(b || Date.now()) + location.hash);
+  }
   async function checkUpdate() {
-    if (!window.LH_BUILD) return;
+    if (!window.LH_BUILD || updating) return;
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
       const j = await r.json();
-      if (j.build && j.build !== window.LH_BUILD && $('btn-update').hidden) {
-        $('btn-update').hidden = false;
-        toast('refresh', 'A new update is ready', 'Tap Update ready at the top to load it. Your progress is saved first, and the patch notes show what changed.', 'feat');
-      }
+      if (!j.build || j.build === window.LH_BUILD) return;
+      // Already reloaded for this build but the page is still old (a slow cache): offer the button instead of looping.
+      if (new URLSearchParams(location.search).get('u') === j.build) { $('btn-update').hidden = false; return; }
+      updating = true;
+      let n = 10;
+      modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Update required</h2><p>A new version of Lanternhold is out. Your progress is saved, and the game reloads in <b id="up-n">' + n + '</b> seconds.</p><div class="row" style="justify-content:center"><button class="btn" id="up-now">Update now</button></div></div>', md => {
+        md.querySelector('#up-now').onclick = () => loadBuild(j.build);
+      });
+      const t = setInterval(() => { n--; const e = $('up-n'); if (e) e.textContent = Math.max(0, n); if (n <= 0) { clearInterval(t); loadBuild(j.build); } }, 1000);
     } catch (e) {}
   }
-  $('btn-update').addEventListener('click', () => { try { save(); } catch (e) {} try { pushCloud && pushCloud(true); } catch (e) {} setTimeout(() => location.reload(), 300); });
-  setInterval(checkUpdate, 5 * 60 * 1000);
+  $('btn-update').addEventListener('click', () => loadBuild(''));
+  setInterval(checkUpdate, 2 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
   setTimeout(checkUpdate, 20000);
 
@@ -2542,6 +2555,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 24, date: 'November 23, 2026', title: 'Automatic updates', items: [
+      'When a new version comes out, the game now saves your progress and reloads itself after a short countdown, so everyone always plays the latest version with the latest fixes.'] },
     { v: 23, date: 'November 23, 2026', title: 'Smaller numbers and the Sigil exchange', items: [
       'Gold, damage, health and prices have been rescaled. Numbers now stay small and plain, written out in full with commas instead of letters like K or M. The pace of the climb is about the same.',
       'Your gold was converted so it still buys the same amount of training. Your levels, floors, gear and Embers are unchanged.',

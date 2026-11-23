@@ -535,6 +535,46 @@
   });
 
   // ---------------- guardians: 200 x 200 ----------------
+  ART.goblin = F(c => {
+    const skin = c.lg(['#8fd16a', '#5aa042', '#2f6a2a'], 0.1, 0, 0.9, 1), sack = c.lg(['#c9a36a', '#8c6a3a', '#5a4022'], 0.1, 0, 0.9, 1),
+      vest = c.lg(['#7a4a3a', '#53302a', '#321a16'], 0, 0, 1, 1), gold = c.lg(['#fff1a8', '#f2c14e', '#a8761e']), steel = c.lg(['#ffffff', '#b8c4d4', '#5a6578']);
+    return [
+      E(80, 152, 56, 6, '#000', ' opacity=".45"'),
+      // loot sack slung over the back, coins spilling out
+      P('M22 100 Q10 70 34 52 Q54 40 70 56 Q82 72 74 98 Q66 120 44 120 Q28 118 22 100Z', sack),
+      L_('M30 62 Q40 70 36 86 M50 54 Q58 66 56 82', '#4a3218', 1.4, ' opacity=".6"'),
+      P('M58 52 Q66 44 74 46 L70 56Z', sack), L_('M60 54 Q66 52 72 52', '#3a2410', 2.2),
+      Eo(66, 44, 5, 3.4, gold, ' stroke-width="1.4"'), Eo(74, 40, 4.4, 3, gold, ' stroke-width="1.4"'), Eo(60, 40, 4, 2.8, gold, ' stroke-width="1.4"'),
+      C(68, 34, 3, c.lg(['#c8f0ff', '#3aa0e8']), ' stroke="' + OUT + '" stroke-width="1.2"'),
+      Pn('M28 70 Q32 58 44 54', 'none', ' stroke="#ffffff" stroke-width="1.6" opacity=".35"'),
+      // legs and big feet
+      P('M70 124 L64 146 L52 150 L54 156 L76 156 L80 128Z', skin), P('M98 124 L104 146 L116 150 L116 156 L94 156 L90 128Z', skin),
+      // body and vest
+      P('M62 128 Q56 98 72 84 Q88 74 104 84 Q118 98 110 128 Q86 138 62 128Z', skin),
+      P('M64 124 Q60 100 74 88 Q86 82 98 86 L94 126 Q80 132 64 124Z', vest),
+      P('M62 122 Q86 134 110 122 L110 130 Q86 140 62 130Z', '#3a2410', ' stroke-width="1.6"'), Eo(86, 129, 4, 3.4, gold, ' stroke-width="1.2"'),
+      // strap of the sack across the chest
+      L_('M66 88 L104 122', '#3a2410', 4.5), L_('M66 88 L104 122', '#8c6a3a', 2.4),
+      // arm holding the sack strap
+      P('M70 92 Q58 96 54 84 Q52 74 60 70 L66 78 Q64 86 72 86Z', skin),
+      // arm with dagger, reaching forward
+      P('M104 94 Q118 98 126 108 L120 114 Q112 106 102 104Z', skin),
+      G(P('M0 -2 L26 -4 L30 0 L26 4 L0 2Z', steel, ' stroke-width="1.6"') + P('M-3 -6 H2 V6 H-3Z', '#3a2410', ' stroke-width="1.4"') + P('M-12 -2.5 H-3 V2.5 H-12Z', '#6a4a2a', ' stroke-width="1.4"'), 'translate(126 112) rotate(-28)'),
+      Eo(124, 111, 6, 6, skin, ' stroke-width="2"'),
+      // head
+      P('M78 52 L50 34 L58 52 L66 58Z', skin), P('M60 42 L70 52', '#2f6a2a', ' stroke-width="1"'),
+      P('M118 50 L148 30 L140 52 L128 58Z', skin), P('M140 38 L130 50', '#2f6a2a', ' stroke-width="1"'),
+      P('M70 60 Q68 34 96 32 Q124 34 124 60 Q124 80 98 84 Q72 82 70 60Z', skin),
+      P('M72 52 Q74 30 98 28 Q122 30 124 50 Q112 40 98 40 Q82 40 72 52Z', vest),
+      Eo(88, 58, 7, 6, '#fff6c0', ' stroke-width="1.6"'), Eo(110, 58, 7, 6, '#fff6c0', ' stroke-width="1.6"'),
+      eye(c, 90, 58, 2.6, '#ffb020'), eye(c, 112, 58, 2.6, '#ffb020'),
+      L_('M80 49 L94 53 M118 49 L104 53', '#1d3a1a', 2.6),
+      P('M110 64 Q116 66 114 72 Q108 70 106 66Z', '#4a8a34', ' stroke-width="1.4"'),
+      P('M82 72 Q98 82 116 72 Q112 80 98 82 Q86 80 82 72Z', '#2a0e12', ' stroke-width="1.6"'),
+      P('M86 73 L89 78 L92 74.5 L95 79 L98 75 L101 79 L104 74.5 L107 78 L110 73.5Z', '#fff6d8', ' stroke-width="0.9"'),
+      Pn('M78 56 Q80 42 94 38', 'none', ' stroke="#ffffff" stroke-width="1.5" opacity=".4"'),
+    ].join('');
+  });
   ART.golem = F(c => {
     const st = c.t('#7b8698'), stone = c.lg([lit(st, 0.2), st, lit(st, -0.25)], 0.1, 0, 0.9, 1), stoneD = c.lg([lit(st, 0.02), lit(st, -0.3)]);
     const moss = c.t('#4a7a3a'), rune = '#7fd6e8';

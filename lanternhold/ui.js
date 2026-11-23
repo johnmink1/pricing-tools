@@ -779,23 +779,44 @@
     const it = e.target.closest('[data-item]'); if (it) { if ((e.ctrlKey || e.metaKey) && linkItem(L.itemOf(S, it.dataset.item))) return; itemModal(it.dataset.item); }
   });
   ['tab-gear', 'tab-party'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof]')) { e.preventDefault(); e.target.click(); } }));
+  function itemStats(it) {
+    const p = L.gearPct(it);
+    if (it.slot === 'weapon') return it.cls === 'healer' ? [['Damage', p], ['Healing', p]] : [['Damage', p]];
+    if (it.slot === 'armor') return [['Health', p]];
+    return it.cls === 'healer' ? [['Healing', p], ['Health', p / 2]] : [['Damage', p / 2], ['Health', p / 2]];
+  }
   function itemModal(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
     let m = L.memberById(gearWho), w = L.wearer(S, uid);
     if (m.cls !== it.cls) { const o = gearOwners().find(id => L.memberById(id).cls === it.cls); if (o) { gearWho = o; m = L.memberById(o); } }
     const set = it.set && L.SETS.find(x => x.id === it.set);
-    const fits = m.cls === it.cls;
+    const fits = m.cls === it.cls, rar = L.RARITY.find(r => r.id === it.rar);
     const cost = L.upgradeCost(it), maxed = it.up >= L.UP_MAX;
-    modal('<div class="itemhead r-' + it.rar + '"><div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt=""></div><div><h2>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</h2><small>' + L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + L.CLASSES[it.cls].name + ' only &middot; found on floor ' + it.ilvl + '</small></div></div>' +
-      '<p class="effect">' + itemEffect(it) + '</p>' +
-      (set ? '<div class="setinfo on"><b>' + set.name + '</b><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
-      (w ? '<p>Worn by ' + esc(L.memberById(w).name) + '.</p>' : fits ? '<p>' + compareTag(it, gearWho) + ' than what ' + esc(m.name) + ' wears now.</p>' : '') +
-      '<div class="row">' +
+    const cur = fits && !w && (S.gear[gearWho] || {})[it.slot], ci = cur && L.itemOf(S, cur);
+    const curStats = ci ? Object.fromEntries(itemStats(ci)) : {};
+    const nextStats = maxed ? null : Object.fromEntries(itemStats(Object.assign({}, it, { up: it.up + 1 })));
+    const pc = v => '+' + Math.round(v * 100) + '%';
+    const stats = itemStats(it).map(([k, v]) => {
+      const d = fits && !w ? Math.round((v - (curStats[k] || 0)) * 100) : 0;
+      return '<div class="ist"><span>' + k + '</span><b>' + pc(v) + '</b>' + (fits && !w ? '<em class="' + (d > 0 ? 'up' : d < 0 ? 'down' : 'eq') + '">' + (d > 0 ? '&#9650; ' + d + '%' : d < 0 ? '&#9660; ' + (-d) + '%' : 'same') + '</em>' : '') + '</div>';
+    }).join('');
+    const pips = '<div class="upips" title="Upgrade level ' + it.up + ' of ' + L.UP_MAX + '">' + Array.from({ length: L.UP_MAX }, (_, i) => '<i class="' + (i < it.up ? 'on' : '') + '"></i>').join('') + '</div>';
+    const wearer = w ? L.memberById(w) : null;
+    const tool = (id, ic, label, extra) => '<button class="itool' + (extra ? ' ' + extra : '') + '" id="' + id + '">' + icon(ic) + '<span>' + label + '</span></button>';
+    modal('<div class="icard r-' + it.rar + '">' +
+      '<button class="iconbtn icx" id="i-close" aria-label="Close">&times;</button>' +
+      '<div class="ihero"><div class="tile big r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
+      '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + esc(L.gearName(it)) + '</h2>' + pips + '<small>Item level ' + it.ilvl + '</small></div></div>' +
+      '<div class="istats">' + stats + '</div>' +
+      (fits && !w ? '<p class="icmp">' + (ci ? 'Compared with ' + esc(m.name) + '’s ' + esc(L.gearName(ci)) + (ci.up ? ' +' + ci.up : '') + '.' : esc(m.name) + ' has nothing in this slot.') + '</p>' : '') +
+      (set ? '<div class="iset"><b>' + set.name + '</b><small><em>2 pieces</em> ' + set.two + '</small><small><em>3 pieces</em> ' + set.three + '</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
+      (wearer ? '<div class="iworn"><img src="' + SP.spriteURL(wearer.cls, 2, wearer.hue || 0) + '" alt="">Worn by <b>' + esc(wearer.name) + '</b></div>' : '') +
+      '<div class="iacts">' +
       (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>No ' + L.CLASSES[it.cls].name + ' in your roster yet</button>') +
-      '<button class="btn ghost" id="i-up"' + (maxed || cost > S.gold ? ' disabled' : '') + '>' + (maxed ? 'Fully upgraded' : 'Upgrade for ' + fmt(cost) + ' gold') + '</button>' +
-      '<button class="btn danger" id="i-sell">Salvage for ' + fmt(L.salvageValue(it)) + '</button></div>' +
-      (CL ? '<div class="row"><button class="btn ghost" id="i-mkt">Sell on market</button><button class="btn ghost" id="i-send">Send to a player</button></div>' : '') +
-      '<div class="row">' + (CL ? '<button class="btn ghost" id="i-link">Link in chat</button>' : '') + '<button class="btn ghost" id="i-close">Close</button></div>', md => {
+      (maxed ? '<button class="btn ghost" disabled>Fully upgraded</button>' : '<button class="btn ghost iup" id="i-up"' + (cost > S.gold ? ' disabled' : '') + '><span>Upgrade to +' + (it.up + 1) + '</span><small>' + icon('coin') + fmt(cost) + ' &middot; ' + Object.entries(nextStats).map(([k, v]) => k.toLowerCase() + ' ' + pc(v)).join(', ') + '</small></button>') +
+      '</div><div class="itools">' +
+      (CL ? tool('i-mkt', 'coin', 'Sell') + tool('i-send', 'users', 'Send') + tool('i-link', 'chat', 'Link') : '') +
+      tool('i-sell', 'flame', 'Salvage ' + fmt(L.salvageValue(it)), 'danger') + '</div></div>', md => {
         const gate = f => () => { if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
         const mk = md.querySelector('#i-mkt'); if (mk) mk.onclick = gate(sellItem);
         const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
@@ -803,11 +824,16 @@
         const re = () => { updateGear(true); updateSeats(true); itemModal(uid); };
         const on = md.querySelector('#i-on'); if (on) on.onclick = () => { if (!campGate()) return; L.equip(S, gearWho, uid); sfx.buy(); re(); };
         const off = md.querySelector('#i-off'); if (off) off.onclick = () => { if (!campGate()) return; L.unequip(S, w, it.slot); re(); };
-        md.querySelector('#i-up').onclick = () => { if (!campGate()) return; if (L.upgrade(S, uid)) { sfx.relic(); re(); } };
-        md.querySelector('#i-sell').onclick = () => { const v = L.salvage(S, uid); sfx.coin(); closeModal(); updateGear(true); toast('coin', 'Salvaged', '+' + fmt(v) + ' gold', ''); };
+        const up = md.querySelector('#i-up'); if (up) up.onclick = () => { if (!campGate()) return; if (L.upgrade(S, uid)) { sfx.relic(); re(); } };
+        const sv = md.querySelector('#i-sell');
+        sv.onclick = () => {
+          if (!sv.classList.contains('confirm') && (it.rar === 'epic' || it.rar === 'set' || it.up || w)) { sv.classList.add('confirm'); sv.querySelector('span').textContent = 'Tap again to salvage'; return; }
+          const v = L.salvage(S, uid); sfx.coin(); closeModal(); updateGear(true); updateSeats(true); toast('coin', 'Salvaged', '+' + fmt(v) + ' gold', '');
+        };
         md.querySelector('#i-close').onclick = closeModal;
       });
   }
+
 
 
   // ---------- companion profile ----------

@@ -2272,14 +2272,20 @@
     const tok = await idToken(); if (!tok) throw new Error('signed out');
     const r = await fetch(CL.api.replace(/\/$/, '') + (path || '/save'), { method, headers: { Authorization: tok, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
     if (r.status === 404) return null;
+    if (r.status === 409 && !path) { const j = await r.json().catch(() => ({})); if (j.error === 'reset') playerReset(); }
     if (!r.ok) throw new Error('cloud ' + r.status);
     return r.json();
+  }
+  // An admin reset this account: drop this device's save and start a brand-new game.
+  function playerReset() {
+    try { localStorage.removeItem(SAVE_KEY); localStorage.setItem('lanternhold.wiped', 'me'); } catch (e) {}
+    S = L.newState(); location.reload();
   }
   async function pushCloud(quiet) {
     if (!CL || !signedIn() || !S.hero) return;
     try {
       const o = saveObj();
-      await api('PUT', { data: JSON.stringify(o), floor: o.maxFloorEver });
+      await api('PUT', { data: JSON.stringify(o), floor: o.maxFloorEver, created: o.created || 0 });
       lastCloud = Date.now();
       if (S.mode === 'multi' && S.hero) publishHero();
       if (!quiet) toast('star', 'Progress synced', 'Your save is stored with your account.', 'feat');
@@ -2304,6 +2310,7 @@
     const local = saveObj();
     if (!rec && !S.hero) { setup('You are signed in, but this account has no hero yet. Create one below and it will be saved to your account.'); return; }
     if (!rec) { await pushCloud(false); return; }
+    if (rec.rst && (S.created || 0) < rec.rst) { playerReset(); return; }
     let cloud; try { cloud = JSON.parse(rec.data); } catch (e) { if (S.hero) await pushCloud(true); else setup(); return; }
     if (!S.hero) { useSave(cloud); return; }
     const ct = (cloud.stats && cloud.stats.playTime) || 0;
@@ -2949,22 +2956,23 @@
   }
   function wipedNotice() {
     let w = null; try { w = localStorage.getItem('lanternhold.wiped'); localStorage.removeItem('lanternhold.wiped'); } catch (e) {}
-    if (w) setTimeout(() => toast('flame', 'A fresh start', 'The Deep has been reset for everyone. Every delver starts again from the top of the stair.', 'feat'), 1500);
+    if (w) setTimeout(() => toast('flame', 'A fresh start', w === 'me' ? 'An admin reset your account. Your delve starts again from the top of the stair.' : 'The Deep has been reset for everyone. Every delver starts again from the top of the stair.', 'feat'), 1500);
   }
   function isAdmin() { return !!(sess && sess.id && String(claims(sess.id)['cognito:groups'] || '').includes('admins')); }
   async function adminApi(method, path, body) {
     const tok = await idToken(); if (!tok) throw new Error('Sign in first.');
     const r = await fetch(CL.api.replace(/\/$/, '') + path, { method, headers: { Authorization: tok, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(r.status === 403 ? 'This account is not an admin.' : j.error === 'self' ? 'You cannot ban yourself.' : j.error === 'player' ? 'That player has not played since bans were added, so their account cannot be found yet.' : 'The server said no (' + r.status + ').');
+    if (!r.ok) throw new Error(r.status === 403 ? 'This account is not an admin.' : j.error === 'self' ? 'You cannot ban yourself.' : j.error === 'player' ? 'That player has not played since bans were added, so their account cannot be found yet.' : j.error === 'name' ? 'The name you typed does not match the hero.' : 'The server said no (' + r.status + ').');
     return j;
   }
-  let adminList = null, adminQ = '', adminBusy = false, adminLinks = [];
+  let adminList = null, adminQ = '', adminBusy = false, adminLinks = [], adminLog = [];
   function paintAdminTab() { const t = $('tabadmin'); if (t) t.hidden = !isAdmin(); }
   async function loadAdmin() {
     $('adminbox').innerHTML = '<p class="note">Loading players…</p>';
     try { adminList = await adminApi('GET', '/admin/players'); } catch (e) { $('adminbox').innerHTML = '<p class="note">' + esc(e.message) + '</p>'; return; }
     try { adminLinks = (await adminApi('GET', '/admin/links')).links || []; await loadWar(); } catch (e) { adminLinks = []; }
+    try { adminLog = (await adminApi('GET', '/admin/audit')).log || []; } catch (e) { adminLog = []; }
     paintAdmin();
   }
   function paintAdmin() {
@@ -2976,9 +2984,10 @@
       '<div class="adm-stats"><div><small>Players</small><b>' + adminList.players.length + '</b></div><div><small>Online now</small><b>' + on + '</b></div><div><small>Banned</small><b>' + banned + '</b></div><div><small>Last wipe</small><b>' + (adminList.epoch ? new Date(adminList.epoch).toLocaleDateString() : 'never') + '</b></div></div>' +
       '<div class="adm-bar"><input id="adm-q" type="search" placeholder="Find a player by name" value="' + esc(adminQ) + '"><button class="btn small ghost" id="adm-re">Refresh</button></div>' +
       '<div class="adm-list">' + (list.length ? list.map(p => '<div class="adm-row' + (p.banned ? ' banned' : '') + '"><span class="adm-n"><b>' + esc(p.name || 'Unnamed') + '</b>' + (p.cls ? ' ' + classTag(p.cls) : '') + '<small>' + (p.banned ? 'Banned' : (p.on ? '<span class="online">Online now</span> &middot; ' : 'Seen ' + ago(p.seen) + ' &middot; ') + 'level ' + p.level + ', floor ' + p.floor) + '</small></span>' +
-        (p.canBan ? '<button class="btn small ghost" data-grant="' + p.id + '">Sigils</button>' : '') + (p.banned ? '<button class="btn small ghost" data-unban="' + p.id + '">Unban</button>' : '<button class="btn small danger" data-ban="' + p.id + '"' + (p.canBan ? '' : ' disabled title="They need to play once more before they can be banned"') + '>Ban</button>') + '</div>').join('') : '<p class="note">No players match.</p>') + '</div>' +
+        (p.canBan ? '<button class="btn small ghost" data-grant="' + p.id + '">Sigils</button><button class="btn small ghost" data-reset="' + p.id + '">Reset</button>' : '') + (p.banned ? '<button class="btn small ghost" data-unban="' + p.id + '">Unban</button>' : '<button class="btn small danger" data-ban="' + p.id + '"' + (p.canBan ? '' : ' disabled title="They need to play once more before they can be banned"') + '>Ban</button>') + '</div>').join('') : '<p class="note">No players match.</p>') + '</div>' +
       '<h3 class="sub">Grand War links</h3>' + (adminLinks.length ? '<p class="note">Players asking to show their Grand War commander badges. Approve only when you know the player is that commander, for example from Discord.</p><div class="adm-list">' + adminLinks.sort((a, c) => a.wv - c.wv).map(l => '<div class="adm-row"><span class="adm-n"><b>' + esc(l.name || 'Unnamed') + '</b> wants to be <b>' + esc(l.wl) + '</b><small>' + (commander(l.wl) ? warBadge(l.wl) : 'Not on the war ladder right now') + (l.wv ? ' &middot; <span class="online">Verified</span>' : ' &middot; Waiting') + '</small></span>' + (l.wv ? '' : '<button class="btn small" data-lok="' + l.id + '">Approve</button>') + '<button class="btn small ghost" data-lno="' + l.id + '">' + (l.wv ? 'Remove' : 'Reject') + '</button></div>').join('') + '</div>' : '<p class="note">No players have asked to link a Grand War commander yet.</p>') +
-      '<div class="adm-danger"><h3 class="sub">Wipe the server</h3><p class="note">Deletes every cloud save, every hero on the guild board and every market listing and letter. Everyone, signed in or not, starts over from a new game the next time they open Lanternhold. Bans, Sigils, bought looks and Grand War links stay in place. This cannot be undone.</p><button class="btn danger" id="adm-wipe">Wipe the server…</button></div>';
+      '<h3 class="sub">Admin log</h3>' + (adminLog.length ? '<div class="adm-list">' + adminLog.map(l => '<div class="adm-row"><span class="adm-n"><b>' + (l.act === 'wipe' ? 'Server wiped' : 'Reset ' + esc(l.name || 'a player') + (l.self ? ' (their own account)' : '')) + '</b><small>' + esc(l.by) + ' &middot; ' + new Date(l.at).toLocaleString() + (l.act === 'reset' ? ' &middot; ' + (l.sigils ? 'Sigils and purchases wiped too' : 'Sigils and purchases kept') : '') + '</small></span></div>').join('') + '</div>' : '<p class="note">No player resets or server wipes yet.</p>') +
+      '<div class="adm-danger"><h3 class="sub">Wipe the server</h3><p class="note">Deletes every cloud save, every hero on the guild board and every market listing and letter. Everyone, signed in or not, starts over from a new game the next time they open Lanternhold. Bans, Sigils, bought looks, Sigil market listings, store links and Grand War links stay in place. This cannot be undone.</p><button class="btn danger" id="adm-wipe">Wipe the server…</button></div>';
   }
   $('tab-admin').addEventListener('input', e => { if (e.target.id === 'adm-q') { adminQ = e.target.value; const pos = e.target.selectionStart; paintAdmin(); const q = $('adm-q'); q.focus(); q.setSelectionRange(pos, pos); } });
   $('tab-admin').addEventListener('click', async e => {
@@ -3002,6 +3011,29 @@
           try { const r = await adminApi('POST', '/admin/grant', { id: p.id, n }); closeModal(); toast('star', 'Sigils sent', p.name + ' now has ' + r.bal + ' Sigils.', 'feat'); }
           catch (x) { closeModal(); toast('lock', 'That did not work', x.message, 'warn'); }
           adminBusy = false;
+        };
+      });
+      return;
+    }
+    const rs = e.target.closest('[data-reset]');
+    if (rs) {
+      const p = adminList.players.find(x => x.id === rs.dataset.reset); if (!p) return;
+      const mine = S.hero && p.name && S.hero.name.toLowerCase() === p.name.toLowerCase();
+      modal('<div class="center"><h2>Reset ' + esc(p.name) + '?</h2><p>' + (mine ? 'This looks like your own hero. ' : '') + 'They start again from a brand-new game on every device: hero, party, gear, gold, floors, Kindling, market listings, letters, Ember Ring standing and world boss scores are deleted for good. Their account, any ban and their Grand War link stay.</p>' +
+        '<label class="adm-chk"><input type="checkbox" id="a-sig"> Also wipe their Sigils, bought looks and passes. Leave this off for real players: it deletes what they paid for. Paid packs are not credited again.</label>' +
+        '<p>Type the hero name <b>' + esc(p.name) + '</b> to confirm.</p><input id="a-conf" class="adm-conf wide" autocomplete="off" spellcheck="false"><div class="row"><button class="btn ghost" id="a-no">Cancel</button><button class="btn danger" id="a-yes" disabled>Reset player</button></div></div>', md => {
+        const inp = md.querySelector('#a-conf'), yes = md.querySelector('#a-yes'), sig = md.querySelector('#a-sig');
+        inp.oninput = () => { yes.disabled = inp.value.trim().toLowerCase() !== p.name.toLowerCase(); };
+        sig.onchange = () => { yes.textContent = sig.checked ? 'Reset player and Sigils' : 'Reset player'; };
+        md.querySelector('#a-no').onclick = closeModal;
+        yes.onclick = async () => {
+          adminBusy = true; yes.disabled = true; yes.textContent = 'Resetting…';
+          try {
+            const r = await adminApi('POST', '/admin/reset', { id: p.id, name: inp.value.trim(), sigils: sig.checked });
+            closeModal(); toast('flame', p.name + ' is reset', (r.self ? 'Your own game starts over now.' : 'Their game starts over the next time it syncs, within a minute if they are playing.') + (r.sigils ? ' Their Sigils were wiped too.' : ' Their Sigils were kept.'), 'feat');
+            if (r.self) setTimeout(playerReset, 2500);
+          } catch (x) { closeModal(); toast('lock', 'The reset did not run', x.message, 'warn'); }
+          adminBusy = false; loadAdmin();
         };
       });
       return;
@@ -3955,11 +3987,14 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 66, date: 'November 23, 2026', title: 'The Nexus Guardian', items: [
+    { v: 67, date: 'November 23, 2026', title: 'The Nexus Guardian', items: [
       'The Nexus has started listening to the Deep. A rhythm that never tires, strikes that land too fast for too long or with perfectly even spacing, sounds to it like a siege engine at the wall.',
       'When it hears one, the back wall starts to crack and glow. Keep it up and the Nexus Guardian breaks through and takes the stage. Nothing lands on it, not your strikes and not your party.',
       'Ease your strikes for a few seconds and it loses interest, withdraws, and the fight picks up right where it was. Normal tapping, even fast tapping, never calls it.',
       'World boss assaults listen too: strikes with that rhythm do not count toward your score.'] },
+    { v: 66, date: 'November 23, 2026', title: 'Fresh starts on request', items: [
+      'Admins can now reset a single account back to a brand-new game, for testing or when a player asks for a clean slate. You get a notice when it happens, and purchased Sigils are kept unless you ask for them to go too.',
+      'A server-wide reset now also keeps Sigil exchange listings and store links in place.'] },
     { v: 65, date: 'November 23, 2026', title: 'Why we fight', items: [
       'A new opening for Lanternhold: the Shattered Reach, the Nyx Rift, the five who answer the call, and why we fight.',
       'It plays once on your first visit. Tap to move through it or skip it any time, and watch it again from Settings.'] },

@@ -3,10 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Lanternhold: An Idle Descent</title>
+<title>Lanternhold: A Grand War Front</title>
+<meta name="author" content="Born 2 Game, LLC">
 <meta name="description" content="Lanternhold is a free idle dungeon crawler set on a hidden front of the Grand War. Lead a party of five, pledge to an alliance, loot class gear and sets, and carry the lantern down to the Nyx Rift.">
 <link rel="canonical" href="https://tools.born2develop.com/lanternhold/">
-<meta property="og:title" content="Lanternhold: An Idle Descent">
+<meta property="og:title" content="Lanternhold: A Grand War Front">
+<meta property="og:site_name" content="Born 2 Game">
 <meta property="og:description" content="A free idle dungeon crawler on a hidden front of the Grand War. Party of five, story chapters, class gear and sets.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://tools.born2develop.com/lanternhold/">
@@ -14,15 +16,15 @@
 <meta name="theme-color" content="#15110d">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611230229">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Alegreya+Sans:wght@400;500;700;800&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=202611230232">
 </head>
 <body>
 <div id="app">
   <header class="top">
     <div class="brand">
       <svg viewBox="0 0 32 32" class="logo" aria-hidden="true"><use href="#i-lantern"/></svg>
-      <div><b>Lanternhold</b><small>An Idle Descent</small></div>
+      <div><b>Lanternhold</b><small>A Grand War Front</small></div>
     </div>
     <div class="purse">
       <div class="stat gold" title="Gold"><svg viewBox="0 0 24 24"><use href="#i-coin"/></svg><span id="gold">0</span></div>
@@ -37,6 +39,13 @@
     <button class="iconbtn" id="btn-guide" aria-label="Guide" title="Guide"><svg viewBox="0 0 24 24"><use href="#i-help"/></svg></button>
     <button class="iconbtn" id="btn-settings" aria-label="Settings"><svg viewBox="0 0 24 24"><use href="#i-gear"/></svg></button>
   </header>
+  <a class="warstrip" id="warstrip" href="https://war.born2gamellc.com/" target="_blank" rel="noopener" title="Open the Grand War war room">
+    <span class="ws-brand">Born <i>2</i> Game &middot; The Grand War</span>
+    <span class="ws-front">The Lantern Deep Front</span>
+    <span class="ws-season" id="ws-season">Season 1 &middot; The First Incursion</span>
+    <span class="ws-surge" id="ws-surge"></span>
+    <span class="ws-go">War room &#8599;</span>
+  </a>
 
   <main class="layout">
     <section class="stage">
@@ -117,10 +126,11 @@
       </div>
       <div class="tabbody" id="tab-admin" hidden><div id="adminbox"></div></div>
       <div class="tabbody" id="tab-codex" hidden>
-        <div class="seg codexseg" id="codexseg"><button data-cx="journal" class="on">Journal <em id="lorecount"></em></button><button data-cx="relics">Relics <em id="relcount"></em></button><button data-cx="stats">Records <em id="featcount"></em></button><button data-cx="board">Leaderboard</button></div>
-        <div class="cx" id="cx-journal">
+        <div class="seg codexseg" id="codexseg"><button data-cx="war" class="on">The War</button><button data-cx="journal">Journal <em id="lorecount"></em></button><button data-cx="relics">Relics <em id="relcount"></em></button><button data-cx="stats">Records <em id="featcount"></em></button><button data-cx="board">Leaderboard</button></div>
+        <div class="cx" id="cx-journal" hidden>
         <div id="journal"></div>
       </div>
+        <div class="cx" id="cx-war"><div id="warroom"></div></div>
         <div class="cx" id="cx-board" hidden><div id="boardtop"></div></div>
         <div class="cx" id="cx-relics" hidden>
         <p class="note">Guardians on floor 10 and below sometimes drop a relic. Relics stay with you forever, and a duplicate raises its level.</p>
@@ -192,10 +202,10 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611230229";</script>
+<script>window.LH_BUILD = "202611230232";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611230229"></script>
-<script src="sprites.js?v=202611230229"></script>
-<script src="ui.js?v=202611230229"></script>
+<script src="core.js?v=202611230232"></script>
+<script src="sprites.js?v=202611230232"></script>
+<script src="ui.js?v=202611230232"></script>
 </body>
 </html>

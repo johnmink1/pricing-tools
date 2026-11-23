@@ -3,7 +3,7 @@
 // Each store account links to one game account (wix#<member>), and each paid order is credited once
 // (wixord#<order>). No admin key is needed: a member token can read that member's own orders.
 const D = require('@aws-sdk/client-dynamodb');
-const db = new D.DynamoDBClient({}), { TABLE: T, WALLETS: W, PACKS } = process.env;
+const db = new D.DynamoDBClient({}), { TABLE: T, WALLETS: W, PACKS, SUB } = process.env;
 const PACK = Object.fromEntries(PACKS.split(',').map(p => p.split(':')).map(([k, n]) => [k, +n]));
 const res = (c, b) => ({ statusCode: c, body: JSON.stringify(b) });
 const S = v => ({ S: String(v) }), N = v => ({ N: String(v) });
@@ -64,6 +64,15 @@ exports.handler = async (e) => {
       added += n;
     } catch (x) { if (x.name !== 'TransactionCanceledException') throw x; }
   }
-  const w = await db.send(new D.GetItemCommand({ TableName: W, Key: { userId: S(cl.sub) } }));
-  return res(200, { ok: true, name, added, bal: w.Item && w.Item.bal ? +w.Item.bal.N : 100 });
+  // Lanternholder: the recurring monthly plan. Its perks last to the end of the paid cycle plus a day of grace,
+  // and each sync (the game runs one on every load) moves that date with the renewals.
+  let sub = 0;
+  for (const o of orders) {
+    if (o.planId !== SUB || o.status !== 'ACTIVE' || o.lastPaymentStatus !== 'PAID' || (o.buyer && o.buyer.memberId !== mid)) continue;
+    const end = Date.parse((o.currentCycle && o.currentCycle.endedDate) || o.endDate || '') || Date.now() + 2592e6;
+    sub = Math.max(sub, end + 864e5);
+  }
+  const w = (await db.send(new D.UpdateItemCommand({ TableName: W, Key: { userId: S(cl.sub) }, ReturnValues: 'ALL_NEW',
+    UpdateExpression: 'SET bal = if_not_exists(bal, :g), #s = :s', ExpressionAttributeNames: { '#s': 'sub' }, ExpressionAttributeValues: { ':g': N(100), ':s': N(sub) } }))).Attributes;
+  return res(200, { ok: true, name, added, bal: +w.bal.N, sub });
 };

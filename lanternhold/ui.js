@@ -176,7 +176,7 @@
   function partyLayout() {
     const floorY = Math.round(H * 0.7);
     const seated = S.party.filter(Boolean);
-    const order = seated.slice().sort((a, b) => FRONT[L.memberById(a).cls] - FRONT[L.memberById(b).cls]);
+    const order = seated; // marching order: first seat stands nearest the foe
     const front = Math.round(W * FOE_X) - 58;
     return order.map((id, i) => ({ id, x: front - i * 21, y: floorY - 30 + (i % 2 ? -5 : 1) }));
   }
@@ -368,8 +368,15 @@
         sfx.hit(e.crit);
       } else if (e.type === 'foehit') {
         foeAnim.lunge = tAnim + 0.15;
-        if (e.target !== 'minion') { const a = mAnim(e.target); a.hit = tAnim + 0.1; floatText('-' + fmt(e.dmg), 'hurt', a.x / W, (a.y - 4) / H); }
+        if (e.target !== 'minion') { const a = mAnim(e.target); a.hit = tAnim + 0.1; floatText('-' + fmt(e.dmg), 'hurt', a.x / W, (a.y - 4) / H); if (e.behind) slashes.push({ x: a.x - 6, y: a.y, a: Math.random() * Math.PI, t: tAnim, c: '#ff5a4a', big: false }); }
         sfx.thud();
+      } else if (e.type === 'ambush') {
+        const a = mAnim(e.target);
+        if (e.first) {
+          floatText(e.guarded ? 'Rear guarded' : 'Ambush!', e.guarded ? 'skill' : 'crit', a.x / W, (a.y - 16) / H);
+          if (!S.stats.ambushes) toast('lock', 'Ambush from behind', e.guarded ? L.memberById(e.target).name + ' guarded the rear and took it on the shield.' : 'Some monsters strike the back of the line first. Put a sturdy member, or a second tank, at the rear.', 'warn');
+          S.stats.ambushes = (S.stats.ambushes || 0) + 1;
+        }
       } else if (e.type === 'dodge') {
         const a = mAnim(e.target); floatText('Dodge', 'dodge', a.x / W, (a.y - 6) / H);
       } else if (e.type === 'fall') {
@@ -466,7 +473,7 @@
       const id = S.party[i];
       if (!id) {
         const canFill = S.unlocked.some(x => !S.party.includes(x)) || (S.guests || []).some(g => !S.party.includes(g.id));
-        html += '<div class="seat empty"><div class="ic">' + icon('user') + '</div><div class="info"><div class="nm">Empty seat</div><div class="lv">' + (canFill ? 'Pick a companion below to fill it.' : (S.mode === 'multi' ? 'Recruit a player or meet more companions in the story.' : 'You will meet more companions as the story goes on.')) + '</div></div></div>';
+        html += '<div class="seat empty"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span><div class="ic">' + icon('user') + '</div><div class="info"><div class="nm">Empty seat</div><div class="lv">' + (canFill ? 'Pick a companion below to fill it.' : (S.mode === 'multi' ? 'Recruit a player or meet more companions in the story.' : 'You will meet more companions as the story goes on.')) + '</div></div></div>';
         continue;
       }
       const m = L.memberById(id), down = S.down[id], hp = Math.max(0, S.hp[id] || 0), mx = L.maxHpOf(S, id);
@@ -477,13 +484,17 @@
         const cost = L.trainCost(S, id, n);
         btn = '<button class="buy" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button>';
       } else btn = '<button class="btn ghost small" data-dismiss="' + id + '">Dismiss</button>';
-      html += '<div class="seat' + (down ? ' down' : '') + (m.player ? ' mine' : '') + '">' + portrait(id) +
+      const mv = '<div class="mv"><button class="mini up" data-move="' + i + ':-1"' + (i === 0 ? ' disabled' : '') + ' title="Move forward" aria-label="Move ' + esc(m.name) + ' forward">&#9650;</button><button class="mini dn" data-move="' + i + ':1"' + (i === L.PARTY_SIZE - 1 ? ' disabled' : '') + ' title="Move back" aria-label="Move ' + esc(m.name) + ' back">&#9660;</button></div>';
+      html += '<div class="seat' + (down ? ' down' : '') + (m.player ? ' mine' : '') + '"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span>' + mv + portrait(id) +
         '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
         '<div class="lv">' + (down ? 'Fallen. Back up in ' + Math.ceil((down - now) / 1000) + 's' : memberStatsLine(id, now)) + '</div>' +
         '<div class="hpbar"><i data-hp="' + id + '"></i></div></div>' + btn +
-        (i > 0 && !guest ? '<button class="mini" data-unseat="' + i + '" title="Send to camp" aria-label="Send to camp">&times;</button>' : '') + '</div>';
+        (id !== 'you' && !guest ? '<button class="mini x" data-unseat="' + i + '" title="Send to camp" aria-label="Send to camp">&times;</button>' : '') + '</div>';
     }
-    if (html !== seatsHtml) { box.innerHTML = html; seatsHtml = html; }
+    if (html !== seatsHtml) {
+      box.innerHTML = html; seatsHtml = html;
+      $('fnotes').innerHTML = L.formationNotes(S).map(n => '<li class="' + (n.warn ? 'warn' : 'ok') + '">' + esc(n.text) + '</li>').join('') + '<li class="tip">Healers heal less the farther they stand from who they heal. Some monsters ambush from behind and hit the rear first; a tank at the back guards it.</li>';
+    }
     paintHp();
     const bench = S.unlocked.filter(x => !S.party.includes(x));
     $('benchwrap').hidden = !bench.length;
@@ -496,6 +507,8 @@
   $('tab-party').addEventListener('click', e => {
     const pf = e.target.closest('[data-prof]'); if (pf) { profileModal(pf.dataset.prof); return; }
     const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.move) { const [i, d] = t.dataset.move.split(':').map(Number); if (L.moveMember(S, i, i + d)) { sfx.buy(); updateSeats(true); updateAbilities(true); } return; }
+    if (t.id === 'f-auto') { L.autoFormation(S); S.formationManual = false; sfx.buy(); updateSeats(true); updateAbilities(true); toast('shield', 'Party arranged', 'Tank in front, rogue behind it, healers in the middle where they reach everyone, casters at the back.', ''); return; }
     if (t.dataset.train) { if (L.train(S, t.dataset.train, buyN())) { sfx.buy(); updateSeats(true); } }
     else if (t.dataset.unseat) { L.unseat(S, +t.dataset.unseat); updateSeats(true); updateAbilities(true); }
     else if (t.dataset.seat) pickSeat(t.dataset.seat);
@@ -505,11 +518,11 @@
     else if (t.id === 'b-signin') openAccount();
   });
   function pickSeat(id) {
-    const empty = S.party.indexOf(null, 1);
-    if (empty > 0) { L.seat(S, id, empty); updateSeats(true); updateAbilities(true); return; }
+    const empty = S.party.indexOf(null);
+    if (empty >= 0) { L.seat(S, id, empty); updateSeats(true); updateAbilities(true); return; }
     const m = L.memberById(id);
     modal('<h2>Who stays at camp?</h2><p>' + esc(m.name) + ' takes their seat.</p><div class="choice">' +
-      S.party.map((x, i) => i === 0 || !x ? '' : '<button class="pick" data-slot="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', level ' + L.lvl(S, x) + '</small></button>').join('') +
+      S.party.map((x, i) => x === 'you' || !x ? '' : '<button class="pick" data-slot="' + i + '"><b>' + esc(L.memberById(x).name) + '</b><small>' + L.CLASSES[L.memberById(x).cls].name + ', level ' + L.lvl(S, x) + '</small></button>').join('') +
       '</div><div class="row"><button class="btn ghost" id="m-cancel">Cancel</button></div>', md => {
         md.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { L.seat(S, id, +b.dataset.slot); closeModal(); updateSeats(true); updateAbilities(true); });
         md.querySelector('#m-cancel').onclick = closeModal;

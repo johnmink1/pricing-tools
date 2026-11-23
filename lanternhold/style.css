@@ -77,7 +77,7 @@ svg{display:block}
 
 .arena{position:relative;aspect-ratio:16/10;border-radius:var(--r);overflow:hidden;border:1px solid var(--line2);box-shadow:0 18px 40px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.03);cursor:crosshair;user-select:none;-webkit-user-select:none;touch-action:manipulation;outline:none}
 .arena:focus-visible{border-color:var(--accent)}
-.arena canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.arena canvas{position:absolute;inset:0;width:100%;height:100%}
 .hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:rgba(239,228,207,.7);pointer-events:none;transition:opacity .6s}
 
 .foe{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;gap:8px}
@@ -386,7 +386,7 @@ button.scene:hover{border-color:var(--accent)}
 .seat .ic[data-prof]{cursor:pointer}
 .prof .profhead{display:flex;gap:16px;align-items:center}
 .profspr{width:84px;height:104px;flex:none;display:grid;place-items:center;border-radius:12px;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--cc,#e9c98a) 22%,#181f2b),#090c12);border:1px solid color-mix(in srgb,var(--cc,#2e3c55) 50%,#232d3e)}
-.profspr canvas{image-rendering:pixelated}
+.profspr canvas{max-width:100%;height:auto}
 .prof h2{margin:0}
 .prof .profhead small{color:var(--muted)}
 .prof .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -634,7 +634,7 @@ button.scene:hover{border-color:var(--accent)}
 .online{color:var(--good);font-weight:700}
 .online::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);margin-right:4px;vertical-align:1px}
 /* ---------- polish pass: pixel portraits, paper doll, item tiles ---------- */
-.ic img,.whochip img{image-rendering:pixelated;display:block}
+.ic img,.whochip img{display:block}
 .seat .ic img,.gearhead .ic img{width:32px;height:auto;max-height:40px;object-fit:contain}
 .whochip img{width:20px;height:auto;max-height:24px;margin:-2px 0}
 .acts{display:flex;flex-direction:column;gap:5px;align-items:stretch}
@@ -663,7 +663,7 @@ button.scene:hover{border-color:var(--accent)}
 .dslot .tile{width:68px;height:68px}.dslot .iimg{width:48px;height:48px}
 .ds-weapon{grid-area:w}.ds-armor{grid-area:a}.ds-trinket{grid-area:t}
 .dfig{grid-area:fig;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;text-align:center}
-.dfig img{image-rendering:pixelated;width:auto;height:110px;filter:drop-shadow(0 6px 6px rgba(0,0,0,.6))}
+.dfig img{width:auto;height:110px;filter:drop-shadow(0 6px 6px rgba(0,0,0,.6))}
 .dfig b{font-size:16px;margin-top:2px}
 .dstats{grid-area:s;display:grid;gap:6px;width:76px}
 .dstats div{background:#0a0c0f;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}
@@ -763,7 +763,7 @@ body:not(.incamp) [data-train]:not(.anywhere)::after,body:not(.incamp) [data-sea
 .iset small em{font-style:normal;color:var(--gold);font-weight:800;margin-right:4px}
 .iset .lore{font-style:italic;color:var(--dim);margin-top:6px}
 .iworn{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted);margin:10px 2px}
-.iworn img{image-rendering:pixelated;height:26px}
+.iworn img{height:26px}
 .iacts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
 .iacts .btn{min-height:52px}
 .iup{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1.1}
@@ -784,7 +784,7 @@ body:not(.incamp) [data-train]:not(.anywhere)::after,body:not(.incamp) [data-sea
 .job .jic svg{width:20px;height:20px;color:var(--dim)}.job.on .jic svg{color:var(--ember)}
 .job b{font-size:14px}
 .job small{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.job small img{image-rendering:pixelated;height:16px}
+.job small img{height:16px}
 .job small.none{color:var(--dim);font-style:italic}
 .job em{font-style:normal;font-size:12px;font-weight:800;color:var(--good)}
 .job:not(.on) em{color:var(--dim);font-weight:600}
@@ -792,7 +792,7 @@ body:not(.incamp) [data-train]:not(.anywhere)::after,body:not(.incamp) [data-sea
 .jobline.on{color:var(--good)}.jobline b{color:var(--text)}
 .jobline svg{width:14px;height:14px;color:var(--ember)}
 .jpick{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;width:100%}
-.jpick img{image-rendering:pixelated;height:32px;justify-self:center}
+.jpick img{height:32px;justify-self:center}
 .jpick .jic svg{width:24px;height:24px;color:var(--ember)}
 .jpick b{display:block}.jpick small{display:block;color:var(--muted);font-size:12.5px}
 .jpick em{font-style:normal;font-weight:800;color:var(--good);font-size:13px;white-space:nowrap}

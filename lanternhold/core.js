@@ -242,7 +242,7 @@
       relics: {}, embers: 0, feats: {},
       bag: [], gear: {}, lore: { hold: 1 },
       story: { seen: {}, queue: [] },
-      autoAdvance: true, autoCast: true, retryAt: 0,
+      autoAdvance: true, autoCast: true, retryAt: 0, formation: 1, formationManual: false,
       foe: null, lantern: 0, foeSwing: 0,
       stats: { kills: 0, bossKills: 0, clicks: 0, chests: 0, goldEarned: 0, rekindles: 0, playTime: 0, crits: 0, wipes: 0, revives: 0 },
       settings: { sound: true, buy: 1, notation: 'short' },
@@ -518,21 +518,50 @@
     if (s.unlocked.includes(id)) return false;
     s.unlocked.push(id);
     if (!s.levels[id]) s.levels[id] = 1;
-    const slot = s.party.indexOf(null, 1);
-    if (slot > 0) s.party[slot] = id;
+    const slot = s.party.indexOf(null);
+    if (slot >= 0) { s.party[slot] = id; if (!s.formationManual) autoFormation(s); }
     s.hp[id] = maxHpOf(s, id);
     return true;
   }
   function seat(s, id, slot) {
     if (!s.unlocked.includes(id) && !isGuest(s, id)) return false;
-    if (slot === 0 || id === 'you') return false; // your hero always leads
+    if (s.party[slot] === 'you' && id !== 'you') return false; // your hero is never benched
     const cur = s.party.indexOf(id);
     if (cur >= 0) s.party[cur] = s.party[slot];
     s.party[slot] = id;
     if (s.hp[id] == null) s.hp[id] = maxHpOf(s, id);
     return true;
   }
-  function unseat(s, slot) { if (slot > 0) s.party[slot] = null; }
+  function unseat(s, slot) { if (s.party[slot] !== 'you') s.party[slot] = null; }
+  // ---------- formation ----------
+  // Seat order is the marching order: slot 0 stands at the front, nearest the foe; slot 4 is the rear.
+  const FORMATION = { tank: 0, rogue: 1, healer: 2, mage: 3, necro: 4 };
+  const POS_NAME = ['Front', 'Second', 'Middle', 'Fourth', 'Rear'];
+  function moveMember(s, from, to) {
+    if (to < 0 || to >= PARTY_SIZE || from === to) return false;
+    const t = s.party[to]; s.party[to] = s.party[from]; s.party[from] = t; s.formationManual = true; return true;
+  }
+  function autoFormation(s) {
+    const seated = s.party.filter(Boolean).sort((a, b) => FORMATION[memberById(a).cls] - FORMATION[memberById(b).cls]);
+    s.party = seated.concat(Array(PARTY_SIZE - seated.length).fill(null));
+  }
+  // Healing falls off with distance between healer and patient: 15% per step, never below 40%.
+  const healReach = (s, a, b) => Math.max(0.4, 1 - 0.15 * Math.abs(s.party.indexOf(a) - s.party.indexOf(b)));
+  function formationNotes(s) {
+    const live = s.party.map((id, i) => id && { id, i, cls: memberById(id).cls }).filter(Boolean);
+    const out = [];
+    const tank = live.find(x => x.cls === 'tank');
+    if (!tank) out.push({ warn: true, text: 'No tank: monsters hit whoever stands in front.' });
+    else if (live.indexOf(tank) > 1) out.push({ warn: true, text: memberById(tank.id).name + ' is too far back to hold the monsters’ attention. Move your tank to the front.' });
+    else out.push({ text: memberById(tank.id).name + ' holds the front and draws the attacks.' });
+    for (const h of live.filter(x => x.cls === 'healer')) {
+      const far = Math.max(...live.map(x => Math.abs(x.i - h.i)));
+      out.push({ warn: far >= 4, text: memberById(h.id).name + (far >= 3 ? ' is far from part of the line. Heals on the far end drop to ' + Math.round(Math.max(0.4, 1 - 0.15 * far) * 100) + '%.' : ' can reach everyone in the line well.') });
+    }
+    const rear = live[live.length - 1];
+    if (rear && live.length > 1) out.push(rear.cls === 'tank' ? { text: memberById(rear.id).name + ' guards the rear against ambushes.' } : { warn: rear.cls === 'healer' || rear.cls === 'mage', text: memberById(rear.id).name + ' takes the first blows when monsters ambush from behind.' });
+    return out;
+  }
 
   // ---------- setup and guests ----------
   function startGame(s, mode, cls, name, side) {
@@ -548,8 +577,8 @@
     s.guests = (s.guests || []).filter(x => x.id !== g.id);
     s.guests.push({ id: g.id, name: g.name, cls: g.cls, level: Math.max(1, Math.floor(g.level)), at: Date.now() });
     registerHero(s);
-    const slot = s.party.indexOf(null, 1);
-    if (slot > 0) s.party[slot] = g.id;
+    const slot = s.party.indexOf(null);
+    if (slot >= 0) s.party[slot] = g.id;
     s.hp[g.id] = maxHpOf(s, g.id);
     return true;
   }
@@ -587,7 +616,9 @@
     let side = null;
     if (elite) { side = b.war.side; name = b.war.units[Math.floor(r() * b.war.units.length)]; sprite = ['skeleton', 'ghost', 'eye'][Math.floor(r() * 3)]; }
     const hp = foeHp(f, boss) * (chest ? 0.5 : elite ? 2.5 : 1);
-    return { name, sprite, boss, chest, elite, side, hp, max: hp, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) };
+    // Some foes sneak up and hit the back of the line first.
+    const ambush = !boss && !chest && f >= 6 && r() < (elite ? 0.3 : 0.1) ? 2 : 0;
+    return { name, sprite, boss, chest, elite, side, ambush, hp, max: hp, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) };
   }
 
   function damageFoe(s, amount, now, rng, events) {
@@ -662,20 +693,33 @@
   }
 
   function pickTarget(s, rng) {
-    const live = alive(s);
+    const live = s.party.filter(id => id && !s.down[id]);   // in marching order, front first
     if (!live.length) return null;
-    const tank = live.find(id => memberById(id).cls === 'tank');
-    if (tank) return tank;
-    const mins = s.minions.filter(m => m.hp > 0);
-    if (mins.length) return 'minion';
-    return live[Math.floor((rng || Math.random)() * live.length)];
+    const r = rng || Math.random, foe = s.foe;
+    // Ambush: the first blows land on the back of the line.
+    if (foe && foe.ambush > 0) return { id: live[live.length - 1], behind: true };
+    // A tank in the front two holds the monsters' attention.
+    const ti = live.findIndex(id => memberById(id).cls === 'tank');
+    if (ti >= 0 && ti <= 1) return { id: live[ti] };
+    if (s.minions.some(m => m.hp > 0)) return { id: 'minion' };
+    // Otherwise the front of the line takes most of the hits.
+    const W = [0.5, 0.25, 0.13, 0.08, 0.04], w = live.map((_, i) => W[i]), tot = w.reduce((x, y) => x + y, 0);
+    let x = r() * tot; for (let i = 0; i < live.length; i++) { x -= w[i]; if (x <= 0) return { id: live[i] }; }
+    return { id: live[0] };
   }
 
   function foeAttack(s, now, rng, events) {
     const foe = s.foe; if (!foe || !foe.atk) return;
-    const t = pickTarget(s, rng);
-    if (!t) return;
+    const pick = pickTarget(s, rng);
+    if (!pick) return;
+    const t = pick.id;
     let dmg = foe.atk;
+    if (pick.behind) {
+      foe.ambush--;
+      const guard = memberById(t).cls === 'tank';
+      if (!guard) dmg *= 1.6;
+      events && events.push({ type: 'ambush', target: t, guarded: guard, first: foe.ambush === 1 });
+    }
     if (t === 'minion') {
       const m = s.minions.find(x => x.hp > 0); m.hp -= dmg;
       events && events.push({ type: 'foehit', target: 'minion', dmg });
@@ -686,7 +730,7 @@
     if (c.armor) dmg *= 1 - c.armor;
     if (m.cls === 'tank' && abilityActive(s, t, now)) dmg *= 0.3;
     s.hp[t] = (s.hp[t] == null ? maxHpOf(s, t) : s.hp[t]) - dmg;
-    events && events.push({ type: 'foehit', target: t, dmg });
+    events && events.push({ type: 'foehit', target: t, dmg, behind: !!pick.behind });
     if (s.hp[t] <= 0) {
       s.hp[t] = 0; s.down[t] = now + REVIVE_TIME * 1000;
       events && events.push({ type: 'fall', id: t });
@@ -762,12 +806,12 @@
       }
     }
     // healing
-    let heal = 0; for (const id of s.party) heal += healPerSec(s, id);
-    if (heal > 0) {
-      // heal the most hurt member first
-      let need = heal * dt;
+    for (const hid of s.party) {
+      const hps = healPerSec(s, hid); if (!(hps > 0)) continue;
+      // each healer tends the most hurt first; the farther away, the weaker the heal
+      let need = hps * dt;
       const order = alive(s).sort((a, b) => s.hp[a] / maxHpOf(s, a) - s.hp[b] / maxHpOf(s, b));
-      for (const id of order) { const mx = maxHpOf(s, id), gap = mx - s.hp[id]; const h = Math.min(gap, need); s.hp[id] += h; need -= h; if (need <= 0) break; }
+      for (const id of order) { const eff = healReach(s, hid, id), gap = maxHpOf(s, id) - s.hp[id]; if (gap <= 0) continue; const h = Math.min(gap, need * eff); s.hp[id] += h; need -= h / eff; if (need <= 1e-9) break; }
     }
     // abilities
     if (s.autoCast) for (const id of s.party) if (id && !s.down[id]) { const st = s.abil[id]; if ((!st || st.readyAt <= now) && wantsCast(s, id, now)) castAbility(s, id, now, events); }
@@ -853,6 +897,8 @@
     s.settings = Object.assign(newState().settings, o.settings || {});
     s.story = Object.assign({ seen: {}, queue: [] }, o.story || {});
     s.party = (o.party || []).concat([null, null, null, null, null]).slice(0, PARTY_SIZE);
+    if (!o.formation) { registerHero(s); try { autoFormation(s); } catch (e) {} }
+    s.formation = 1;
     s.foe = null; s.lantern = 0; s.minions = []; s.abil = {}; s.down = {};
     s.guests = o.guests || [];
     s.bag = o.bag || []; s.gear = o.gear || {}; s.lore = Object.assign({ hold: 1 }, o.lore || {});
@@ -862,7 +908,7 @@
   }
 
   const api = {
-    VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
+    VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, SLOTS, SLOT_NAME, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,

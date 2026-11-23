@@ -655,7 +655,7 @@
     const eq = e.target.closest('[data-equip]'); if (eq) { if (L.equip(S, gearWho, eq.dataset.equip)) { sfx.buy(); updateGear(true); updateSeats(true); } return; }
     if (e.target.closest('#g-best')) { const n = L.equipBest(S, gearWho); if (n) { sfx.buy(); toast('gear-armor', 'Best gear on', n + (n === 1 ? ' piece' : ' pieces') + ' equipped on ' + L.memberById(gearWho).name + '.', ''); updateGear(true); updateSeats(true); } return; }
     if (e.target.closest('.gearhead .ic')) { profileModal(gearWho); return; }
-    const it = e.target.closest('[data-item]'); if (it) itemModal(it.dataset.item);
+    const it = e.target.closest('[data-item]'); if (it) { if ((e.ctrlKey || e.metaKey) && linkItem(L.itemOf(S, it.dataset.item))) return; itemModal(it.dataset.item); }
   });
   ['tab-gear', 'tab-party'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof]')) { e.preventDefault(); e.target.click(); } }));
   function itemModal(uid) {
@@ -673,7 +673,8 @@
       (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>No ' + L.CLASSES[it.cls].name + ' in your roster yet</button>') +
       '<button class="btn ghost" id="i-up"' + (maxed || cost > S.gold ? ' disabled' : '') + '>' + (maxed ? 'Fully upgraded' : 'Upgrade for ' + fmt(cost) + ' gold') + '</button>' +
       '<button class="btn danger" id="i-sell">Salvage for ' + fmt(L.salvageValue(it)) + '</button></div>' +
-      '<div class="row"><button class="btn ghost" id="i-close">Close</button></div>', md => {
+      '<div class="row">' + (CL ? '<button class="btn ghost" id="i-link">Link in chat</button>' : '') + '<button class="btn ghost" id="i-close">Close</button></div>', md => {
+        const lk = md.querySelector('#i-link'); if (lk) lk.onclick = () => { closeModal(); linkItem(it); };
         const re = () => { updateGear(true); updateSeats(true); itemModal(uid); };
         const on = md.querySelector('#i-on'); if (on) on.onclick = () => { L.equip(S, gearWho, uid); sfx.buy(); re(); };
         const off = md.querySelector('#i-off'); if (off) off.onclick = () => { L.unequip(S, w, it.slot); re(); };
@@ -1204,14 +1205,53 @@
     if (!r.ok) throw Object.assign(new Error(j.error || 'chat'), { status: r.status, code: j.error });
     return j;
   }
-  function chatNote(t, warn) { const n = $('chatnote'); n.textContent = t || 'Be kind. No links. Tap a name to mute or report.'; n.classList.toggle('warn', !!warn); }
+  function chatNote(t, warn) { const n = $('chatnote'); n.textContent = t || 'Be kind. No web links. Ctrl+click an item to link it. Tap a name to mute or report.'; n.classList.toggle('warn', !!warn); }
+  // Item links: Ctrl/Cmd+click an item (or use Link in chat) to drop it into the message.
+  const ITEM_TOKEN = /\[\[i:(tank|healer|rogue|mage|necro),(weapon|armor|trinket),(common|fine|rare|epic|set),([a-z]{0,8}),(\d{1,6}),(\d{1,2})\]\]/g;
+  const tokenOf = it => '[[i:' + it.cls + ',' + it.slot + ',' + it.rar + ',' + (it.set || '') + ',' + it.ilvl + ',' + (it.up || 0) + ']]';
+  const itemLabel = it => L.gearName(it) + (it.up ? ' +' + it.up : '');
+  function itemFromToken(m) {
+    const it = { cls: m[1], slot: m[2], rar: m[3], set: m[4] || undefined, ilvl: +m[5], up: Math.min(+m[6], L.UP_MAX) };
+    if (it.set && !L.SETS.some(x => x.id === it.set && x.cls === it.cls)) return null;
+    if (it.rar === 'set' && !it.set) return null;
+    try { L.gearName(it); return it; } catch (e) { return null; }
+  }
+  chat.links = [];
+  function linkItem(it) {
+    if (!it || !CL) return false;
+    if (!signedIn()) { toast('lock', 'Sign in to chat', 'Item links go to chat, which needs a free account.', 'warn'); return true; }
+    if (chat.links.length >= 3) { toast('lock', 'Three links at most', 'Send this message first, then link more.', 'warn'); return true; }
+    const label = '[' + itemLabel(it) + ']';
+    chat.links.push({ label, token: tokenOf(it) });
+    if (!chat.open) openChat(true);
+    const inp = $('chatin'), at = inp.selectionStart != null ? inp.selectionStart : inp.value.length;
+    inp.value = inp.value.slice(0, at) + (at && inp.value[at - 1] !== ' ' ? ' ' : '') + label + ' ' + inp.value.slice(at);
+    inp.focus(); return true;
+  }
+  function renderText(t) {
+    let out = '', last = 0, m; ITEM_TOKEN.lastIndex = 0;
+    while ((m = ITEM_TOKEN.exec(t))) {
+      out += esc(t.slice(last, m.index)); last = ITEM_TOKEN.lastIndex;
+      const it = itemFromToken(m);
+      out += it ? '<button class="ilink r-' + it.rar + '" data-link="' + esc(m[0]) + '">[' + esc(itemLabel(it)) + ']</button>' : esc(m[0]);
+    }
+    return out + esc(t.slice(last));
+  }
+  function previewItem(tok) {
+    ITEM_TOKEN.lastIndex = 0; const m = ITEM_TOKEN.exec(tok), it = m && itemFromToken(m); if (!it) return;
+    const set = it.set && L.SETS.find(x => x.id === it.set), rar = L.RARITY.find(r => r.id === it.rar);
+    modal('<div class="itemhead r-' + it.rar + '">' + icon(SLOT_ICON[it.slot]) + '<div><h2>' + esc(itemLabel(it)) + '</h2><small>' + rar.name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + L.CLASSES[it.cls].name + ' only &middot; found on floor ' + it.ilvl + '</small></div></div>' +
+      '<p class="effect">' + itemEffect(it) + '</p>' +
+      (set ? '<div class="setinfo on"><b>' + set.name + '</b><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
+      '<p class="note">A preview of an item linked in chat. Viewing it does not add it to your pack.</p><div class="row"><button class="btn ghost" id="lp-x">Close</button></div>', md => { md.querySelector('#lp-x').onclick = closeModal; });
+  }
   function paintChat() {
     const log = $('chatlog'), k = roomKey(), list = (chat.msgs[k] || []).filter(m => !chat.muted.has(m.from));
     if (!signedIn()) { log.innerHTML = '<div class="chatempty"><p>Sign in to chat with other delvers.</p><button class="btn small" id="chat-in">Sign in</button></div>'; $('chatform').hidden = true; return; }
     if (!S.hero) { log.innerHTML = '<div class="chatempty"><p>Create your hero first.</p></div>'; $('chatform').hidden = true; return; }
     $('chatform').hidden = false;
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-    log.innerHTML = list.length ? list.map(m => '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + esc(m.name) + '</button><span>' + esc(m.text) + '</span></div>').join('')
+    log.innerHTML = list.length ? list.map(m => '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + esc(m.name) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
       : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : 'Quiet down here. Say hello.') + '</p></div>';
     if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
   }
@@ -1256,6 +1296,7 @@
     $('chatroom').addEventListener('change', e => { chat.leader = e.target.value || null; paintChat(); pollChat(); });
     $('chatlog').addEventListener('click', e => {
       if (e.target.closest('#chat-in')) { authForm('in'); return; }
+      const lk = e.target.closest('[data-link]'); if (lk) { previewItem(lk.dataset.link); return; }
       const w = e.target.closest('[data-from]'); if (!w || w.dataset.from === chat.me) return;
       const from = w.dataset.from, id = w.dataset.id, name = w.dataset.name;
       modal('<h2>' + esc(name) + '</h2><p>Mute hides everything this player says, on this device. Report flags this message for review; messages with several reports are hidden for everyone.</p><div class="row"><button class="btn ghost" id="c-mute">Mute ' + esc(name) + '</button><button class="btn danger" id="c-rep">Report message</button><button class="btn ghost" id="c-x">Cancel</button></div>', md => {
@@ -1266,11 +1307,13 @@
     });
     $('chatform').addEventListener('submit', async e => {
       e.preventDefault();
-      const inp = $('chatin'), text = inp.value.trim(); if (!text || !S.hero) return;
+      const inp = $('chatin'); let text = inp.value.trim(); if (!text || !S.hero) return;
+      for (const l of chat.links) text = text.replace(l.label, l.token);
+      text = text.replace(/\[\[(?!i:)/g, '[');
       inp.disabled = true;
       try {
         await chatCall('POST', '/chat', { ch: chat.ch, leader: chat.leader || undefined, text, name: S.hero.name, cls: S.hero.cls });
-        inp.value = ''; chatNote(); pollChat();
+        inp.value = ''; chat.links = []; chatNote(); pollChat();
       } catch (err) {
         chatNote({ slow: 'Easy there. One message every few seconds.', links: 'Links aren’t allowed in chat.', name: 'Your hero’s name can’t be used in chat. Start a new hero with a different name.', room: 'You can’t post in that party.' }[err.code] || 'Message not sent. Try again in a moment.', true);
       }

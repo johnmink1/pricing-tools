@@ -486,3 +486,6 @@ button.scene:hover{border-color:var(--accent)}
 @keyframes upglow{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 25%,transparent)}}
 @media (prefers-reduced-motion:reduce){.updatebtn{animation:none}}
 @media (max-width:720px){.updatebtn span{display:none}.updatebtn{padding:0 10px}}
+.ilink{background:none;border:0;padding:0;font:inherit;font-weight:800;cursor:pointer;color:var(--rc,#e9c98a)}
+.ilink:hover{text-decoration:underline}
+.ilink.r-common{--rc:#d9cdb8}.ilink.r-fine{--rc:#8fcf6a}.ilink.r-rare{--rc:#6cb6ff}.ilink.r-epic{--rc:#c78bff}.ilink.r-set{--rc:#f2c45a}

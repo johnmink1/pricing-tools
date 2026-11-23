@@ -698,3 +698,29 @@ body:not(.incamp) [data-train]:not([data-train="you"])::after,body:not(.incamp) 
 .itool.danger{color:#e88a7a}.itool.danger:hover{border-color:#8a3a2a;background:#2a1512}
 .itool.confirm{background:#3a1712;border-color:#c8453a;color:#ffb0a0}
 @media (max-width:480px){.ihero{flex-direction:column;align-items:flex-start;padding-right:40px}.ititle h2{font-size:21px}}
+/* camp jobs */
+.jobs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 12px}
+.job{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;font:inherit;color:var(--text);background:#15110d;border:1px dashed var(--line2);border-radius:12px;padding:10px;cursor:pointer;min-width:0}
+.job.on{border-style:solid;border-color:color-mix(in srgb,var(--ember) 45%,var(--line2));background:radial-gradient(ellipse at 0% 0%,rgba(255,138,61,.14),transparent 70%),#1a1410}
+.job:hover{border-color:var(--ember)}
+.job .jic svg{width:20px;height:20px;color:var(--dim)}.job.on .jic svg{color:var(--ember)}
+.job b{font-size:14px}
+.job small{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.job small img{image-rendering:pixelated;height:16px}
+.job small.none{color:var(--dim);font-style:italic}
+.job em{font-style:normal;font-size:12px;font-weight:800;color:var(--good)}
+.job:not(.on) em{color:var(--dim);font-weight:600}
+.jobline{font-size:12.5px;color:var(--dim);margin-top:3px;display:flex;align-items:center;gap:5px}
+.jobline.on{color:var(--good)}.jobline b{color:var(--text)}
+.jobline svg{width:14px;height:14px;color:var(--ember)}
+.jpick{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;width:100%}
+.jpick img{image-rendering:pixelated;height:32px;justify-self:center}
+.jpick .jic svg{width:24px;height:24px;color:var(--ember)}
+.jpick b{display:block}.jpick small{display:block;color:var(--muted);font-size:12.5px}
+.jpick em{font-style:normal;font-weight:800;color:var(--good);font-size:13px;white-space:nowrap}
+.aff{font-style:normal;font-size:11px;color:var(--gold);font-weight:800;margin-left:4px}
+.choice{display:grid;gap:8px}
+@media (max-width:720px){.jobs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile .lvb{bottom:3px;left:3px;background:#000b;color:var(--muted);font-size:10px}
+.tile .lvb.no{background:#5a1a14;color:#ffb0a0}
+.ititle small b.bad{color:#ff8a7a}

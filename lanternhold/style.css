@@ -1147,3 +1147,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .passfx b{color:var(--gold)}.passfx span{color:var(--muted);font-size:14px}
 .passstate{margin:0 0 10px}.passstate b{color:var(--gold)}
 .autot.locked{opacity:.55}.autot.locked::after{content:'';display:inline-block;width:6px;height:6px;margin-left:4px;border-radius:50%;background:var(--violet)}
+/* Continue with Born 2 Game */
+.auth .b2g{width:100%;background:linear-gradient(180deg,#8b5cf6,#6d28d9);color:#fff;border-color:#7c3aed}
+.auth .or{display:flex;align-items:center;gap:10px;margin:12px 0 4px;color:var(--muted);font-size:13px}
+.auth .or::before,.auth .or::after{content:'';flex:1;height:1px;background:var(--line2)}

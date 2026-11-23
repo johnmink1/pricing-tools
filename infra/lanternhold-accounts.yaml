@@ -38,6 +38,10 @@ Resources:
         EmailMessage: 'Your Lanternhold code is {####}. Enter it in the game to finish. If you did not ask for this, you can ignore this email.'
       UserPoolTags:
         app: lanternhold
+      LambdaConfig:
+        DefineAuthChallenge: !GetAtt AuthChalFunction.Arn
+        CreateAuthChallenge: !GetAtt AuthChalFunction.Arn
+        VerifyAuthChallengeResponse: !GetAtt AuthChalFunction.Arn
 
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
@@ -48,6 +52,7 @@ Resources:
       ExplicitAuthFlows:
         - ALLOW_USER_PASSWORD_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_CUSTOM_AUTH
       PreventUserExistenceErrors: ENABLED
       EnableTokenRevocation: true
       AccessTokenValidity: 1
@@ -1018,7 +1023,7 @@ Resources:
       Code:
         ZipFile: |
           // built from infra/lambda/store.js by infra/build.py
-          const m=require("@aws-sdk/client-dynamodb"),b=new m.DynamoDBClient({}),{TABLE:y,WALLETS:h,PACKS:C}=process.env,k=Object.fromEntries(C.split(",").map(t=>t.split(":")).map(([t,e])=>[t,+e])),s=(t,e)=>({statusCode:t,body:JSON.stringify(e)}),n=t=>({S:String(t)}),i=t=>({N:String(t)}),S=async(t,e)=>{const o=await fetch("https://www.wixapis.com"+t,{headers:{Authorization:e}});if(!o.ok)throw Object.assign(new Error("wix "+o.status),{st:o.status});return o.json()};exports.handler=async t=>{const e=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!e||!e.sub)return s(401,{error:1});if(t.routeKey!=="POST /store/sync")return s(404,{error:1});let o={};try{o=JSON.parse(t.isBase64Encoded?Buffer.from(t.body||"","base64").toString():t.body||"{}")}catch{return s(400,{error:1})}const u=String(o.token||"");if(u.length<20||u.length>4e3)return s(400,{error:1});let a;try{a=(await S("/members/v1/members/my",u)).member}catch{return s(401,{error:"wix"})}if(!a||!a.id)return s(401,{error:"wix"});const d=a.id,w=String(a.profile&&a.profile.nickname||(a.loginEmail||"").replace(/@.*/,"")||"Store account").slice(0,40);try{await b.send(new m.PutItemCommand({TableName:y,Item:{pk:n("wix#"+d),sk:n("link"),u:n(e.sub),name:n(w),at:i(Date.now())},ConditionExpression:"attribute_not_exists(pk) OR u = :u",ExpressionAttributeValues:{":u":n(e.sub)}}))}catch(r){if(r.name==="ConditionalCheckFailedException")return s(409,{error:"taken"});throw r}let p=[];try{p=(await S("/pricing-plans/v2/member/orders?limit=100",u)).orders||[]}catch{return s(502,{error:"orders"})}let x=0;for(const r of p){const c=k[r.planId];if(!(!c||r.lastPaymentStatus!=="PAID"||r.buyer&&r.buyer.memberId!==d))try{await b.send(new m.TransactWriteItemsCommand({TransactItems:[{Put:{TableName:y,Item:{pk:n("wixord#"+r.id),sk:n("-"),u:n(e.sub),m:n(d),n:i(c),at:i(Date.now())},ConditionExpression:"attribute_not_exists(pk)"}},{Update:{TableName:h,Key:{userId:n(e.sub)},UpdateExpression:"SET bal = if_not_exists(bal, :g) + :n, own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":i(100),":n":i(c),":o":{SS:["f.plain"]}}}}]})),x+=c}catch(f){if(f.name!=="TransactionCanceledException")throw f}}const l=await b.send(new m.GetItemCommand({TableName:h,Key:{userId:n(e.sub)}}));return s(200,{ok:!0,name:w,added:x,bal:l.Item&&l.Item.bal?+l.Item.bal.N:100})};
+          const w=require("@aws-sdk/client-dynamodb"),x=new w.DynamoDBClient({}),{TABLE:E,WALLETS:f,PACKS:g}=process.env,S=Object.fromEntries(g.split(",").map(t=>t.split(":")).map(([t,r])=>[t,+r])),s=(t,r)=>({statusCode:t,body:JSON.stringify(r)}),o=t=>({S:String(t)}),l=t=>({N:String(t)}),C=async(t,r)=>{const i=await fetch("https://www.wixapis.com"+t,{headers:{Authorization:r}});if(!i.ok)throw Object.assign(new Error("wix "+i.status),{st:i.status});return i.json()};let h=null,I=0;async function T(){if(h&&Date.now()-I<3e5)return h;const t=await fetch("https://war.born2gamellc.com/api/mercy.json").then(m=>m.json()),r=t.food||{},i=t.toys||{},c=Math.floor((t.total||0)/10)+Math.floor((r.items||0)/5)+Math.floor((r.dollars||0)/10)+(i.items||0)+Math.floor((i.dollars||0)/10),n=Date.now(),d={userId:o("#mercy")},a=(await x.send(new w.GetItemCommand({TableName:f,Key:d}))).Item,p=a?+a.pts.N:-1,b=a?+a.until.N:0;let u=b,e=a?+a.at.N:0;if(a?c>p&&(u=Math.min(Math.max(n,b)+(c-p)*72e5,n+6048e5),e=n):(u=n+864e5,e=n),c!==p)try{await x.send(new w.UpdateItemCommand({TableName:f,Key:d,UpdateExpression:"SET pts = :p, #u = :u, #a = :a",ConditionExpression:a?"pts = :o":"attribute_not_exists(userId)",ExpressionAttributeNames:{"#u":"until","#a":"at"},ExpressionAttributeValues:Object.assign({":p":l(c),":u":l(u),":a":l(e)},a?{":o":a.pts}:{})}))}catch(m){if(m.name!=="ConditionalCheckFailedException")throw m;return{until:b,at:e}}return h={until:u,at:e,pts:c},I=n,h}exports.handler=async t=>{if(t.routeKey==="GET /mercy")try{return Object.assign(s(200,await T()),{headers:{"cache-control":"public, max-age=120"}})}catch{return s(502,{error:"mercy"})}const r=t.requestContext.authorizer&&t.requestContext.authorizer.jwt&&t.requestContext.authorizer.jwt.claims;if(!r||!r.sub)return s(401,{error:1});if(t.routeKey!=="POST /store/sync")return s(404,{error:1});let i={};try{i=JSON.parse(t.isBase64Encoded?Buffer.from(t.body||"","base64").toString():t.body||"{}")}catch{return s(400,{error:1})}const c=String(i.token||"");if(c.length<20||c.length>4e3)return s(400,{error:1});let n;try{n=(await C("/members/v1/members/my",c)).member}catch{return s(401,{error:"wix"})}if(!n||!n.id)return s(401,{error:"wix"});const d=n.id,a=String(n.profile&&n.profile.nickname||(n.loginEmail||"").replace(/@.*/,"")||"Store account").slice(0,40);try{await x.send(new w.PutItemCommand({TableName:E,Item:{pk:o("wix#"+d),sk:o("link"),u:o(r.sub),name:o(a),at:l(Date.now())},ConditionExpression:"attribute_not_exists(pk) OR u = :u",ExpressionAttributeValues:{":u":o(r.sub)}}))}catch(e){if(e.name==="ConditionalCheckFailedException")return s(409,{error:"taken"});throw e}let p=[];try{p=(await C("/pricing-plans/v2/member/orders?limit=100",c)).orders||[]}catch{return s(502,{error:"orders"})}let b=0;for(const e of p){const m=S[e.planId];if(!(!m||e.lastPaymentStatus!=="PAID"||e.buyer&&e.buyer.memberId!==d))try{await x.send(new w.TransactWriteItemsCommand({TransactItems:[{Put:{TableName:E,Item:{pk:o("wixord#"+e.id),sk:o("-"),u:o(r.sub),m:o(d),n:l(m),at:l(Date.now())},ConditionExpression:"attribute_not_exists(pk)"}},{Update:{TableName:f,Key:{userId:o(r.sub)},UpdateExpression:"SET bal = if_not_exists(bal, :g) + :n, own = if_not_exists(own, :o)",ExpressionAttributeValues:{":g":l(100),":n":l(m),":o":{SS:["f.plain"]}}}}]})),b+=m}catch(y){if(y.name!=="TransactionCanceledException")throw y}}const u=await x.send(new w.GetItemCommand({TableName:f,Key:{userId:o(r.sub)}}));return s(200,{ok:!0,name:a,added:b,bal:u.Item&&u.Item.bal?+u.Item.bal.N:100})};
 
   StoreIntegration:
     Type: AWS::ApiGatewayV2::Integration
@@ -1114,6 +1119,116 @@ Resources:
       Target: !Sub 'integrations/${StoreIntegration}'
 
 
+
+  AuthChalFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: authchalfunction-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:DeleteItem]
+                Resource: !GetAtt TradeTable.Arn
+
+  AuthChalFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-authchal
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 10
+      Role: !GetAtt AuthChalFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE: !Ref TradeTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/authchal.js by infra/build.py
+          const a=require("@aws-sdk/client-dynamodb"),o=new a.DynamoDBClient({}),{TABLE:r}=process.env;exports.handler=async e=>{const l=e.request,t=e.triggerSource;if(t==="DefineAuthChallenge_Authentication"){const n=l.session||[],s=n[n.length-1];s&&s.challengeName==="CUSTOM_CHALLENGE"&&s.challengeResult?(e.response.issueTokens=!0,e.response.failAuthentication=!1):n.length>=2?(e.response.issueTokens=!1,e.response.failAuthentication=!0):(e.response.issueTokens=!1,e.response.failAuthentication=!1,e.response.challengeName="CUSTOM_CHALLENGE")}else if(t==="CreateAuthChallenge_Authentication")e.response.publicChallengeParameters={kind:"store"},e.response.privateChallengeParameters={},e.response.challengeMetadata="STORE";else if(t==="VerifyAuthChallengeResponse_Authentication"){const n={pk:{S:"otp#"+e.userName},sk:{S:"-"}},s=await o.send(new a.GetItemCommand({TableName:r,Key:n,ConsistentRead:!0})),i=!!(s.Item&&s.Item.c.S===String(l.challengeAnswer)&&+s.Item.exp.N>Date.now());s.Item&&await o.send(new a.DeleteItemCommand({TableName:r,Key:n})),e.response.answerCorrect=i}return e};
+
+  AuthChalInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref AuthChalFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*'
+
+  WixLoginFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: wixloginfunction-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem]
+                Resource: !GetAtt TradeTable.Arn
+              - Effect: Allow
+                Action: [cognito-idp:ListUsers, cognito-idp:AdminCreateUser, cognito-idp:AdminSetUserPassword, cognito-idp:AdminInitiateAuth, cognito-idp:AdminRespondToAuthChallenge]
+                Resource: !GetAtt UserPool.Arn
+
+  WixLoginFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-wixlogin
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 25
+      Role: !GetAtt WixLoginFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE: !Ref TradeTable
+          POOL: !Ref UserPool
+          CLIENT: !Ref UserPoolClient
+      Code:
+        ZipFile: |
+          // built from infra/lambda/wixlogin.js by infra/build.py
+          const c=require("@aws-sdk/client-dynamodb"),a=require("@aws-sdk/client-cognito-identity-provider"),I=require("crypto"),w=new c.DynamoDBClient({}),o=new a.CognitoIdentityProviderClient({}),{TABLE:C,POOL:i,CLIENT:N}=process.env,r=(e,m)=>({statusCode:e,body:JSON.stringify(m)}),n=e=>({S:String(e)}),h=e=>({N:String(e)}),P=async e=>((await o.send(new a.ListUsersCommand({UserPoolId:i,Filter:e,Limit:1}))).Users||[])[0];exports.handler=async e=>{let m={};try{m=JSON.parse(e.isBase64Encoded?Buffer.from(e.body||"","base64").toString():e.body||"{}")}catch{return r(400,{error:1})}const u=String(m.token||"");if(u.length<20||u.length>4e3)return r(400,{error:1});const S=await fetch("https://www.wixapis.com/members/v1/members/my",{headers:{Authorization:u}}),s=S.ok&&(await S.json()).member;if(!s||!s.id)return r(401,{error:"wix"});const U=s.id,A=String(s.profile&&s.profile.nickname||"Store account").slice(0,40),b={pk:n("wix#"+U),sk:n("link")},f=(await w.send(new c.GetItemCommand({TableName:C,Key:b,ConsistentRead:!0}))).Item;let t,p=!1;if(f&&(t=await P('sub = "'+f.u.S.replace(/[^0-9a-f-]/g,"")+'"')),!t){const d="store-"+U.replace(/[^0-9a-f-]/g,"")+"@players.born2gamellc.com";t=await P('email = "'+d+'"'),t||(t=(await o.send(new a.AdminCreateUserCommand({UserPoolId:i,Username:d,MessageAction:"SUPPRESS",UserAttributes:[{Name:"email",Value:d},{Name:"email_verified",Value:"true"}]}))).User,await o.send(new a.AdminSetUserPasswordCommand({UserPoolId:i,Username:t.Username,Password:I.randomBytes(24).toString("base64")+"aA1!",Permanent:!0})),p=!0);const k=t.Attributes.find(l=>l.Name==="sub").Value;try{await w.send(new c.PutItemCommand({TableName:C,Item:Object.assign({},b,{u:n(k),name:n(A),at:h(Date.now())}),ConditionExpression:"attribute_not_exists(pk)"}))}catch(l){if(l.name!=="ConditionalCheckFailedException")throw l;return r(409,{error:"state"})}}const g=I.randomBytes(18).toString("hex");await w.send(new c.PutItemCommand({TableName:C,Item:{pk:n("otp#"+t.Username),sk:n("-"),c:n(g),exp:h(Date.now()+6e4),ttl:h(Math.floor(Date.now()/1e3)+600)}}));const E=await o.send(new a.AdminInitiateAuthCommand({UserPoolId:i,ClientId:N,AuthFlow:"CUSTOM_AUTH",AuthParameters:{USERNAME:t.Username}})),y=await o.send(new a.AdminRespondToAuthChallengeCommand({UserPoolId:i,ClientId:N,ChallengeName:"CUSTOM_CHALLENGE",Session:E.Session,ChallengeResponses:{USERNAME:t.Username,ANSWER:g}}));return y.AuthenticationResult?r(200,{AuthenticationResult:y.AuthenticationResult,name:A,created:p}):r(401,{error:"auth"})};
+
+  WixLoginIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt WixLoginFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  WixLoginInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WixLoginFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  WixLoginRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /store/login
+      Target: !Sub 'integrations/${WixLoginIntegration}'
 
   WardenFunctionRole:
     Type: AWS::IAM::Role

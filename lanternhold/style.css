@@ -1,4 +1,4 @@
-/* lh-build 202611232013 */
+/* lh-build 202611232124 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1756,6 +1756,10 @@ body.resting .taptip{display:none}
 .picker .pkrow .cmp{display:inline-flex;align-items:center;gap:4px}.picker .pkrow .cmp svg{width:12px;height:12px}
 #pk-lk{display:inline-flex;align-items:center;gap:5px}#pk-lk svg{width:13px;height:13px}#pk-lk.on{color:var(--gold);border-color:#c9a24a88}
 .mu.rep{color:var(--gold)}
+.aspack{display:flex;align-items:center;gap:12px;margin:12px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.aspack>div{flex:1;min-width:0}.aspack b{display:block;font-size:14px}.aspack small{display:block;color:var(--muted);font-size:12.5px;line-height:1.35;margin-top:2px}
+.aspack.on{border-color:#e8604a66;background:rgba(232,96,74,.06)}.aspack .btn{flex:none}
+@media (max-width:520px){.aspack{flex-wrap:wrap}.aspack .btn{width:100%}}
 /* ---------- music player ---------- */
 .musbtn{position:relative}
 .musbtn.on{color:var(--gold);border-color:rgba(245,194,66,.45)}

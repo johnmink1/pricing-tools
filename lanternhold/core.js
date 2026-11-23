@@ -461,10 +461,41 @@
     const v = k.v * Math.max(1, rank);
     return k.d.replace('{v}', k.k === 'lantern' ? v : Math.round(v * 100) + '%');
   }
-  // Total of one effect from your hero's tree. It only counts while your hero is in the party.
+  // ---------- Grand War auras ----------
+  // A verified Grand War commander's hero carries an aura for their class. Its strength follows their war rank
+  // (0 Recruit .. 6, the top of the alliance ladder), and war honors add to it. Earned in the war, never bought.
+  const AURA_TIER = [0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10];
+  const AURAS = {
+    tank:   { name: 'Bulwark Aura',  fx: [['guard', 0.5, 'less damage taken by the party'], ['php', 1, 'party health']] },
+    healer: { name: 'Mending Aura',  fx: [['pheal', 1.5, 'party healing'], ['php', 0.5, 'party health']] },
+    rogue:  { name: 'Shadow Aura',   fx: [['gold', 1.5, 'gold'], ['crit', 0.25, 'critical strike chance']] },
+    mage:   { name: 'Ember Aura',    fx: [['pdps', 1, 'party damage'], ['crit', 0.25, 'critical strike chance']] },
+    necro:  { name: 'Grave Aura',    fx: [['pdps', 0.75, 'party damage'], ['loot', 1, 'gear drop chance']] },
+  };
+  const HONOR_FX = [
+    ['Grand Marshal', 'Marshal’s Banner', 'pdps', 0.05, 'party damage'],
+    ['Alliance Champion', 'Champion’s Mantle', 'php', 0.05, 'party health'],
+    ['Nexus Holder', 'Nexus Tithe', 'gold', 0.10, 'gold'],
+  ];
+  // s.war: { lv, h: [honor names] } for a verified commander, otherwise absent.
+  function warAura(s) {
+    const w = s.war, c = heroCls(s);
+    if (!w || !c || !AURAS[c]) return null;
+    const lv = Math.max(0, Math.min(6, w.lv | 0)), h = Array.isArray(w.h) ? w.h.map(String) : [];
+    const vets = h.filter(x => /Season/.test(x)).length, base = AURA_TIER[lv] * (1 + 0.25 * Math.min(4, vets));
+    const fx = {}, lines = [];
+    for (const [k, m, d] of AURAS[c].fx) { fx[k] = (fx[k] || 0) + base * m; lines.push(fmtPct(base * m) + ' ' + d); }
+    for (const [hn, name, k, v, d] of HONOR_FX) if (h.includes(hn)) { fx[k] = (fx[k] || 0) + v; lines.push(name + ': ' + fmtPct(v) + ' ' + d); }
+    if (vets) lines.push('Veteran of ' + vets + (vets === 1 ? ' season' : ' seasons') + ': aura ' + fmtPct(0.25 * Math.min(4, vets)) + ' stronger');
+    return { name: AURAS[c].name, cls: c, lv, fx, lines };
+  }
+  const fmtPct = v => '+' + (Math.round(v * 1000) / 10) + '%';
+  function auraVal(s, key) { const a = warAura(s); return a && a.fx[key] || 0; }
+  // Total of one effect from your hero's tree and Grand War aura. It only counts while your hero is in the party.
   function sk(s, key) {
-    if (!s.skills || !s.party.includes('you')) return 0;
-    let t = 0;
+    if (!s.party.includes('you')) return 0;
+    if (!s.skills) return auraVal(s, key);
+    let t = auraVal(s, key);
     for (const id in s.skills) { const k = skillById(id); if (k && k.k === key && k.cls === heroCls(s)) t += k.v * s.skills[id]; }
     return t;
   }
@@ -1425,7 +1456,7 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

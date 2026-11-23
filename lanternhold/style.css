@@ -1095,3 +1095,10 @@ body.resting .arena{cursor:default}
 .linkname:hover{text-decoration-color:currentColor}
 .seat.gboard{align-items:center}
 @media (prefers-reduced-motion:reduce){.fr-ember,.fr-rift,.fr-nexus,.nc-rift{animation:none}}
+/* Grand War aura */
+.aura{border:1px solid var(--line2);border-radius:12px;padding:10px 12px;margin:6px 0 10px;background:linear-gradient(135deg,rgba(245,194,66,.10),rgba(232,121,249,.06) 60%,transparent),var(--panel2);box-shadow:0 0 0 1px rgba(245,194,66,.08),0 0 22px -8px rgba(245,194,66,.45)}
+.aurah{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.aurah b{font-family:var(--title);color:var(--gold);letter-spacing:.04em;text-transform:uppercase;font-size:14px}
+.aurah small{color:var(--muted);font-size:12px}
+.aura ul{margin:6px 0 0;padding-left:18px;color:var(--text);font-size:13px}
+.aura li{margin:2px 0}

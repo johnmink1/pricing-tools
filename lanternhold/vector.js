@@ -575,6 +575,42 @@
       Pn('M78 56 Q80 42 94 38', 'none', ' stroke="#ffffff" stroke-width="1.5" opacity=".4"'),
     ].join('');
   });
+  // World boss: the Rift Colossus, a giant of void crystal with the Nyx Rift burning through its chest.
+  ART.colossus = F(c => {
+    const body = c.lg(['#4a3a6e', '#2a1f45', '#150f26'], 0.1, 0, 0.9, 1), plate = c.lg(['#6a58a0', '#3c2f66', '#1f1838'], 0.15, 0, 0.85, 1),
+      xtal = c.lg(['#ffd6ff', '#d76bff', '#7a2ab8'], 0.2, 0, 0.8, 1), rift = '#ff5ad0', glow = c.glowF(3);
+    const shard = (x, y, h, r) => G(P('M0 0 L' + (h * 0.22) + ' ' + (-h * 0.75) + ' L0 ' + (-h) + ' L' + (-h * 0.22) + ' ' + (-h * 0.75) + 'Z', xtal, ' stroke-width="1.8"') + Pn('M0 -2 L0 ' + (-h * 0.9), 'none', ' stroke="#ffffff" stroke-width="1.2" opacity=".6"'), 'translate(' + x + ' ' + y + ') rotate(' + r + ')');
+    return [
+      E(120, 234, 92, 7, '#000', ' opacity=".5"'),
+      E(120, 120, 100, 96, '#b44aff', ' opacity=".12" filter="' + c.glowF(14) + '"'),
+      // floating shards
+      shard(26, 70, 18, -20), shard(210, 52, 16, 18), shard(40, 150, 12, -40), shard(222, 140, 14, 30),
+      // legs
+      P('M78 168 L68 222 L52 232 L98 234 L102 172Z', body), P('M138 172 L142 232 L188 234 L172 222 L162 168Z', body),
+      P('M62 216 L100 216 L100 234 L52 234Z', plate), P('M140 216 L178 216 L188 234 L140 234Z', plate),
+      // torso
+      P('M60 92 Q56 60 92 50 L148 50 Q184 60 180 92 L172 168 Q120 186 68 168Z', body),
+      P('M74 70 Q120 58 166 70 L160 100 Q120 92 80 100Z', plate),
+      // the rift in the chest
+      Pn('M120 96 L112 116 L124 124 L108 150 L132 128 L120 120 L130 102Z', rift, ' filter="' + glow + '"'),
+      P('M120 96 L112 116 L124 124 L108 150 L132 128 L120 120 L130 102Z', '#ffe0f6', ' stroke="' + rift + '" stroke-width="1.6"'),
+      L_('M86 120 L100 128 L94 144 M154 118 L142 128 L150 146', rift, 1.6, ' opacity=".8"'),
+      // shoulders with crystal growths
+      P('M40 74 Q44 50 72 50 L84 60 L76 96 Q52 100 40 88Z', plate), P('M200 74 Q196 50 168 50 L156 60 L164 96 Q188 100 200 88Z', plate),
+      shard(52, 56, 30, -18), shard(66, 52, 22, 6), shard(188, 56, 30, 18), shard(174, 52, 22, -6),
+      // arms and fists
+      P('M44 90 L30 150 L40 156 L62 100Z', body), P('M196 90 L210 150 L200 156 L178 100Z', body),
+      P('M20 148 Q18 132 34 130 L50 134 Q58 150 48 166 L28 168 Q18 162 20 148Z', plate),
+      P('M220 148 Q222 132 206 130 L190 134 Q182 150 192 166 L212 168 Q222 162 220 148Z', plate),
+      shard(30, 132, 12, -30), shard(212, 132, 12, 30),
+      // hooded head and the single eye
+      P('M92 52 Q90 20 120 14 Q150 20 148 52 Q136 60 120 60 Q104 60 92 52Z', body),
+      P('M98 46 Q120 30 142 46 Q132 54 120 54 Q108 54 98 46Z', '#0a0614', ' stroke-width="1.6"'),
+      E(120, 45, 9, 6, rift, ' opacity=".7" filter="' + c.glowF(4) + '"'), E(120, 45, 5, 3.6, '#ffe8fb'), E(121, 45, 2, 2.6, '#3a0a30'),
+      shard(108, 20, 16, -14), shard(120, 16, 20, 0), shard(132, 20, 16, 14),
+      Pn('M70 66 Q90 56 110 56', 'none', ' stroke="#ffffff" stroke-width="1.5" opacity=".25"'),
+    ].join('');
+  }, 240, 240);
   ART.golem = F(c => {
     const st = c.t('#7b8698'), stone = c.lg([lit(st, 0.2), st, lit(st, -0.25)], 0.1, 0, 0.9, 1), stoneD = c.lg([lit(st, 0.02), lit(st, -0.3)]);
     const moss = c.t('#4a7a3a'), rune = '#7fd6e8';

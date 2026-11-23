@@ -21,18 +21,14 @@
   }
 
   // ---------- formatting ----------
-  // Plain numbers with commas. Past a million, words instead of letters: 2.4 million, 1.3 billion.
-  const BIG = ['', '', 'million', 'billion', 'trillion', 'quadrillion', 'quintillion', 'sextillion', 'septillion', 'octillion', 'nonillion', 'decillion'];
+  // Plain numbers with commas. Past a million, short letters: 2.40M, 13.1B, 250T (John, 2026-11-23: never 1.00e6).
+  const BIG = ['', '', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc', 'Ud', 'Dd', 'Td', 'Qad', 'Qid', 'Sxd', 'Spd', 'Ocd', 'Nod', 'Vg'];
   function fmt(n) {
     if (!isFinite(n)) return '∞';
     if (n < 0) return '-' + fmt(-n);
     if (n < 1e6) return n < 10 && n % 1 > 0.05 ? n.toFixed(1) : Math.floor(n).toLocaleString('en-US');
-    const e = Math.floor(Math.log10(n) / 3);
-    if (S.settings.notation !== 'sci' && e < BIG.length) {
-      const v = n / Math.pow(1000, e);
-      return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v)) + ' ' + BIG[e];
-    }
-    return n.toExponential(2).replace('e+', 'e');
+    const e = Math.min(BIG.length - 1, Math.floor(Math.log10(n) / 3)), v = n / Math.pow(1000, e);
+    return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v).toLocaleString('en-US')) + BIG[e];
   }
   function fmtTime(sec) {
     sec = Math.floor(sec);
@@ -1587,7 +1583,6 @@
   function openSettings() {
     modal('<h2>Settings</h2>' +
       '<label class="setrow"><span>Sound effects</span><input type="checkbox" id="s-sound"' + (S.settings.sound ? ' checked' : '') + '></label>' +
-      '<label class="setrow"><span>Scientific notation for big numbers</span><input type="checkbox" id="s-sci"' + (S.settings.notation === 'sci' ? ' checked' : '') + '></label>' +
       '<p style="margin-top:16px">Your progress saves automatically in this browser. Copy a backup to move it to another device.</p>' +
       '<div class="row"><button class="btn ghost" id="s-export">Copy backup</button><button class="btn ghost" id="s-import">Load backup</button><button class="btn danger" id="s-reset">Erase progress</button></div>' +
       '<div id="s-extra"></div>' +
@@ -1595,7 +1590,6 @@
       '<p class="credits">Lanternhold &middot; A Grand War game by Born 2 Game, LLC. &copy; 2026 Born 2 Game, LLC. Made with care, no ads, no tracking.</p>' +
       '<div class="row"><button class="btn" id="s-close">Done</button></div>', m => {
         m.querySelector('#s-sound').onchange = e => { S.settings.sound = e.target.checked; };
-        m.querySelector('#s-sci').onchange = e => { S.settings.notation = e.target.checked ? 'sci' : 'short'; updatePanel(true); };
         m.querySelector('#s-close').onclick = () => { save(); closeModal(); };
         m.querySelector('#s-export').onclick = () => {
           save(); const code = btoa(unescape(encodeURIComponent(localStorage.getItem(SAVE_KEY) || '')));
@@ -2979,6 +2973,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 35, date: 'November 23, 2026', title: 'Easier big numbers', items: [
+      'Big numbers now read 2.40M, 13.1B and 250T (million, billion, trillion) instead of scientific notation.'] },
     { v: 34, date: 'November 23, 2026', title: 'Tonics at the Quartermaster', items: [
       'Seven new tonics: Draught of Fury (+15% damage), Ironbark Tonic (+15% health), Mender’s Brew (+20% healing), Keen-Eye Elixir (+5% crit), Prospector’s Luck (+15% gold), Seeker’s Charm (+15% gear drops) and Scholar’s Ink (+25% hero XP).',
       'Each lasts 10 or 15 minutes. Different tonics stack, and drinking the same one again adds time, up to an hour.',

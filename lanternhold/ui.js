@@ -1,4 +1,4 @@
-/* lh-build 202611232204 */
+/* lh-build 202611232215 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1045,7 +1045,7 @@
     else if (t.id === 'm-market') openTrade('market');
     else if (t.id === 'm-mail') openTrade('mail');
   };
-  ['tab-party', 'tab-camp', 'tab-market'].forEach(id => $(id).addEventListener('click', partyClick));
+  ['tab-party', 'tab-camp', 'tab-market', 'tab-guild'].forEach(id => $(id).addEventListener('click', partyClick));
   // camp jobs: pick who does a job, or which job someone does
   function jobsFull() { const n = L.JOB_SLOT_LV.find(x => x > L.heroLv(S)); toast('lock', 'Every job slot is taken', 'You can run ' + L.jobSlots(S) + (L.jobSlots(S) === 1 ? ' camp job' : ' camp jobs') + ' at once.' + (n ? ' Another slot opens at hero level ' + n + '.' : '') + ' Clear a job to move someone.', 'warn'); }
   function jobModal(jid) {
@@ -1342,7 +1342,7 @@
     if (e.target.closest('.dfig')) { profileModal(gearWho); return; }
     const it = e.target.closest('[data-item]'); if (it) { if ((e.ctrlKey || e.metaKey) && linkItem(L.itemOf(S, it.dataset.item))) return; itemModal(it.dataset.item); }
   });
-  ['tab-gear', 'tab-party', 'tab-camp', 'tab-market'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof],[data-pos],[data-unlock]')) { e.preventDefault(); e.target.click(); } }));
+  ['tab-gear', 'tab-party', 'tab-camp', 'tab-market', 'tab-guild'].forEach(t => $(t).addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-item],[data-prof],[data-pos],[data-unlock]')) { e.preventDefault(); e.target.click(); } }));
   const itemStats = it => L.itemStats(it);
   function itemModal(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
@@ -3877,6 +3877,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 67, date: 'November 23, 2026', title: 'Guild invites fixed', items: [
+      'Fixed: the Invite buttons in the Guild tab did nothing. Pressing Invite now sends the invite right away, shows Invited with a Cancel button, and pops up a notice. The same fix covers accepting or declining party invitations and opening a hero’s profile from the Guild tab.'] },
     { v: 66, date: 'November 23, 2026', title: 'Fresh starts on request', items: [
       'Admins can now reset a single account back to a brand-new game, for testing or when a player asks for a clean slate. You get a notice when it happens, and purchased Sigils are kept unless you ask for them to go too.',
       'A server-wide reset now also keeps Sigil exchange listings and store links in place.'] },

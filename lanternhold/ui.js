@@ -1296,6 +1296,7 @@
   function updatePanel(force) {
     const now = Date.now();
     $('gold').textContent = fmt(S.gold);
+    { const sg = $('sigils'); if (sg) { const on = !!(typeof prof !== 'undefined' && prof && signedIn()); if (sg.hidden === on) sg.hidden = !on; if (on) $('sigilct').textContent = prof.bal.toLocaleString(); } }
     $('dps').textContent = fmt(L.totalDps(S, now));
     $('embers').textContent = fmt(S.embers); $('kindcount').textContent = S.kindling ? S.kindling : '';
     if (tab === 'party' || tab === 'camp') updateSeats(force);
@@ -1859,6 +1860,7 @@
     try { const r = await papi('PUT', '/profile', draft); prof.pf = r.pf; closeModal(); sfx.buy(); toast('star', 'Profile saved', 'Other players see your new look in the Players Guild.', 'feat'); }
     catch (e) { toast('lock', 'Could not save', e.code === 'bio' ? 'Keep the bio friendly, without links, under 140 characters.' : e.code === 'state' ? 'Play a little first so your hero is registered, then try again.' : 'Try again in a moment.', 'warn'); }
   }
+  $('sigils').addEventListener('click', () => openProfileEditor());
   // ---------- server resets and the admin tab ----------
   // A server wipe bumps a public "epoch". Saves started before it reset to a new game.
   const EPOCH_KEY = 'lanternhold.epoch';
@@ -2542,7 +2544,8 @@
       'Verified Grand War commanders now carry an aura for their hero’s class. Tanks get the Bulwark Aura (party health, less damage taken), healers the Mending Aura (healing), rogues the Shadow Aura (gold, critical hits), mages the Ember Aura (party damage, critical hits) and necromancers the Grave Aura (party damage, gear drops).',
       'The aura grows with your rank on the Grand War ladder, from 2% at Recruit to 10% at the top rank. Past seasons as Grand Marshal or champion make it a quarter stronger each.',
       'War honors add their own bonus: Grand Marshal gives the Marshal’s Banner (+5% party damage), Alliance Champion the Champion’s Mantle (+5% party health) and Nexus Holder the Nexus Tithe (+10% gold).',
-      'Your aura shows on your hero’s portrait. Auras are earned in the war and can never be bought.'] },
+      'Your aura shows on your hero’s portrait. Auras are earned in the war and can never be bought.',
+      'Your Sigils now show in the top bar when you are signed in. Tap them to open your profile.'] },
     { v: 21, date: 'November 22, 2026', title: 'Profiles, Sigils and Grand War badges', items: [
       'Your hero now has a profile card that other players see in the Players Guild: a frame, a title, a name color, a banner, up to six emblems and a short bio. Open it from your hero’s portrait and press Customize profile.',
       'Sigils buy looks for your card. Every account starts with 100. Looks never change your party’s power, and they stay with your account even through a server reset.',

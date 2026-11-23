@@ -1,4 +1,4 @@
-/* lh-build 202611232314 */
+/* lh-build 202611232327 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -160,7 +160,7 @@
     { id: 'b10',   name: 'Giant Slayer',      desc: 'Defeat 10 guardians',        test: s => s.stats.bossKills >= 10 },
     { id: 'c500',  name: 'Busy Hands',        desc: 'Strike 500 times',           test: s => s.stats.clicks >= 500 },
     { id: 'full',  name: 'A Full Table',      desc: 'Fill all five party seats',  test: s => s.party.filter(Boolean).length >= 5 },
-    { id: 'h100',  name: 'Veteran',           desc: 'Train a companion to level 100', test: s => Object.values(s.levels).some(l => l >= 100) },
+    { id: 'h100',  name: 'Veteran',           desc: 'Train a companion to power level 100', test: s => Object.values(s.levels).some(l => l >= 100) },
     { id: 'hall',  name: 'Full Roster',       desc: 'Meet all ten companions',    test: s => s.unlocked.length >= MEMBERS.length },
     { id: 'guest', name: 'Strength in Numbers', desc: 'Recruit another player\u2019s hero', test: s => (s.guests || []).length >= 1 },
     { id: 'heal',  name: 'Not Today',         desc: 'Lift 25 fallen allies with the Lantern Hymn', test: s => s.stats.revives >= 25 },
@@ -554,7 +554,7 @@
     { id: 'camp',     lv: 5,  name: 'The Campfire',      icon: 'flame',  desc: 'Rest companions at camp, swap your party and train who stays behind.' },
     { id: 'map',      lv: 8,  name: 'Map travel',        icon: 'map',    desc: 'Travel back to any floor you have reached from the Map of the Deep.' },
     { id: 'buy',      lv: 8,  name: 'Market: buying',    icon: 'coin',   desc: 'Buy gear other players have listed.' },
-    { id: 'jobs',     lv: 10, name: 'Camp jobs',         icon: 'hammer', desc: 'Put resting companions to work. One job to start, one more every 5 levels.' },
+    { id: 'jobs',     lv: 10, name: 'Camp jobs',         icon: 'hammer', desc: 'Put resting companions to work. One job to start, one more every 5 hero levels.' },
     { id: 'guild',    lv: 12, name: 'Players Guild',     icon: 'crown',  desc: 'Recruit other players\u2019 heroes into your party.' },
     { id: 'ring',     lv: 15, name: 'The Ember Ring',    icon: 'duel',   desc: 'Duel other players\u2019 parties for Laurels.' },
     { id: 'sell',     lv: 18, name: 'Market: selling',   icon: 'coin',   desc: 'Sell and send gear, and trade on the Sigil exchange.' },

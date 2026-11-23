@@ -349,7 +349,7 @@ ref({
 ref({
   slug: 'camp-and-jobs', title: 'Camp and jobs', nav: 'Camp and jobs', icon: 'flame',
   desc: 'Lanternhold camp: the main camp, Campfire Draughts, and all six camp jobs with their bonuses and best classes.',
-  lede: 'Companions resting at camp can work a job that helps the whole party. Output grows with their level and is 50% higher when the job suits their class.',
+  lede: 'Companions resting at camp can work a job that helps the whole party. Output grows with their power level and is 50% higher when the job suits their class.',
   body: () => '<div class="grid3">' + L.JOBS.map(j => card('job-' + j.id, esc(j.name), { pic: '<div class="gicon">' + icon(j.icon) + '</div>', sub: esc(j.desc),
       body: kv([['Gives', esc(j.fmt)], ['Best class', clsName(j.aff)], ['Job set', L.JOB_SETS[j.id] ? '<a href="/wiki/sets/#job-' + j.id + '">' + esc(L.JOB_SETS[j.id].name) + '</a>' : '–']]) })).join('') + '</div>' +
     '<h2 id="main-camp">Main camp</h2><p>Floor ' + L.CAMP_FLOOR + '. Swap companions, recruit, train camp companions and change gear. Descending again restarts you at the top of the region you left, so floor 99 becomes 91.</p>' +
@@ -362,7 +362,8 @@ ref({
   slug: 'progression', title: 'Progression', icon: 'star',
   desc: 'Lanternhold progression: hero stats, rekindling and Kindling upgrades, relics, records, daily quests and training milestones.',
   lede: 'Train your party with gold, level your hero, rekindle the lantern for Kindling, collect relics and chase records.',
-  body: () => '<h2 id="stats">Hero stats</h2><p>Your hero earns XP from every fight. Each level gives a stat point, two every fifth level. Stats start at ' + L.STAT_BASE + ' and cap at ' + L.STAT_MAX + '. Each class favours two stats, which count ×' + L.STAT_AFFINITY + '.</p>' +
+  body: () => '<h2 id="two-levels">Power level and hero level</h2><p>Lanternhold has two kinds of level. <b>Power level</b> belongs to every character in your party, your hero included: you raise it with gold using Train on the Party tab, it sets their damage and health, and gear needs a certain power level to wear. Rekindling resets it. <b>Hero level</b> is your own hero\'s experience level: it rises from fighting, gives stat points, opens new parts of the game and lets you into deeper regions. It is never reset. So a hero can be hero level 11 with a power level of 142.</p>' +
+    '<h2 id="stats">Hero stats</h2><p>Your hero earns XP from every fight and gains hero levels. Each hero level gives a stat point, two every fifth level. Stats start at ' + L.STAT_BASE + ' and cap at ' + L.STAT_MAX + '. Each class favours two stats, which count ×' + L.STAT_AFFINITY + '.</p>' +
     table(['Stat', 'Helps', 'Favoured by'], L.STATS.map(s => ['<b>' + esc(s.name) + '</b> <small>' + s.short + '</small>', esc(s.desc), CO.filter(c => (L.STAT_CLASS[c] || []).includes(s.id)).map(clsName).join(', ') || '–'])) +
     '<h2 id="unlocks">Hero level unlocks</h2><p>New parts of the game open as your hero levels up. Hero level carries over through rekindling.</p>' +
     table(['Hero level', 'Unlocks', 'What it does'], L.UNLOCKS.map(u => [String(u.lv), '<b>' + esc(u.name) + '</b>', esc(u.desc)])) +
@@ -376,7 +377,7 @@ ref({
     '<h2 id="relics">Relics</h2><p>Guardians from floor 10 sometimes drop a relic. Duplicates level it up, and relics stay through rekindling.</p>' + table(['Relic', 'Bonus'], L.RELICS.map(r => ['<b>' + esc(r.name) + '</b>', esc(r.desc)])) +
     '<h2 id="records">Records</h2><p>Each record you earn adds ' + 1 + '% to party damage, permanently.</p><div class="grid3 tight">' + L.FEATS.map(f => '<div class="mini" id="feat-' + f.id + '">' + icon('cup') + '<b>' + esc(f.name) + '</b><small>' + esc(f.desc) + '</small></div>').join('') + '</div>' +
     '<h2 id="quests">Daily quests</h2><p>Three a day, picked from the list below. Each pays ' + L.QUEST_REWARD + ' Sigil, and finishing all three pays ' + L.QUEST_BONUS + ' more.</p><ul>' + L.QUESTS.map(q => '<li>' + esc(q.text.replace('{n}', num(q.n))) + '</li>').join('') + '</ul>' +
-    '<h2 id="milestones">Training milestones</h2><p>Companions get a big power jump at levels ' + L.MILESTONES.slice(0, 8).join(', ') + ' and on up to ' + num(L.MILESTONES[L.MILESTONES.length - 1]) + '.</p>' +
+    '<h2 id="milestones">Training milestones</h2><p>Companions get a big power jump at power levels ' + L.MILESTONES.slice(0, 8).join(', ') + ' and on up to ' + num(L.MILESTONES[L.MILESTONES.length - 1]) + '.</p>' +
     '<h2 id="offline">While you are away</h2><p>Your party earns 25% of its gold for ' + (L.OFFLINE_BASE / 3600) + ' hours while the game is closed. Night Watch adds 16 hours a rank, up to ' + (L.OFFLINE_MAX / 3600) + ' hours.</p>' + related(['classes', 'getting-stronger']),
   index: () => { for (const s of L.STATS) addSearch('progression', s.name, 'stats', 'Hero stat: ' + s.desc, 'Stat'); for (const u of L.KINDLE_UPS) addSearch('progression', u.name, 'kindling', 'Kindling upgrade: ' + u.desc, 'Kindling'); for (const r of L.RELICS) addSearch('progression', r.name, 'relics', 'Relic: ' + r.desc, 'Relic');
     for (const f of L.FEATS) addSearch('progression', f.name, 'feat-' + f.id, 'Record: ' + f.desc, 'Record'); addSearch('progression', 'Rekindling', 'rekindle', 'Restart for Embers and Kindling from floor ' + L.REKINDLE_FLOOR, 'Progression'); addSearch('progression', 'Daily quests', 'quests', L.QUESTS.map(q => q.text.replace('{n}', q.n)).join('. '), 'Quests'); },

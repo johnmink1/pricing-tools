@@ -1,4 +1,4 @@
-/* lh-build 202611231735 */
+/* lh-build 202611231911 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -3635,6 +3635,7 @@
         'Gold and gear have no real-money value.']],
       ['The Ember Ring (PvP)', 'i:sword', 'Duel other players\u2019 heroes for Laurels and rating.', [
         'Open the <b>PvP</b> tab and press <b>Duel</b>. Only your own hero fights; companions, tonics and Sigils never count.',
+        'Each class has the edge on two classes and is countered by two. Learn <b>Ring skills</b> with Laurels and pick 2 abilities and 2 passives for your loadout.',
         '10 challenges, one back every 30 minutes. Wins give rating and Laurels, losses a few Laurels; your hero also defends while you are away. A full kit is a long climb.',
         'Laurels buy the <b>Ringwarden kit</b>: PvP gear with <b>Edge</b> (more damage to heroes) and <b>Resolve</b> (less damage from heroes). It works only in the Ring.']],
       ['Your profile', 'i:user', 'The card other players see.', [
@@ -3667,6 +3668,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 58, date: 'November 23, 2026', title: 'The Ember Ring: abilities, counters and Ring skills', items: [
+      'Heroes now fight with their class abilities in duels: Shield Bash stuns, Mend heals, Backstab and Fireball burst, Life Drain steals health, and more.',
+      'Every class has the edge on two classes and is countered by two others. Challenger cards show who has the edge, and what each foe brings.',
+      'New Skills view in the PvP tab: learn and rank up 6 Ring skills per class with Laurels, then pick 2 abilities (in the order you want them used) and 2 passives.',
+      'Your loadout also defends while you are away, so build it with care. Every class starts with its first ability for free.',
+      'Fixed: world boss assaults said the server could not record them. Every assault now counts toward the shared health bar.'] },
     { v: 57, date: 'November 23, 2026', title: 'The Wardrobe', items: [
       'New: <b>the Wardrobe</b>. Dress any hero in your company in one of nine outfits, from Emberforged and Hoarfrost to the Riftborn and Lanternsworn regalia with their own auras. Buy an outfit once and every hero can wear it.',
       'New <b>lantern styles</b>: Moonlit, Marsh Wisp, Rosefire, Riftglass, Sunforged, Soulflame and Starless. Your lantern hangs beside your lead hero and colours the light around your party.',
@@ -4372,9 +4379,10 @@
   setInterval(paintBoss, 1000);
   // ---------- The Ember Ring (PvP) ----------
   // Only the player's own hero fights here, one on one, against the saved build of another player's hero.
-  // The server fights the duel (infra/lambda/duel.js); this part sends our build, shows challengers, plays the
-  // duel back, sells Ringwarden kit ranks for Laurels and shows the Ring standings. No Sigils, no tonics.
-  // Keep RING_KIT, ringGate, ringCost and the stat formula in step with infra/lambda/arena.js and duel.js.
+  // The server fights the duel (infra/ring/index.js); this part sends our build, shows challengers and class
+  // matchups, sells Ring skills and Ringwarden kit ranks for Laurels, keeps the skill loadout, plays the duel back
+  // and shows the Ring standings. No Sigils, no tonics. The skill list and matchups come from the server.
+  // Keep RING_KIT, ringGate, ringCost and the stat formula in step with infra/ring/index.js.
   const RING_KIT = [
     { id: 'helm', name: 'Helm', slot: 'head', R: 5, E: 0, hp: .02, at: 0 },
     { id: 'hauberk', name: 'Hauberk', slot: 'chest', R: 7, E: 0, hp: .015, at: 0 },
@@ -4391,6 +4399,27 @@
   // A rough strength score for "even match" hints: damage per hit times health, Edge and Resolve included.
   const ringPower = s => s.at * (1 + s.E / (s.E + 300)) * s.hp / (1 - .5 * s.R / (s.R + 300));
   const rg = { st: null, at: 0, view: 'foes', busy: false, err: '', sent: 0 };
+  // ---- Ring skills and class matchups (the data comes with GET /arena) ----
+  const CLS_NAME = c => L.CLASSES[c].name;
+  const ringPc = x => Math.round(x * 1000) / 10 + '%';
+  const ringSkill = id => (rg.st && rg.st.skills || []).find(s => s.id === id);
+  function ringSkillText(s, r) {
+    const v = s.v[Math.max(0, (r || 1) - 1)];
+    return ({
+      hit: 'Strikes for ' + ringPc(v) + ' damage.', pierce: 'A holy strike for ' + ringPc(v) + ' damage that never misses and ignores Resolve and armor.',
+      stun: 'Hits for ' + ringPc(v) + ' damage and stuns: the foe loses its next turn.', heal: 'Restores ' + ringPc(v) + ' of max health. Used once you drop below 70%.',
+      shield: 'Raises a shield that absorbs ' + ringPc(v) + ' of max health, with a light blow.', dot: 'Deals ' + ringPc(v) + ' of your attack on each of the foe\u2019s next 3 turns.',
+      drain: 'Hits for ' + ringPc(v) + ' damage and heals you for all of it.', weaken: 'The foe deals ' + ringPc(v) + ' less damage for 4 turns.',
+      ward: 'Take ' + ringPc(v) + ' less damage from the next 3 hits, with a light blow.', evade: 'Dodge the next ' + (v === 1 ? 'attack' : v + ' attacks') + ', with a light blow.',
+      armor: 'Take ' + ringPc(v) + ' less damage.', reflect: 'Return ' + ringPc(v) + ' of the damage you take.', regen: 'Heal ' + ringPc(v) + ' of max health every turn.',
+      crit: '+' + ringPc(v) + ' critical hit chance.', dodge: '+' + ringPc(v) + ' chance that attacks miss you.', power: 'Abilities hit and heal ' + ringPc(v) + ' harder.',
+      leech: 'Heal ' + ringPc(v) + ' of the damage you deal.', undying: 'Once per duel, survive a killing blow with ' + ringPc(v) + ' health.', execute: '+' + ringPc(v) + ' damage to foes under 30% health.',
+    })[s.fx] + (s.cd ? ' Every ' + s.cd + ' turns.' : '');
+  }
+  const NATURE_TEXT = { tank: 'Sturdy: takes 10% less damage.', healer: 'Blessed: heals 1% each turn and takes 6% less damage.', rogue: 'Deadly: +8% critical chance, and crits hit harder.', mage: 'Arcane: abilities hit 10% harder.', necro: 'Hungry: heals 12% of the damage it deals.' };
+  // 1 if a has the edge on b, -1 if b counters a, 0 otherwise.
+  const ringEdge = (a, b) => { const m = rg.st && rg.st.match; if (!m) return 0; return m.beats[a].includes(b) ? 1 : m.beats[b].includes(a) ? -1 : 0; };
+  const ringWhy = (a, b) => (rg.st && rg.st.match.why[a + '>' + b]) || '';
   const laurel = n => '<span class="laurel">' + icon('crown') + Number(n).toLocaleString('en-US') + '</span>';
   // Our build: the log of the hero's own damage and health, with no tonics, abilities or knocked-out state.
   function ringBuild() {
@@ -4408,7 +4437,7 @@
     rg.busy = true; rg.err = '';
     try {
       // The hero board row must exist first (it holds the name); publishing is quick and harmless.
-      if (Date.now() - rg.sent > 5 * 6e4) { try { await api('PUT', { name: S.hero.name, cls: S.hero.cls, side: S.hero.side, level: L.lvl(S, 'you'), floor: S.maxFloorEver }, '/hero'); } catch (e) {} await api('PUT', ringBuild(), '/arena'); rg.sent = Date.now(); }
+      if (Date.now() - rg.sent > 5 * 6e4) { try { await api('PUT', { name: S.hero.name, cls: S.hero.cls, side: S.hero.side, level: L.lvl(S, 'you'), floor: S.maxFloorEver, ref: '' }, '/hero'); } catch (e) {} await api('PUT', ringBuild(), '/arena'); rg.sent = Date.now(); }
       const st = await api('GET', null, '/arena'); if (!st) throw 0; rg.st = st; rg.at = Date.now();
       fetchLooks((st.foes || []).map(f => f.id).concat((st.top || []).map(t => t.id))).then(n => { if (n) paintRing(); });
       ringDefenseNews();
@@ -4436,18 +4465,22 @@
     const me = st.me, you = L.memberById('you'), en = ringEnergy(me), nextIn = me.et - Date.now() - (RING_EMAX - en - 1) * RING_EINT;
     let h = '<div class="ringhead"><div class="rhfig">' + ringFig(you.cls, lookHue(you), 3) + '</div><div class="rhinfo"><div class="rhtop"><h3>The Ember Ring</h3><span class="rtitle rt-' + ringTitle(me.r).toLowerCase() + '">' + ringTitle(me.r) + '</span></div>' +
       '<div class="rhrate"><b>' + me.r.toLocaleString('en-US') + '</b> rating' + (st.rank ? ' &middot; rank ' + st.rank + ' of ' + st.n : '') + (me.pk > me.r ? ' &middot; best ' + me.pk.toLocaleString('en-US') : '') + '</div>' +
-      '<div class="rhchips"><span title="Wins and losses">' + icon('sword') + me.w + '&ndash;' + me.l + '</span>' + '<span title="Laurels, spent on the Ringwarden kit">' + laurel(me.ll) + '</span>' +
+      '<div class="rhchips"><span title="Wins and losses">' + icon('sword') + me.w + '&ndash;' + me.l + '</span>' + '<span title="Laurels, spent on Ring skills and the Ringwarden kit">' + laurel(me.ll) + '</span>' +
       '<span title="Challenges refill one every 30 minutes, up to 10" class="' + (en ? '' : 'out') + '">' + icon('flame') + en + '/' + RING_EMAX + (en < RING_EMAX ? ' <small>+1 in ' + fmtTime(Math.max(1, Math.ceil(nextIn / 1000))) + '</small>' : '') + '</span></div></div></div>' +
-      '<div class="seg ringseg">' + [['foes', 'Challengers'], ['kit', 'Ringwarden kit'], ['top', 'Standings']].map(v => '<button data-rv="' + v[0] + '"' + (rg.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>').join('') + '</div>';
+      '<div class="seg ringseg">' + [['foes', 'Challengers'], ['skills', 'Skills'], ['kit', 'Kit'], ['top', 'Standings']].map(v => '<button data-rv="' + v[0] + '"' + (rg.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>').join('') + '</div>';
     if (rg.view === 'foes') {
       const ms = me.s, mp = ringPower(ms);
       h += '<p class="note small ringbuild"><b>Your hero in the Ring:</b> ' + ringStatLine(ms) + '. Deeper delving helps a little; the Ringwarden kit helps a lot.</p>';
       h += st.foes.length ? '<div class="ringfoes">' + st.foes.map(f => {
         const q = ringPower(f.s) / mp, odd = q > 1.35 ? ['tough', 'Tough fight'] : q < 0.75 ? ['easy', 'You are favored'] : ['even', 'Even match'];
-        return '<div class="ringfoe"><div class="rffig">' + ringFig(f.c, outfitHue((looksCache[f.id] || {}).k), 2) + '</div><div class="rfinfo"><div class="nm">' + esc(f.n) + ' ' + classTag(f.c) + '</div><small><span class="rtitle sm rt-' + ringTitle(f.r).toLowerCase() + '">' + ringTitle(f.r) + '</span> ' + f.r.toLocaleString('en-US') + ' &middot; ' + f.w + '&ndash;' + f.l + ' &middot; <i class="odds ' + odd[0] + '">' + odd[1] + '</i></small><small class="dim">' + ringStatLine(f.s) + '</small></div>' +
+        const ed = ringEdge(you.cls, f.c), mu = ed > 0 ? '<span class="mu good" title="' + esc(ringWhy(you.cls, f.c)) + '">' + icon('star') + 'Your ' + CLS_NAME(you.cls).toLowerCase() + ' has the edge</span>' : ed < 0 ? '<span class="mu bad" title="' + esc(ringWhy(f.c, you.cls)) + '">' + icon('shield') + 'Counters your ' + CLS_NAME(you.cls).toLowerCase() + '</span>' : '';
+        const brings = (f.lo ? f.lo.a.concat(f.lo.p) : []).map(id => { const k = ringSkill(id); return k ? k.n : ''; }).filter(Boolean);
+        return '<div class="ringfoe"><div class="rffig">' + ringFig(f.c, outfitHue((looksCache[f.id] || {}).k), 2) + '</div><div class="rfinfo"><div class="nm">' + esc(f.n) + ' ' + classTag(f.c) + '</div><small><span class="rtitle sm rt-' + ringTitle(f.r).toLowerCase() + '">' + ringTitle(f.r) + '</span> ' + f.r.toLocaleString('en-US') + ' &middot; ' + f.w + '&ndash;' + f.l + ' &middot; <i class="odds ' + odd[0] + '">' + odd[1] + '</i></small></small>' + (mu ? '<small>' + mu + '</small>' : '') + (brings.length ? '<small class="brings">Brings ' + brings.map(esc).join(' &middot; ') + '</small>' : '') + '<small class="dim">' + ringStatLine(f.s) + '</small></div>' +
           '<button class="btn small" data-duel="' + f.id + '"' + (en ? '' : ' disabled title="No challenges left. One returns every 30 minutes."') + '>Duel</button></div>';
       }).join('') + '</div>' : '<p class="note">No other heroes have entered the Ring yet. Check back soon, or tell a friend to bring their hero.</p>';
       h += '<div class="row"><button class="btn ghost small" id="ring-ref">' + icon('refresh') + ' New challengers</button></div>';
+    } else if (rg.view === 'skills') {
+      h += ringSkillsView(me, you.cls);
     } else if (rg.view === 'kit') {
       h += '<p class="note small">Ringwarden gear is separate from your dungeon gear and works only in the Ring. <b>Edge</b> adds damage against heroes; <b>Resolve</b> softens their blows. Each piece has ' + RING_MAX + ' ranks: Ironbound, then Emberforged (needs a best rating of 1,300), then Starwrought (1,600).</p><div class="ringkit">';
       h += RING_KIT.map((p, i) => {
@@ -4465,6 +4498,59 @@
       h += '<p class="note small">Everyone starts at 1,000. Beating a higher-rated hero is worth more. Heroes that defend well while their owner is away climb too.</p>';
     }
     box.innerHTML = h;
+  }
+  // The Skills view: what the class is good and bad at, the skills to learn and rank up, and the loadout.
+  function ringSkillsView(me, cls) {
+    const st = rg.st, m = st.match, own = me.sk || {}, lo = me.lo || { a: [], p: [] }, sl = st.slots || [2, 2];
+    const beats = m.beats[cls], weak = Object.keys(m.beats).filter(c => m.beats[c].includes(cls));
+    let h = '<div class="rmatch"><div><b>' + CLS_NAME(cls) + '</b> <small>' + NATURE_TEXT[cls] + '</small></div>' +
+      '<div class="rmrow"><span class="mu good">' + icon('star') + 'Strong against</span>' + beats.map(c => '<span class="rmc c-' + c + '" title="' + esc(ringWhy(cls, c)) + '">' + CLS_NAME(c) + '</span>').join('') + '</div>' +
+      '<div class="rmrow"><span class="mu bad">' + icon('shield') + 'Weak against</span>' + weak.map(c => '<span class="rmc c-' + c + '" title="' + esc(ringWhy(c, cls)) + '">' + CLS_NAME(c) + '</span>').join('') + '</div>' +
+      '<small class="dim">With the edge you deal 4% more damage; against a counter, 4% less.</small></div>';
+    h += '<p class="note small">Learn skills with Laurels and choose what your hero brings: ' + sl[0] + ' abilities, used in the order you set whenever they make sense, and ' + sl[1] + ' passives. Your loadout also defends while you are away.</p>';
+    const list = st.skills.filter(s => s.c === cls);
+    const card = s => {
+      const r = own[s.id] || 0, inA = lo.a.indexOf(s.id), inP = lo.p.indexOf(s.id), on = s.k === 'a' ? inA >= 0 : inP >= 0, cost = st.skcost[r];
+      const full = s.k === 'a' ? lo.a.length >= sl[0] : lo.p.length >= sl[1];
+      return '<div class="rskill' + (on ? ' on' : '') + (r ? '' : ' locked') + '"><div class="rsk-top"><b>' + esc(s.n) + '</b>' + (on && s.k === 'a' ? '<em class="rslot">' + (inA === 0 ? '1st' : '2nd') + '</em>' : on ? '<em class="rslot">Equipped</em>' : '') +
+        '<span class="pips">' + [1, 2, 3].map(k => '<i class="' + (k <= r ? 'on' : '') + '"></i>').join('') + '</span></div>' +
+        '<small>' + ringSkillText(s, r || 1) + '</small>' + (r && r < 3 ? '<small class="dim">Rank ' + (r + 1) + ': ' + ringSkillText(s, r + 1) + '</small>' : '') +
+        '<div class="rsk-act">' + (r < 3 ? '<button class="btn small' + (r ? ' ghost' : '') + '" data-skl="' + s.id + '"' + (me.ll < cost ? ' disabled title="Not enough Laurels"' : '') + '>' + (r ? 'Rank up' : 'Learn') + ' ' + laurel(cost) + '</button>' : '<span class="rkmax">Mastered</span>') +
+        (r ? (on ? (s.k === 'a' && lo.a.length > 1 && inA === 1 ? '<button class="btn ghost small" data-lofirst="' + s.id + '">Use first</button>' : '') + '<button class="btn ghost small" data-looff="' + s.id + '">Unequip</button>' : '<button class="btn ghost small" data-loon="' + s.id + '"' + (full ? ' disabled title="Unequip one first"' : '') + '>Equip</button>') : '') + '</div></div>';
+    };
+    h += '<h3 class="sub">Abilities</h3><div class="rskills">' + list.filter(s => s.k === 'a').map(card).join('') + '</div>';
+    h += '<h3 class="sub">Passives</h3><div class="rskills">' + list.filter(s => s.k === 'p').map(card).join('') + '</div>';
+    return h;
+  }
+  async function ringLearn(id, btn) {
+    if (rg.busy) return; rg.busy = true; if (btn) btn.disabled = true;
+    try {
+      const r = await api('POST', { id }, '/arena/skill'); if (!r || !r.me) throw 0;
+      const was = (rg.st.me.sk || {})[id] || 0; rg.st.me = r.me; sfx.buy();
+      const s = ringSkill(id), lo = r.me.lo;
+      toast('star', s.n + (was ? ' rank ' + (was + 1) : ' learned'), was ? 'Stronger in every duel it is equipped for.' : 'Equip it in your loadout to take it into duels.', 'feat');
+      // A first ability or passive goes straight into an empty slot.
+      if (!was && s && lo && (s.k === 'a' ? lo.a.length < rg.st.slots[0] : lo.p.length < rg.st.slots[1])) { rg.busy = false; return ringSetLoadout(s.k === 'a' ? lo.a.concat(id) : lo.a, s.k === 'p' ? lo.p.concat(id) : lo.p); }
+    } catch (e) { toast('lock', 'Could not learn that', 'Check your Laurels and try again in a moment.', 'warn'); }
+    rg.busy = false; paintRing();
+  }
+  async function ringSetLoadout(a, p) {
+    if (rg.busy) return; rg.busy = true;
+    try { const r = await api('POST', { a, p }, '/arena/loadout'); if (!r || !r.me) throw 0; rg.st.me = r.me; sfx.buy(); }
+    catch (e) { toast('lock', 'Loadout not saved', 'Try again in a moment.', 'warn'); }
+    rg.busy = false; paintRing();
+  }
+  function ringLoadoutClick(e) {
+    const lo = rg.st && rg.st.me && rg.st.me.lo; if (!lo) return false;
+    const on = e.target.closest('[data-loon]'), off = e.target.closest('[data-looff]'), fst = e.target.closest('[data-lofirst]');
+    const id = (on || off || fst || {}).dataset; if (!id) return false;
+    const k = id.loon || id.looff || id.lofirst, s = ringSkill(k); if (!s) return true;
+    let a = lo.a.slice(), p = lo.p.slice();
+    const list = s.k === 'a' ? a : p;
+    if (on && !list.includes(k)) list.push(k);
+    if (off) list.splice(list.indexOf(k), 1);
+    if (fst) { list.splice(list.indexOf(k), 1); list.unshift(k); }
+    ringSetLoadout(a, p); return true;
   }
   async function ringKit(i, btn) {
     if (rg.busy) return; rg.busy = true; if (btn) btn.disabled = true;
@@ -4490,10 +4576,13 @@
   }
   function playDuel(r) {
     const you = L.memberById('you'), A = r.a, B = r.b, hp = [A.s.hp, B.s.hp];
-    const side = (x, i, hue) => '<div class="rdside s' + i + '"><div class="rdname"><b>' + esc(x.n) + '</b>' + classTag(x.c) + '</div><div class="rdfig"><img src="' + SP.spriteURL(x.c, 5, hue || 0) + '" alt=""><div class="rdpop" id="rd-pop' + i + '"></div></div>' +
+    const sname = id => { const k = ringSkill(id); return k ? k.n : ''; };
+    const kit = x => (x.lo ? x.lo.a.concat(x.lo.p) : []).map(sname).filter(Boolean);
+    const ed = ringEdge(A.c, B.c), edl = ed ? '<div class="rdedge ' + (ed > 0 ? 'good' : 'bad') + '">' + esc(ed > 0 ? ringWhy(A.c, B.c) : ringWhy(B.c, A.c)) + ': ' + esc(ed > 0 ? A.n : B.n) + ' has the edge</div>' : '';
+    const side = (x, i, hue) => '<div class="rdside s' + i + '"><div class="rdname"><b>' + esc(x.n) + '</b>' + classTag(x.c) + '</div><small class="rdkit">' + kit(x).map(esc).join(' &middot; ') + '</small><div class="rdfig"><img src="' + SP.spriteURL(x.c, 5, hue || 0) + '" alt=""><div class="rdpop" id="rd-pop' + i + '"></div></div>' +
       '<div class="bar rdhp"><i id="rd-hp' + i + '" style="width:100%"></i><span id="rd-ht' + i + '">' + fmt(hp[i]) + '</span></div><small>' + ringTitle(x.r) + ' &middot; ' + x.r.toLocaleString('en-US') + '</small></div>';
     modal('<div class="maphead"><div><h2>The Ember Ring</h2><small>' + esc(A.n) + ' challenges ' + esc(B.n) + '</small></div><button class="iconbtn" id="rd-x" aria-label="Close">&times;</button></div>' +
-      '<div class="ringduel">' + side(A, 0, lookHue(you)) + '<div class="rdvs">VS</div>' + side(B, 1, outfitHue((looksCache[B.id] || {}).k)) + '</div><div class="rdlog" id="rd-log"></div><div class="rdres" id="rd-res" hidden></div>' +
+      edl + '<div class="ringduel">' + side(A, 0, lookHue(you)) + '<div class="rdvs">VS</div>' + side(B, 1, outfitHue((looksCache[B.id] || {}).k)) + '</div><div class="rdlog" id="rd-log"></div><div class="rdres" id="rd-res" hidden></div>' +
       '<div class="row"><button class="btn ghost" id="rd-skip">Skip to the end</button></div>', md => {
       $('modal').dataset.lock = '1';
       const cur = hp.slice(), lines = [];
@@ -4501,17 +4590,26 @@
       const nm = [A.n, B.n];
       const pop = (k, txt, cls) => { const p = md.querySelector('#rd-pop' + k); if (!p) return; const s = document.createElement('span'); s.className = cls; s.textContent = txt; p.appendChild(s); setTimeout(() => s.remove(), 900); };
       const paint = () => { for (const k of [0, 1]) { const w = Math.max(0, cur[k] / hp[k] * 100); md.querySelector('#rd-hp' + k).style.width = w + '%'; md.querySelector('#rd-ht' + k).textContent = fmt(Math.max(0, cur[k])); } md.querySelector('#rd-log').innerHTML = lines.slice(-3).map(l => '<p>' + l + '</p>').join(''); };
+      // Log entries: [actor, damage, flag, heal, tag, health 0, health 1]. Flags: 0 hit, 1 crit, 2 miss,
+      // 3 stunned (loses the turn), 4 poison or plague ticking, 5 survives a killing blow. Tag: the ability used.
       const step = quiet => {
         const e = r.log[i++]; if (!e) return false;
-        const [a, d, c, hl] = e, t = 1 - a;
-        cur[t] -= d; cur[a] = Math.min(hp[a], cur[a] + hl);
+        const [a, d, c, hl, tag, h0, h1] = e, t = 1 - a;
+        cur[0] = h0; cur[1] = h1;
         if (!quiet) {
           const fig = md.querySelector('.rdside.s' + a + ' .rdfig'), tf = md.querySelector('.rdside.s' + t + ' .rdfig');
+          const an = tag && tag !== 'dot' && tag !== 'stun' && tag !== 'und' ? sname(tag) : '';
+          if (c === 3) { pop(a, 'Stunned', 'miss'); sfx.thud(); lines.push('<b>' + esc(nm[a]) + '</b> is stunned and loses the turn.'); return true; }
+          if (c === 5) { pop(a, 'Survives!', 'crit'); sfx.relic(); lines.push('<b>' + esc(nm[a]) + '</b> refuses to fall!'); return true; }
+          if (c === 4) { pop(t, '-' + fmt(d), 'dot'); lines.push('<b>' + esc(nm[t]) + '</b> suffers ' + fmt(d) + ' from the lingering wound.'); return true; }
           fig.classList.remove('lunge'); void fig.offsetWidth; fig.classList.add('lunge');
-          if (c !== 2) { tf.classList.remove('struck'); void tf.offsetWidth; tf.classList.add('struck'); }
-          pop(t, c === 2 ? 'Miss' : '-' + fmt(d), c === 2 ? 'miss' : c ? 'crit' : 'dmg'); if (hl) pop(a, '+' + fmt(hl), 'heal');
-          c === 2 ? sfx.thud() : sfx.hit(c === 1);
-          lines.push('<b>' + esc(nm[a]) + '</b> ' + (c === 2 ? 'misses.' : (c ? 'lands a <em>critical</em> blow for ' : 'hits for ') + fmt(d) + (hl ? ' and recovers ' + fmt(hl) : '') + '.'));
+          if (an) pop(a, an, 'abil');
+          if (d > 0 || c === 1) { tf.classList.remove('struck'); void tf.offsetWidth; tf.classList.add('struck'); }
+          if (c === 2) pop(t, 'Miss', 'miss'); else if (d > 0) pop(t, '-' + fmt(d), c ? 'crit' : 'dmg');
+          if (hl) pop(a, '+' + fmt(hl), 'heal');
+          c === 2 ? sfx.thud() : d > 0 ? sfx.hit(c === 1) : sfx.buy();
+          const what = an ? 'uses <em class="ab">' + esc(an) + '</em>' + (c === 2 ? ' but misses' : d > 0 ? ' for ' + fmt(d) + (c ? ' (critical)' : '') : '') : c === 2 ? 'misses' : (c ? 'lands a <em>critical</em> blow for ' : 'hits for ') + fmt(d);
+          lines.push('<b>' + esc(nm[a]) + '</b> ' + what + (hl ? ' and recovers ' + fmt(hl) : '') + '.');
         }
         return true;
       };
@@ -4533,15 +4631,16 @@
     });
   }
   if ($('ringbox')) $('ringbox').addEventListener('click', e => {
-    const v = e.target.closest('[data-rv]'); if (v) { rg.view = v.dataset.rv; paintRing(); if (v.dataset.rv !== 'kit') loadRing(); return; }
+    const v = e.target.closest('[data-rv]'); if (v) { rg.view = v.dataset.rv; paintRing(); if (v.dataset.rv === 'foes' || v.dataset.rv === 'top') loadRing(); return; }
     const d = e.target.closest('[data-duel]'); if (d) { ringDuel(d.dataset.duel, d); return; }
     const k = e.target.closest('[data-kit]'); if (k) { ringKit(+k.dataset.kit, k); return; }
+    const sk = e.target.closest('[data-skl]'); if (sk) { ringLearn(sk.dataset.skl, sk); return; }
+    if (ringLoadoutClick(e)) return;
     if (e.target.closest('#ring-ref')) { rg.sent = 0; loadRing(true); }
   });
   document.querySelectorAll('.tabs [data-tab="ring"]').forEach(b => b.addEventListener('click', () => { paintRing(); loadRing(); }));
   // Keep the challenge timer fresh while the tab is open.
   setInterval(() => { if (typeof tab !== 'undefined' && tab === 'ring' && !document.hidden && !$('modal').dataset.lock) { const a = document.activeElement; if (!a || !$('ringbox') || !$('ringbox').contains(a)) paintRing(); } }, 30000);
-
   // ---------- the Wardrobe: outfits and lantern styles ----------
   // Looks only: nothing here changes power. Bought with Sigils on the server (infra/lambda/looks.js);
   // keep ids and prices in step with its CAT. The art lives in vector.js (OUTFITS, LANTERNS).

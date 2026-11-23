@@ -43,7 +43,7 @@ exports.handler = async (e) => {
         ConditionExpression: 'attribute_not_exists(#l) OR #l < :cut', ExpressionAttributeNames: { '#l': 'last' },
         ExpressionAttributeValues: { ':t': N(now), ':n': h.name, ':c': h.cls, ':s': N(sc), ':cut': N(now - COOL + 5000) } }));
     } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(429, { error: 'cool' }); throw x; }
-    const g = await db.send(new D.UpdateItemCommand({ TableName: T, Key: { w: S(w.id), s: S('#') }, UpdateExpression: 'ADD total :s', ExpressionAttributeValues: { ':s': N(sc) }, ReturnValues: 'ALL_NEW' }));
+    const g = await db.send(new D.UpdateItemCommand({ TableName: T, Key: { w: S(w.id), s: S('#') }, UpdateExpression: 'ADD #t :s', ExpressionAttributeNames: { '#t': 'total' }, ExpressionAttributeValues: { ':s': N(sc) }, ReturnValues: 'ALL_NEW' }));
     return res(200, { ok: true, add: sc, total: +g.Attributes.total.N });
   }
   if (e.routeKey === 'POST /boss/claim') {

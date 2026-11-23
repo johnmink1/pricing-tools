@@ -29,7 +29,7 @@ exports.handler = async (e) => {
         UpdateExpression: 'SET #n = :n, cls = :c, lv = :l, fl = :f, sd = :s, seen = :t, recruits = :z, u = :u, rf = if_not_exists(rf, :r)',
         ConditionExpression: 'attribute_not_exists(ban)',
         ExpressionAttributeNames: { '#n': 'name' },
-        ExpressionAttributeValues: { ':n': { S: name }, ':c': { S: b.cls }, ':l': { N: String(level) }, ':f': { N: String(floor) }, ':s': { S: side }, ':t': { N: String(Date.now()) }, ':z': { N: '0' }, ':u': { S: cl.sub }, ':r': { S: /^[a-z0-9_-]{1,24}$/.test(b.ref) ? b.ref : '-' } },
+        ExpressionAttributeValues: { ':n': { S: name }, ':c': { S: b.cls }, ':l': { N: String(level) }, ':f': { N: String(floor) }, ':s': { S: side }, ':t': { N: String(Date.now()) }, ':z': { N: '0' }, ':u': { S: cl.sub }, ':r': { S: /^[a-z0-9_-]{1,24}$/.test(b.ref || '') ? b.ref : '-' } },
         ReturnValues: 'UPDATED_OLD' }));
     } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(403, { error: 'banned' }); throw x; }
     // A brand-new hero is announced in Global chat with their alliance.

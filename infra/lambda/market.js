@@ -42,7 +42,7 @@ exports.handler = async (e) => {
     if (!it || !p) return res(400, E);
     if (!okName(String(b.name || ''))) return res(400, { error: 'name' });
     const mine = await db.send(new D.QueryCommand({ TableName: T, KeyConditionExpression: 'pk = :p', ExpressionAttributeValues: { ':p': S('sell#' + me) }, Select: 'COUNT' }));
-    if (mine.Count >= 10) return res(400, { error: 'full' });
+    if (mine.Count >= 25) return res(400, { error: 'full' });
     const id = newId(), body = { cls: S(it.cls), seller: S(me), name: S(b.name), item: S(JSON.stringify(it)), price: S(p), at: { N: String(Date.now()) } };
     await db.send(new D.TransactWriteItemsCommand({ TransactItems: [
       { Put: { TableName: T, Item: Object.assign({ pk: S('mkt#' + it.cls), sk: S(id) }, body) } },

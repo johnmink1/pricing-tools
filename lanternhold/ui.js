@@ -1,4 +1,4 @@
-/* lh-build 202611231437 */
+/* lh-build 202611231438 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -3266,7 +3266,7 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
-    { v: 42, date: 'November 23, 2026', title: 'The Ember Ring: duels between players', items: [
+    { v: 43, date: 'November 23, 2026', title: 'The Ember Ring: duels between players', items: [
       'Open the new PvP tab to duel other players\u2019 heroes one on one. Only your own hero fights: no companions, tonics or Sigils.',
       'Wins earn Laurels and rating. Climb from Ashen through Ironclad, Emberborn, Gilded and Lanternsworn to Riftbreaker on the Ring standings.',
       'Spend Laurels on the Ringwarden kit, a separate set of PvP gear with 15 ranks per piece. Its Edge and Resolve count only in the Ring.',

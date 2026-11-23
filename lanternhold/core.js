@@ -515,6 +515,8 @@
     if (canLearn(s, id) !== 'ok') return false;
     const k = skillById(id); s.kindling -= skillCost(k); s.skills[id] = (s.skills[id] || 0) + 1; return true;
   }
+  // Items in the pack. Gear someone is wearing lives on them, not in the pack.
+  function packCount(s) { let n = 0; for (const it of s.bag) if (!wearer(s, it.uid)) n++; return n; }
   function resetSkills(s) { s.kindling = (s.kindling || 0) + skillSpent(s); s.skills = {}; }
   // Kindling earned by rekindling now: 2 at floor 50, plus 1 for every 10 floors deeper.
   function skillPointsFor(s) { return s.maxFloor < REKINDLE_FLOOR ? 0 : 2 + Math.floor((s.maxFloor - REKINDLE_FLOOR) / 10); }
@@ -642,7 +644,7 @@
     else if (foe.elite) { if (r() < 0.15 * loot) it = rollGear(s, f, { boost: 0.5 }, r); }
     else if (r() < 0.012 * loot) it = rollGear(s, f, null, r);
     if (!it) return;
-    if (s.bag.length >= bagCap(s)) {
+    if (packCount(s) >= bagCap(s)) {
       // full bag: the lowest value common item gets sold automatically
       const worst = s.bag.filter(x => x.rar === 'common' && !wearer(s, x.uid)).sort((a, b) => gearPct(a) - gearPct(b))[0];
       if (worst && gearPct(worst) < gearPct(it)) { s.bag = s.bag.filter(x => x !== worst); s.gold += salvageValue(worst); }
@@ -1373,7 +1375,7 @@
     CAMP_FLOOR, atCamp, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

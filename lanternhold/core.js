@@ -84,7 +84,35 @@
       war: { side: 'tide', units: ['Tide Rootfiend', 'Devourer Brood'] } },
     { name: 'The Starless Vault',      adj: ['Void-touched', 'Starless', 'Umbral'],  hue: 250, bg: ['#141022', '#05040b'], accent: '#9aa6ff', boss: 'The Unlit',
       war: { side: 'tide', units: ['Riftspawn', 'Nyxborn Herald'] } },
+    // Below the Vault: the second half of Act One. Each region has its own monster and a signature trick.
+    { name: 'The Glass Wastes',       adj: ['Glassy', 'Prismatic', 'Shard-backed'], hue: 190, bg: ['#1a2830', '#070d12'], accent: '#7fd6e8', boss: 'The Glass Regent',
+      war: { side: 'radiant', units: ['Radiant Glass-Reaper', 'Ascendant Lens-Mage'] }, foe: { id: 'shard', name: 'Glass Crawler' }, mod: 'ward' },
+    { name: 'The Ironbound Bastion',  adj: ['Rusted', 'Iron-sworn', 'Riveted'],     hue: 0,   bg: ['#26241f', '#0c0b09'], accent: '#c9b38a', boss: 'Marshal Ironvow',
+      war: { side: 'covenant', units: ['Covenant Holdout', 'Bastion Gunner'] }, foe: { id: 'sentinel', name: 'Iron Husk' }, mod: 'cleave' },
+    { name: 'The Weeping Aqueduct',   adj: ['Weeping', 'Silted', 'Brackish'],       hue: 150, bg: ['#10242a', '#050d10'], accent: '#5fd0c0', boss: 'The Brine Matriarch',
+      war: { side: 'tide', units: ['Tide Drinker', 'Devourer Leech'] }, foe: { id: 'eel', name: 'Sluice Eel' }, mod: 'regen' },
+    { name: 'The Bone Orchard',       adj: ['Pale', 'Root-white', 'Marrow'],        hue: 30,  bg: ['#2a2620', '#0f0d0a'], accent: '#e8dcc0', boss: 'The Orchard Keeper',
+      war: { side: 'tide', units: ['Tide Gravepicker', 'Marrow Brood'] }, foe: { id: 'thorn', name: 'Thornling' }, mod: 'venom' },
+    { name: 'Stormglass Spire',       adj: ['Charged', 'Stormlit', 'Humming'],      hue: 210, bg: ['#151a33', '#060813'], accent: '#9ab8ff', boss: 'The Ascendant Prism',
+      war: { side: 'radiant', units: ['Ascendant Stormcaller', 'Radiant Spire-Guard'] }, foe: { id: 'prism', name: 'Storm Lens' }, mod: 'swift' },
+    { name: 'The Nexus Scar',         adj: ['Scarred', 'Warborn', 'Tri-banner'],    hue: -40, bg: ['#2b1420', '#10060b'], accent: '#ff6a8a', boss: 'The Threefold Warhost',
+      war: { side: 'covenant', units: ['Covenant Breacher', 'Bastion Deserter'] }, foe: { id: 'hound', name: 'Rift Hound' }, mod: 'enrage' },
+    { name: 'The Rift Threshold',     adj: ['Unmade', 'Starborn', 'Hollow-lit'],    hue: 260, bg: ['#0e0a1f', '#030208'], accent: '#c9a6ff', boss: 'The Lampmother',
+      war: { side: 'tide', units: ['Nyxborn Reaver', 'Rift Herald'] }, foe: { id: 'riftling', name: 'Riftling' }, mod: 'ward' },
   ];
+  // Act One ends with the guardian on this floor. Act Two opens with Season 2 of the Grand War.
+  const ACT_ONE_END = 150, ACT_TWO_AT = Date.UTC(2027, 0, 25, 5);
+  const actTwoOpen = now => (now || Date.now()) >= ACT_TWO_AT;
+  // Monster tricks. Deeper foes carry more of them, and guardians always do past floor 20.
+  const MODS = {
+    enrage: { name: 'Enrages', desc: 'Hits much harder below 30% health' },
+    ward:   { name: 'Warded', desc: 'Raises a magic ward every 12 seconds that soaks up damage' },
+    regen:  { name: 'Regenerates', desc: 'Heals itself over time' },
+    venom:  { name: 'Venomous', desc: 'Its hits poison, dealing damage over time' },
+    cleave: { name: 'Cleaves', desc: 'Its hits also strike the next hero in line' },
+    swift:  { name: 'Swift', desc: 'Attacks harder and faster' },
+  };
+  const MOD_KEYS = Object.keys(MODS);
   const ELITE_CHANCE = 0.12;
   const FOES = [
     { id: 'slime', name: 'Gloop' }, { id: 'rat', name: 'Gnawer' }, { id: 'bat', name: 'Flitterwing' },
@@ -114,7 +142,9 @@
     { id: 'f10',   name: 'Below the Cellars', desc: 'Reach floor 10',             test: s => s.maxFloorEver >= 10 },
     { id: 'f25',   name: 'Spore Season',      desc: 'Reach floor 25',             test: s => s.maxFloorEver >= 25 },
     { id: 'f50',   name: 'Through the Fire',  desc: 'Reach floor 50',             test: s => s.maxFloorEver >= 50 },
-    { id: 'f81',   name: 'The Lantern’s Secret', desc: 'Finish the story of Act One', test: s => !!s.story.seen.end },
+    { id: 'f81',   name: 'The Lantern’s Secret', desc: 'Reach the Unlit below the Vault', test: s => !!s.story.seen.end },
+    { id: 'act1',  name: 'Lampbreaker', desc: 'Finish Act One', test: s => !!s.story.seen.act1 },
+    { id: 'f100',  name: 'Iron and Oath', desc: 'Reach floor 100', test: s => s.maxFloorEver >= 100 },
     { id: 'f120',  name: 'Deeper Than Maps',  desc: 'Reach floor 120',            test: s => s.maxFloorEver >= 120 },
     { id: 'k100',  name: 'Pest Control',      desc: 'Defeat 100 foes',            test: s => s.stats.kills >= 100 },
     { id: 'k5k',   name: 'Monster Ledger',    desc: 'Defeat 5,000 foes',          test: s => s.stats.kills >= 5000 },
@@ -228,8 +258,50 @@
         ['The Unlit', 'boss', 'You are the first to reach me with your own light still burning. I am the Nyx Rift’s breath. The Tide wants to drink me. The Ascendancy wants to wear me.'],
         ['Old Thessaly', 'lamp', 'You were not supposed to come this far, child. The seal needs feeding. If it fails, this front falls, and the war comes through the Rift into every sector of the Reach.'],
         ['Wren', 'mage', 'Then we will find it something else to burn.'],
-        ['Narrator', 'lamp', 'End of Act One. The lantern is yours now, and every alliance in the Reach knows it. Rekindle it, grow stronger, and see what waits below floor 80.'],
-      ], goal: 'Keep descending. Act Two is coming in a future update.' },
+        ['The Unlit', 'boss', 'The seal has a root, far below the Vault. Follow it, and you will find where she plants her bearers.'],
+      ], goal: 'Cross the Glass Wastes to floor 90' },
+    { id: 'glass', ch: 9, when: s => s.maxFloorEver >= 83, title: 'Below the Bottom of the Map',
+      lines: [
+        ['Brann', 'mage', 'No map goes below the Vault. Then again, no map admitted the Vault was there.'],
+        ['Brann', 'mage', 'This glass is the Rift, cooled. The Ascendancy grinds it into lenses. Whoever rules here sees every sector at once.'],
+        ['Kestrel', 'rogue', 'Then let us break the glasses.'],
+      ], goal: 'Shatter the Glass Regent on floor 90' },
+    { id: 'bastion', ch: 10, when: s => s.maxFloorEver >= 92, title: 'The Iron Covenant Holds',
+      lines: [
+        ['Oduya', 'tank', 'That is a Covenant banner. The Ironbound Bastion. It fell into the Rift in the first year of the war, and they never stopped holding it.'],
+        ['Oduya', 'tank', 'Marshal Ironvow sealed the gates from the inside. Hold the line, he said. He never said for how long.'],
+      ], goal: 'Relieve Marshal Ironvow on floor 100' },
+    { id: 'aqueduct', ch: 11, when: s => s.maxFloorEver >= 102, title: 'Where the Tide Drinks',
+      lines: [
+        ['Varga', 'rogue', 'The Tide built this aqueduct to drink the Rift dry. Every drop that runs here was somebody’s warmth.'],
+        ['Moss', 'healer', 'Mercy Corps markers on the walls. Someone was still triaging the wounded down here. They held out longer than anyone should have.'],
+      ], goal: 'Drain the Brine Matriarch on floor 110' },
+    { id: 'orchard', ch: 12, when: s => s.maxFloorEver >= 112, title: 'The Bone Orchard',
+      lines: [
+        ['The Hollow King', 'necro', 'These trees grow from the bearers she fed. I can hear every one of them.'],
+        ['The Hollow King', 'necro', 'Corvane. That was my name. It is carved into the third root. Thank you, bearer. I will carry it the rest of the way.'],
+      ], goal: 'Lay the Orchard Keeper to rest on floor 120' },
+    { id: 'spire', ch: 13, when: s => s.maxFloorEver >= 122, title: 'Stormglass',
+      lines: [
+        ['Wren', 'mage', 'My master’s spire. The Radiant Ascendancy has pulled light out of the Rift from up here for years.'],
+        ['Wren', 'mage', 'If they master the Rift, they rule every sector of the Reach. I used to think that was the whole point of the war.'],
+      ], goal: 'Break the Ascendant Prism on floor 130' },
+    { id: 'scar', ch: 14, when: s => s.maxFloorEver >= 132, title: 'The Nexus Scar',
+      lines: [
+        ['Narrator', 'lamp', 'Here the Nexus runs close enough to touch. All three alliances have warbands in the scar, and none of them is winning.'],
+        ['The Pale Oracle', 'healer', 'This is the moment I saw. One road ends on a throne in the dark. The other ends with the lantern breaking.'],
+      ], goal: 'Survive the Threefold Warhost on floor 140' },
+    { id: 'threshold', ch: 15, when: s => s.maxFloorEver >= 142, title: 'The Rift Threshold',
+      lines: [
+        ['Old Thessaly', 'lamp', 'You should have stayed in the cellars, child. Every seal needs a keeper. I was going to let you choose to become one.'],
+        ['Kestrel', 'rogue', 'We are choosing. Just not the way you hoped.'],
+      ], goal: 'Face the Lampmother on floor 150' },
+    { id: 'act1', ch: 15, when: s => s.maxFloorEver >= 151, title: 'The Lampmother Falls',
+      lines: [
+        ['The Lampmother', 'lamp', 'Without me the seal breaks at the next surge. The Rift will open into every sector of the Reach. Is that what you wanted?'],
+        ['The Unlit', 'boss', 'It wanted to breathe. Now it will.'],
+        ['Narrator', 'lamp', 'End of Act One. When the Rift surges at the end of the season, the alliance holding the Nexus decides what comes through. Act Two opens with Season 2 of the Grand War.'],
+      ], goal: 'Act Two opens with Season 2 of the Grand War' },
   ];
 
   function newState() {
@@ -672,6 +744,13 @@
     { id: 'biome5', title: 'The Drowned Chapel', group: 'Places', text: 'An Ascendancy chapel to a god of thresholds, flooded when its bishop tried to pry the Rift open from below.' },
     { id: 'biome6', title: 'Hollow Roots', group: 'Places', text: 'The roots of a tree that grew downward toward the Rift, as if something below was the sun. The Tide nests in them.' },
     { id: 'biome7', title: 'The Starless Vault', group: 'Places', text: 'The bottom of every map, and the edge of the Rift itself. The maps are wrong.' },
+    { id: 'biome8', title: 'The Glass Wastes', group: 'Places', text: 'Below the Vault the Rift-light cooled into glass, mile after mile of it. The Ascendancy calls it a mirror of heaven. Walk on it barefoot and it remembers your name.' },
+    { id: 'biome9', title: 'The Ironbound Bastion', group: 'Places', text: 'A Covenant fortress sunk whole into the deep when the Rift opened, with its garrison still inside. The gates are shut from the inside. Someone is still bolting them.' },
+    { id: 'biome10', title: 'The Weeping Aqueduct', group: 'Places', text: 'Covenant engineers built it to carry clean water to the Hold. The Tide reversed the flow. Now it carries everything that drowned upward, toward the light.' },
+    { id: 'biome11', title: 'The Bone Orchard', group: 'Places', text: 'Trees grown from the Hollow Roots, fed on battlefields. Their fruit is pale and hard and hums when you hold it. Nobody who has tasted it says what it tastes like.' },
+    { id: 'biome12', title: 'The Stormglass Spire', group: 'Places', text: 'An Ascendancy tower built downward, floor by floor, toward the Rift. Lightning runs up it instead of down. The choir at the top has not stopped singing in a century.' },
+    { id: 'biome13', title: 'The Nexus Scar', group: 'Places', text: 'Where the three alliances first broke through to the Rift together, and turned on each other. The walls still carry the marks. So do the soldiers who never left.' },
+    { id: 'biome14', title: 'The Rift Threshold', group: 'Places', text: 'The last landing before the Rift itself. The lantern’s light reaches this far and no further. Past here, the war does not have names for things.' },
     { id: 'g0', title: 'The Cellar Glutton', group: 'Guardians', text: 'A Tide war-beast left to guard the stair. It ate the oil, the barrels, and a courier carrying orders. Everything feeds the Tide, and the Glutton took that personally.' },
     { id: 'g1', title: 'Grandmother Rot', group: 'Guardians', text: 'Once the Mercy Corps healer of this front. The Tide did not kill her. It convinced her that rot was just another kind of mending.' },
     { id: 'g2', title: 'The Mycelial Choir', group: 'Guardians', text: 'An Ascendancy experiment: teach the Rift-fed spores to sing in unison, and see if the song opens doors. It did. Just not the right ones.' },
@@ -680,6 +759,13 @@
     { id: 'g5', title: 'The Sunken Bishop', group: 'Guardians', text: 'He drowned his own chapel to reach the Rift. He is still praying. The water carries the words a long way down.' },
     { id: 'g6', title: 'The Root Mother', group: 'Guardians', text: 'Before the Tide reached her she mended anything that bled. Now she feeds the dark with whatever wanders into her roots.' },
     { id: 'g7', title: 'The Unlit', group: 'Guardians', text: 'The Nyx Rift’s breath, held under the lantern. It does not hate the light. It has simply never been allowed any.' },
+    { id: 'g8', title: 'The Glass Regent', group: 'Guardians', text: 'The Ascendancy’s first saint, who walked into the Rift-glass to become a window. He became a wall instead, and every ward he raises is a prayer that did not land.' },
+    { id: 'g9', title: 'Marshal Ironvow', group: 'Guardians', text: 'He swore the Bastion would never fall. It did not fall. It sank, and he held it all the way down. His blade still swings at whoever stands behind you.' },
+    { id: 'g10', title: 'The Brine Matriarch', group: 'Guardians', text: 'Mother of every eel in the aqueduct, and most of the things that eat them. Cut her and the water closes the wound.' },
+    { id: 'g11', title: 'The Orchard Keeper', group: 'Guardians', text: 'The first bearer Thessaly ever planted, grown into the trees he was buried under. He tends the others now. His shears are coated in sap that does not wash off.' },
+    { id: 'g12', title: 'The Ascendant Prism', group: 'Guardians', text: 'What the Spire’s choir sings to. A living lens that splits a single strike into a dozen. It is very fast, and it is very proud of it.' },
+    { id: 'g13', title: 'The Threefold Warhost', group: 'Guardians', text: 'A Covenant shield, a Radiant lance and a Tide maw, fused at the Scar into one soldier. It fights harder the closer it comes to losing, because it has lost before.' },
+    { id: 'g14', title: 'The Lampmother', group: 'Guardians', text: 'Old Thessaly, at the root of her own seal, younger than she has looked in a hundred years. There has only ever been one Lampmother. She fed every bearer before you to keep it that way.' },
     { id: 'foe_slime', title: 'Gloops', group: 'Bestiary', text: 'Lamp oil left too long near the Rift grows hungry. Gloops are what it becomes. Harmless alone, ruinous in barrels.' },
     { id: 'foe_rat', title: 'Gnawers', group: 'Bestiary', text: 'The Hold’s rats went down for the oil and came back up bigger. The Tide uses them as scouts now.' },
     { id: 'foe_bat', title: 'Flitterwings', group: 'Bestiary', text: 'Drawn to any light. A lantern-bearer learns to love them, because they always fly toward the way out.' },
@@ -687,6 +773,13 @@
     { id: 'foe_eye', title: 'Watchers', group: 'Bestiary', text: 'Nobody has seen a Watcher blink. Moss thinks they report to the Ascendancy. Kestrel thinks Moss worries too much.' },
     { id: 'foe_shroom', title: 'Caplings', group: 'Bestiary', text: 'They walk on their roots and sing in a pitch only the dead can hear. The Choir is what happens when enough of them agree.' },
     { id: 'foe_ghost', title: 'Wisps', group: 'Bestiary', text: 'A wisp is the warmth a person leaves behind. The Pale Oracle says she can tell whose by the colour.' },
+    { id: 'foe_shard', title: 'Glass Crawlers', group: 'Bestiary', text: 'Splinters of Rift-glass that learned to walk. They reflect the light you carry and throw it back as a ward.' },
+    { id: 'foe_sentinel', title: 'Iron Husks', group: 'Bestiary', text: 'Empty Covenant armour, still on patrol. They swing wide, as they were drilled to, and hit whoever stands beside you too.' },
+    { id: 'foe_eel', title: 'Sluice Eels', group: 'Bestiary', text: 'They swim up the aqueduct against the current. A cut eel knits itself shut if you let it rest.' },
+    { id: 'foe_thorn', title: 'Thornlings', group: 'Bestiary', text: 'Seedlings of the Bone Orchard that walked away from their trees. Their barbs carry a slow venom that keeps working after the fight.' },
+    { id: 'foe_prism', title: 'Storm Lenses', group: 'Bestiary', text: 'Shards of the Spire that caught a lightning stroke and kept it. They strike before you see them move.' },
+    { id: 'foe_hound', title: 'Rift Hounds', group: 'Bestiary', text: 'Bred by no alliance, followed by all of them. Wounding one only makes it angry.' },
+    { id: 'foe_riftling', title: 'Riftlings', group: 'Bestiary', text: 'Small pieces of the Rift that wandered up toward the lantern. They are curious. They are also very hard to hurt.' },
     { id: 'foe_chest', title: 'Treasure Chests', group: 'Bestiary', text: 'Lantern-bearers stashed supplies for whoever came next. Some chests are still waiting for the right hands.' },
     { id: 'boss', title: 'Guardians', group: 'Bestiary', text: 'Every fifth landing has something that will not move. The old maps call them guardians. The bones call them jailers.' },
     { id: 'set_vigil', title: "Gravewarden's Vigil", group: 'Relics of the Bearers', text: SETS[0].lore },
@@ -872,7 +965,7 @@
       sprite = BOSS_SPRITES[Math.floor(f / BOSS_EVERY) % BOSS_SPRITES.length];
       name = (f % 10 === 0) ? b.boss : ['Stone Sentinel', 'Tunnel Wyrm', 'Bone Hierarch'][BOSS_SPRITES.indexOf(sprite)];
     } else if (chest) { sprite = 'chest'; name = 'Treasure Chest'; }
-    else { const fo = FOES[Math.floor(r() * FOES.length)]; sprite = fo.id; name = b.adj[Math.floor(r() * b.adj.length)] + ' ' + fo.name; }
+    else { const fo = b.foe && r() < 0.55 ? b.foe : FOES[Math.floor(r() * FOES.length)]; sprite = fo.id; name = b.adj[Math.floor(r() * b.adj.length)] + ' ' + fo.name; }
     // Grand War warbands: soldiers of the alliances fighting over the Rift.
     const elite = !boss && !chest && f >= 4 && r() < ELITE_CHANCE;
     let side = null;
@@ -880,7 +973,15 @@
     const hp = foeHp(f, boss) * (chest ? 0.5 : elite ? 2.5 : 1);
     // Some foes sneak up and hit the back of the line first.
     const ambush = !boss && !chest && f >= 6 && r() < (elite ? 0.3 : 0.1) ? 2 : 0;
-    return { name, sprite, boss, chest, elite, side, ambush, hp, max: hp, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) };
+    const mods = chest ? [] : rollMods(f, boss, elite, b, r);
+    return { name, sprite, boss, chest, elite, side, ambush, hp, max: hp, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) * (mods.includes('swift') ? 1.35 : 1), mods, ward: 0, wardAt: 0 };
+  }
+  function rollMods(f, boss, elite, b, r) {
+    let n = boss ? (f >= 20 ? 1 : 0) + (f >= 60 ? 1 : 0) + (f >= 110 ? 1 : 0) : elite ? (f >= 30 ? 1 : 0) + (f >= 100 ? 1 : 0) : (f >= 40 && r() < Math.min(0.4, 0.08 + (f - 40) / 300) ? 1 : 0);
+    const out = [];
+    if (n && b.mod && r() < 0.6) { out.push(b.mod); n--; }
+    while (n-- > 0) { const k = MOD_KEYS[Math.floor(r() * MOD_KEYS.length)]; if (!out.includes(k)) out.push(k); }
+    return out;
   }
 
   function damageFoe(s, amount, now, rng, events) {
@@ -888,7 +989,8 @@
     while (amount > 0 && guard++ < 60) {
       if (!s.foe) s.foe = makeFoe(s, rng);
       const foe = s.foe, mult = foe.boss ? 1 + relicVal(s, 'lens') : 1;
-      const dmg = amount * mult;
+      let dmg = amount * mult;
+      if (foe.ward > 0) { const soak = Math.min(foe.ward, dmg); foe.ward -= soak; dmg -= soak; amount = dmg / mult; if (dmg <= 0) return; }
       if (dmg < foe.hp) { foe.hp -= dmg; drain(s, dmg); return; }
       amount -= foe.hp / mult; drain(s, foe.hp);
       killFoe(s, now, rng, events);
@@ -931,6 +1033,12 @@
   }
 
   function clearFloor(s, events, boss) {
+    // Past the end of Act One the way is sealed until Season 2.
+    if (s.floor >= ACT_ONE_END && !actTwoOpen()) {
+      if (s.floor >= s.maxFloor) { s.maxFloor = Math.max(s.maxFloor, ACT_ONE_END + 1); if (s.maxFloor > s.maxFloorEver) { s.maxFloorEver = s.maxFloor; events && events.push({ type: 'newfloor', floor: s.maxFloor }); } }
+      s.lantern = 0; s.foeIdx = 0; healParty(s, 0.3, true); events && events.push({ type: 'sealed' });
+      return;
+    }
     if (s.floor >= s.maxFloor) {
       s.maxFloor = s.floor + 1;
       if (s.maxFloor > s.maxFloorEver) { s.maxFloorEver = s.maxFloor; events && events.push({ type: 'newfloor', floor: s.maxFloor }); }
@@ -942,7 +1050,7 @@
   }
 
   function gotoFloor(s, f) {
-    f = Math.max(1, Math.min(s.maxFloor, f));
+    f = Math.max(1, Math.min(s.maxFloor, f, actTwoOpen() ? Infinity : ACT_ONE_END));
     s.floor = f; s.foeIdx = 0; s.foe = null; s.lantern = 0; s.foeSwing = 0;
   }
 
@@ -976,6 +1084,8 @@
     if (!pick) return;
     const t = pick.id;
     let dmg = foe.atk;
+    const mods = foe.mods || [];
+    if (mods.includes('enrage') && foe.hp < foe.max * 0.3) dmg *= 1.8;
     if (pick.behind) {
       foe.ambush--;
       const guard = memberById(t).cls === 'tank';
@@ -994,6 +1104,11 @@
     dmg *= 1 - Math.min(0.5, sk(s, 'guard'));
     s.hp[t] = (s.hp[t] == null ? maxHpOf(s, t) : s.hp[t]) - dmg;
     events && events.push({ type: 'foehit', target: t, dmg, behind: !!pick.behind });
+    if (mods.includes('venom')) { s.poison = s.poison || {}; s.poison[t] = { dps: dmg * 0.12, until: now + 5000 }; events && events.push({ type: 'poison', id: t }); }
+    if (mods.includes('cleave')) {
+      const live = s.party.filter(id => id && !s.down[id]), nx = live[live.indexOf(t) + 1];
+      if (nx) { s.hp[nx] = (s.hp[nx] == null ? maxHpOf(s, nx) : s.hp[nx]) - dmg * 0.4; if (s.hp[nx] <= 0) { s.hp[nx] = 0; s.down[nx] = now + REVIVE_TIME * 1000; events && events.push({ type: 'fall', id: nx }); } }
+    }
     if (s.hp[t] <= 0) {
       s.hp[t] = 0; s.down[t] = now + REVIVE_TIME * 1000;
       events && events.push({ type: 'fall', id: t });
@@ -1074,6 +1189,15 @@
         gotoFloor(s, s.floor - 1);
         return;
       }
+    }
+    // monster tricks: wards, regeneration and poison
+    const fm = s.foe.mods || [];
+    if (fm.includes('regen') && s.foe.hp < s.foe.max) s.foe.hp = Math.min(s.foe.max, s.foe.hp + s.foe.max * (s.foe.boss ? 0.004 : 0.012) * dt);
+    if (fm.includes('ward') && now >= (s.foe.wardAt || 0)) { s.foe.ward = s.foe.max * (s.foe.boss ? 0.05 : 0.15); s.foe.wardAt = now + 12000; events && events.push({ type: 'ward' }); }
+    if (s.poison) for (const id in s.poison) {
+      const p = s.poison[id]; if (p.until <= now || s.down[id] || !s.party.includes(id)) { delete s.poison[id]; continue; }
+      s.hp[id] -= p.dps * dt;
+      if (s.hp[id] <= 0) { s.hp[id] = 0; s.down[id] = now + REVIVE_TIME * 1000; delete s.poison[id]; events && events.push({ type: 'fall', id }); if (!alive(s).length) { wipe(s, now, events); return; } }
     }
     // healing
     for (const hid of s.party) {
@@ -1192,7 +1316,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, lanternTime, embersFor, SKILL_TREES, skillById, skillCost, skillText, sk, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, resting, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

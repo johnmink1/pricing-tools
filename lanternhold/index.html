@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611230201">
+<link rel="stylesheet" href="style.css?v=202611230212">
 </head>
 <body>
 <div id="app">
@@ -60,7 +60,8 @@
       <div class="foe">
         <div class="restcard" id="restcard"></div>
         <div class="foename"><span id="foename">Cellar Gloop</span><span class="tag" id="foetag"></span></div>
-        <div class="bar hp"><i id="hpbar"></i><span id="hptext">10 / 10</span></div>
+        <div class="foemods" id="foemods"></div>
+        <div class="bar hp"><i id="hpbar"></i><b id="wardbar"></b><span id="hptext">10 / 10</span></div>
         <div class="bar lantern" id="lanternwrap" hidden><i id="lanternbar"></i><span id="lanterntext">Lantern oil 30s</span></div>
         <button class="btn small oilbtn" id="b-oil" hidden>Pour lantern oil</button>
         <div class="toggles"><label class="auto"><input type="checkbox" id="auto" checked> <span>Descend automatically</span></label><label class="auto"><input type="checkbox" id="autocast" checked> <span>Use abilities automatically</span></label></div>
@@ -188,10 +189,10 @@
   /* AWS settings for optional accounts and cloud saves (from the CloudFormation stack output). Sign-in stays hidden while clientId is empty. */
   window.LH_CLOUD = { region: "us-east-1", clientId: "191dppk0cud8d3bdgh3lbmgjr2", api: "https://nyu3u8gc73.execute-api.us-east-1.amazonaws.com" };
 </script>
-<script>window.LH_BUILD = "202611230201";</script>
+<script>window.LH_BUILD = "202611230212";</script>
 <script>window.LH_SUPPORT_URL = ""; /* Buy Me a Coffee page; the button stays hidden while this is empty */</script>
-<script src="core.js?v=202611230201"></script>
-<script src="sprites.js?v=202611230201"></script>
-<script src="ui.js?v=202611230201"></script>
+<script src="core.js?v=202611230212"></script>
+<script src="sprites.js?v=202611230212"></script>
+<script src="ui.js?v=202611230212"></script>
 </body>
 </html>

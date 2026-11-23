@@ -967,7 +967,7 @@
   // Publish your hero to the board; owners earn gold whenever someone recruits them.
   async function publishHero() {
     try {
-      const r = await api('PUT', { name: S.hero.name, cls: S.hero.cls, level: L.lvl(S, 'you'), floor: S.maxFloorEver }, '/hero');
+      const r = await api('PUT', { name: S.hero.name, cls: S.hero.cls, side: S.hero.side, level: L.lvl(S, 'you'), floor: S.maxFloorEver }, '/hero');
       const n = r && r.recruits;
       if (n > 0) {
         const g = Math.max(100, L.offlineGoldPerSec(S) * 600) * n;

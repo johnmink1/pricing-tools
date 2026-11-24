@@ -1,4 +1,4 @@
-/* lh-build 202611241302 */
+/* lh-build 202611241310 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -38,7 +38,7 @@
   function save() {
     if (dormant) return;
     S.lastSeen = Date.now();
-    const o = Object.assign({}, S); delete o.foe;
+    const o = Object.assign({}, S); delete o.foe; delete o.enchAt;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(o)); } catch (e) {}
   }
 
@@ -1100,7 +1100,7 @@
       });
   }
   function campBarHtml() {
-    const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now()), store = '<button class="btn ghost small" data-camp="store" data-tip="Draughts, lantern oil and tonics.">Store</button>';
+    const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now()), store = '<button class="btn ghost small" data-camp="ench" data-tip="Visit the Enchanter to enchant and disenchant gear. The dive pauses while you are there.">Enchanter</button><button class="btn ghost small" data-camp="store" data-tip="Draughts, lantern oil and tonics.">Store</button>';
     if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Main camp</b><small>Everything can change here</small></div>' + (S.maxFloor > 1 || S.campReturn ? '<button class="btn small" data-camp="down" data-tip="Head back down. You start at the top of the region you left.">' + downLabel() + '</button>' : '') + store + '</div>';
     if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Field camp · ' + Math.ceil(left) + 's</b><small>Change gear, then carry on</small></div>' + store + '</div>';
     const top = Math.min(S.maxFloor, L.regionTop(S.floor));
@@ -1119,6 +1119,7 @@
   subView('tab-gear', 'lh_gearv', 'kit'); subView('tab-rekindle', 'lh_skillv', 'stats');
   let campWas = null;
   function paintCamp() {
+    paintEnchOv();
     const h = campBarHtml();
     for (const id of ['campbar', 'campbar2', 'gearcamp']) { const el = $(id); if (el && el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; } }
     const c = camp(), cw = c + '|' + mainCamp(); if (campWas !== null && cw !== campWas) { campWas = cw; updateSeats(true); paintBoard(); updateGear(true); } campWas = cw;
@@ -1134,7 +1135,7 @@
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-camp]'); if (!b) return;
     const a = b.dataset.camp;
-    if (a === 'go') goCamp(); else if (a === 'down') descend(); else if (a === 'drink') drinkDraught(); else if (a === 'store') openStore(); else campModal();
+    if (a === 'go') goCamp(); else if (a === 'ench') enchanterModal(); else if (a === 'down') descend(); else if (a === 'drink') drinkDraught(); else if (a === 'store') openStore(); else campModal();
   });
   setInterval(paintCamp, 500);
 
@@ -1696,8 +1697,8 @@
         const locked = () => { toast('lock', 'This item is locked', 'Unlock it first to sell, send or salvage it.', 'warn'); };
         md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin' + (w ? ', and Equip best leaves it in its slot.' : '.') : L.gearName(it) + ' can be scrapped and sold again.', ''); };
         const gate = f => () => { if (it.lk) return locked(); if (!gateUse('sell')) return; if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
-        const en = md.querySelector('#i-ench'); if (en) en.onclick = () => enchantPicker({ dst: uid });
-        const ds = md.querySelector('#i-dis'); if (ds) ds.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to disenchant it.', 'warn'); if (w) return toast('flare', 'Take it off first', 'Worn gear cannot be disenchanted.', 'warn'); enchantPicker({ src: uid }); };
+        const en = md.querySelector('#i-ench'); if (en) en.onclick = () => atEnchanter(() => enchantPicker({ dst: uid }));
+        const ds = md.querySelector('#i-dis'); if (ds) ds.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to disenchant it.', 'warn'); if (w) return toast('flare', 'Take it off first', 'Worn gear cannot be disenchanted.', 'warn'); atEnchanter(() => enchantPicker({ src: uid })); };
         const mg = md.querySelector('#i-merge'); if (mg) mg.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to merge it.', 'warn'); mergePicker(uid); };
         const mk = md.querySelector('#i-mkt'); if (mk) mk.onclick = gate(sellItem);
         const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
@@ -1761,19 +1762,81 @@
           md.querySelectorAll('[data-dst]').forEach(e => e.onclick = () => { dst = e.dataset.dst; slot = -1; draw(); });
           md.querySelectorAll('[data-src]').forEach(e => e.onclick = () => { src = e.dataset.src; idx = +e.dataset.i; draw(); });
           md.querySelectorAll('[data-sl]').forEach(e => e.onclick = () => { slot = +e.dataset.sl; draw(); });
-          md.querySelector('#en-back').onclick = () => itemModal(o.src || o.dst);
+          md.querySelector('#en-back').onclick = () => o.home ? enchanterModal() : itemModal(o.src || o.dst);
           md.querySelector('#en-go').onclick = () => {
-            if (B && L.wearer(S, B.uid) && !campGate()) return;
             const r = L.disenchant(S, src, idx, dst, slot); if (!r) return;
             save(); updateGear(true); updateSeats(true); sfx.relic();
             toast('star', 'Enchant moved', enchName(r.moved) + ' is now on ' + L.gearName(r.item) + '. -' + fmt(r.cost) + ' Dust', '');
-            itemModal(r.item.uid);
+            if (o.home) enchanterModal(); else itemModal(r.item.uid);
           };
         });
     };
     draw();
   }
 
+  // ---------- the Enchanter (John, 2026-11-24) ----------
+  // Enchanting and disenchanting happen on a visit to the Enchanter, like stopping at the campfire:
+  // the dive pauses while you are there (nobody fights or advances), then you leave and carry on from the same floor.
+  const ENCH_SVG = '<svg viewBox="0 0 40 52" aria-hidden="true"><defs><radialGradient id="eorb"><stop offset="0" stop-color="#e9d5ff"/><stop offset=".55" stop-color="#a78bfa"/><stop offset="1" stop-color="#6d28d9" stop-opacity="0"/></radialGradient></defs>' +
+    '<path d="M20 3 10 20h20z" fill="#4c1d95"/><circle cx="20" cy="22" r="6" fill="#f2d3b1"/><path d="M8 50c1-14 5-22 12-22s11 8 12 22z" fill="#5b21b6"/><path d="M20 28v22" stroke="#c4b5fd" stroke-width="1.4"/>' +
+    '<path d="M14 20h12" stroke="#c4b5fd" stroke-width="2"/><circle cx="33" cy="30" r="7" fill="url(#eorb)"/><circle cx="33" cy="30" r="2.6" fill="#f5f3ff"/><path d="M28 36l-3 6" stroke="#f2d3b1" stroke-width="3" stroke-linecap="round"/></svg>';
+  function atEnchanter(then) {
+    if (L.visiting(S)) { then && then(); return; }
+    modal('<div class="merchbox enchvisit"><div class="merchhead">' + ENCH_SVG + '<div><h2>That is done at the Enchanter</h2><small>Enchanting and disenchanting happen on a visit. Your party stops diving while you are there and carries on from floor ' + S.floor + ' when you leave.</small></div></div>' +
+      '<div class="row"><button class="btn ghost" id="ev-no">Not now</button><button class="btn" id="ev-go">' + icon('star') + ' Visit the Enchanter</button></div></div>', md => {
+        md.querySelector('#ev-no').onclick = closeModal;
+        md.querySelector('#ev-go').onclick = () => { visitEnch(); if (then) then(); };
+      });
+  }
+  function visitEnch() {
+    if (!L.visitEnchanter(S, Date.now())) return false;
+    sfx.relic(); paintEnchOv(); updatePanel(true);
+    return true;
+  }
+  function leaveEnch() {
+    if (!L.leaveEnchanter(S)) return;
+    closeModal(); sfx.buy(); paintEnchOv(); updatePanel(true); save();
+    toast('star', 'Back to the dive', 'The party leaves the Enchanter and carries on from floor ' + S.floor + '.', '');
+  }
+  function enchanterModal() {
+    if (!L.visiting(S)) visitEnch();
+    const free = x => !x.lk && !L.wearer(S, x.uid);
+    const srcs = S.bag.filter(x => free(x) && L.enchList(x).length);
+    const dsts = S.bag.filter(x => L.sockets(x)).sort((a, b) => (!!L.wearer(S, b.uid) - !!L.wearer(S, a.uid)) || ((L.sockets(b) - L.enchList(b).length) - (L.sockets(a) - L.enchList(a).length)) || (L.itemScore(b) - L.itemScore(a)));
+    const open = dsts.reduce((n, x) => n + Math.max(0, L.sockets(x) - L.enchList(x).length), 0);
+    const row = (x, act) => '<div class="pkrow r-' + x.rar + '" data-' + act + '="' + x.uid + '" role="button" tabindex="0"><div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div><span class="pkt"><b>' + esc(L.gearName(x)) + (x.up ? ' +' + x.up : '') + '</b><small>' + (L.enchList(x).map(enchName).join(', ') || 'No enchants yet') + (L.wearer(S, x.uid) ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(L.wearer(S, x.uid)).name) + '</i>' : '') + '</small></span><span class="cmp eq">' + L.enchList(x).length + '/' + L.sockets(x) + '</span></div>';
+    let tab = enchTab;
+    const body = () => tab === 'dis'
+      ? '<p class="note small">Pick an item to break down. One of its enchants moves to another item, and the item itself is destroyed. Worn and locked items are left out.</p><div class="mglist">' + (srcs.length ? srcs.slice(0, 80).map(x => row(x, 'edis')).join('') : '<p class="note">Nothing to disenchant. Spare items with enchants show up here.</p>') + '</div>'
+      : '<p class="note small">Pick an item to enchant, worn or not. You then choose an enchant from a spare item to move into one of its sockets.</p><div class="mglist">' + (dsts.length ? dsts.slice(0, 80).map(x => row(x, 'eon')).join('') : '<p class="note">None of your items has an enchant socket yet. Rarer gear and gear from deeper floors has more.</p>') + '</div>';
+    const draw = () => modal('<div class="merchbox picker enchvisit"><div class="merchhead">' + ENCH_SVG + '<div><h2>The Enchanter</h2><small>“Sit, rest your blades. Nothing down there will move until you do.”</small></div></div>' +
+      '<div class="evbal"><span>' + icon('dust') + ' <b>' + fmt(S.dust || 0) + '</b> Dust</span><span>' + open + ' open ' + (open === 1 ? 'socket' : 'sockets') + '</span><span>' + srcs.length + ' spare enchanted ' + (srcs.length === 1 ? 'item' : 'items') + '</span></div>' +
+      '<div class="fseg evtabs"><button data-et="on" class="' + (tab === 'on' ? 'on' : '') + '">Enchant</button><button data-et="dis" class="' + (tab === 'dis' ? 'on' : '') + '">Disenchant</button><button data-et="scrap">Scrap for Dust</button></div>' + body() +
+      '<p class="note small">Moving an enchant costs Dust: ' + [1, 2, 3].map(t => fmt(L.enchCost({ id: 'might', t })) + ' for tier ' + ROMAN9[t]).join(', ') + ', and more for higher tiers.</p>' +
+      '<div class="row"><button class="btn ghost" id="ev-stay">Close (stay here)</button><button class="btn" id="ev-leave">Leave and keep diving</button></div></div>', md => {
+        md.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { if (b.dataset.et === 'scrap') { closeModal(); openScrap(); return; } tab = enchTab = b.dataset.et; draw(); });
+        md.querySelectorAll('[data-eon]').forEach(e => e.onclick = () => enchantPicker({ dst: e.dataset.eon, home: true }));
+        md.querySelectorAll('[data-edis]').forEach(e => e.onclick = () => enchantPicker({ src: e.dataset.edis, home: true }));
+        md.querySelector('#ev-stay').onclick = closeModal;
+        md.querySelector('#ev-leave').onclick = leaveEnch;
+      });
+    draw();
+  }
+  let enchTab = 'on';
+  // While visiting, the battle scene shows the Enchanter's table instead of a fight.
+  function paintEnchOv() {
+    let el = $('enchov'); const on = L.visiting(S);
+    if (!el) {
+      if (!on) return;
+      el = document.createElement('div'); el.id = 'enchov'; el.className = 'enchov';
+      el.addEventListener('pointerdown', e => e.stopPropagation());
+      el.addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-ev]'); if (!b) return; if (b.dataset.ev === 'open') enchanterModal(); else leaveEnch(); });
+      $('arena').appendChild(el);
+    }
+    el.hidden = !on; document.body.classList.toggle('atench', on);
+    if (on && !el.dataset.h) { el.innerHTML = '<div class="evfig">' + ENCH_SVG + '</div><div class="evtxt"><b>At the Enchanter</b><small>The dive is paused on floor ' + S.floor + '.</small></div><div class="evrow"><button class="evb main" data-ev="open">Enchant gear</button><button class="evb" data-ev="leave">Leave</button></div>'; el.dataset.h = '1'; }
+    if (!on) delete el.dataset.h;
+  }
   // ---------- merge: two copies of the same item become one at +1, or both are lost ----------
   function mergePicker(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
@@ -4320,7 +4383,8 @@
         'Fine items have 1 socket, rare 2, epic 3 and set pieces 2. Items from floor 30 and floor 80 on get one more each, up to 4. Common items get sockets from floor 30.',
         'Enchants: <b>Might</b> (damage), <b>Vigor</b> (health), <b>Keen</b> (crits), <b>Fortune</b> (gold), <b>Finder</b> (gear drops), <b>Mending</b> (healing), <b>Warding</b> (less damage taken) and <b>Wick</b> (lantern time) help the whole party. Tiers run I to IX, higher from deeper floors.',
         'Four enchants help <b>only the hero wearing the item</b>: <b>Flow</b> (mana or stamina regen, up to +100%), <b>Leech</b> (life steal, up to 8%), <b>Bulwark</b> (block chance, up to 25%) and <b>Plating</b> (defense, up to 30% less damage). Rings and trinkets roll Flow and Leech more often, armor and shields roll Bulwark and Plating more often, and weapons roll Leech.',
-        '<b>Disenchant</b> destroys an item and moves one of its enchants into a socket on another item of any class. A full socket can be overwritten.',
+        'Enchanting happens at <b>the Enchanter</b>. Press <b>Enchanter</b> on the battle screen, or Enchant on an item, to visit. The dive pauses while you are there (nobody fights and you keep your floor). Press <b>Leave</b> to carry on.',
+        '<b>Disenchant</b> destroys an item and moves one of its enchants into a socket on another item of any class. A full socket can be overwritten. At the Enchanter you can enchant worn gear too.',
         'Moving an enchant costs <b>Dust</b>: 5 for tier I, 20 for II, 45 for III and so on (5 &times; tier&sup2;).',
         'Merging two items keeps the best enchants of both, as many as the result has sockets.']],
       ['Dust', 'i:dust', 'Scrap gear to get Dust for enchanting.', [
@@ -4481,6 +4545,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 96, date: 'November 24, 2026', title: 'The Enchanter', items: [
+      'Enchanting and disenchanting now happen at the Enchanter. Press Enchanter on the battle screen (or Enchant on any item) to visit. Your party stops diving while you are there: nobody fights, nothing new turns up and you keep your floor.',
+      'The Enchanter has three tabs: Enchant (pick any item with a socket, worn or not, and move an enchant onto it), Disenchant (break down a spare item to move one of its enchants) and Scrap for Dust.',
+      'Press Leave when you are done and the party carries on from the same floor. Reloading the game also ends a visit.',
+    ] },
     { v: 95, date: 'November 24, 2026', title: 'XP in the fight log', items: [
       'The fight log now shows the hero XP each kill gave you, with all your bonuses counted, next to the gold: "Defeated Gloop +120 gold, +6.4 XP". Ambushes also show how many foes were in the group.',
     ] },

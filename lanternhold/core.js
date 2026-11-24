@@ -1,4 +1,4 @@
-/* lh-build 202611240414 */
+/* lh-build 202611240418 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -126,19 +126,19 @@
   // kind 'all' hits the whole party, 'splash' hits a hero and the ones beside them, 'pos' marks one spot in the line
   // (tanks cannot draw it away). A dot leaves a burn or poison that keeps ticking for DOT_FIGHTS fights.
   const SPECIALS = {
-    slam:    { name: 'Ground Slam',     kind: 'all',    mult: 0.24,  desc: 'Slams the ground and hits the whole party' },
+    slam:    { name: 'Ground Slam',     kind: 'all',    mult: 0.24,  cc: 'stun', desc: 'Slams the ground and hits the whole party. Some heroes are stunned' },
     breath:  { name: 'Fire Breath',     kind: 'all',    mult: 0.18,  dot: 'burn',   desc: 'Breathes fire over the whole party and sets them burning' },
     mark:    { name: 'Death Mark',      kind: 'pos',    mult: 1.32,  desc: 'Marks one spot in your line, then strikes it hard. Tanks cannot draw it away' },
-    gorge:   { name: 'Belly Flop',      kind: 'splash', mult: 0.72,  desc: 'Crashes onto a hero and the heroes beside them' },
+    gorge:   { name: 'Belly Flop',      kind: 'splash', mult: 0.72,  cc: 'stun', desc: 'Crashes onto a hero and the heroes beside them and stuns the one it lands on' },
     rotcloud:{ name: 'Rot Cloud',       kind: 'all',    mult: 0.12,  dot: 'poison', desc: 'Breathes rot over the whole party and poisons them' },
     spores:  { name: 'Choking Spores',  kind: 'all',    mult: 0.09, dot: 'poison', desc: 'Fills the air with spores that poison the whole party' },
     bonespear:{ name: 'Bone Spear',     kind: 'pos',    mult: 1.44,  desc: 'Hurls a spear at one spot in your line' },
     magma:   { name: 'Magma Wave',      kind: 'all',    mult: 0.21, dot: 'burn',   desc: 'Floods the floor with magma: hits everyone and burns' },
-    tidal:   { name: 'Tidal Crash',     kind: 'all',    mult: 0.3,  desc: 'A wall of water hits the whole party' },
+    tidal:   { name: 'Tidal Crash',     kind: 'all',    mult: 0.3,  cc: 'stun', desc: 'A wall of water hits the whole party. Some heroes are stunned' },
     roots:   { name: 'Grasping Roots',  kind: 'pos',    mult: 0.96,  dot: 'poison', desc: 'Roots burst up under one spot in your line and poison it' },
     void:    { name: 'Void Mark',       kind: 'pos',    mult: 1.56,  desc: 'Marks one spot in your line with the void, then strikes it' },
     shards:  { name: 'Shard Storm',     kind: 'splash', mult: 0.66,  desc: 'Bursts into glass that hits a hero and the heroes beside them' },
-    charge:  { name: 'Shield Charge',   kind: 'splash', mult: 0.78,  desc: 'Charges into the line, hitting a hero and the heroes beside them' },
+    charge:  { name: 'Shield Charge',   kind: 'splash', mult: 0.78,  cc: 'disarm', desc: 'Charges into the line, hitting a hero and the heroes beside them, and knocks the weapon from the one it hits' },
     beam:    { name: 'Prism Beam',      kind: 'pos',    mult: 1.44,  dot: 'burn',   desc: 'Focuses a beam on one spot in your line and burns it' },
     volley:  { name: 'Arrow Volley',    kind: 'all',    mult: 0.21, desc: 'Looses a volley that hits the whole party' },
     eclipse: { name: 'Eclipse',         kind: 'all',    mult: 0.24,  dot: 'burn',   desc: 'Puts out the light: hits everyone and burns' },
@@ -146,13 +146,33 @@
     dive:    { name: 'Dive',            kind: 'pos',    mult: 0.96,  desc: 'Dives at one spot in your line, often the back' },
     wail:    { name: 'Wail',            kind: 'all',    mult: 0.15, desc: 'A wail that hurts the whole party' },
     venombite:{ name: 'Venom Bite',     kind: 'pos',    mult: 0.72,  dot: 'poison', desc: 'Bites one spot in your line and poisons it' },
+    lash:    { name: 'Disarming Lash',  kind: 'pos',    mult: 0.66,  cc: 'disarm', desc: 'Whips one spot in your line and tears the weapon away' },
   };
   // guardian signature moves by region, and the move each guardian body uses on the in-between boss floors
   const BOSS_SPECIAL = ['gorge', 'rotcloud', 'spores', 'bonespear', 'magma', 'tidal', 'roots', 'void', 'shards', 'charge', 'tidal', 'rotcloud', 'beam', 'volley', 'eclipse'];
   const BODY_SPECIAL = { golem: 'slam', wyrm: 'breath', lich: 'mark' };
-  const FOE_SPECIAL = { slime: 'acid', bat: 'dive', ghost: 'wail', eye: 'mark', shroom: 'spores', rat: 'venombite', thorn: 'acid', eel: 'tidal', sentinel: 'slam', prism: 'beam', hound: 'dive', riftling: 'void', shard: 'shards' };
+  const FOE_SPECIAL = { slime: 'acid', bat: 'dive', ghost: 'wail', eye: 'mark', shroom: 'spores', rat: 'venombite', thorn: 'lash', eel: 'tidal', sentinel: 'slam', prism: 'beam', hound: 'dive', riftling: 'void', shard: 'shards' };
   const SPECIAL_FLOOR = 8, SPECIAL_CHANCE = 0.3, SPECIAL_WARN = 1.5, DOT_FIGHTS = 3;
   const DOTS = { burn: { name: 'Burning', dps: 0.05 }, poison: { name: 'Poisoned', dps: 0.035 } };
+  // Who a burn or poison hurts most (John, 2026-11-24): fire eats cloth, plate shrugs some of it off;
+  // poison bites everyone harder, except necromancers, who live with rot and mostly ignore it.
+  const DOT_VS = { burn: { healer: 2, mage: 2, necro: 2, tank: 0.75 }, poison: { necro: 0.25, tank: 1.25, rogue: 1.25, healer: 1.25, mage: 1.25 } };
+  const dotMult = (id, k) => { const m = memberById(id); return (m && DOT_VS[k] && DOT_VS[k][m.cls]) || 1; };
+  // Stun: the hero cannot attack, heal or use abilities for a few seconds. Disarm: the hero fights with bare hands
+  // (35% damage, half healing, no abilities) until it picks its weapon back up. Tanks shake both off twice as fast.
+  const CC = { stun: { name: 'Stunned', sec: 3 }, disarm: { name: 'Disarmed', sec: 8, dmg: 0.35, heal: 0.5 } };
+  const ccOf = (s, id, now) => { const c = s.cc && s.cc[id]; return c && c.until > (now || s.clock || Date.now()) ? c : null; };
+  const stunned = (s, id, now) => { const c = ccOf(s, id, now); return !!(c && c.k === 'stun'); };
+  const disarmed = (s, id, now) => { const c = ccOf(s, id, now); return !!(c && c.k === 'disarm'); };
+  function addCC(s, id, k, now, events, short) {
+    const m = memberById(id); if (!m) return;
+    if (m.cls === 'tank' && abilityActive(s, id, now)) return; // Shield Wall holds firm
+    let sec = CC[k].sec * (m.cls === 'tank' ? 0.5 : 1) * (short ? 0.67 : 1);
+    s.cc = s.cc || {}; const cur = ccOf(s, id, now);
+    if (cur && cur.k === 'stun' && k === 'disarm') return; // a stun already holds them; keep it simple
+    s.cc[id] = { k, until: now + sec * 1000 };
+    events && events.push({ type: 'cc', id, k, sec });
+  }
   function rollSpecial(f, boss, elite, sprite, b, r) {
     if (boss) return (f % 10 === 0 && BOSS_SPECIAL[Math.floor((f - 1) / 10) % BOSS_SPECIAL.length]) || BODY_SPECIAL[sprite] || 'slam';
     if (f < SPECIAL_FLOOR) return null;
@@ -433,6 +453,7 @@
     let d = c.dps * scale(s, id) * partyMult(s) * gearMult(s, id, 'dps');
     if (id === 'you') { d *= (HERO_DPS[m.cls] || 1) * (1 + sk(s, 'dps')); const fu = fxOn(s, 'fury', now); if (fu) d *= fu; }
     if (m.cls === 'mage' && abilityActive(s, id, now)) d *= (setBonus(s, id) >= 3 ? 6 : 4) * (id === 'you' ? 1 + sk(s, 'power') : 1);
+    const cc = s.cc && ccOf(s, id, now); if (cc) d *= cc.k === 'stun' ? 0 : CC.disarm.dmg;
     return d * (1 - ghostSap(s, 'dps', now));
   }
   function minionDps(s, now) {
@@ -446,7 +467,7 @@
   function healPerSec(s, id) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id); if (m.cls !== 'healer') return 0;
-    return (CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0))) * (1 - ghostSap(s, 'heal'));
+    return (CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0))) * (1 - ghostSap(s, 'heal')) * (s.cc && ccOf(s, id) ? (ccOf(s, id).k === 'stun' ? 0 : CC.disarm.heal) : 1);
   }
   // Mana and stamina (John, 2026-11-24). Healers, mages and necromancers run on mana; rogues and tanks on stamina.
   // Every ability costs some. A healer also spends mana to heal: run dry and it stops healing and only attacks
@@ -825,6 +846,7 @@
   }
   const fxOn = (s, k, now) => { const f = s.fx && s.fx[k]; return f && f.until > now ? f.v : 0; };
   function castSpec(s, abId, now, events) {
+    if (s.cc && ccOf(s, 'you', now)) { events && events.push({ type: 'ccblock', id: 'you', k: ccOf(s, 'you', now).k }); return false; }
     if (s.down.you || !lvl(s, 'you')) return false;
     const ab = heroSpecs(s).find(a => a.id === abId); if (!ab) return false;
     const key = 'you:' + ab.id, st = s.abil[key] || { readyAt: 0, until: 0 };
@@ -835,7 +857,7 @@
     const fx = ab.fx; s.fx = s.fx || {};
     for (const k of ['shield', 'vuln', 'fury']) if (fx[k]) s.fx[k] = { v: fx[k], until: st.until };
     if (fx.heal) healParty(s, fx.heal, true);
-    if (fx.cleanse) { s.poison = {}; s.dots = {}; }
+    if (fx.cleanse) { s.poison = {}; s.dots = {}; s.cc = {}; }
     if (fx.strip && s.foe) s.foe.ward = 0;
     let d = 0;
     if (fx.burst) { const c = CLASSES[heroCls(s)]; d = Math.max(c.dps, 1) * scale(s, 'you') * partyMult(s) * gearMult(s, 'you', 'dps') * (1 + sk(s, 'dps')) * fx.burst; }
@@ -2002,7 +2024,9 @@
         if (d < 0) { out.push({ id, dodge: true, block: d === -2 }); continue; }
         out.push({ id, dmg: d });
         const fell = hurtHero(s, id, d, now, events);
-        if (!fell && sp.dot) addDot(s, id, sp.dot, foe.atk * DOTS[sp.dot].dps, events);
+        if (!fell && sp.dot) addDot(s, id, sp.dot, foe.atk * DOTS[sp.dot].dps * dotMult(id, sp.dot), events);
+        // stuns and disarms: a whole-party move catches about a third of the line, aimed moves always land on the main target
+        if (!fell && sp.cc && (sp.kind === 'all' ? (rng || Math.random)() < 0.35 : mult >= sp.mult)) addCC(s, id, sp.cc, now, events, sp.kind === 'all');
       }
       s.stats.specials = (s.stats.specials || 0) + 1;
       events && events.push({ type: 'special', sp: foe.sp, kind: sp.kind, hits: out });
@@ -2057,6 +2081,7 @@
   }
 
   function castAbility(s, id, now, events) {
+    if (s.cc && ccOf(s, id, now)) { events && events.push({ type: 'ccblock', id, k: ccOf(s, id, now).k }); return false; }
     if (!id || s.down[id] || !lvl(s, id)) return false;
     const m = memberById(id), c = CLASSES[m.cls], ab = c.ability;
     const st = s.abil[id] || { readyAt: 0, until: 0 };
@@ -2143,7 +2168,7 @@
     if (s.unlocked.length && !(s.traits && s.unlocked.every(id => s.traits[id]))) for (const id of s.unlocked) traitsOf(s, id);
     if (resting(s, now)) {
       for (const id of s.party) if (id) { delete s.down[id]; const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + mx * 0.25 * (1 + campTrait(s, 'rest')) * dt); }
-      s.minions = []; s.lantern = 0; s.dots = {}; s.res = {}; s.oom = {};
+      s.minions = []; s.lantern = 0; s.dots = {}; s.res = {}; s.oom = {}; s.cc = {};
       return;
     }
     // story recruits and revivals
@@ -2151,6 +2176,7 @@
     // mana and stamina come back over time; an out-of-mana healer wakes up again at RES_WAKE
     s.res = s.res || {}; s.oom = s.oom || {};
     for (const id of s.party) { if (!id || !resKind(id)) continue; s.res[id] = Math.min(RES_MAX, resOf(s, id) + resRegen(s, id) * dt); if (s.oom[id] && s.res[id] >= RES_WAKE) { delete s.oom[id]; events && events.push({ type: 'resback', id }); } }
+    if (s.cc) for (const id in s.cc) if (s.cc[id].until <= now || s.down[id]) { const k = s.cc[id].k; delete s.cc[id]; if (!s.down[id]) events && events.push({ type: 'ccend', id, k }); }
     s.minions = s.minions.filter(m => m.until > now && m.hp > 0);
     if (!alive(s).length) return; // nobody to fight
     if (nexusOn(s)) return; // the Nexus Guardian holds the floor: the foe behind it waits and nothing lands
@@ -2197,8 +2223,8 @@
     // life steal: a share of each hero's own damage heals that hero
     for (const id of s.party) { if (!id || s.down[id]) continue; const ls = wearVal(s, id, 'leech'); if (ls > 0) { const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + memberDps(s, id, now) * ls * dt); } }
     // abilities
-    if (s.autoCast) for (const id of s.party) if (id && !s.down[id] && (memberById(id).cls === 'healer' ? !oom(s, id) && resOf(s, id) > 0 : resOf(s, id) >= AB_COST)) { const st = s.abil[id]; if ((!st || st.readyAt <= now) && wantsCast(s, id, now)) castAbility(s, id, now, events); }
-    if (s.autoCast && !s.down.you) for (const ab of heroSpecs(s)) { if (resOf(s, 'you') < SPEC_COST) break; const st = s.abil['you:' + ab.id]; if ((!st || st.readyAt <= now) && wantsSpec(s, ab, now)) castSpec(s, ab.id, now, events); }
+    if (s.autoCast) for (const id of s.party) if (id && !s.down[id] && !ccOf(s, id, now) && (memberById(id).cls === 'healer' ? !oom(s, id) && resOf(s, id) > 0 : resOf(s, id) >= AB_COST)) { const st = s.abil[id]; if ((!st || st.readyAt <= now) && wantsCast(s, id, now)) castAbility(s, id, now, events); }
+    if (s.autoCast && !s.down.you && !ccOf(s, 'you', now)) for (const ab of heroSpecs(s)) { if (resOf(s, 'you') < SPEC_COST) break; const st = s.abil['you:' + ab.id]; if ((!st || st.readyAt <= now) && wantsSpec(s, ab, now)) castSpec(s, ab.id, now, events); }
     specialTick(s, now, rng, events);
     if (!alive(s).length || !s.foe) return;
     // foe swings
@@ -2375,7 +2401,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

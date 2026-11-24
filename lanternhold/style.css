@@ -1,4 +1,4 @@
-/* lh-build 202611240432 */
+/* lh-build 202611240515 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2048,3 +2048,18 @@ body.resting .taptip{display:none}
 .skill.stun{opacity:.6;border-color:#ffd27a55}
 .bar.hp.shielded{box-shadow:0 0 0 1px #8fd0ff,0 0 10px rgba(120,200,255,.45)}
 .mod.m-shield{background:#14304a;color:#bfe6ff;border-color:#4f8fc0}
+
+/* v91 merchant, bounties, Lantern Keeper */
+.merchant{position:absolute;left:12px;top:9%;z-index:6;background:none;border:0;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;animation:mstep 3s ease-in-out infinite;filter:drop-shadow(0 0 8px rgba(255,210,122,.45))}
+.merchant svg{width:40px;height:52px}
+.merchant small{font-size:11px;font-weight:700;color:#ffe7b0;background:rgba(26,16,34,.82);border:1px solid rgba(255,210,122,.5);border-radius:999px;padding:1px 7px;white-space:nowrap}
+.merchant.fading{opacity:.6}
+@keyframes mstep{50%{transform:translateY(-4px)}}
+@media (max-width:720px){.merchant svg{width:34px;height:44px}.merchant small{font-size:10px}}
+@media (prefers-reduced-motion:reduce){.merchant{animation:none}}
+.merchhead{display:flex;gap:12px;align-items:center}.merchhead svg{width:46px;height:60px;flex:none}
+.merchdeal{margin:14px 0 8px;padding:12px 14px;border:1px solid #6b4f2a;border-radius:12px;background:linear-gradient(180deg,#24180e,#160f09);display:flex;flex-direction:column;gap:4px}
+.merchprice{margin-top:6px;font-size:15px}.merchprice s{color:var(--muted);margin-right:6px}.merchprice .off{margin-left:6px;font-size:11px;font-weight:800;color:#1a1208;background:#ffd27a;border-radius:999px;padding:1px 7px}
+.quest.bounty .btn.ghost{white-space:nowrap}
+.keeperbar{display:flex;align-items:center;gap:8px;margin:6px auto 0;max-width:100%;padding:6px 12px;border-radius:999px;border:1px solid #a8822e;background:linear-gradient(90deg,#2a1e08,#3a2a0c);color:#ffe7b0;font-size:13px}
+.keeperbar[hidden]{display:none}.keeperbar svg{width:16px;height:16px;flex:none;color:#ffd27a}

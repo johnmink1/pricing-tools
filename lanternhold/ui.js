@@ -1,4 +1,4 @@
-/* lh-build 202611241310 */
+/* lh-build 202611241316 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2967,11 +2967,12 @@
     }
     modal('<div class="maphead"><div><h2>Your profile</h2><small>Looks only. Nothing here changes your party’s power.</small></div><button class="iconbtn" id="pe-x" aria-label="Close">&times;</button></div>' +
       '<div class="pfwrap">' + looksCard(me) + '</div>' +
-      '<div class="pfbal"><span>' + sigil + '<b>' + prof.bal + '</b> ' + TOKEN + '</span><button class="btn small ghost" id="pe-get">Get Sigils</button></div>' +
-      (subOn() ? '<div class="pfbal pass"><span>Lanternholder: <b>active</b>, renews ' + subDate() + '</span><button class="btn small ghost" id="pe-pass">Perks</button></div>' :
-        '<div class="pfbal pass"><span>Lantern Pass: <b>' + (passLeft() || 'none') + '</b></span><button class="btn small ghost" id="pe-pass">' + (passLeft() ? 'Extend' : 'Get the pass') + '</button></div>') +
-      (wardOn() ? '<div class="pfbal pass"><span>Wardrobe: <b>outfits and lanterns</b></span><button class="btn small ghost" id="pe-ward">Open</button></div>' : '') +
-      '<div class="pfbal pass"><span>Bag of Holding: <b>' + (S.boh ? 'owned' : 'none') + '</b></span>' + (S.boh ? '' : '<button class="btn small ghost" id="pe-boh">See it</button>') + '</div>' +
+      '<div class="pfacct">' +
+        '<button class="pft" id="pe-get"><small>' + TOKEN + '</small><b>' + sigil + fmt(prof.bal) + '</b><em>Shop</em></button>' +
+        '<button class="pft" id="pe-pass"><small>Lanternholder</small><b>' + (subOn() ? 'Member' : passLeft() ? passLeft() + ' left' : 'Not active') + '</b><em>' + (subOn() ? 'Perks' : passLeft() ? 'Extend' : 'Get it') + '</em></button>' +
+        (wardOn() ? '<button class="pft" id="pe-ward"><small>Wardrobe</small><b>Outfits</b><em>Open</em></button>' : '') +
+        '<button class="pft" id="pe-boh"><small>Bag of Holding</small><b>' + (S.boh ? 'Owned' : 'Not owned') + '</b><em>' + (S.boh ? 'Details' : 'See it') + '</em></button>' +
+      '</div><h3 class="pflook">Card looks</h3>' +
       '<div class="seg pfseg">' + tabs + '</div><div class="pfbody">' + body + '</div>' +
       '<div class="row"><button class="btn ghost" id="pe-cancel">Cancel</button><button class="btn" id="pe-save">Save profile</button></div>', md => {
         md.querySelector('#pe-x').onclick = closeModal; md.querySelector('#pe-cancel').onclick = closeModal;
@@ -3103,34 +3104,54 @@
   }
   function getSigils(back) {
     back = typeof back === 'function' ? back : closeModal;
-    const w = wixGet(), linked = !!(w && (w.a || w.r)), member = subOn();
+    const w = wixGet(), linked = !!(w && (w.a || w.r)), member = subOn(), bal = prof ? prof.bal : null, left = passLeft();
     const tiles = PACKS.map(p => '<button class="pack" data-pack="' + p[0] + '">' + sigil + '<b>' + p[1].toLocaleString() + '</b><small>' + TOKEN + '</small>' + (p[3] ? '<em>' + p[3] + '</em>' : '') + '<span>' + p[2] + '</span></button>').join('');
-    modal('<div class="maphead"><div><h2>Get ' + TOKEN + '</h2><small>Outfits and lanterns in the Wardrobe, looks for your profile, speed-ups, or sell them to other players for gold.</small></div><button class="iconbtn" id="gs-x" aria-label="Close">&times;</button></div>' +
-      '<div class="shopsec"><h3>Sigil packs <span class="tag once">One-time purchase</span></h3><p class="shopsub">Pay once and the ' + TOKEN + ' are yours. Not a subscription: nothing renews and you are never charged again.</p></div>' +
+    const use = (id, ic, name, what, act) => '<button class="shopuse" id="' + id + '"><span class="su-ic">' + icon(ic) + '</span><span class="su-t"><b>' + name + '</b><small>' + what + '</small></span><em>' + act + '</em></button>';
+    modal('<div class="maphead"><div><h2>' + TOKEN + ' shop</h2><small>Buy ' + TOKEN + ' once, then spend them on the things below or sell them to other players for gold.</small></div><button class="iconbtn" id="gs-x" aria-label="Close">&times;</button></div>' +
+      (signedIn() && bal != null ? '<div class="shopbal">' + sigil + '<span>You have <b>' + fmt(bal) + '</b> ' + TOKEN + '</span></div>' : '') +
+      // 1. what Sigils are for
+      '<div class="shopsec"><h3>Spend ' + TOKEN + '</h3></div><div class="shopuses">' +
+        use('gs-pass', 'star', 'Lanternholder', member ? 'Member, renews ' + subDate() : left ? left + ' left' : L.PASS_COST + ' ' + TOKEN + ' for 30 days', member ? 'Perks' : left ? 'Extend' : 'Get') +
+        use('gs-boh', 'bag', 'Bag of Holding', S.boh ? 'Owned' : fmt(L.BOH_COST) + ' ' + TOKEN + ', once', S.boh ? 'Details' : 'See') +
+        (wardOn() ? use('gs-ward', 'user', 'Wardrobe', 'Outfits and lantern styles', 'Open') : '') +
+        use('gs-look', 'crown', 'Profile looks', 'Frames, titles, banners, emblems', 'Open') +
+        (CL ? use('gs-mkt', 'coin', 'Sigil exchange', 'Sell ' + TOKEN + ' for gold, or buy them with gold', 'Open') : '') +
+      '</div>' +
+      // 2. Lanternholder: one set of perks, two ways to get it
+      '<div class="shopsec subbox"><h3>Lanternholder <span class="tag">Premium</span></h3>' +
+      '<p class="shopsub">Convenience, never power.</p>' +
+      '<ul class="passfx tight"><li><b>Auto-train</b><span>Characters train themselves whenever you have the gold.</span></li>' +
+      '<li><b>+' + L.PASS_BAG + ' bag slots</b><span>More room for loot.</span></li>' +
+      '<li><b>+' + L.PASS_OFFLINE / 3600 + ' hours away</b><span>Your party earns offline for longer.</span></li></ul>' +
+      (member ? '<p class="passstate">You are a Lanternholder member. It renews on <b>' + subDate() + '</b>.</p>' : left ? '<p class="passstate">Lanternholder is on for <b>' + left + '</b>.</p>' : '') +
+      '<div class="lhways"><div class="lhway"><small>With ' + TOKEN + '</small><b>' + sigil + L.PASS_COST + '</b><span>30 days. Nothing renews. Buy again to add 30 more.</span><button class="btn" id="gs-pass2"' + (member ? ' disabled' : '') + '>' + (left && !member ? 'Add 30 days' : 'Use ' + L.PASS_COST + ' ' + TOKEN) + '</button></div>' +
+        '<div class="lhway"><small>Monthly membership</small><b>' + SUB_PRICE + '<i>/month</i></b><span>Renews every month until you cancel in your Born 2 Game account.</span>' +
+        (member ? '<a class="btn ghost" href="' + SUB_MANAGE + '" target="_blank" rel="noopener">Manage or cancel</a>' : '<button class="btn ghost" id="gs-sub">Subscribe</button>') + '</div></div></div>' +
+      // 3. buying Sigils
+      '<div class="shopsec"><h3>Buy ' + TOKEN + ' <span class="tag once">One-time</span></h3><p class="shopsub">Pay once. Nothing renews. Every pack also lights a <b>Lantern Surge</b> for everyone: +25% gold and XP, 30 minutes per 500 ' + TOKEN + '.</p></div>' +
       '<div class="packs">' + tiles + '</div>' +
-      '<p class="note surgenote">Every pack also lights a <b>Lantern Surge</b> for all players: +25% gold and XP, 30 minutes per 500 ' + TOKEN + '.</p>' +
-      '<div class="shopsec subbox"><h3>Lanternholder <span class="tag renew">Monthly subscription</span></h3>' +
-      '<p class="shopsub">' + SUB_PRICE + ' a month for the automation perks, on for as long as you stay a member.</p>' +
-      '<ul class="passfx"><li><b>Auto-train</b><span>Every character trains themselves whenever you have the gold.</span></li>' +
-      '<li><b>+' + L.PASS_BAG + ' bag slots</b><span>More room for loot between trips to the forge.</span></li>' +
-      '<li><b>+' + L.PASS_OFFLINE / 3600 + ' hours away</b><span>Your party keeps earning offline for longer.</span></li></ul>' +
-      (member ? '<p class="passstate">You are a Lanternholder. Your membership renews on <b>' + subDate() + '</b>.</p><div class="row"><a class="btn ghost" href="' + SUB_MANAGE + '" target="_blank" rel="noopener">Manage or cancel</a></div>'
-        : '<div class="row"><button class="btn" id="gs-sub">Subscribe for ' + SUB_PRICE + ' / month</button></div>') +
-      '<p class="note renewnote"><b>This renews automatically.</b> You are charged ' + SUB_PRICE + ' every month until you cancel. Cancel any time under My Subscriptions in your Born 2 Game account; the perks stay on until the end of the month you paid for.</p></div>' +
       (!signedIn() ? '<p class="note">Sign in to the game first so we know which hero gets the ' + TOKEN + '.</p>' :
         linked ? '<div class="storelink"><span>Store account: <b>' + esc(w.n || 'linked') + '</b></span><button class="btn small ghost" id="gs-sync">Check for purchases</button><button class="btn small ghost" id="gs-out">Unlink</button></div>' :
         '<div class="storelink"><span>Packs and memberships are sold in the Born 2 Game store. Sign in there once and every purchase lands on this hero.</span><button class="btn small" id="gs-in">Sign in with Born 2 Game</button></div>') +
-      '<p class="note">Payment is handled by the Born 2 Game store at born2gamellc.com. Every account also starts with 100 ' + TOKEN + ', and the team hands more out at Grand War events.</p>' +
+      '<p class="note small">Payment is handled by the Born 2 Game store at born2gamellc.com. Every account starts with 100 ' + TOKEN + ', and the team hands more out at Grand War events.</p>' +
       '<div class="row"><button class="btn ghost" id="gs-ok">Back</button></div>', md => {
         md.querySelector('#gs-x').onclick = closeModal; md.querySelector('#gs-ok').onclick = () => back();
         const go = async (b, f) => { b.disabled = true; try { await f(); } catch (e) { b.disabled = false; toast('lock', 'Could not reach the store', 'Check your connection and try again.', 'warn'); } };
         const need = () => { if (signedIn()) return true; toast('user', 'Sign in first', 'Make a free game account so your purchase has a home.', 'warn'); return false; };
+        const reopen = () => getSigils(back);
         md.querySelectorAll('[data-pack]').forEach(b => b.onclick = () => { if (need()) go(b, () => buyPack(b.dataset.pack)); });
         const sb = md.querySelector('#gs-sub'); if (sb) sb.onclick = () => { if (need()) go(sb, () => buyPack(SUB_PLAN)); };
+        md.querySelector('#gs-pass').onclick = () => openPass(reopen);
+        const p2 = md.querySelector('#gs-pass2'); if (p2) p2.onclick = () => openPass(reopen);
+        md.querySelector('#gs-boh').onclick = () => openBoh(reopen);
+        const wd = md.querySelector('#gs-ward'); if (wd) wd.onclick = () => openWardrobe('k');
+        md.querySelector('#gs-look').onclick = () => openProfileEditor();
+        const mk = md.querySelector('#gs-mkt'); if (mk) mk.onclick = () => { closeModal(); openTrade('sigils'); };
         const i = md.querySelector('#gs-in'); if (i) i.onclick = () => go(i, storeSignIn);
         const sy = md.querySelector('#gs-sync'); if (sy) sy.onclick = async () => { sy.disabled = true; await storeSync(true); getSigils(back); };
         const o = md.querySelector('#gs-out'); if (o) o.onclick = () => { wixPut(null); toast('user', 'Store account unlinked', 'This device no longer checks it for purchases.', ''); getSigils(back); };
       });
+    if (signedIn() && !prof && CL) loadProfile().then(() => { if (prof && document.querySelector('#gs-x')) getSigils(back); }).catch(() => {});
   }
   setTimeout(() => { storeReturn().then(done => { if (!done) storeSync(false); }); }, 1500);
   async function linkCommander(n) {
@@ -3195,29 +3216,31 @@
   // ---------- Lantern Pass: 30 days of convenience for 500 Sigils (auto-train, +10 bag slots, +4 h offline) ----------
   if (!S.passTrialGiven) { S.passTrialGiven = 1; S.passTrial = Date.now() + 3 * 864e5; save(); }
   const passLeft = () => { const ms = Math.max(S.pass || 0, S.passTrial || 0) - Date.now(); if (ms <= 0) return ''; const d = Math.floor(ms / 864e5); return d >= 1 ? d + (d === 1 ? ' day' : ' days') : Math.max(1, Math.ceil(ms / 36e5)) + ' h'; };
-  async function openPass() {
+  async function openPass(back) {
+    back = typeof back === 'function' ? back : null;
     if (CL && signedIn() && !prof) await loadProfile();
     const left = passLeft(), trial = left && !(S.pass > Date.now()), can = prof && prof.bal >= L.PASS_COST;
-    modal('<div class="maphead"><div><h2>Lantern Pass</h2><small>Convenience for 30 days. Never power.</small></div><button class="iconbtn" id="lp-x" aria-label="Close">&times;</button></div>' +
+    modal('<div class="maphead"><div><h2>Lanternholder</h2><small>Premium convenience. Never power.</small></div><button class="iconbtn" id="lp-x" aria-label="Close">&times;</button></div>' +
       '<ul class="passfx"><li><b>Auto-train</b><span>The Auto button under each Train button: characters train themselves whenever you have the gold.</span></li>' +
       '<li><b>+' + L.PASS_BAG + ' bag slots</b><span>More room for loot between trips to the forge.</span></li>' +
       '<li><b>+' + L.PASS_OFFLINE / 3600 + ' hours away</b><span>Your party keeps earning offline for longer.</span></li></ul>' +
-      (subOn() ? '<p class="passstate">You are a <b>Lanternholder</b>: these perks are on while your membership is active (renews ' + subDate() + ').</p>' : '') +
-      '<p class="passstate">' + (left ? (trial ? 'Your free trial has <b>' + left + '</b> left.' : 'Your pass has <b>' + left + '</b> left. Buying again adds 30 days.') : 'You do not have a pass right now.') + '</p>' +
-      (!signedIn() ? '<p class="note">Sign in to the game to buy a pass with ' + TOKEN + '.</p>' : '') +
-      (subOn() ? '' : '<p class="note">Prefer not to top up every month? The <b>Lanternholder</b> membership (' + SUB_PRICE + ' a month, renews until you cancel) keeps these perks on. Find it under Get ' + TOKEN + '.</p>') +
-      '<div class="row"><button class="btn ghost" id="lp-no">Not now</button>' + (signedIn() ? (can ? '<button class="btn" id="lp-buy">' + sigil + ' ' + L.PASS_COST + ' ' + TOKEN + ' for 30 days</button>' : '<button class="btn" id="lp-get">Get ' + TOKEN + '</button>') : '') + '</div>', md => {
-        md.querySelector('#lp-x').onclick = closeModal; md.querySelector('#lp-no').onclick = closeModal;
+      (subOn() ? '<p class="passstate">You are a Lanternholder <b>member</b>: the perks are on while your membership is active (renews ' + subDate() + ').</p>' :
+        '<p class="passstate">' + (left ? (trial ? 'Your free trial has <b>' + left + '</b> left.' : 'Lanternholder is on for <b>' + left + '</b>. Buying again adds 30 days.') : 'Lanternholder is not active right now.') + '</p>') +
+      (!signedIn() ? '<p class="note">Sign in to the game to get Lanternholder with ' + TOKEN + '.</p>' : '') +
+      (subOn() ? '' : '<p class="note">Two ways to get it: <b>' + L.PASS_COST + ' ' + TOKEN + ' for 30 days</b> (nothing renews), or the <b>' + SUB_PRICE + ' monthly membership</b> in the ' + TOKEN + ' shop (renews until you cancel).</p>') +
+      '<div class="row"><button class="btn ghost" id="lp-no">' + (back ? 'Back' : 'Not now') + '</button>' + (signedIn() ? (subOn() ? '' : can ? '<button class="btn" id="lp-buy">' + sigil + ' ' + L.PASS_COST + ' ' + TOKEN + ' for 30 days</button>' : '<button class="btn" id="lp-get">Get ' + TOKEN + '</button>') : '') + '</div>', md => {
+        md.querySelector('#lp-x').onclick = closeModal; md.querySelector('#lp-no').onclick = () => back ? back() : closeModal();
         const g = md.querySelector('#lp-get'); if (g) g.onclick = () => getSigils(openPass);
         const y = md.querySelector('#lp-buy'); if (y) y.onclick = async () => {
           y.disabled = true;
-          try { const r = await papi('POST', '/store/pass'); S.pass = r.pass; prof.bal = r.bal; prof.pass = r.pass; save(); sfx.buy(); updatePanel(true); updateSeats(true); toast('star', 'Lantern Pass active', 'Auto-train, extra bag slots and longer offline time for ' + passLeft() + '.', 'feat'); closeModal(); }
+          try { const r = await papi('POST', '/store/pass'); S.pass = r.pass; prof.bal = r.bal; prof.pass = r.pass; save(); sfx.buy(); updatePanel(true); updateSeats(true); toast('star', 'Lanternholder active', 'Auto-train, extra bag slots and longer offline time for ' + passLeft() + '.', 'feat'); back ? back() : closeModal(); }
           catch (e) { y.disabled = false; toast('lock', 'That did not go through', e.code === 'funds' ? 'Not enough ' + TOKEN + '.' : 'Try again in a moment.', 'warn'); }
         };
       });
   }
   // ---------- Bag of Holding: endless pack space, bought once for 6,500 Sigils ----------
-  async function openBoh() {
+  async function openBoh(back) {
+    back = typeof back === 'function' ? back : null;
     if (CL && signedIn() && !prof) await loadProfile();
     const can = prof && prof.bal >= L.BOH_COST;
     modal('<div class="maphead"><div><h2>Bag of Holding</h2><small>Bought once, yours for good. Never power.</small></div><button class="iconbtn" id="bh-x" aria-label="Close">&times;</button></div>' +
@@ -3227,8 +3250,8 @@
       '<li><b>No more auto-selling</b><span>Loot is never sold off for lack of space, and market returns and mail always fit.</span></li></ul>' +
       (S.boh ? '<p class="passstate">You own the Bag of Holding.</p>' : '<p class="passstate">Costs <b>' + fmt(L.BOH_COST) + ' ' + TOKEN + '</b>, once. ' + (prof ? 'You have ' + fmt(prof.bal) + '.' : '') + '</p>') +
       (!signedIn() ? '<p class="note">Sign in to the game to buy it with ' + TOKEN + '.</p>' : '') +
-      '<div class="row"><button class="btn ghost" id="bh-no">' + (S.boh ? 'Close' : 'Not now') + '</button>' + (signedIn() && !S.boh ? (can ? '<button class="btn" id="bh-buy">' + sigil + ' Buy for ' + fmt(L.BOH_COST) + ' ' + TOKEN + '</button>' : '<button class="btn" id="bh-get">Get ' + TOKEN + '</button>') : '') + '</div>', md => {
-        md.querySelector('#bh-x').onclick = closeModal; md.querySelector('#bh-no').onclick = closeModal;
+      '<div class="row"><button class="btn ghost" id="bh-no">' + (back ? 'Back' : S.boh ? 'Close' : 'Not now') + '</button>' + (signedIn() && !S.boh ? (can ? '<button class="btn" id="bh-buy">' + sigil + ' Buy for ' + fmt(L.BOH_COST) + ' ' + TOKEN + '</button>' : '<button class="btn" id="bh-get">Get ' + TOKEN + '</button>') : '') + '</div>', md => {
+        md.querySelector('#bh-x').onclick = closeModal; md.querySelector('#bh-no').onclick = () => back ? back() : closeModal();
         const g = md.querySelector('#bh-get'); if (g) g.onclick = () => getSigils(openBoh);
         const y = md.querySelector('#bh-buy'); if (y) y.onclick = async () => {
           y.disabled = true;
@@ -4246,7 +4269,7 @@
       ['While you are away', 'i:refresh', 'The game keeps earning when you close it.', [
         'You earn <b>a quarter</b> of your usual gold for up to <b>8 hours</b>.',
         '<b>Night Watch</b> (Skills tab) stretches that up to 3 days.',
-        'The <b>Lantern Pass</b> adds 4 more hours.']],
+        '<b>Lanternholder</b> adds 4 more hours.']],
       ['The side panel', 'i:map', 'Eight tabs, each with one job. Locked tabs show the hero level that opens them.', [
         '<b>Party</b>: who fights, and in what order.',
         '<b>Camp</b>: resting companions, camp jobs and training.',
@@ -4419,7 +4442,7 @@
         'Fine 2%, rare 6%, epic 15% chance to roll one.',
         'Each job has a 3-piece job set from floor 20 once your hero reaches level 25: <b>2 pieces +40%</b>, <b>3 pieces +100%</b>.']],
       ['Your pack', 'i:bag', 'The pack holds 40 items to start.', [
-        'Kindling adds <b>+10 slots</b> up to six times. The Lantern Pass adds 10.',
+        'Kindling adds <b>+10 slots</b> up to six times. Lanternholder adds 10.',
         'When full, the weakest common item is sold automatically.',
         'The <b>Bag of Holding</b> (6,500 Sigils, once) makes it endless.']],
       ['Relics', 'i:relic', 'Permanent bonuses that guardians sometimes drop.', [
@@ -4468,11 +4491,11 @@
         'Chests and guardians sometimes hold 1 to 3.',
         'Trade gold for Sigils with other players on the exchange.']],
       ['What Sigils buy', 'i:crown', 'Looks, convenience and speed-ups. Never combat power.', [
-        '<b>Lantern Pass</b> (500, 30 days): Auto-train, +10 bag slots, +4 h away. Free 3-day trial.',
+        '<b>Lanternholder</b> (premium): Auto-train, +10 bag slots, +4 h away. Get it for 500 Sigils (30 days, nothing renews) or as a $4.99 monthly membership. New heroes get a free 3-day trial.',
         '<b>Bag of Holding</b> (6,500, once): an endless pack.',
         '<b>Speed-up tonics</b> and Campfire Draughts. <b>Wardrobe</b> outfits and lanterns. Profile frames, titles and colors.',
         'Buy packs with <b>Get Sigils</b> after signing in with your Born 2 Game store account. Packs are one-time purchases and never renew.',
-        '<b>Lanternholder</b> ($4.99 a month, renews until you cancel): the Lantern Pass perks for as long as you are a member.',
+        'Sigils can also be sold to other players for gold on the Sigil exchange in the Market, or bought there with gold.',
         'Every pack bought lights a <b>Lantern Surge</b> for all players: +25% gold and XP.']],
       ['Mercy’s Blessing', 'i:cross', 'Real donations to the Grand War’s Mercy Corps bless every player.', [
         '<b>+10% gold</b>, <b>+10% health</b>, <b>+20% healing</b> while it burns.',
@@ -4545,6 +4568,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 97, date: 'November 24, 2026', title: 'A clearer Sigil shop', items: [
+      'Lanternholder is now the one name for premium. Get it with 500 Sigils for 30 days (nothing renews), or as the $4.99 monthly membership. The old Lantern Pass is the same thing under its new name, and any days you had are kept.',
+      'The Sigil shop is laid out in three parts: what Sigils are for (Lanternholder, Bag of Holding, Wardrobe, profile looks, the Sigil exchange), Lanternholder with both ways to get it side by side, and the Sigil packs.',
+      'Your profile shows your Sigils, Lanternholder, Wardrobe and Bag of Holding as four tidy tiles, with your card looks below.',
+    ] },
     { v: 96, date: 'November 24, 2026', title: 'The Enchanter', items: [
       'Enchanting and disenchanting now happen at the Enchanter. Press Enchanter on the battle screen (or Enchant on any item) to visit. Your party stops diving while you are there: nobody fights, nothing new turns up and you keep your floor.',
       'The Enchanter has three tabs: Enchant (pick any item with a socket, worn or not, and move an enchant onto it), Disenchant (break down a spare item to move one of its enchants) and Scrap for Dust.',

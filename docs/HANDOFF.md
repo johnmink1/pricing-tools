@@ -1,6 +1,6 @@
 # Lanternhold handoff (24 Nov 2026)
 
-This handoff stands on its own for the new Lanternhold project. It is current as of **v103, build 202611241422**, live at https://lanternhold.born2gamellc.com.
+This handoff stands on its own for the new Lanternhold project. It is current as of **v104, build 202611241427**, live at https://lanternhold.born2gamellc.com.
 
 ## Where the code lives
 
@@ -9,7 +9,7 @@ This handoff stands on its own for the new Lanternhold project. It is current as
 | Path | What it is |
 |---|---|
 | `lanternhold/core.js` | All game rules: classes, foes, loot, crafting, events, the `api` export list. Any new function must be added to that big export list at the bottom. |
-| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v104**. |
+| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v105**. |
 | `lanternhold/style.css`, `index.html` | Styles and markup. |
 | `lanternhold/vector.js` | Illustrated SVG sprites (`ART.enchanter`, `ART.armorer`, classes, foes). |
 | `lanternhold/sprites.js` | Pixel fallback sprites and `itemIcon`. |
@@ -94,6 +94,7 @@ There is no working AWS CLI. The cloud container's keys are invalid, and VENGEAN
   - **The Hold view:** tapping The Hold on the Map of the Deep opens a scene with four tents (Campfire, Enchanter, Armorer, Store). Each tent takes you there.
 
 - **v103:** fix for John's report "did you get rid of the things?". Visiting a shop from the main camp showed the campfire scene, because `render()` checked `resting` before `visiting`. Now the shop visit wins.
+- **v104:** Return to camp, Descend, a Draught, or any floor travel now ends a shop visit. Core `gotoFloor` and `useDraught` clear `enchAt` and `shopK`. Before this, John had to press Leave first.
 
 ## Open asks and things to watch
 

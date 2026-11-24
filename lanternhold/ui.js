@@ -1,4 +1,4 @@
-/* lh-build 202611240414 */
+/* lh-build 202611240418 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -339,6 +339,13 @@
         ctx.strokeStyle = 'rgba(255,70,60,' + (0.55 + 0.4 * k) + ')'; ctx.lineWidth = spd.kind === 'pos' ? 1.4 : 0.9;
         ctx.beginPath(); ctx.ellipse(p.x + 12, p.y + 32, 11 + k * 2, 3 + k * 0.6, 0, 0, Math.PI * 2); ctx.stroke();
         if (spd.kind === 'pos') { ctx.fillStyle = 'rgba(255,80,70,' + (0.7 + 0.3 * k) + ')'; ctx.beginPath(); ctx.moveTo(p.x + 9, p.y - 17); ctx.lineTo(p.x + 15, p.y - 17); ctx.lineTo(p.x + 12, p.y - 13); ctx.fill(); }
+      }
+      // stunned: little stars circle the head; disarmed: a broken-blade badge
+      const ccx = !down && L.ccOf(S, p.id);
+      if (ccx) {
+        const hx = p.x + 12, hy = p.y - (p.id === 'you' ? 12 : 8);
+        if (ccx.k === 'stun') { for (let k = 0; k < 3; k++) { const an = tAnim * 5 + k * 2.1; ctx.fillStyle = k % 2 ? '#ffe27a' : '#fff6c9'; ctx.beginPath(); ctx.arc(hx + Math.cos(an) * 7, hy + Math.sin(an) * 2, 1.3, 0, Math.PI * 2); ctx.fill(); } }
+        else { ctx.fillStyle = 'rgba(4,7,13,0.85)'; ctx.beginPath(); ctx.arc(hx - 8, hy, 3.8, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#ff8a6a'; ctx.lineWidth = 0.8; ctx.stroke(); ctx.beginPath(); ctx.moveTo(hx - 10, hy + 2); ctx.lineTo(hx - 6, hy - 2); ctx.moveTo(hx - 10, hy - 2); ctx.lineTo(hx - 6, hy + 2); ctx.stroke(); }
       }
       // burns and poisons: a small badge with the fights left
       const dt2 = S.dots && S.dots[p.id];
@@ -702,6 +709,8 @@
       case 'revive': flog('party', '<b class="good">' + nm(e.id) + ' is back up</b>'); break;
       case 'dodge': flog('party', nm(e.target) + ' dodges', 'dg' + e.target, 5000); break;
       case 'block': flog('party', nm(e.target) + ' blocks a hit', 'bk' + e.target, 5000); break;
+      case 'cc': flog('party', '<b class="bad">' + nm(e.id) + (e.k === 'stun' ? ' is stunned</b> and cannot act for ' : ' is disarmed</b> and fights barehanded for ') + Math.round(e.sec * 10) / 10 + 's'); break;
+      case 'ccend': flog('party', nm(e.id) + (e.k === 'stun' ? ' shakes off the stun' : ' grabs its weapon back'), 'ce' + e.id, 3000); break;
       case 'oom': flog('party', '<b class="bad">' + nm(e.id) + ' is out of mana</b> and can only attack until it recovers'); break;
       case 'resback': flog('party', nm(e.id) + ' has mana again', 'rb' + e.id, 3000); break;
       case 'poison': flog('party', nm(e.id) + ' is poisoned', 'ps' + e.id, 6000); break;
@@ -767,6 +776,13 @@
         }
       } else if (e.type === 'block') {
         const a = mAnim(e.target); floatText('Block', 'dodge', a.x / W, (a.y - 6) / H);
+      } else if (e.type === 'cc') {
+        const a = mAnim(e.id); floatText(e.k === 'stun' ? 'Stunned!' : 'Disarmed!', 'crit', a.x / W, (a.y - 16) / H);
+        if (!(S.stats.ccSeen || {})[e.k]) { S.stats.ccSeen = Object.assign({}, S.stats.ccSeen, { [e.k]: 1 }); toast(e.k === 'stun' ? 'flare' : 'sword', L.memberById(e.id).name + (e.k === 'stun' ? ' is stunned' : ' is disarmed'), e.k === 'stun' ? 'A stunned hero cannot attack, heal or use abilities for a few seconds. Tanks shake it off twice as fast, and Shield Wall makes them immune.' : 'A disarmed hero fights barehanded: 35% damage, half healing and no abilities until it grabs its weapon back a few seconds later. Tanks recover twice as fast.', ''); }
+      } else if (e.type === 'ccend') {
+        const a = mAnim(e.id); if (e.k === 'disarm') floatText('Weapon back', 'heal', a.x / W, (a.y - 16) / H);
+      } else if (e.type === 'ccblock') {
+        const a = mAnim(e.id); floatText(e.k === 'stun' ? 'Stunned' : 'Disarmed', 'dodge', a.x / W, (a.y - 14) / H);
       } else if (e.type === 'oom') {
         const a = mAnim(e.id); floatText('Out of mana', 'hurt', a.x / W, (a.y - 14) / H);
         if (!S.stats.oomSeen) { S.stats.oomSeen = 1; toast('cross', L.memberById(e.id).name + ' ran out of mana', 'A healer spends mana to heal. With none left it only attacks until its mana comes back to ' + L.RES_WAKE + '. Gear with Flow speeds up mana and stamina regen.', 'warn'); }
@@ -789,7 +805,7 @@
         floatText(sp.name || 'Special', 'crit', FOE_X - 0.1, 0.28);
         sfx.thud(); tone(90, 0.3, 'square', 0.04, 60);
       } else if (e.type === 'dot') {
-        const a = mAnim(e.id); if (Math.random() < 0.6) floatText(e.k === 'burn' ? 'Burning' : 'Poisoned', e.k === 'burn' ? 'crit' : 'heal', a.x / W, (a.y - 14) / H);
+        const a = mAnim(e.id), mu = L.dotMult(e.id, e.k); floatText((e.k === 'burn' ? 'Burning' : 'Poisoned') + (mu >= 2 ? ' x2' : mu < 0.5 ? ' (resists)' : ''), e.k === 'burn' ? 'crit' : 'heal', a.x / W, (a.y - 14) / H);
       } else if (e.type === 'poison') {
         const a = mAnim(e.id); if (Math.random() < 0.5) floatText('Poisoned', 'heal', a.x / W, (a.y - 12) / H);
       } else if (e.type === 'ward') {
@@ -1455,19 +1471,21 @@
     box.querySelectorAll('[data-spec]').forEach(b => {
       const ab = specs.find(a => a.id === b.dataset.spec); if (!ab) return;
       const st = S.abil['you:' + ab.id], active = st && st.until > now && ab.dur > 0, cd = st && st.readyAt > now ? (st.readyAt - now) / 1000 : 0, down = !!S.down.you;
-      const lack = !cd && !active && L.resOf(S, 'you') < L.SPEC_COST, rn = L.resKind('you') === 'mana' ? 'mana' : 'stamina';
+      const lack = !cd && !active && L.resOf(S, 'you') < L.SPEC_COST, rn = L.resKind('you') === 'mana' ? 'mana' : 'stamina', cc = !down && L.ccOf(S, 'you', now);
       b.classList.toggle('active', !!active); b.classList.toggle('ready', !cd && !down && !lack); b.classList.toggle('lack', lack); b.disabled = down;
-      b.querySelector('small').textContent = down ? 'Your hero has fallen' : active ? 'Active ' + fmtTime((st.until - now) / 1000) : cd ? 'Ready in ' + fmtTime(cd) : lack ? 'Needs ' + L.SPEC_COST + ' ' + rn : 'Ready';
+      b.classList.toggle('stun', !!cc); if (cc) b.classList.remove('ready');
+      b.querySelector('small').textContent = down ? 'Your hero has fallen' : cc ? (cc.k === 'stun' ? 'Stunned ' : 'Disarmed ') + fmtTime((cc.until - now) / 1000) : active ? 'Active ' + fmtTime((st.until - now) / 1000) : cd ? 'Ready in ' + fmtTime(cd) : lack ? 'Needs ' + L.SPEC_COST + ' ' + rn : 'Ready';
       b.querySelector('.cd').style.transform = 'scaleX(' + (cd && !active ? cd / ab.cd : 0) + ')';
     });
     box.querySelectorAll('[data-cast]').forEach(b => {
       const id = b.dataset.cast, m = L.memberById(id), ab = L.CLASSES[m.cls].ability, st = S.abil[id];
       const active = st && st.until > now && ab.dur > 0, cd = st && st.readyAt > now ? (st.readyAt - now) / 1000 : 0;
       const down = !!S.down[id];
-      const lack = !cd && !active && L.resOf(S, id) < L.AB_COST, rn = L.resKind(id) === 'mana' ? 'mana' : 'stamina';
+      const lack = !cd && !active && (m.cls === 'healer' ? L.oom(S, id) || L.resOf(S, id) <= 0 : L.resOf(S, id) < L.AB_COST), rn = L.resKind(id) === 'mana' ? 'mana' : 'stamina', cc = !down && L.ccOf(S, id, now);
       b.classList.toggle('active', !!active); b.classList.toggle('ready', !cd && !down && !lack); b.classList.toggle('lack', lack); b.disabled = down;
       const sm = b.querySelector('small'), ov = b.querySelector('.cd');
-      sm.textContent = down ? m.name + ' has fallen' : active ? 'Active ' + fmtTime((st.until - now) / 1000) : cd ? 'Ready in ' + fmtTime(cd) : lack ? (L.oom(S, id) ? 'Out of mana' : 'Needs ' + L.AB_COST + ' ' + rn) : m.name + ' · Ready';
+      b.classList.toggle('stun', !!cc); if (cc) b.classList.remove('ready');
+      sm.textContent = down ? m.name + ' has fallen' : cc ? (cc.k === 'stun' ? 'Stunned ' : 'Disarmed ') + fmtTime((cc.until - now) / 1000) : active ? 'Active ' + fmtTime((st.until - now) / 1000) : cd ? 'Ready in ' + fmtTime(cd) : lack ? (L.oom(S, id) ? 'Out of mana' : 'Needs ' + L.AB_COST + ' ' + rn) : m.name + ' · Ready';
       ov.style.transform = 'scaleX(' + (cd && !active ? cd / ab.cd : 0) + ')';
     });
   }
@@ -4130,6 +4148,13 @@
         '<b>Lantern Hymn</b> can be sung with any mana left, and uses up to ' + L.AB_COST + ', but never while the healer is out of mana. Resting at camp fills every bar.',
         'Faster regen comes from <b>Flow</b> enchants on the hero’s own gear, and for your hero from cooldown skills.',
         'Other gear stats for the wearer: <b>Leech</b> heals the hero for part of its damage, <b>Bulwark</b> gives a chance to block a hit outright, <b>Plating</b> cuts damage taken. A hero’s profile shows its totals.']],
+      ['Burns, poison, stuns and disarms', 'i:flare', 'Some special attacks leave more than a bruise.', [
+        '<b>Burning</b> hurts heroes in cloth (healers, mages and necromancers) twice as much. Tanks in plate take a quarter less.',
+        '<b>Poison</b> bites everyone a quarter harder, except necromancers, who live with rot and take only a quarter of it.',
+        'Burns and poison last ' + L.DOT_FIGHTS + ' fights. A healer\u2019s ability, Purify or the campfire clears them.',
+        '<b>Stunned</b> heroes cannot attack, heal or use abilities for ' + L.CC.stun.sec + ' seconds. Ground Slam, Tidal Crash and Belly Flop stun.',
+        '<b>Disarmed</b> heroes fight barehanded for ' + L.CC.disarm.sec + ' seconds: ' + Math.round(L.CC.disarm.dmg * 100) + '% damage, half healing and no abilities, until they grab their weapon back. Shield Charge and Disarming Lash disarm.',
+        'Tanks shake off stuns and disarms twice as fast, and nothing stuns or disarms a tank behind Shield Wall. Dodging or blocking the hit avoids it too.']],
       ['Ghost Lantern', 'i:lantern', 'Now and then a Ghost Lantern drifts into the fight. Tap it to shatter it for a reward.', [
         'It only appears while you are playing (from floor ' + L.GHOST_FLOOR + '), never while you are away.',
         'While it floats there it slowly saps your party’s damage or healing, up to ' + Math.round(L.GHOST_MAX * 100) + '% at most. The tag under it shows how much and how long it has left.',
@@ -4343,6 +4368,14 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 88, date: 'November 24, 2026', title: 'Burns, poison, stuns and disarms', items: [
+      'Burning now hurts heroes in cloth (healers, mages, necromancers) twice as much. Tanks in plate take a quarter less.',
+      'Poison now bites everyone a quarter harder, except necromancers, who take only a quarter of it.',
+      'New: Stun. Ground Slam, Tidal Crash and Belly Flop can stun heroes, who cannot attack, heal or use abilities for 3 seconds. Stars circle a stunned hero\u2019s head.',
+      'New: Disarm. Shield Charge and the new Disarming Lash (Thornlings) knock a hero\u2019s weapon away: 35% damage, half healing and no abilities for 8 seconds, until it grabs it back.',
+      'Tanks shake off stuns and disarms twice as fast, and Shield Wall makes them immune. Dodging or blocking the hit avoids it.',
+      'Ability buttons show when a hero is stunned or disarmed and for how long.'
+    ] },
     { v: 87, date: 'November 24, 2026', title: 'Ghost Lantern, and a balance pass', items: [
       'New: the Ghost Lantern. Now and then, while you are playing, a ghost lantern drifts into the fight and slowly saps your party’s damage or healing (10% at most). Tap it to shatter it for gold, Dust or a free tonic. Ignore it and it fades after 30 seconds with nothing lost.',
       'Healers: Lantern Hymn can now be sung with whatever mana is left (it uses up to 30), but still never while out of mana. Healing costs a little less mana. Parties fall far less often than they did in v86.',

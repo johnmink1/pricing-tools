@@ -27,14 +27,14 @@ exports.handler = async (e) => {
   const tok = String(b.token || '');
   if (tok.length < 20 || tok.length > 4000) return res(400, { error: 1 });
   let m;
-  try { m = (await wix('/members/v1/members/my', tok)).member; } catch (x) { return res(401, { error: 'wix' }); }
+  try { m = (await wix('/members/v1/members/my', tok)).member; } catch (x) { console.log('me', x.st || x.message); return res(401, { error: 'wix' }); }
   if (!m || !m.id) return res(401, { error: 'wix' });
   const mid = m.id, name = String((m.profile && m.profile.nickname) || (m.loginEmail || '').replace(/@.*/, '') || 'Store account').slice(0, 40);
   // Claim the link, or confirm it is already ours.
   try {
     await db.send(new D.PutItemCommand({ TableName: T, Item: { pk: S('wix#' + mid), sk: S('link'), u: S(cl.sub), name: S(name), at: N(Date.now()) },
       ConditionExpression: 'attribute_not_exists(pk) OR u = :u', ExpressionAttributeValues: { ':u': S(cl.sub) } }));
-  } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'taken' }); throw x; }
+  } catch (x) { if (x.name === 'ConditionalCheckFailedException') { console.log('taken', mid); return res(409, { error: 'taken' }); } throw x; }
   // Wix caps this list at 50 a page (limit=100 is a 400, which broke every sync until 24 Nov 2026), so page through.
   let orders = [];
   try {
@@ -43,6 +43,7 @@ exports.handler = async (e) => {
       orders = orders.concat(pg); if (pg.length < 50) break;
     }
   } catch (x) { console.log('orders', x.st || x.message); return res(502, { error: 'orders' }); }
+  console.log('sync', mid, orders.length, orders.map(o => o.planId.slice(0, 8) + ':' + o.lastPaymentStatus + ':' + (o.buyer && o.buyer.memberId === mid)).join(' '));
   let added = 0;
   for (const o of orders) {
     const n = PACK[o.planId];

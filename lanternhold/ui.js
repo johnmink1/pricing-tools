@@ -1,4 +1,4 @@
-/* lh-build 202611241535 */
+/* lh-build 202611241538 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -5077,7 +5077,12 @@
     const d = document.documentElement;
     try {
       if (fsEl()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-      else { const r = (d.requestFullscreen || d.webkitRequestFullscreen).call(d, { navigationUI: 'hide' }); r && r.catch && r.catch(() => toast('lock', 'Full screen is not available', 'Your browser blocked it. Try F11 on a computer.', 'warn')); }
+      else {
+        const r = (d.requestFullscreen || d.webkitRequestFullscreen).call(d, { navigationUI: 'hide' }); r && r.catch && r.catch(() => toast('lock', 'Full screen is not available', 'Your browser blocked it. Try F11 on a computer.', 'warn'));
+        // Some browsers (for example while a tab is being shared or controlled) say yes but keep the page inside the
+        // window. Tell the player to use the browser's own full screen key instead.
+        setTimeout(() => { if (fsEl() && innerHeight < screen.height * 0.85) toast('lock', 'Your browser kept the game in its window', 'Press F11 (or Fn + F11 on some keyboards) for true full screen. Press it again to leave.', 'warn'); }, 900);
+      }
     } catch (e) { toast('lock', 'Full screen is not available', 'Your browser blocked it. Try F11 on a computer.', 'warn'); }
   }
   function paintFull() {
@@ -5093,6 +5098,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 111, date: 'November 24, 2026', title: 'Full screen help', items: [
+      'If your browser keeps the game inside its window when you press full screen, the game now tells you to press F11 instead, which always works on a computer.'] },
     { v: 110, date: 'November 24, 2026', title: 'Full screen button stays put', items: [
       'The full screen button no longer hides when the top bar is crowded. The icons squeeze a little instead.'] },
     { v: 109, date: 'November 24, 2026', title: 'Bestiary mastery and full screen', items: [

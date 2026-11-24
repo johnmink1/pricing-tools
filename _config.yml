@@ -7,4 +7,5 @@ exclude:
   - lanternhold-music
   - lanternhold-wiki
   - infra
+  - docs
   - README.md

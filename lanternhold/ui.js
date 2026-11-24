@@ -1,4 +1,4 @@
-/* lh-build 202611241528 */
+/* lh-build 202611241535 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -5064,9 +5064,9 @@
   // Top bar fit: step up .fit1..fit4 until nothing overflows (works at any zoom, whatever chips are showing).
   function fitTop() {
     const top = document.querySelector('.top'); if (!top) return;
-    if (innerWidth <= 900) { top.classList.remove('fit1', 'fit2', 'fit3', 'fit4'); return; }
-    let n = 0; top.classList.remove('fit1', 'fit2', 'fit3', 'fit4');
-    while (n < 4 && top.scrollWidth > top.clientWidth + 1) top.classList.add('fit' + (++n));
+    if (innerWidth <= 900) { top.classList.remove('fit1', 'fit2', 'fit3', 'fit4', 'fit5'); return; }
+    let n = 0; top.classList.remove('fit1', 'fit2', 'fit3', 'fit4', 'fit5');
+    while (n < 5 && top.scrollWidth > top.clientWidth + 1) top.classList.add('fit' + (++n));
   }
   addEventListener('resize', fitTop); setInterval(fitTop, 1500); setTimeout(fitTop, 50);
   // ---------- Full screen (John, 24 Nov 2026): the whole game fills the screen, no browser bars. Esc leaves. ----------
@@ -5093,6 +5093,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 110, date: 'November 24, 2026', title: 'Full screen button stays put', items: [
+      'The full screen button no longer hides when the top bar is crowded. The icons squeeze a little instead.'] },
     { v: 109, date: 'November 24, 2026', title: 'Bestiary mastery and full screen', items: [
       'Bestiary mastery: every 500 of one kind of creature you defeat gives +1% damage and +1% hero XP against that kind, up to +10% at 5,000. Open a creature’s page in the Codex Journal to see your count, a progress bar and the next step. Counting starts today.',
       'The XP bar breakdown shows your Bestiary bonus against the foe you are fighting.',

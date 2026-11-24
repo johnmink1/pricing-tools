@@ -1,4 +1,4 @@
-/* lh-build 202611241603 */
+/* lh-build 202611241612 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -1367,16 +1367,27 @@
   const wearVal = (s, id, key) => (id && s.gear && s.bag && !String(id).startsWith('p_') ? wearTotals(s, id)[key] || 0 : 0);
   const enchVal = (s, key) => (s.gear && s.bag ? enchTotals(s)[key] || 0 : 0);
   const enchDirty = () => { enCache = { s: null, t: 0, v: null }; wearCache = { s: null, t: 0, v: {} }; };
+  // Specialist shops (John, 2026-11-24): crafting at the shop that specialises in it beats doing it in the field.
+  // At the Armorer every merge risk is cut by a quarter. At the Enchanter an enchant you move has a 15% chance to
+  // come out one tier stronger. In the field (anywhere else) a moved enchant loses one tier (never below I) and
+  // costs half again as much Dust.
+  const SHOP_FX = { mergeCut: 0.25, enchUp: 0.15 }, FIELD_FX = { tierDown: 1, dust: 1.5 };
+  const atShop = (s, k) => visiting(s) && (s.shopK || 'ench') === k;
+  const enchCostAt = (s, x) => atShop(s, 'ench') ? enchCost(x) : Math.ceil(enchCost(x) * FIELD_FX.dust);
+  const fieldTier = x => Math.max(1, x.t - FIELD_FX.tierDown);
   // Move enchant number `idx` of `src` into socket `slot` of `dst` (an empty socket, or one to overwrite). src is destroyed.
-  function disenchant(s, srcUid, idx, dstUid, slot, events) {
+  function disenchant(s, srcUid, idx, dstUid, slot, events, rng) {
     const a = itemOf(s, srcUid), b = itemOf(s, dstUid);
-    if (!visiting(s) || !a || !b || a === b || a.lk || wornAt(s, a.uid)) return null;
-    const la = enchList(a), lb = enchList(b), x = la[idx]; if (!x || (s.dust || 0) < enchCost(x)) return null;
+    if (!a || !b || a === b || a.lk || wornAt(s, a.uid)) return null;
+    const shop = atShop(s, 'ench'), la = enchList(a), lb = enchList(b), x = la[idx], cost = x ? enchCostAt(s, x) : 0;
+    if (!x || (s.dust || 0) < cost) return null;
     const n = sockets(b); if (!(slot >= 0 && slot < n && slot <= lb.length)) return null;
-    const old = lb[slot] || null; lb[slot] = { id: x.id, t: x.t }; b.en = enchStr(lb);
-    s.dust -= enchCost(x); s.bag = s.bag.filter(y => y !== a); enchDirty();
+    const boost = shop && x.t < 9 && (rng || Math.random)() < SHOP_FX.enchUp;
+    const put = { id: x.id, t: shop ? x.t + (boost ? 1 : 0) : fieldTier(x) };
+    const old = lb[slot] || null; lb[slot] = put; b.en = enchStr(lb);
+    s.dust -= cost; s.bag = s.bag.filter(y => y !== a); enchDirty();
     const xp = craftXp(s, CRAFT_XP.ench * x.t, events, 'enchant');
-    return { item: b, moved: x, replaced: old, lost: a, cost: enchCost(x), xp };
+    return { item: b, moved: put, from: x, boost, field: !shop, replaced: old, lost: a, cost, xp };
   }
   // Merging (John, 2026-11-23): two copies of the same item fuse into one a level higher (+1), keeping the higher
   // item level and the better camp-job affix. Every merge can fail and destroy BOTH pieces. The risk climbs with the
@@ -1386,7 +1397,8 @@
   function mergeRisk(s, a, b) {
     const to = Math.max(a.up, b.up) + 1, base = Math.min(0.9, 0.08 + 0.06 * (to - 1));
     const at = s.attr || {}, cut = Math.min(0.5, (at.lck || 0) * 0.006 + (at.int || 0) * 0.004);
-    return { to, base, cut, risk: Math.round(base * (1 - cut) * 1000) / 1000 };
+    const shop = atShop(s, 'arm'), field = Math.round(base * (1 - cut) * 1000) / 1000;
+    return { to, base, cut, shop, field, risk: shop ? Math.round(base * (1 - cut) * (1 - SHOP_FX.mergeCut) * 1000) / 1000 : field };
   }
   function mergeItems(s, uidA, uidB, rng, events) {
     const a = itemOf(s, uidA), b = itemOf(s, uidB);
@@ -2745,7 +2757,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, WB_SETS, WB_SLOTS, WB_PCT, WB_TWO, WB_FOUR, wbUpCost, wbCounts, wbBonus, shardsOf, makeLegend, SPAWN_EVENTS, spawnEvent, visiting, visitEnchanter, leaveEnchanter, SMELT_MULT, smeltValue, smelt, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, BEAST_STEP, BEAST_PER, BEAST_MAX, beastKey, beastTier, beastBonus, MERCY_FX, mercyOn, WARWIN_FX, WARWIN_REVIVE, WAR_KEY, warWinOn, reviveMs, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, SHOP_FX, FIELD_FX, atShop, enchCostAt, fieldTier, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

@@ -12,7 +12,7 @@ async function canParty(me, leader) {
 }
 async function room(me, q) {
   const ch = q.ch;
-  if (ch === 'global' || ch === 'trade') return ch;
+  if (ch === 'global' || ch === 'trade' || ch === 'help') return ch;
   if (ch === 'banner') { const r = await db.send(new D.GetItemCommand({ TableName: H, Key: { pid: S(me) }, ProjectionExpression: 'sd' })); return r.Item && r.Item.sd ? 'banner#' + r.Item.sd.S : null; }
   // Whispers: each player reads only their own inbox, which holds what they sent and what they got.
   if (ch === 'dm') return 'dm#' + me;

@@ -1,4 +1,4 @@
-/* lh-build 202611241603 */
+/* lh-build 202611241612 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1961,11 +1961,17 @@
   function atEnchanter(t, uid) {
     const pre = () => { ewReset(t || 'on'); if (uid) { if (t === 'dis') EW.src = uid; else EW.dst = uid; } };
     if (L.visiting(S)) { pre(); closeModal(); paintEnchOv(); return; }
-    modal('<div class="merchbox enchvisit"><div class="merchhead"><img src="' + SP.spriteURL('enchanter', 4, 0) + '" alt=""><div><h2>That is done at the Enchanter</h2><small>Enchanting and disenchanting happen in the Enchanter’s shop. Your party leaves the Deep while you are there and goes back to floor ' + S.floor + ' when you leave.</small></div></div>' +
-      '<div class="row"><button class="btn ghost" id="ev-no">Not now</button><button class="btn" id="ev-go">Go to the Enchanter</button></div></div>', md => {
-        md.querySelector('#ev-no').onclick = closeModal;
+    modal('<div class="merchbox enchvisit"><div class="merchhead"><img src="' + SP.spriteURL('enchanter', 4, 0) + '" alt=""><div><h2>Best done at the Enchanter</h2><small>You can move an enchant right here in the field, but it loses one tier and costs ' + Math.round((L.FIELD_FX.dust - 1) * 100) + '% more Dust. At the Enchanter it keeps its tier, costs the normal Dust, and has a ' + Math.round(L.SHOP_FX.enchUp * 100) + '% chance to come out one tier stronger. Your dive waits on floor ' + S.floor + ' while you shop.</small></div></div>' +
+      '<div class="row"><button class="btn ghost" id="ev-field">Do it here</button><button class="btn" id="ev-go">Go to the Enchanter</button></div></div>', md => {
+        md.querySelector('#ev-field').onclick = () => { pre(); fieldEnch(); };
         md.querySelector('#ev-go').onclick = () => { pre(); visitEnch(); };
       });
+  }
+  // Field enchanting (v116): the same counter steps in a window, at field results. Scrapping stays on the Gear tab.
+  const fieldOn = () => !L.visiting(S) && !$('modal').hidden && !!$('fieldench');
+  function fieldEnch() {
+    if (EW.mode === 'scrap') EW.mode = 'on';
+    modal('<div class="enchpanel picker fieldench" id="fieldench"></div>', md => { md.querySelector('#fieldench').addEventListener('click', shopClick); paintEnchPanel(true); });
   }
   function visitEnch(kind) {
     kind = kind === 'arm' || kind === 'store' ? kind : 'ench';
@@ -1984,6 +1990,7 @@
   // The Armorer: upgrade an item with gold, merge two copies, or scrap spare gear for gold (more gold than the Enchanter
   // pays, but no Dust). AW: mode 'up' | 'merge' | 'smelt'; a = the item picked, b = the copy merged into it.
   const AW = { mode: 'up', a: null, b: null, done: null };
+  let mmCap = 3;
   function awReset(mode, keep) { Object.assign(AW, { mode: mode || AW.mode, a: null, b: null, done: keep ? AW.done : null }); }
   const riskTxt = v => Math.round(v * 1000) / 10 + '%';
   const upCostTag = x => { if (x.wb != null) { const c = L.wbUpCost(x), h = L.shardsOf(S)[x.wb] || 0; return '<span class="ewcost legc' + (h < c ? ' short' : '') + '">' + icon('relic') + c + ' shard' + (c === 1 ? '' : 's') + '</span>'; }
@@ -2019,7 +2026,8 @@
   });
   function armPanelHtml() {
     const gold = '<span class="epdust">' + icon('coin') + '<b>' + fmt(S.gold) + '</b> gold</span>';
-    const tabs = '<div class="ewtabs forge" role="tablist">' + [['up', 'Upgrade'], ['merge', 'Merge'], ['smelt', 'Scrap for gold']].map(([k, n]) => '<button role="tab" class="' + (AW.mode === k ? 'on' : '') + '" data-awmode="' + k + '">' + n + '</button>').join('') + '</div>';
+    const tabs = '<div class="ewtabs forge" role="tablist">' + [['up', 'Upgrade'], ['merge', 'Merge'], ['mass', 'Mass merge'], ['smelt', 'Scrap for gold']].map(([k, n]) => '<button role="tab" class="' + (AW.mode === k ? 'on' : '') + '" data-awmode="' + k + '">' + n + '</button>').join('') + '</div>';
+    const perk = '<p class="shopperk">' + icon('star') + '<span>Armorer’s forge: every merge here carries ' + Math.round(L.SHOP_FX.mergeCut * 100) + '% less risk than merging in the field.</span></p>';
     const head = '<div class="ephead"><b>The Armorer’s counter</b>' + gold + '</div>' + tabs + (AW.done ? '<div class="ewdone">' + icon('star') + '<span>' + AW.done + '</span></div>' : '');
     const A = AW.a && L.itemOf(S, AW.a), B = AW.b && L.itemOf(S, AW.b);
     if (AW.a && !A) AW.a = null; if (AW.b && !B) AW.b = null;
@@ -2032,6 +2040,15 @@
         '<label class="chk"><input type="checkbox" data-ewopt="keepUp"' + (scrapOpts.keepUp ? ' checked' : '') + '><span><b>Keep upgraded pieces</b></span></label>' +
         '<div class="ewsum">' + (list.length ? '<p><b>' + list.length + '</b> ' + (list.length === 1 ? 'piece becomes' : 'pieces become') + ' <b>' + fmt(g) + ' gold</b>.</p>' : '<p>Nothing matches. Tick more rarities above.</p>') +
         '<button class="btn danger" data-awgo="smelt"' + (list.length ? '' : ' disabled') + '>Melt ' + list.length + '</button></div>';
+    }
+    if (AW.mode === 'mass') {
+      const plan = L.massMergePlan(S, mmCap), exp = plan.reduce((a, p) => a + p.risk, 0), fexp = plan.reduce((a, p) => a + L.mergeRisk(S, p.a, p.b).field, 0);
+      return head + perk + '<h3 class="ewq">Merge all your spare pairs at once?</h3><p class="ewhint">Copies of the same item merge in pairs, best with next best. Worn and locked items are left alone. Each pair rolls on its own; a loss destroys both pieces.</p>' +
+        '<div class="ewchips">' + [1, 2, 3, 5, 10].map(n => '<button class="ewchip' + (n === mmCap ? ' sel' : '') + '" data-awcap="' + n + '"><b>Up to +' + n + '</b></button>').join('') + '</div>' +
+        (plan.length ? ewList(plan.map(p => ewItemRow(p.a, 'data-noop="1"', '+' + p.a.up + ' &amp; +' + p.b.up + ' &rarr; +' + p.to, '<span class="ewcost">' + riskTxt(p.risk) + ' risk</span>')), '') +
+          '<div class="ewsum"><div class="mgodds"><div><small>Merges</small><b>' + plan.length + '</b></div><div class="ok"><small>Expected wins</small><b>' + (Math.round((plan.length - exp) * 10) / 10) + '</b></div><div class="bad"><small>Expected losses</small><b>' + (Math.round(exp * 10) / 10) + '</b></div></div>' +
+          '<p class="shopnote">In the field the same merges would expect ' + (Math.round(fexp * 10) / 10) + ' losses.</p><button class="btn danger" data-awgo="mass">Merge ' + plan.length + '</button></div>'
+          : '<p class="ewempty">No spare pairs to merge up to +' + mmCap + '. Worn and locked items are skipped.</p>');
     }
     let steps, cur = 0, body = '', picked = '';
     if (AW.mode === 'up') {
@@ -2059,19 +2076,19 @@
       } else {
         cur = 2; const r = L.mergeRisk(S, A, B), worn = L.wearer(S, A.uid) || L.wearer(S, B.uid);
         body = '<div class="ewsum"><div class="mgodds"><div><small>Result</small><b>+' + r.to + '</b></div><div class="ok"><small>Success</small><b>' + riskTxt(1 - r.risk) + '</b></div><div class="bad"><small>Both destroyed</small><b>' + riskTxt(r.risk) + '</b></div></div>' +
-          '<p class="ewhint">Base risk ' + riskTxt(r.base) + ', cut by ' + Math.round(r.cut * 100) + '% from Luck and Intelligence.</p>' + (worn ? '<p class="warn">A worn piece is part of this merge. If it fails, that slot ends up empty.</p>' : '') +
+          '<p class="ewhint">Base risk ' + riskTxt(r.base) + ', cut by ' + Math.round(r.cut * 100) + '% from Luck and Intelligence, then by ' + Math.round(L.SHOP_FX.mergeCut * 100) + '% at the forge. In the field: ' + riskTxt(r.field) + '.</p>' + (worn ? '<p class="warn">A worn piece is part of this merge. If it fails, that slot ends up empty.</p>' : '') +
           '<button class="btn danger" data-awgo="merge">Merge to +' + r.to + '</button></div>';
       }
     }
     const stepper = '<ol class="ewsteps">' + steps.map((s, i) => '<li class="' + (i < cur ? 'done' : i === cur ? 'cur' : '') + '"><i>' + (i < cur ? '&#10003;' : i + 1) + '</i>' + s + '</li>').join('') + '</ol>';
-    return head + stepper + (picked ? '<div class="ewpicked">' + picked + '</div>' : '') + body;
+    return head + (AW.mode === 'merge' ? perk : '') + stepper + (picked ? '<div class="ewpicked">' + picked + '</div>' : '') + body;
   }
   // pieces of the panel
   const ewTile = x => '<div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>';
   const ewName = x => esc(L.gearName(x)) + (x.up ? ' +' + x.up : '');
   const ewDots = x => { const n = L.sockets(x), l = L.enchList(x); let h = '<span class="ewdots" title="' + l.length + ' of ' + n + ' sockets used">'; for (let i = 0; i < n; i++) h += '<i' + (l[i] ? ' class="on"' : '') + '></i>'; return h + '</span>'; };
   const ewWorn = x => { const w = L.wearer(S, x.uid); return w ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(w).name) + '</i>' : ''; };
-  const ewCost = e => '<span class="ewcost' + ((S.dust || 0) < L.enchCost(e) ? ' short' : '') + '">' + icon('dust') + fmt(L.enchCost(e)) + '</span>';
+  const ewCost = e => '<span class="ewcost' + ((S.dust || 0) < L.enchCostAt(S, e) ? ' short' : '') + '">' + icon('dust') + fmt(L.enchCostAt(S, e)) + '</span>';
   function ewTargets(excl) {
     return S.bag.filter(x => x.uid !== excl && L.sockets(x)).sort((a, b) => (!!L.wearer(S, b.uid) - !!L.wearer(S, a.uid)) || ((L.sockets(b) - L.enchList(b).length) - (L.sockets(a) - L.enchList(a).length)) || (L.itemScore(b) - L.itemScore(a)));
   }
@@ -2089,7 +2106,10 @@
   }
   function enchPanelHtml() {
     const dust = '<span class="epdust" data-tip="Dust pays for moving enchants. Scrap spare gear to get more.">' + icon('dust') + '<b>' + fmt(S.dust || 0) + '</b> Dust</span>';
-    const tabs = '<div class="ewtabs" role="tablist">' + [['on', 'Enchant an item'], ['dis', 'Disenchant'], ['scrap', 'Scrap for Dust']].map(([k, n]) => '<button role="tab" class="' + (EW.mode === k ? 'on' : '') + '" data-ewmode="' + k + '">' + n + '</button>').join('') + '</div>';
+    const field = !L.visiting(S), title = field ? 'Enchanting in the field' : 'The Enchanter’s counter';
+    const perk = field ? '<p class="shopperk field">' + icon('flare') + '<span>In the field a moved enchant loses one tier and costs ' + Math.round((L.FIELD_FX.dust - 1) * 100) + '% more Dust. <button class="linkbtn" data-ewgo="visit">Go to the Enchanter</button> for full tier, normal Dust and a ' + Math.round(L.SHOP_FX.enchUp * 100) + '% chance of +1 tier.</span></p>'
+      : '<p class="shopperk">' + icon('star') + '<span>Enchanter’s touch: enchants keep their tier, cost the normal Dust, and have a ' + Math.round(L.SHOP_FX.enchUp * 100) + '% chance to come out one tier stronger.</span></p>';
+    const tabs = '<div class="ewtabs" role="tablist">' + [['on', 'Enchant an item'], ['dis', 'Disenchant']].concat(field ? [] : [['scrap', 'Scrap for Dust']]).map(([k, n]) => '<button role="tab" class="' + (EW.mode === k ? 'on' : '') + '" data-ewmode="' + k + '">' + n + '</button>').join('') + '</div>';
     let body = '', steps = [], cur = 0;
     const done = EW.done ? '<div class="ewdone">' + icon('star') + '<span>' + EW.done + '</span></div>' : '';
     if (EW.mode === 'scrap') {
@@ -2100,7 +2120,7 @@
         '<label class="chk"><input type="checkbox" data-ewopt="keepUp"' + (scrapOpts.keepUp ? ' checked' : '') + '><span><b>Keep upgraded pieces</b></span></label>' +
         '<div class="ewsum">' + (list.length ? '<p><b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' become <b>' + fmt(dd) + ' Dust</b> and <b>' + fmt(gold) + ' gold</b>.</p>' : '<p>Nothing matches. Tick more rarities above.</p>') +
         '<button class="btn danger" data-ewgo="scrap"' + (list.length ? '' : ' disabled') + '>Scrap ' + list.length + '</button></div>';
-      return '<div class="ephead"><b>The Enchanter’s counter</b>' + dust + '</div>' + tabs + done + body;
+      return '<div class="ephead"><b>' + title + '</b>' + dust + '</div>' + tabs + done + body;
     }
     const A = EW.src && L.itemOf(S, EW.src), B = EW.dst && L.itemOf(S, EW.dst);
     if (EW.src && !A) EW.src = null; if (EW.dst && !B) EW.dst = null;
@@ -2143,18 +2163,21 @@
     }
     if (A && B && mv) {
       cur = 2;
-      const cost = L.enchCost(mv), have = S.dust || 0, rep = EW.slot != null ? lb[EW.slot] : null;
+      const cost = L.enchCostAt(S, mv), have = S.dust || 0, rep = EW.slot != null ? lb[EW.slot] : null;
+      const lands = field ? '<p class="warn">In the field it goes on as <b>' + enchName({ id: mv.id, t: L.fieldTier(mv) }) + '</b>' + (L.fieldTier(mv) < mv.t ? ', one tier lower' : '') + '. At the Enchanter: ' + enchName(mv) + ' for ' + fmt(L.enchCost(mv)) + ' Dust.</p>'
+        : '<p class="shopnote">' + Math.round(L.SHOP_FX.enchUp * 100) + '% chance it comes out as ' + enchName({ id: mv.id, t: Math.min(9, mv.t + 1) }) + '. In the field it would be ' + enchName({ id: mv.id, t: L.fieldTier(mv) }) + ' for ' + fmt(Math.ceil(L.enchCost(mv) * L.FIELD_FX.dust)) + ' Dust.</p>';
       if (full) body += '<h3 class="ewq">' + ewName(B) + ' is full. Which enchant should ' + enchName(mv) + ' replace?</h3><div class="ewchips">' + lb.map((e, i) => '<button class="ewchip' + (EW.slot === i ? ' sel' : '') + '" data-ewslot="' + i + '"><b>' + enchName(e) + '</b><small>' + L.enchText(e) + '</small></button>').join('') + '</div>';
       const ready = EW.slot != null, ok = ready && have >= cost;
       body += '<div class="ewsum"><p><b>' + enchName(mv) + '</b> goes onto <b>' + ewName(B) + '</b>' + (rep ? ', replacing ' + enchName(rep) : '') + '.</p>' +
-        '<p class="warn">' + ewName(A) + ' is used up' + (L.enchList(A).length > 1 ? ' with its other enchants' : '') + '.</p>' +
+        lands + '<p class="warn">' + ewName(A) + ' is used up' + (L.enchList(A).length > 1 ? ' with its other enchants' : '') + '.</p>' +
         '<p>Costs ' + icon('dust') + '<b>' + fmt(cost) + ' Dust</b>' + (have < cost ? '. You have ' + fmt(have) + '. Scrap spare gear for more.' : '.') + '</p>' +
         '<button class="btn" data-ewgo="move"' + (ok ? '' : ' disabled') + '>' + (!ready ? 'Pick the enchant to replace' : have < cost ? 'Not enough Dust' : (EW.mode === 'dis' ? 'Move it for ' : 'Enchant for ') + fmt(cost) + ' Dust') + '</button></div>';
     }
     const stepper = '<ol class="ewsteps">' + steps.map((s, i) => '<li class="' + (i < cur ? 'done' : i === cur ? 'cur' : '') + '"><i>' + (i < cur ? '&#10003;' : i + 1) + '</i>' + s + '</li>').join('') + '</ol>';
-    return '<div class="ephead"><b>The Enchanter’s counter</b>' + dust + '</div>' + tabs + done + stepper + (picked ? '<div class="ewpicked">' + picked + '</div>' : '') + body;
+    return '<div class="ephead"><b>' + title + '</b>' + dust + '</div>' + tabs + perk + done + stepper + (picked ? '<div class="ewpicked">' + picked + '</div>' : '') + body;
   }
   function paintEnchPanel(force) {
+    if (fieldOn()) { const f = $('fieldench'), h = enchPanelHtml(); if (force || f.dataset.h !== h) { const top = f.scrollTop; f.innerHTML = h; f.dataset.h = h; f.scrollTop = top; } }
     const el = $('enchpanel'); if (!el) return; const on = L.visiting(S);
     el.hidden = !on; if (!on) { el.dataset.h = ''; return; }
     const kind = shopKind(), arm = kind === 'arm', h = kind === 'store' ? storePanelHtml() : arm ? armPanelHtml() : enchPanelHtml(); if (!force && el.dataset.h === h) return;
@@ -2166,10 +2189,20 @@
     const sum = el.querySelector('.ewsum'); if (sum && !same && sum.scrollIntoView) sum.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
   function ewSet(o) { Object.assign(EW, o, { done: null }); paintEnchPanel(true); paintEnchOv(); }
-  $('enchpanel') && $('enchpanel').addEventListener('click', e => {
-    const t = e.target.closest('[data-ewmode],[data-ewdst],[data-ewsrc],[data-ewsrcitem],[data-ewidx],[data-ewslot],[data-ewundo],[data-ewrar],[data-ewgo],[data-awmode],[data-awa],[data-awb],[data-awgo]'); if (!t) return;
+  $('enchpanel') && $('enchpanel').addEventListener('click', shopClick);
+  function shopClick(e) {
+    const t = e.target.closest('[data-ewmode],[data-ewdst],[data-ewsrc],[data-ewsrcitem],[data-ewidx],[data-ewslot],[data-ewundo],[data-ewrar],[data-ewgo],[data-awmode],[data-awa],[data-awb],[data-awgo],[data-awcap]'); if (!t) return;
     const d = t.dataset;
     if (d.awmode) { awReset(d.awmode); return paintEnchPanel(true); }
+    if (d.awcap) { mmCap = +d.awcap; AW.done = null; return paintEnchPanel(true); }
+    if (d.awgo === 'mass') {
+      let ok = 0, bad = 0, mxp = 0;
+      for (const p of L.massMergePlan(S, mmCap)) { const r = L.mergeItems(S, p.a.uid, p.b.uid, null, events); if (!r) continue; mxp += r.xp || 0; if (r.ok) ok++; else bad++; }
+      if (!ok && !bad) return;
+      save(); updateGear(true); updateSeats(true); ok ? (sfx.relic(), shopBurst()) : sfx.coin();
+      AW.done = ok + ' merged' + (bad ? ', ' + bad + ' failed (' + bad * 2 + ' items lost)' : '') + '. +' + fmt(mxp) + ' hero XP.'; return paintEnchPanel(true);
+    }
+    if (d.awgo === 'field') { closeModal(); return; }
     if (d.awa) { Object.assign(AW, { a: d.awa, b: null, done: null }); return paintEnchPanel(true); }
     if (d.awb) { Object.assign(AW, { b: d.awb, done: null }); return paintEnchPanel(true); }
     if (d.ewundo && shopKind() === 'arm') { if (d.ewundo === 'a') Object.assign(AW, { a: null, b: null }); else AW.b = null; AW.done = null; return paintEnchPanel(true); }
@@ -2191,6 +2224,7 @@
       AW.done = 'Melted ' + l.length + (l.length === 1 ? ' piece' : ' pieces') + ' for ' + fmt(g) + ' gold.'; return paintEnchPanel(true);
     }
     if (d.ewmode) { ewReset(d.ewmode); EW.done = null; paintEnchPanel(true); paintEnchOv(); return; }
+    if (d.ewgo === 'visit') { const keep = Object.assign({}, EW); visitEnch('ench'); Object.assign(EW, keep, { done: null }); paintEnchPanel(true); return; }
     if (d.ewdst) return ewSet({ dst: d.ewdst, slot: null });
     if (d.ewsrc) return ewSet({ src: d.ewsrc, idx: +d.ewi });
     if (d.ewsrcitem) return ewSet({ src: d.ewsrcitem, idx: null });
@@ -2210,12 +2244,13 @@
       return paintEnchPanel(true);
     }
     if (d.ewgo === 'move') {
+      if (!L.visiting(S) && !campGate()) return;
       const r = L.disenchant(S, EW.src, EW.idx, EW.dst, EW.slot, events); if (!r) return;
-      save(); updateGear(true); updateSeats(true); sfx.relic(); shopBurst();
-      const msg = enchName(r.moved) + ' is now on ' + esc(L.gearName(r.item)) + '. ' + esc(L.gearName(r.lost)) + ' was used up. -' + fmt(r.cost) + ' Dust, +' + fmt(r.xp) + ' hero XP.';
+      save(); updateGear(true); updateSeats(true); sfx.relic(); if (!r.field) shopBurst();
+      const msg = (r.boost ? 'The Enchanter’s touch! ' : '') + enchName(r.moved) + ' is now on ' + esc(L.gearName(r.item)) + (r.boost ? ' (one tier stronger)' : r.field && r.moved.t < r.from.t ? ' (one tier lower, done in the field)' : '') + '. ' + esc(L.gearName(r.lost)) + ' was used up. -' + fmt(r.cost) + ' Dust, +' + fmt(r.xp) + ' hero XP.';
       ewReset(EW.mode); EW.done = msg; paintEnchPanel(true); paintEnchOv();
     }
-  });
+  }
   $('enchpanel') && $('enchpanel').addEventListener('change', e => { const c = e.target.closest('[data-ewopt]'); if (c) { scrapOpts[c.dataset.ewopt] = c.checked; paintEnchPanel(true); } });
   // In the shop the stage header names the shop and holds the way out. Everything else is in the counter panel.
   function paintEnchOv() {
@@ -2256,11 +2291,13 @@
         '<p class="note">Pick the copy to merge in. The better job bonus is kept. ' + tipI('The higher the result, the bigger the risk. Every point of Luck and Intelligence lowers it, up to half. Nothing can buy the risk away.') + '</p>' +
         '<div class="mglist">' + all.map(row).join('') + '</div>' +
         '<div class="mgodds"><div><small>Result</small><b>+' + r.to + '</b></div><div class="ok"><small>Success</small><b>' + pct(1 - r.risk) + '</b></div><div class="bad"><small>Both destroyed</small><b>' + pct(r.risk) + '</b></div></div>' +
-        '<p class="mgcut">Base risk ' + pct(r.base) + ', cut by ' + Math.round(r.cut * 100) + '% from Luck ' + ((S.attr || {}).lck || 0) + ' and Intelligence ' + ((S.attr || {}).int || 0) + '.</p>' +
+        '<p class="mgcut">Base risk ' + pct(r.base) + ', cut by ' + Math.round(r.cut * 100) + '% from Luck ' + ((S.attr || {}).lck || 0) + ' and Intelligence ' + ((S.attr || {}).int || 0) + (r.shop ? ', and by ' + Math.round(L.SHOP_FX.mergeCut * 100) + '% at the Armorer.' : '.') + '</p>' +
+        (r.shop ? '' : '<p class="shopperk field">' + icon('flare') + '<span>Better at the Armorer: ' + pct(Math.round(r.field * (1 - L.SHOP_FX.mergeCut) * 1000) / 1000) + ' risk instead of ' + pct(r.field) + '. <button class="linkbtn" id="mg-arm">Merge at the Armorer</button></span></p>') +
         (wa || wb ? '<p class="note warn">A worn piece is part of this merge. If it fails, that slot ends up empty.</p>' : '') +
         '<div class="row"><button class="btn ghost" id="mg-back">Back</button><button class="btn danger" id="mg-go"' + (blocked ? ' disabled' : '') + '>' + (blocked ? 'Unlock first' : 'Merge to +' + r.to) + '</button></div></div>', md => {
           md.querySelectorAll('[data-mp]').forEach(e => e.onclick = () => { pick = e.dataset.mp; draw(); });
           md.querySelector('#mg-back').onclick = () => itemModal(uid);
+          const ga = md.querySelector('#mg-arm'); if (ga) ga.onclick = () => { awReset('merge'); AW.a = uid; AW.b = pick; visitEnch('arm'); paintEnchPanel(true); };
           md.querySelector('#mg-go').onclick = () => {
             if (!campGate()) return;
             const res = L.mergeItems(S, uid, pick, null, events); if (!res) return;
@@ -2432,7 +2469,6 @@
     draw();
   }
   // ---------- mass merge ----------
-  let mmCap = 3;
   function openMassMerge() {
     const draw = () => {
       const plan = L.massMergePlan(S, mmCap), exp = plan.reduce((a, p) => a + p.risk, 0);
@@ -2441,11 +2477,13 @@
         '<div class="mmcap">' + [1, 2, 3, 5, 10].map(n => '<button class="enchip' + (n === mmCap ? ' sel' : '') + '" data-cap="' + n + '"><b>Up to +' + n + '</b></button>').join('') + '</div>' +
         (plan.length ? '<div class="mmlist">' + plan.map(p => '<div class="mmrow r-' + p.a.rar + '"><b>' + esc(L.gearName(p.a)) + ' +' + p.a.up + ' &amp; +' + p.b.up + ' &rarr; +' + p.to + '</b><em>' + pct(p.risk) + ' risk</em></div>').join('') + '</div>' +
           '<div class="mgodds"><div><small>Merges</small><b>' + plan.length + '</b></div><div class="ok"><small>Expected wins</small><b>' + (Math.round((plan.length - exp) * 10) / 10) + '</b></div><div class="bad"><small>Expected losses</small><b>' + (Math.round(exp * 10) / 10) + '</b></div></div>' +
-          '<p class="mgcut">A loss destroys both pieces in that pair, so about ' + Math.round(exp * 2) + ' items could be lost.</p>'
+          '<p class="mgcut">A loss destroys both pieces in that pair, so about ' + Math.round(exp * 2) + ' items could be lost.</p>' +
+          (L.visiting(S) && shopKind() === 'arm' ? '' : '<p class="shopperk field">' + icon('flare') + '<span>Better at the Armorer: ' + Math.round(L.SHOP_FX.mergeCut * 100) + '% less risk, about ' + (Math.round(exp * (1 - L.SHOP_FX.mergeCut) * 10) / 10) + ' expected losses. <button class="linkbtn" id="mm-arm">Mass merge at the Armorer</button></span></p>')
           : '<p class="scrapsum">No spare pairs to merge up to +' + mmCap + '. Worn and locked items are skipped.</p>') +
         '<div class="row"><button class="btn ghost" id="mm-x">Cancel</button><button class="btn danger" id="mm-go"' + (plan.length ? '' : ' disabled') + '>Merge ' + plan.length + '</button></div></div>', md => {
           md.querySelectorAll('[data-cap]').forEach(b => b.onclick = () => { mmCap = +b.dataset.cap; draw(); });
           md.querySelector('#mm-x').onclick = closeModal;
+          const ma = md.querySelector('#mm-arm'); if (ma) ma.onclick = () => { awReset('mass'); visitEnch('arm'); paintEnchPanel(true); };
           md.querySelector('#mm-go').onclick = () => {
             let ok = 0, bad = 0, mxp = 0;
             for (const p of L.massMergePlan(S, mmCap)) { const r = L.mergeItems(S, p.a.uid, p.b.uid, null, events); if (!r) continue; mxp += r.xp || 0; if (r.ok) ok++; else bad++; }
@@ -4052,8 +4090,8 @@
     return out;
   }
   // @mentions (John, 24 Nov 2026): Banner and Trade are checked in the background too, only to catch pings.
-  const BG_ROOMS = ['dm', 'global', 'banner', 'trade'];
-  const CH_NAME = { global: 'Global', banner: 'Banner', trade: 'Trade', party: 'Party', dm: 'Whispers' };
+  const BG_ROOMS = ['dm', 'global', 'banner', 'trade', 'help'];
+  const CH_NAME = { global: 'Global', banner: 'Banner', trade: 'Trade', help: 'Help', party: 'Party', dm: 'Whispers' };
   const mentionsMe = m => { if (!S.hero || !m || m.from === chat.me || m.from === 'sys' || chat.muted.has(m.from)) return false;
     const t = String(m.text || '').toLowerCase(), n = '@' + S.hero.name.toLowerCase(); let i = t.indexOf(n);
     while (i >= 0) { const c = t[i + n.length]; if (!c || !/[a-z'\-]/.test(c)) return true; i = t.indexOf(n, i + 1); } return false; };
@@ -4146,7 +4184,7 @@
     if (dm) return paintWhispers(log, list, atBottom);
     $('dmto').hidden = true;
     log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + (mentionsMe(m) ? ' ment' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
-      : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : chat.ch === 'dm' ? 'No whispers yet. Tap a player’s name in any channel and choose Whisper to message them privately.' : 'Quiet down here. Say hello.') + '</p></div>';
+      : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'help' ? 'Help chat. Stuck on something? Ask here and other delvers and the Lantern Keepers can answer. The wiki at lanternhold.born2gamellc.com/wiki has guides too.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : chat.ch === 'dm' ? 'No whispers yet. Tap a player’s name in any channel and choose Whisper to message them privately.' : 'Quiet down here. Say hello.') + '</p></div>';
     if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
   }
   function mergeMsgs(k, r) {
@@ -4194,7 +4232,7 @@
       { const first = !chat.polled[k], add = mergeMsgs(k, await chatCall('GET', '/chat' + q)); if (!first && k.split(':')[0] !== 'dm') pingMentions(k, add); } chat.polled[k] = 1;
       if (k === roomKey()) { paintChat(); if (viewing(k)) markSeen(k); paintUnread(); }
       fetchLooks((chat.msgs[k] || []).map(m => m.from)).then(n => { if (n && k === roomKey()) paintChat(); });
-    } catch (e) { if (e.status === 403) { chatNote('You are no longer in that party.', true); } }
+    } catch (e) { if (e.status === 403) { chatNote(chat.ch === 'help' ? 'Help chat opens very soon. Ask in Global for now.' : 'You are no longer in that party.', true); } }
     chat.timer = setTimeout(pollChat, CHAT_POLL_OPEN);
   }
   // Whispers read like a messenger: one conversation at a time, picked from the chips on top.
@@ -4243,7 +4281,7 @@
   }
   function setChannel(ch) {
     chat.ch = ch; document.querySelectorAll('#chatch button').forEach(b => b.classList.toggle('on', b.dataset.ch === ch));
-    $('chatin').placeholder = ch === 'dm' ? (chat.dmTo ? 'Whisper to ' + chat.dmTo.name : 'Pick someone to whisper') : ch === 'trade' ? 'Looking for, or offering...' : ch === 'banner' ? 'Talk to your banner' : ch === 'party' ? 'Talk to your party' : 'Say something';
+    $('chatin').placeholder = ch === 'dm' ? (chat.dmTo ? 'Whisper to ' + chat.dmTo.name : 'Pick someone to whisper') : ch === 'trade' ? 'Looking for, or offering...' : ch === 'help' ? 'Ask a question...' : ch === 'banner' ? 'Talk to your banner' : ch === 'party' ? 'Talk to your party' : 'Say something';
     if (ch === 'party') loadRooms(); else $('chatroom').hidden = true;
     chatNote(); paintChat(); pollChat();
   }
@@ -5169,6 +5207,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 116, date: 'November 24, 2026', title: 'Specialist shops and a Help channel', items: [
+      'The Armorer’s forge: every merge at the Armorer carries 25% less risk than merging in the field. The Armorer now has a Mass merge tab too.',
+      'The Enchanter’s touch: enchants moved at the Enchanter keep their tier and have a 15% chance to come out one tier stronger.',
+      'Enchanting in the field is back. It works at any camp, but the enchant loses one tier and costs 50% more Dust.',
+      'Merge, mass merge and enchant screens show what you would get at the shop.',
+      'New Help channel in chat for questions. Other delvers and the Lantern Keepers can answer.'] },
     { v: 115, date: 'November 24, 2026', title: '@ mentions find everyone', items: [
       'The @ list now includes every hero on the Players Guild board, not only people who chatted lately.'] },
     { v: 114, date: 'November 24, 2026', title: '@ mentions in chat', items: [

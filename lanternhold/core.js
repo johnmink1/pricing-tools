@@ -1,4 +1,4 @@
-/* lh-build 202611241343 */
+/* lh-build 202611241356 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -744,6 +744,17 @@
     if (after > before && events) events.push({ type: 'herolevel', lv: after, from: before, pts: pointsFor(after) - pointsFor(before) });
     return xp;
   }
+  // Crafting XP (John, 2026-11-24): enchanting and merging gear also teach your hero. Worth a handful of kills at your
+  // deepest floor, scaled by the same XP bonuses as kills.
+  const CRAFT_XP = { ench: 8, merge: 6 };
+  function craftXp(s, units, events, why) {
+    if (!s.hero || !(units > 0)) return 0;
+    const before = heroLevel(s).lv, xp = (1 + (s.maxFloorEver || s.floor) / 25) * units * (1 + sk(s, 'xp') + masteryXp(s)) * keeperMult(s);
+    s.hxp += xp; const after = heroLevel(s).lv;
+    if (after > before && events) events.push({ type: 'herolevel', lv: after, from: before, pts: pointsFor(after) - pointsFor(before) });
+    events && events.push({ type: 'craftxp', xp, why });
+    return xp;
+  }
   // Total of one effect from your hero's tree, Grand War aura and character stats. It only counts while your hero is in the party.
   // Tonics from the Quartermaster: small timed buffs, one of each at a time; drinking again adds time up to an hour.
   const TONIC_CAP = 3600;
@@ -764,7 +775,7 @@
   const SURGE_FX = { gold: 0.25, xp: 0.25 };
   const surgeOn = s => !!(s && s.surge && s.surge > Date.now());
   function tonicVal(s, key) {
-    const now = Date.now(); let t = surgeOn(s) ? SURGE_FX[key] || 0 : 0;
+    const now = Date.now(); let t = (surgeOn(s) ? SURGE_FX[key] || 0 : 0) + (mercyXpOn(s, now) ? RESCUE_FX[key] || 0 : 0) + (mercyAidOn(s, now) ? AID_FX[key] || 0 : 0);
     if (!s.tonic) return t;
     for (const x of TONICS) if (x.k === key && (s.tonic[x.id] || 0) > now) t += x.v;
     return t;
@@ -1122,10 +1133,10 @@
   // Every source of hero XP for the character sheet's XP bar: additive bonuses, then the Lantern Keeper multiplier (John, 2026-11-24).
   function xpBonus(s) {
     const hero = s.party.includes('you'), st = hero ? statVal(s, 'xp') : 0, au = hero ? auraVal(s, 'xp') : 0;
-    const surge = surgeOn(s) ? SURGE_FX.xp : 0;
+    const surge = surgeOn(s) ? SURGE_FX.xp : 0, mx = mercyXpOn(s) ? RESCUE_FX.xp : 0;
     const parts = [
-      ['Class skills', skBase(s, 'xp') - st - au], ['Stats', st], ['War aura', au], ['Scholar’s Ink', tonicVal(s, 'xp') - surge],
-      ['Lantern Surge', surge], ['Companion traits', traitVal(s, 'xp')], ['Enchants', enchVal(s, 'xp')], ['Region mastery', masteryXp(s)],
+      ['Class skills', skBase(s, 'xp') - st - au], ['Stats', st], ['War aura', au], ['Scholar’s Ink', tonicVal(s, 'xp') - surge - mx],
+      ['Lantern Surge', surge], ['Mercy Corps rescue', mx], ['Companion traits', traitVal(s, 'xp')], ['Enchants', enchVal(s, 'xp')], ['Region mastery', masteryXp(s)],
     ].filter(x => x[1] > 1e-9);
     const add = parts.reduce((a, x) => a + x[1], 0), mult = keeperMult(s);
     return { parts, add, mult, total: (1 + add) * mult };
@@ -1323,14 +1334,15 @@
   const enchVal = (s, key) => (s.gear && s.bag ? enchTotals(s)[key] || 0 : 0);
   const enchDirty = () => { enCache = { s: null, t: 0, v: null }; wearCache = { s: null, t: 0, v: {} }; };
   // Move enchant number `idx` of `src` into socket `slot` of `dst` (an empty socket, or one to overwrite). src is destroyed.
-  function disenchant(s, srcUid, idx, dstUid, slot) {
+  function disenchant(s, srcUid, idx, dstUid, slot, events) {
     const a = itemOf(s, srcUid), b = itemOf(s, dstUid);
     if (!visiting(s) || !a || !b || a === b || a.lk || wornAt(s, a.uid)) return null;
     const la = enchList(a), lb = enchList(b), x = la[idx]; if (!x || (s.dust || 0) < enchCost(x)) return null;
     const n = sockets(b); if (!(slot >= 0 && slot < n && slot <= lb.length)) return null;
     const old = lb[slot] || null; lb[slot] = { id: x.id, t: x.t }; b.en = enchStr(lb);
     s.dust -= enchCost(x); s.bag = s.bag.filter(y => y !== a); enchDirty();
-    return { item: b, moved: x, replaced: old, lost: a, cost: enchCost(x) };
+    const xp = craftXp(s, CRAFT_XP.ench * x.t, events, 'enchant');
+    return { item: b, moved: x, replaced: old, lost: a, cost: enchCost(x), xp };
   }
   // Merging (John, 2026-11-23): two copies of the same item fuse into one a level higher (+1), keeping the higher
   // item level and the better camp-job affix. Every merge can fail and destroy BOTH pieces. The risk climbs with the
@@ -1342,18 +1354,20 @@
     const at = s.attr || {}, cut = Math.min(0.5, (at.lck || 0) * 0.006 + (at.int || 0) * 0.004);
     return { to, base, cut, risk: Math.round(base * (1 - cut) * 1000) / 1000 };
   }
-  function mergeItems(s, uidA, uidB, rng) {
+  function mergeItems(s, uidA, uidB, rng, events) {
     const a = itemOf(s, uidA), b = itemOf(s, uidB);
     if (!mergeable(a, b) || a.lk || b.lk) return null;
-    if (wornAt(s, b.uid) && !wornAt(s, a.uid)) return mergeItems(s, uidB, uidA, rng);
+    if (wornAt(s, b.uid) && !wornAt(s, a.uid)) return mergeItems(s, uidB, uidA, rng, events);
     const m = mergeRisk(s, a, b), lose = (rng || Math.random)() < m.risk;
     const drop = it => { const w = wornAt(s, it.uid); if (w) delete s.gear[w[0]][w[1]]; s.bag = s.bag.filter(x => x !== it); };
-    if (lose) { drop(a); drop(b); return { ok: false, risk: m.risk, a, b }; }
+    // merging teaches your hero too, a little even when it fails
+    const xp = craftXp(s, CRAFT_XP.merge * m.to * (lose ? 0.5 : 1), events, 'merge');
+    if (lose) { drop(a); drop(b); return { ok: false, risk: m.risk, a, b, xp }; }
     a.up = m.to; a.ilvl = Math.max(a.ilvl, b.ilvl);
     if (b.aff && (!a.aff || b.aff.v > a.aff.v)) a.aff = b.aff;
     a.en = enchStr(enchList(a).concat(enchList(b)).sort((x, y) => y.t - x.t).slice(0, sockets(a)));
     drop(b); enchDirty();
-    return { ok: true, risk: m.risk, item: a };
+    return { ok: true, risk: m.risk, item: a, xp };
   }
   // Mass merge: pair up unworn, unlocked copies of the same item, best with next best, one merge per pair.
   // Only merges whose result is at most `cap` are planned. Each pair carries its own risk of losing both.
@@ -1749,6 +1763,42 @@
 
   // ---------- foes ----------
   const PACK_CHANCE = 0.06, PACK_FLOOR = 3, PACK_GOLD = 2, PACK_XP = 2; // ambush of n foes: n x 2 hero XP and gold (John, 2026-11-24: 3% -> 6%)
+  // Mercy Corps encounters (John, 2026-11-24): rare, random, active play only, floor 5+.
+  //  Rescue: a monster has a Mercy Corps companion captive. Kill it and the freed companion's thanks give +30% hero XP for 15 minutes.
+  //  Wounded: a Mercy Corps companion lies hurt on the path. Nobody fights; your healers pour their healing into them (taps
+  //  bandage a little, Lantern Hymn a lot). Heal them to full within AID_TIME and the party gets +15% damage and healing for 15 minutes.
+  //  If time runs out, other medics carry them to safety: no penalty.
+  const MERCY_FLOOR = 5, MERCY_COOL = 15 * 60000, RESCUE_CHANCE = 0.0025, WOUNDED_CHANCE = 0.002, MERCY_MIN = 15;
+  const RESCUE_FX = { xp: 0.3 }, AID_FX = { pdps: 0.15, pheal: 0.15 }, AID_TIME = 45, AID_SEC = 18, AID_TAP = 0.006, AID_HYMN = 0.2;
+  const MERCY_NAMES = ['Sister Odessa', 'Brother Fenn', 'Medic Juniper', 'Corpsman Hale', 'Warden Ines', 'Sister Marigold', 'Brother Tobin', 'Medic Saoirse'];
+  const mercyActive = (s, now) => now - (s.actAt || 0) < 5000;
+  const mercyXpOn = (s, now) => (s.mercyXp || 0) > (now || Date.now());
+  const mercyAidOn = (s, now) => (s.mercyAid || 0) > (now || Date.now());
+  const partyHeal = s => s.party.reduce((a, id) => a + healPerSec(s, id), 0);
+  // Called when a new foe is due. Returns a Mercy Corps encounter, or null for a normal foe.
+  function mercyFoe(s, now, rng) {
+    const r = rng || Math.random, f = s.floor;
+    if (f < MERCY_FLOOR || isBossFloor(f) || (s.wb && s.wb.until > now) || now < (s.mercyNext || 0) || !mercyActive(s, now)) return null;
+    if (s.goblin && s.goblin.item && f >= s.goblin.floor) return null;
+    const who = MERCY_NAMES[Math.floor(r() * MERCY_NAMES.length)], roll = r(), heal = partyHeal(s);
+    if (heal > 0 && roll < WOUNDED_CHANCE) {
+      const max = Math.max(200, heal * AID_SEC / 0.9);
+      s.mercyNext = now + MERCY_COOL; s.stats.mercySeen = (s.stats.mercySeen || 0) + 1;
+      return { name: who + ', wounded', who, wounded: 1, sprite: 'healer', boss: false, chest: false, elite: false, side: null, ambush: 0, pack: 0, hp: max * 0.1, max, hue: 0, atk: 0, mods: [], ward: 0, wardAt: 0, aidT: 0, sp: null };
+    }
+    if (roll >= WOUNDED_CHANCE && roll < WOUNDED_CHANCE + RESCUE_CHANCE) {
+      const foe = makeFoe(s, r); if (foe.boss || foe.chest || foe.goblin || foe.pack || foe.world) return foe;
+      foe.rescue = who; foe.hp *= 1.5; foe.max = foe.hp;
+      s.mercyNext = now + MERCY_COOL; s.stats.mercySeen = (s.stats.mercySeen || 0) + 1;
+      return foe;
+    }
+    return null;
+  }
+  function mercyAided(s, now, events) {
+    const f = s.foe; if (!f || !f.wounded || f.hp < f.max - 1e-6) return false;
+    s.mercyAid = Math.max(now, s.mercyAid || 0) + MERCY_MIN * 60000; s.stats.aided = (s.stats.aided || 0) + 1;
+    s.foe = null; s.foeGap = now + 900; events && events.push({ type: 'aided', who: f.who }); return true;
+  }
   function makeFoe(s, rng) {
     const f = s.floor, boss = isBossFloor(f), r = rng || Math.random;
     if (s.wb && s.wb.until > (s.clock || Date.now())) return wbFoe(s);
@@ -1847,6 +1897,7 @@
   }
 
   function damageFoe(s, amount, now, rng, events) {
+    if (s.foe && s.foe.wounded) return; // nobody fights a wounded Mercy Corps companion
     let guard = 0;
     while (amount > 0 && guard++ < 60) {
       if (!s.foe) s.foe = makeFoe(s, rng);
@@ -2023,6 +2074,7 @@
       events && events.push({ type: 'goblinkill', item: back || null });
       if ((rng || Math.random)() < GOBLIN_SACK_CHANCE) { const sack = rollGoblinSack(s, f, rng || Math.random); s.bag.push(sack); s.stats.sacks = (s.stats.sacks || 0) + 1; events && events.push({ type: 'goblinsack', item: sack }); }
     }
+    if (foe.rescue) { s.mercyXp = Math.max(now, s.mercyXp || 0) + MERCY_MIN * 60000; s.stats.rescues = (s.stats.rescues || 0) + 1; events && events.push({ type: 'rescued', who: foe.rescue }); }
     s.gold += g; s.stats.goldEarned += g; s.stats.kills++;
     bountyCount(s, 'kill', foe, f);
     if (s.dots) for (const id in s.dots) if (--s.dots[id].n <= 0) delete s.dots[id];
@@ -2232,6 +2284,7 @@
     s.abil[id] = st;
     if (m.cls === 'healer') {
       healParty(s, 0.45 * pw, true);
+      if (s.foe && s.foe.wounded) s.foe.hp = Math.min(s.foe.max, s.foe.hp + s.foe.max * AID_HYMN * pw);
       s.dots = {};
       const fallen = s.party.filter(x => x && s.down[x]).slice(0, (sb >= 3 ? 5 : 1) + (me ? sk(s, 'revive') : 0));
       for (const f of fallen) { delete s.down[f]; s.hp[f] = maxHpOf(s, f) * 0.5; s.stats.revives++; events && events.push({ type: 'revive', id: f }); }
@@ -2246,6 +2299,7 @@
       s.minions = Array.from({ length: (sb >= 3 ? 5 : 3) + (me ? sk(s, 'minion') : 0) }, () => ({ dps: each, hp, max: hp, until: st.until }));
     }
     events && events.push({ type: 'ability', id, cls: m.cls });
+    if (m.cls === 'healer' && s.foe && s.foe.wounded) mercyAided(s, now, events);
     return true;
   }
 
@@ -2255,7 +2309,7 @@
     if (!foe) return false;
     switch (m.cls) {
       case 'tank': return !foe.chest && (foe.boss || (s.hp[id] || 0) < maxHpOf(s, id) * 0.6);
-      case 'healer': return s.party.some(x => x && (s.down[x] || (s.hp[x] || 0) < maxHpOf(s, x) * 0.5));
+      case 'healer': return !!foe.wounded || s.party.some(x => x && (s.down[x] || (s.hp[x] || 0) < maxHpOf(s, x) * 0.5));
       case 'rogue': return true;
       case 'mage': return foe.boss || foe.hp > totalDps(s, now) * 3;
       case 'necro': return !foe.chest;
@@ -2323,8 +2377,12 @@
     if (!alive(s).length) return; // nobody to fight
     if (nexusOn(s)) return; // the Nexus Guardian holds the floor: the foe behind it waits and nothing lands
     if ((s.foeGap || 0) > now) return; // the next foe is still on its way
-    if (!s.foe) { s.foe = makeFoe(s, rng); if (s.foe.pack) events && events.push({ type: 'pack', n: s.foe.pack, name: s.foe.name }); }
+    if (!s.foe) { s.foe = mercyFoe(s, now, rng) || makeFoe(s, rng); if (s.foe.wounded || s.foe.rescue) events && events.push({ type: 'mercy', kind: s.foe.wounded ? 'wounded' : 'rescue', who: s.foe.who || s.foe.rescue }); if (s.foe.pack) events && events.push({ type: 'pack', n: s.foe.pack, name: s.foe.name }); }
     if (s.retryAt && !s.autoAdvance && now >= s.retryAt) { s.autoAdvance = true; s.retryAt = 0; events && events.push({ type: 'retry' }); }
+    if (s.foe.wounded) {
+      s.foe.aidT += dt;
+      if (s.foe.aidT >= AID_TIME) { const who = s.foe.who; s.foe = null; s.foeGap = now + 900; events && events.push({ type: 'mercyleft', who }); return; }
+    }
     if (s.foe.goblin) {
       s.foe.flee += dt;
       if (s.foe.flee >= GOBLIN_TIME) { goblinFlee(s, rng, events); return; }
@@ -2364,10 +2422,12 @@
       let need = hps * dt; const cap = need;
       const order = alive(s).sort((a, b) => s.hp[a] / maxHpOf(s, a) - s.hp[b] / maxHpOf(s, b));
       for (const id of order) { const eff = healReach(s, hid, id), gap = maxHpOf(s, id) - s.hp[id]; if (gap <= 0) continue; const h = Math.min(gap, need * eff); s.hp[id] += h; need -= h / eff; if (need <= 1e-9) break; }
+      if (s.foe && s.foe.wounded && need > 1e-9) { s.foe.hp = Math.min(s.foe.max, s.foe.hp + need); need = 0; }
       // healing costs mana in proportion to how hard the healer worked this tick
       const used = cap > 0 ? (cap - Math.max(0, need)) / cap : 0;
       if (used > 0) { s.res[hid] = Math.max(0, resOf(s, hid) - HEAL_DRAIN * used * dt); if (s.res[hid] <= 0) { s.oom[hid] = 1; events && events.push({ type: 'oom', id: hid }); } }
     }
+    if (s.foe && s.foe.wounded && mercyAided(s, now, events)) return;
     // life steal: a share of each hero's own damage heals that hero
     for (const id of s.party) { if (!id || s.down[id]) continue; const ls = wearVal(s, id, 'leech'); if (ls > 0) { const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + memberDps(s, id, now) * ls * dt); } }
     // abilities
@@ -2428,6 +2488,12 @@
     if ((s.foeGap || 0) > (now || Date.now())) return 0;
     if (nexusOn(s)) { if (!auto) s.stats.clicks++; events && events.push({ type: 'hit', dmg: 0, crit: false, auto, nexus: true }); return { dmg: 0, crit: false }; }
     if (!s.foe) s.foe = makeFoe(s, rng);
+    if (s.foe.wounded) {
+      const crit = (rng || Math.random)() < critChance(s), h = s.foe.max * AID_TAP * (crit ? 2 : 1);
+      if (!auto) s.stats.clicks++; else return 0;
+      s.foe.hp = Math.min(s.foe.max, s.foe.hp + h); events && events.push({ type: 'bandage', amt: h, crit });
+      mercyAided(s, now || Date.now(), events); return { dmg: 0, crit };
+    }
     let dmg = clickDamage(s, now);
     const crit = (rng || Math.random)() < critChance(s);
     if (crit) { dmg *= 5; s.stats.crits++; }
@@ -2550,7 +2616,7 @@
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, xpBonus, visiting, visitEnchanter, leaveEnchanter, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, visiting, visitEnchanter, leaveEnchanter, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

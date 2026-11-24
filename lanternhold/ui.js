@@ -1,4 +1,4 @@
-/* lh-build 202611241343 */
+/* lh-build 202611241356 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -681,6 +681,27 @@
     if (x.ph === 1) { foeAnim.cx = fxC; foeAnim.cy = fy + sh / 2; foeAnim.w = sw; foeAnim.h = sh; }
   }
 
+  // ---------- Mercy Corps encounters (John, 2026-11-24) ----------
+  // A wounded companion sits propped against a rock, a lantern-green glow rising as the healers mend them.
+  function drawWounded(foe, fxC, floorY) {
+    const spr = sprite('healer', 0, false), sw = spr.lw * 2, sh = spr.lh * 2, k = foe.hp / foe.max;
+    ctx.fillStyle = '#3a3440'; ctx.beginPath(); ctx.ellipse(fxC + sw * 0.35, floorY + 1, sw * 0.32, sh * 0.2, 0, Math.PI, 0); ctx.fill();
+    const gl = ctx.createRadialGradient(fxC, floorY - sh * 0.3, 2, fxC, floorY - sh * 0.3, sw * 0.9); gl.addColorStop(0, 'rgba(126,224,165,' + (0.15 + 0.35 * k) + ')'); gl.addColorStop(1, 'rgba(126,224,165,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gl; ctx.fillRect(fxC - sw, floorY - sh * 1.2, sw * 2, sh * 1.4); ctx.globalCompositeOperation = 'source-over';
+    // sitting: lean back and sink a little, facing the party
+    ctx.save(); ctx.translate(fxC + sw * 0.2, floorY + 3); ctx.rotate(0.18 - 0.12 * k); ctx.scale(-1, 1); ctx.drawImage(spr, -sw * 0.5, -sh * (0.78 + 0.2 * k), sw, sh); ctx.restore();
+    // a bandage that turns from red to white as they heal
+    ctx.fillStyle = k < 0.5 ? '#e5484d' : '#f5f5f5'; ctx.fillRect(fxC - sw * 0.05, floorY - sh * (0.62 + 0.2 * k), sw * 0.22, 1.6);
+    if (Math.random() < 0.15 + 0.3 * k) particles.push({ x: fxC + (Math.random() - 0.5) * sw * 0.6, y: floorY - sh * 0.4, vx: (Math.random() - 0.5) * 6, vy: -14 - Math.random() * 10, life: 0.9, age: 0, c: Math.random() < 0.5 ? '#7ee0a5' : '#d1fae5', s: 1, float: true });
+  }
+  // A Mercy Corps companion held captive behind the monster, hands bound.
+  function drawCaptive(x, floorY) {
+    const spr = sprite('healer', 0, false), sw = spr.lw * 1.4, sh = spr.lh * 1.4;
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x, floorY + 3, sw * 0.35, 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); ctx.drawImage(spr, -sw / 2, floorY + 4 - sh + Math.sin(tAnim * 3) * 0.4, sw, sh); ctx.restore();
+    ctx.strokeStyle = '#a8742e'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - sw * 0.25, floorY - sh * 0.45); ctx.lineTo(x + sw * 0.25, floorY - sh * 0.4); ctx.moveTo(x - sw * 0.25, floorY - sh * 0.38); ctx.lineTo(x + sw * 0.25, floorY - sh * 0.33); ctx.stroke();
+    if (Math.sin(tAnim * 2) > 0.6) { ctx.fillStyle = '#fff'; ctx.font = '600 7px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Help!', x, floorY - sh - 2); ctx.textAlign = 'left'; }
+  }
   function render(now) {
     const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now; tAnim += dt;
     ctx.setTransform(R, 0, 0, R, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
@@ -733,8 +754,12 @@
         ctx.fillStyle = gg; ctx.fillRect(fxC - sw, fy - 10, sw * 2, sh + 20);
       }
       ctx.globalAlpha = Math.min(1, age / 0.15);
-      // foes face left, toward the party
-      ctx.save(); ctx.translate(fx + sw, fy); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0, sw, sh); ctx.restore();
+      if (foe.wounded) drawWounded(foe, fxC, floorY);
+      else {
+        // foes face left, toward the party
+        ctx.save(); ctx.translate(fx + sw, fy); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0, sw, sh); ctx.restore();
+        if (foe.rescue) drawCaptive(fxC + sw * 0.55, floorY);
+      }
       ctx.globalAlpha = 1;
       foeAnim.cx = fxC; foeAnim.cy = fy + sh / 2; foeAnim.w = sw; foeAnim.h = sh;
       // a shielded foe sits in a pale blue bubble that thins and cracks as it wears down
@@ -765,12 +790,13 @@
       slashTimer -= dt;
       if (slashTimer <= 0) {
         slashTimer = 0.3 + Math.random() * 0.3;
-        const fighters = lay.filter(p => !S.down[p.id]);
+        const fighters = lay.filter(p => !S.down[p.id] && !(foe && foe.wounded && L.memberById(p.id).cls !== 'healer'));
         const p = fighters[Math.floor(Math.random() * fighters.length)];
         if (p) {
           const m = L.memberById(p.id);
           mAnim(p.id).lunge = tAnim + 0.12;
-          if (m.cls === 'mage' || m.cls === 'necro' || m.cls === 'healer') {
+          if (foe && foe.wounded) bolts.push({ x: p.x + 22, y: p.y + 10, tx: foeAnim.cx, ty: foeAnim.cy, t: tAnim, c: '#7ee0a5' });
+          else if (m.cls === 'mage' || m.cls === 'necro' || m.cls === 'healer') {
             bolts.push({ x: p.x + 22, y: p.y + 10, tx: foeAnim.cx, ty: foeAnim.cy, t: tAnim, c: L.CLASSES[m.cls].color });
           } else {
             slashes.push({ x: foeAnim.cx + (Math.random() - 0.5) * foeAnim.w * 0.5, y: foeAnim.cy + (Math.random() - 0.5) * foeAnim.h * 0.5, a: Math.random() * Math.PI, t: tAnim, c: L.CLASSES[m.cls].color });
@@ -877,6 +903,11 @@
       case 'poison': flog('party', nm(e.id) + ' is poisoned', 'ps' + e.id, 6000); break;
       case 'special': { const sp = L.SPECIALS[e.sp] || {}, hit = e.hits.filter(h => !h.dodge); flog('fight', '<b class="bad">' + esc((S.foe && S.foe.name) || 'The foe') + ': ' + esc(sp.name || 'special') + '</b> hits ' + (e.kind === 'all' ? 'the whole party' : hit.map(h => nm(h.id)).join(', ') || 'nobody') + (hit.length ? ' for ' + fmt(hit.reduce((a, h) => a + h.dmg, 0)) : '') + (sp.dot ? ' and leaves them ' + (sp.dot === 'burn' ? 'burning' : 'poisoned') + ' for ' + L.DOT_FIGHTS + ' fights' : '')); break; }
       case 'ambush': if (e.first) flog('fight', e.guarded ? nm(e.target) + ' guards the rear from an ambush' : '<b class="bad">Ambush!</b> ' + nm(e.target) + ' is hit from behind'); break;
+      case 'mercy': flog('fight', '<b class="good">Mercy Corps:</b> ' + esc(e.who) + (e.kind === 'wounded' ? ' is wounded on the path' : ' is held captive')); break;
+      case 'rescued': flog('fight', '<b class="good">Rescued ' + esc(e.who) + '</b>: +' + L.RESCUE_FX.xp * 100 + '% hero XP for ' + L.MERCY_MIN + ' min'); break;
+      case 'aided': flog('fight', '<b class="good">Healed ' + esc(e.who) + '</b>: +' + L.AID_FX.pdps * 100 + '% damage and healing for ' + L.MERCY_MIN + ' min'); break;
+      case 'craftxp': flog('party', '+' + fmt(e.xp) + ' hero XP for ' + (e.why === 'merge' ? 'merging' : 'enchanting'), 'cx', 1500); break;
+      case 'mercyleft': flog('fight', esc(e.who) + ' was carried to safety'); break;
       case 'pack': flog('fight', '<b class="bad">Ambush pack:</b> ' + e.n + ' monsters attack together'); break;
       case 'ward': flog('fight', 'The foe raises a ward', 'ward', 4000); break;
       case 'shieldup': flog('fight', '<b class="bad">' + (e.again ? 'The guardian raises its shield again' : 'The foe hides behind a shield') + '</b>: the party deals ' + Math.round(L.SHIELD_CUT * 100) + '% less damage until it breaks'); break;
@@ -1028,6 +1059,21 @@
       } else if (e.type === 'goblinkill') {
         sfx.relic(); floatText(e.item ? 'Got it back!' : 'Goblin slain!', 'skill', FOE_X, 0.2);
         toast('bag', e.item ? 'You got it back' : 'Loot Goblin slain', e.item ? L.gearName(e.item) + ' is back in your pack, and the goblin dropped a fat purse of gold.' : 'It dropped a fat purse of gold. Your pack is safe.', 'feat');
+      } else if (e.type === 'mercy') {
+        sfx.relic(); floatText(e.kind === 'wounded' ? 'A wounded medic!' : 'A captive medic!', 'skill', 0.5, 0.2);
+        if (e.kind === 'wounded') toast('cross', 'A Mercy Corps companion is hurt', esc(e.who) + ' lies wounded on the path. Your healers will mend them; Lantern Hymn and your taps help too. Heal them to full within ' + L.AID_TIME + ' seconds for +' + L.AID_FX.pdps * 100 + '% damage and healing for ' + L.MERCY_MIN + ' minutes.', 'feat');
+        else toast('cross', 'A Mercy Corps companion needs rescue', 'This monster is holding ' + esc(e.who) + ' captive. Defeat it to free them: +' + L.RESCUE_FX.xp * 100 + '% hero XP for ' + L.MERCY_MIN + ' minutes.', 'feat');
+      } else if (e.type === 'rescued') {
+        sfx.relic(); floatText('Rescued!', 'skill', FOE_X, 0.2);
+        toast('cross', esc(e.who) + ' is free', 'The Mercy Corps thanks you: +' + L.RESCUE_FX.xp * 100 + '% hero XP for ' + L.MERCY_MIN + ' minutes.', 'feat');
+      } else if (e.type === 'aided') {
+        sfx.relic(); floatText('Healed!', 'skill', FOE_X, 0.2);
+        toast('cross', esc(e.who) + ' is back on their feet', 'Mercy’s Thanks: +' + L.AID_FX.pdps * 100 + '% damage and +' + L.AID_FX.pheal * 100 + '% healing for ' + L.MERCY_MIN + ' minutes.', 'feat');
+      } else if (e.type === 'mercyleft') {
+        floatText('Carried to safety', 'auto', FOE_X, 0.2);
+        toast('cross', 'Other medics carried ' + esc(e.who) + ' to safety', 'They will be fine. Next time, more healing (or a Lantern Hymn and some taps) gets them up in time.', '');
+      } else if (e.type === 'bandage') {
+        floatText('+' + fmt(e.amt), e.crit ? 'heal crit' : 'heal', FOE_X + (Math.random() - 0.5) * 0.08, 0.4);
       } else if (e.type === 'pack') {
         floatText('Ambush!', 'crit', 0.5, 0.3);
         if (!(S.stats.packs > 0)) toast('sword', 'Ambush!', e.n + ' monsters have teamed up to jump your party. They hit harder and strike the back first, but they pay ' + (e.n * L.PACK_GOLD) + ' times the gold, ' + (e.n * L.PACK_XP) + ' times the hero XP and often drop gear.', 'feat');
@@ -1332,15 +1378,17 @@
   function paintTonics() {
     const now = Date.now(), box = $('tonicbar');
     const act = L.TONICS.filter(t => L.tonicLeft(S, t.id, now) > 0), carry = L.TONICS.filter(t => !L.tonicLeft(S, t.id, now) && (S.items[t.id] || 0) > 0);
-    const key = act.map(t => t.id + (S.items[t.id] || 0)).join() + '|' + carry.map(t => t.id + S.items[t.id]).join();
-    box.hidden = !act.length && !carry.length;
+    const mer = [L.mercyXpOn(S, now) && ['mx', 'Mercy rescue: +' + L.RESCUE_FX.xp * 100 + '% hero XP', S.mercyXp], L.mercyAidOn(S, now) && ['ma', 'Mercy’s Thanks: +' + L.AID_FX.pdps * 100 + '% damage and healing', S.mercyAid]].filter(Boolean);
+    const key = act.map(t => t.id + (S.items[t.id] || 0)).join() + '|' + carry.map(t => t.id + S.items[t.id]).join() + '|' + mer.map(m => m[0]).join();
+    box.hidden = !act.length && !carry.length && !mer.length;
     if (key !== tonicKey) {
       tonicKey = key;
       // An active tonic still shows how many more you carry, so a stack never seems to vanish when you drink one.
       box.innerHTML = act.map(t => '<button class="tonic on" data-tonic="' + t.id + '" title="' + esc(t.name + ': ' + t.desc) + ((S.items[t.id] || 0) > 0 ? ' Tap to drink another and add time (' + S.items[t.id] + ' left).' : '') + '">' + icon(t.icon) + '<span></span>' + ((S.items[t.id] || 0) > 0 ? '<i class="tcount">&times;' + S.items[t.id] + '</i>' : '') + '</button>').join('') +
-        carry.map(t => '<button class="tonic" data-tonic="' + t.id + '" title="Drink ' + esc(t.name) + ': ' + esc(t.desc) + '">' + icon(t.icon) + '<span>&times;' + S.items[t.id] + '</span></button>').join('');
+        carry.map(t => '<button class="tonic" data-tonic="' + t.id + '" title="Drink ' + esc(t.name) + ': ' + esc(t.desc) + '">' + icon(t.icon) + '<span>&times;' + S.items[t.id] + '</span></button>').join('') +
+        mer.map(m => '<span class="tonic mercy on" data-mer="' + m[0] + '" title="' + esc(m[1]) + '">' + icon('cross') + '<span></span></span>').join('');
     }
-    box.querySelectorAll('.tonic.on').forEach(b => { b.querySelector('span').textContent = fmtTime(L.tonicLeft(S, b.dataset.tonic, now)); });
+    box.querySelectorAll('.tonic.on').forEach(b => { const m = b.dataset.mer && mer.find(x => x[0] === b.dataset.mer); b.querySelector('span').textContent = fmtTime(m ? Math.max(0, (m[2] - now) / 1000) : L.tonicLeft(S, b.dataset.tonic, now)); });
   }
   $('tonicbar').addEventListener('click', e => { const b = e.target.closest('[data-tonic]'); if (b) drink(b.dataset.tonic); });
   setInterval(paintTonics, 1000);
@@ -2028,9 +2076,9 @@
       return paintEnchPanel(true);
     }
     if (d.ewgo === 'move') {
-      const r = L.disenchant(S, EW.src, EW.idx, EW.dst, EW.slot); if (!r) return;
+      const r = L.disenchant(S, EW.src, EW.idx, EW.dst, EW.slot, events); if (!r) return;
       save(); updateGear(true); updateSeats(true); sfx.relic(); shopBurst();
-      const msg = enchName(r.moved) + ' is now on ' + esc(L.gearName(r.item)) + '. ' + esc(L.gearName(r.lost)) + ' was used up. -' + fmt(r.cost) + ' Dust.';
+      const msg = enchName(r.moved) + ' is now on ' + esc(L.gearName(r.item)) + '. ' + esc(L.gearName(r.lost)) + ' was used up. -' + fmt(r.cost) + ' Dust, +' + fmt(r.xp) + ' hero XP.';
       ewReset(EW.mode); EW.done = msg; paintEnchPanel(true); paintEnchOv();
     }
   });
@@ -2098,10 +2146,10 @@
           md.querySelector('#mg-back').onclick = () => itemModal(uid);
           md.querySelector('#mg-go').onclick = () => {
             if (!campGate()) return;
-            const res = L.mergeItems(S, uid, pick); if (!res) return;
+            const res = L.mergeItems(S, uid, pick, null, events); if (!res) return;
             save(); updateGear(true); updateSeats(true);
-            if (res.ok) { sfx.relic(); toast('relic', 'Merge succeeded', L.gearName(res.item) + ' is now +' + res.item.up + '.', ''); itemModal(res.item.uid); }
-            else { sfx.coin(); closeModal(); toast('skull', 'The merge failed', 'Both ' + L.gearName(res.a) + ' pieces were destroyed.', 'warn'); }
+            if (res.ok) { sfx.relic(); toast('relic', 'Merge succeeded', L.gearName(res.item) + ' is now +' + res.item.up + '. +' + fmt(res.xp) + ' hero XP.', ''); itemModal(res.item.uid); }
+            else { sfx.coin(); closeModal(); toast('skull', 'The merge failed', 'Both ' + L.gearName(res.a) + ' pieces were destroyed. +' + fmt(res.xp) + ' hero XP for trying.', 'warn'); }
           };
         });
     };
@@ -2274,10 +2322,10 @@
           md.querySelectorAll('[data-cap]').forEach(b => b.onclick = () => { mmCap = +b.dataset.cap; draw(); });
           md.querySelector('#mm-x').onclick = closeModal;
           md.querySelector('#mm-go').onclick = () => {
-            let ok = 0, bad = 0;
-            for (const p of L.massMergePlan(S, mmCap)) { const r = L.mergeItems(S, p.a.uid, p.b.uid); if (!r) continue; if (r.ok) ok++; else bad++; }
+            let ok = 0, bad = 0, mxp = 0;
+            for (const p of L.massMergePlan(S, mmCap)) { const r = L.mergeItems(S, p.a.uid, p.b.uid, null, events); if (!r) continue; mxp += r.xp || 0; if (r.ok) ok++; else bad++; }
             closeModal(); save(); updateGear(true); updateSeats(true); ok ? sfx.relic() : sfx.coin();
-            toast('relic', 'Mass merge done', ok + ' merged' + (bad ? ', ' + bad + ' failed (' + bad * 2 + ' items lost)' : '') + '.', bad ? 'warn' : 'feat');
+            toast('relic', 'Mass merge done', ok + ' merged' + (bad ? ', ' + bad + ' failed (' + bad * 2 + ' items lost)' : '') + '. +' + fmt(mxp) + ' hero XP.', bad ? 'warn' : 'feat');
           };
         });
     };
@@ -2521,9 +2569,9 @@
     paintGoblinHunt();
     const f = S.foe;
     if (f) {
-      $('foename').textContent = f.pack ? f.name + ' and ' + (f.pack - 1) + ' more' : f.name;
+      $('foename').textContent = f.pack ? f.name + ' and ' + (f.pack - 1) + ' more' : f.rescue ? f.name + ', holding ' + f.rescue : f.name;
       if (f.goblin && !f.seen) { f.seen = 1; goblinArrives(f); }
-      const tag = $('foetag'); tag.textContent = f.world ? 'World boss' : f.goblin ? 'Thief' : f.pack ? 'Ambush ×' + f.pack + ' · XP ×' + f.pack * L.PACK_XP : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; if (f.pack) tag.dataset.tip = f.pack + ' foes at once: ' + f.pack * L.PACK_XP + '× hero XP and ' + f.pack * L.PACK_GOLD + '× gold.'; else delete tag.dataset.tip; tag.className = 'tag' + (f.world ? ' world' : '') + (f.goblin ? ' thief' : '') + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
+      const tag = $('foetag'); tag.textContent = f.wounded || f.rescue ? 'Mercy Corps' : f.world ? 'World boss' : f.goblin ? 'Thief' : f.pack ? 'Ambush ×' + f.pack + ' · XP ×' + f.pack * L.PACK_XP : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; if (f.pack) tag.dataset.tip = f.pack + ' foes at once: ' + f.pack * L.PACK_XP + '× hero XP and ' + f.pack * L.PACK_GOLD + '× gold.'; else if (f.wounded) tag.dataset.tip = 'A wounded Mercy Corps companion. Nobody fights: your healers mend them, Lantern Hymn helps a lot, and every tap is a bandage. Heal them to full for +' + L.AID_FX.pdps * 100 + '% damage and healing for ' + L.MERCY_MIN + ' minutes.'; else if (f.rescue) tag.dataset.tip = 'This monster holds ' + f.rescue + ' of the Mercy Corps captive. Defeat it to free them: +' + L.RESCUE_FX.xp * 100 + '% hero XP for ' + L.MERCY_MIN + ' minutes.'; else delete tag.dataset.tip; tag.className = 'tag' + (f.wounded || f.rescue ? ' mercy' : '') + (f.world ? ' world' : '') + (f.goblin ? ' thief' : '') + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
       { const sp = f.sp && L.SPECIALS[f.sp], mk = (f.mods || []).join(',') + '|' + (f.sp || ''); if (mk !== lastModKey) { lastModKey = mk; $('foemods').innerHTML = (sp ? '<span class="mod m-sp' + (sp.dot ? ' m-' + sp.dot : '') + '" title="' + esc(sp.desc + (sp.dot ? '. ' + (sp.dot === 'burn' ? 'Burns' : 'Poison') + ' last ' + L.DOT_FIGHTS + ' fights.' : '.')) + '">' + esc(sp.name) + '</span>' : '') + (f.mods || []).map(m => '<span class="mod m-' + m + '" title="' + esc(L.MODS[m].desc) + '">' + esc(L.MODS[m].name) + '</span>').join(''); } }
       if (f.world && S.wb) {
         const ph = L.wbPhase(wbState().total + S.wb.score), pct = ph.into / ph.need * 100;
@@ -2532,15 +2580,19 @@
       } else {
         $('hpbar').style.width = Math.max(0, f.hp / f.max * 100) + '%';
         $('wardbar').style.width = Math.min(100, (f.ward || 0) / f.max * 100) + '%';
-        $('hptext').textContent = fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max) + (f.ward > 0 ? ' + ' + fmt(f.ward) + ' ward' : '') + (f.shield > 0 ? ' · Shield ' + Math.ceil(f.shield * 100) + '%: tap to break' : '');
-        $('hpbar').parentNode.classList.toggle('shielded', f.shield > 0);
+        $('hptext').textContent = f.wounded ? 'Health ' + fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max) + ' · heal them to full' : fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max) + (f.ward > 0 ? ' + ' + fmt(f.ward) + ' ward' : '') + (f.shield > 0 ? ' · Shield ' + Math.ceil(f.shield * 100) + '%: tap to break' : '');
+        $('hpbar').parentNode.classList.toggle('shielded', f.shield > 0); $('hpbar').parentNode.classList.toggle('aid', !!f.wounded);
       }
-      $('lanternwrap').hidden = !f.boss && !f.goblin && !f.world; $('lanternwrap').classList.toggle('flee', !!f.goblin); $('lanternwrap').classList.toggle('wb', !!f.world); $('hpbar').parentNode.classList.toggle('wb', !!f.world);
+      $('lanternwrap').hidden = !f.boss && !f.goblin && !f.world && !f.wounded; $('lanternwrap').classList.toggle('aid', !!f.wounded); $('lanternwrap').classList.toggle('flee', !!f.goblin); $('lanternwrap').classList.toggle('wb', !!f.world); $('hpbar').parentNode.classList.toggle('wb', !!f.world);
       { const n = (S.items && S.items.oil) || 0; $('b-oil').hidden = !f.boss || !n || S.lantern <= 0; $('b-oil').textContent = 'Pour lantern oil (' + n + ')'; }
       if (f.world && S.wb) {
         const left = Math.max(0, (S.wb.until - Date.now()) / 1000);
         $('lanternbar').style.width = (left / L.WB_TIME * 100) + '%';
         $('lanterntext').textContent = 'Assault ends in ' + left.toFixed(0) + 's';
+      } else if (f.wounded) {
+        const left = Math.max(0, L.AID_TIME - f.aidT);
+        $('lanternbar').style.width = (left / L.AID_TIME * 100) + '%';
+        $('lanterntext').textContent = 'Carried to safety in ' + left.toFixed(0) + 's';
       } else if (f.goblin) {
         const left = Math.max(0, L.GOBLIN_TIME - f.flee);
         $('lanternbar').style.width = (left / L.GOBLIN_TIME * 100) + '%';
@@ -2592,7 +2644,7 @@
     L.strike(S, Date.now(), null, events);
     strikesThisSession++;
     if (strikesThisSession === 8) $('hint').style.opacity = 0;
-    if (ev && ev.clientX != null) {
+    if (ev && ev.clientX != null && !(S.foe && S.foe.wounded)) {
       const r = arena.getBoundingClientRect();
       slashes.push({ x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H, a: Math.random() * Math.PI, t: tAnim, c: '#fff3dc', big: true });
     }
@@ -2671,6 +2723,7 @@
     if (!S || !S.hero) return;
     const now = Date.now(), ev = [];
     const act = !document.hidden && now - lastAct < 90000;
+    if (act) S.actAt = now;
     try { L.ghostTick(S, now, act, Math.random, ev); L.merchantTick(S, now, act, Math.random, ev); } catch (e) { return; }
     for (const e of ev) {
       if (e.type === 'ghost') {
@@ -4804,6 +4857,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 100, date: 'November 24, 2026', title: 'The Mercy Corps on the road', items: [
+      'Rare Mercy Corps encounters, from floor 5, while you are playing. Now and then a monster holds a Mercy Corps companion captive: defeat it to free them and get +30% hero XP for 15 minutes.',
+      'Sometimes you find a Mercy Corps companion lying wounded on the path instead. Nobody fights: your healers pour their healing into them, Lantern Hymn mends a big chunk, and every tap is a bandage. Heal them to full within 45 seconds for Mercy’s Thanks, +15% damage and healing for 15 minutes. If time runs out, other medics carry them to safety, and nothing is lost.',
+      'Both buffs show in the tonic bar under the fight with their time left, and the rescue counts in the XP bar’s bonus list.',
+      'Enchanting and merging gear now give hero XP: more for higher enchant tiers and higher merges, and half for a merge that fails.',
+    ] },
     { v: 99, date: 'November 24, 2026', title: 'The Enchanter’s shop, rebuilt', items: [
       'The Enchanter has been redrawn: an old, hooded enchanter with half-moon spectacles and a glowing crystal, standing behind his counter in front of a turning rune circle. Your hero walks in at full size.',
       'The top of the screen now says you are in the Enchanter’s Shop, with a Leave shop button, instead of showing the dungeon floor.',

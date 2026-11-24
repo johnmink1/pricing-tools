@@ -1,4 +1,4 @@
-/* lh-build 202611241407 */
+/* lh-build 202611241413 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -38,7 +38,7 @@
   function save() {
     if (dormant) return;
     S.lastSeen = Date.now();
-    const o = Object.assign({}, S); delete o.foe; delete o.enchAt;
+    const o = Object.assign({}, S); delete o.foe; delete o.enchAt; delete o.shopK;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(o)); } catch (e) {}
   }
 
@@ -459,139 +459,113 @@
     }
   }
 
-  // ---------- the Enchanter's shop (John, 2026-11-24) ----------
-  // The party leader leaves the Deep and walks into the shop. The Enchanter stands behind his counter on the right,
-  // where the monsters usually are; the choices hang above him in a speech bubble (#enchov); the work happens in the
-  // counter panel under the scene, and the items you pick appear on the counter.
-  const SHOP = { ex: 0.7 };
+  // ---------- the Hold's shops: the Enchanter and the Armorer (John, 2026-11-24, v102) ----------
+  // The shop is drawn in the battle frame at battle scale: the whole party stands where it stands in a fight and the
+  // shopkeeper stands where a monster would, at monster size, behind a counter. A sign names the shop. All choices
+  // live in the counter panel under the scene (one set of controls).
   let shopBg = null, shopKey = '';
-  const shopIcons = {};
-  function shopIcon(it) {
-    const k = it.cls + '|' + it.slot + '|' + it.rar;
-    if (!shopIcons[k]) { const im = new Image(); im.src = SP.itemIcon(it.cls, it.slot, it.rar); shopIcons[k] = im; }
-    return shopIcons[k];
+  const shopKind = () => S.shopK === 'arm' ? 'arm' : 'ench';
+  function shopGlow(g, cx, cy, r, rgb, a) { const q = g.createRadialGradient(cx, cy, 0, cx, cy, r); q.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); q.addColorStop(1, 'rgba(' + rgb + ',0)'); g.globalCompositeOperation = 'lighter'; g.fillStyle = q; g.fillRect(cx - r, cy - r, r * 2, r * 2); g.globalCompositeOperation = 'source-over'; }
+  function shopShelf(g, sx, y, w, seed) {
+    let s = seed; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let bx = sx + 2; bx < sx + w - 4; bx += 4.5 + r() * 3) {
+      if (r() < 0.6) { const c = ['#a78bfa', '#60a5fa', '#34d399', '#f472b6', '#fbbf24'][Math.floor(r() * 5)], bh = 4 + r() * 3; g.fillStyle = c; g.beginPath(); g.ellipse(bx + 1.6, y - bh * 0.4, 1.8, bh * 0.45, 0, 0, Math.PI * 2); g.fill(); g.fillRect(bx + 1, y - bh, 1.2, bh * 0.5); g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(bx + 0.9, y - bh * 0.6, 0.6, 1.2); }
+      else { const bh = 5 + r() * 2.5; g.fillStyle = ['#7c2d12', '#1e3a8a', '#14532d', '#581c87'][Math.floor(r() * 4)]; g.fillRect(bx, y - bh, 3, bh); }
+    }
+    g.fillStyle = '#6a4426'; g.fillRect(sx, y, w, 2); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(sx, y + 2, w, 1.5);
   }
-  function shopGeo() {
-    const floorY = Math.round(H * 0.8), cw = Math.round(W * 0.34), ex = Math.round(W * SHOP.ex), cTop = Math.round(floorY - Math.max(14, H * 0.24));
-    // the Enchanter is as big as fits under his speech bubble (SHOP.top, measured in placeEnchOv); the hero matches him
-    const room = cTop - (SHOP.top || 0), eh = Math.max(40, Math.min(H * 0.74, room / 0.6)), ew = eh * 0.75;
-    const hh = Math.max(28, Math.min(eh * 0.82, floorY - (SHOP.top || 0) + 2)), hw = hh * 0.75;
-    return { floorY, cw, ex, cTop, eh, ew, hh, hw, eTop: cTop - eh * 0.6, standX: ex - cw / 2 - hw * 0.5 };
-  }
-  function buildShop() {
+  function buildShop(kind) {
     const c = document.createElement('canvas'); c.width = Math.round(W * R); c.height = Math.round(H * R);
     const g = c.getContext('2d'); g.scale(R, R);
-    const { floorY, ex } = shopGeo();
-    // back wall: deep plum plaster with a faint diamond pattern, a dark wood wainscot and two timber posts
-    let lg = g.createLinearGradient(0, 0, 0, floorY); lg.addColorStop(0, '#1a1128'); lg.addColorStop(0.6, '#2c1c42'); lg.addColorStop(1, '#352350');
-    g.fillStyle = lg; g.fillRect(0, 0, W, floorY);
-    g.fillStyle = 'rgba(255,220,160,.045)';
-    for (let y = 8; y < floorY - 14; y += 12) for (let x = (y / 12 % 2) * 8; x < W; x += 16) { g.beginPath(); g.moveTo(x, y - 2.5); g.lineTo(x + 2, y); g.lineTo(x, y + 2.5); g.lineTo(x - 2, y); g.fill(); }
-    const wy = floorY - Math.max(10, H * 0.13);
-    lg = g.createLinearGradient(0, wy, 0, floorY); lg.addColorStop(0, '#4a2f1c'); lg.addColorStop(1, '#2a190e'); g.fillStyle = lg; g.fillRect(0, wy, W, floorY - wy);
-    g.fillStyle = '#6a4426'; g.fillRect(0, wy - 1.5, W, 2);
-    g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 0.6; for (let x = 10; x < W; x += 22) g.strokeRect(x, wy + 2.5, 18, floorY - wy - 5);
-    const post = x => { const pg = g.createLinearGradient(x - 3, 0, x + 3, 0); pg.addColorStop(0, '#2a1a0e'); pg.addColorStop(0.5, '#5a3a22'); pg.addColorStop(1, '#2a1a0e'); g.fillStyle = pg; g.fillRect(x - 3, 0, 6, floorY); };
-    post(Math.round(W * 0.2)); post(Math.round(W * 0.985));
-    lg = g.createLinearGradient(0, 0, 0, 7); lg.addColorStop(0, '#2a1a0e'); lg.addColorStop(1, '#4a2f1c'); g.fillStyle = lg; g.fillRect(0, 0, W, 6);
-    // the open doorway the party came in by, with the blue dark of the Deep beyond it
-    const dx = Math.round(W * 0.085), dw = Math.max(16, W * 0.075), dh = Math.max(26, (floorY - 6) * 0.62);
-    const arch = () => { g.beginPath(); g.moveTo(dx - dw / 2, floorY); g.lineTo(dx - dw / 2, floorY - dh + dw / 2); g.arc(dx, floorY - dh + dw / 2, dw / 2, Math.PI, 0); g.lineTo(dx + dw / 2, floorY); g.closePath(); };
-    lg = g.createLinearGradient(0, floorY - dh, 0, floorY); lg.addColorStop(0, '#0a0f1e'); lg.addColorStop(1, '#16223a'); g.fillStyle = lg; arch(); g.fill();
-    g.strokeStyle = '#7a5434'; g.lineWidth = 2.2; arch(); g.stroke();
-    g.fillStyle = 'rgba(120,160,255,.08)'; g.beginPath(); g.moveTo(dx - dw / 2, floorY); g.lineTo(dx + dw / 2, floorY); g.lineTo(dx + dw * 1.6, H); g.lineTo(dx - dw, H); g.fill();
-    // shelves of potions and books on both sides of the Enchanter
-    const shelf = (x, y, w, seed0) => {
-      let seed = seed0; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-      for (let bx = x + 2; bx < x + w - 4; bx += 4.5 + rnd() * 3) {
-        if (rnd() < 0.55) { const col = ['#a78bfa', '#60a5fa', '#34d399', '#f472b6', '#fbbf24'][Math.floor(rnd() * 5)], bh = 4 + rnd() * 3;
-          g.fillStyle = col; g.globalAlpha = 0.9; g.beginPath(); g.ellipse(bx + 1.6, y - bh * 0.4, 1.8, bh * 0.45, 0, 0, Math.PI * 2); g.fill(); g.fillRect(bx + 1, y - bh, 1.2, bh * 0.5); g.globalAlpha = 1;
-          g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(bx + 0.9, y - bh * 0.6, 0.6, 1.2); }
-        else { const bh = 5 + rnd() * 2.5; g.fillStyle = ['#7c2d12', '#1e3a8a', '#14532d', '#581c87', '#713f12'][Math.floor(rnd() * 5)]; g.fillRect(bx, y - bh, 3, bh); g.fillStyle = 'rgba(255,220,150,.4)'; g.fillRect(bx, y - bh + 1.2, 3, 0.6); }
-      }
-      g.fillStyle = '#6a4426'; g.fillRect(x, y, w, 2); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x, y + 2, w, 1.5);
-    };
-    const top = Math.max(16, floorY * 0.3), gap = Math.max(10, floorY * 0.2);
-    for (let i = 0; i < 2; i++) { shelf(Math.round(W * 0.43), Math.round(top + gap * i + 8), Math.round(W * 0.12), 11 + i * 7); shelf(Math.round(W * 0.86), Math.round(top + gap * i + 8), Math.round(W * 0.115), 29 + i * 5); }
-    // a round window with moonlight between the door and the post
-    const wx = Math.round(W * 0.31), wyy = Math.round(Math.max(18, floorY * 0.36)), wr = Math.max(8, Math.min(14, floorY * 0.13));
-    g.fillStyle = '#3a2618'; g.beginPath(); g.arc(wx, wyy, wr + 2.5, 0, Math.PI * 2); g.fill();
-    const wg = g.createRadialGradient(wx - wr * 0.3, wyy - wr * 0.3, 1, wx, wyy, wr); wg.addColorStop(0, '#c7d6ff'); wg.addColorStop(1, '#33467a'); g.fillStyle = wg; g.beginPath(); g.arc(wx, wyy, wr, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#3a2618'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(wx - wr, wyy); g.lineTo(wx + wr, wyy); g.moveTo(wx, wyy - wr); g.lineTo(wx, wyy + wr); g.stroke();
-    // floorboards, darker towards the front, with a warm pool of light by the counter
-    lg = g.createLinearGradient(0, floorY, 0, H); lg.addColorStop(0, '#5a3a22'); lg.addColorStop(1, '#24160c'); g.fillStyle = lg; g.fillRect(0, floorY, W, H - floorY);
-    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = floorY + 4, k = 0; y < H; y += 4 + k * 1.5, k++) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
-    const pool = g.createRadialGradient(ex - W * 0.12, floorY + 4, 2, ex - W * 0.12, floorY + 4, W * 0.32); pool.addColorStop(0, 'rgba(255,190,110,.22)'); pool.addColorStop(1, 'rgba(255,190,110,0)');
-    g.fillStyle = pool; g.fillRect(0, floorY - 2, W, H - floorY + 2);
+    const fy = Math.round(H * 0.7), ench = kind === 'ench', ex = Math.round(W * FOE_X);
+    let lg = g.createLinearGradient(0, 0, 0, fy);
+    if (ench) { lg.addColorStop(0, '#1a1128'); lg.addColorStop(1, '#352350'); } else { lg.addColorStop(0, '#17130f'); lg.addColorStop(1, '#3a2a20'); }
+    g.fillStyle = lg; g.fillRect(0, 0, W, fy);
+    if (ench) { g.fillStyle = 'rgba(255,220,160,.05)'; for (let y = 8; y < fy - 14; y += 12) for (let x = (y / 12 % 2) * 8; x < W; x += 16) { g.beginPath(); g.moveTo(x, y - 2.5); g.lineTo(x + 2, y); g.lineTo(x, y + 2.5); g.lineTo(x - 2, y); g.fill(); } }
+    else { g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = 6, k = 0; y < fy; y += 9, k++) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); for (let x = (k % 2) * 10; x < W; x += 20) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 9); g.stroke(); } } }
+    const wy = fy - 16; lg = g.createLinearGradient(0, wy, 0, fy); lg.addColorStop(0, ench ? '#4a2f1c' : '#2a2420'); lg.addColorStop(1, ench ? '#2a190e' : '#16120e'); g.fillStyle = lg; g.fillRect(0, wy, W, fy - wy);
+    g.fillStyle = ench ? '#6a4426' : '#4a3e34'; g.fillRect(0, wy - 1.5, W, 2);
+    for (const px of [W * 0.04, W * 0.5, W * 0.97]) { const pg = g.createLinearGradient(px - 3, 0, px + 3, 0); pg.addColorStop(0, '#2a1a0e'); pg.addColorStop(0.5, '#5a3a22'); pg.addColorStop(1, '#2a1a0e'); g.fillStyle = pg; g.fillRect(px - 3, 0, 6, fy); }
+    g.fillStyle = '#3a2618'; g.fillRect(0, 0, W, 6);
+    lg = g.createLinearGradient(0, fy, 0, H); lg.addColorStop(0, ench ? '#5a3a22' : '#3a322c'); lg.addColorStop(1, '#1a120a'); g.fillStyle = lg; g.fillRect(0, fy, W, H - fy);
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = fy + 4, k = 0; y < H; y += 4 + k * 1.6, k++) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    if (ench) {
+      shopShelf(g, ex - 46, 30, 30, 7); shopShelf(g, ex - 46, 48, 30, 19); shopShelf(g, ex + 18, 30, 30, 23); shopShelf(g, ex + 18, 48, 30, 31);
+    } else {
+      // forge hearth behind the smith, a weapon rack and a shield on the wall
+      const hx = ex + 30; g.fillStyle = '#2a2420'; g.fillRect(hx - 6, 6, 12, fy - 56);
+      g.beginPath(); g.moveTo(hx - 16, fy - 16); g.lineTo(hx - 16, fy - 40); g.quadraticCurveTo(hx, fy - 54, hx + 16, fy - 40); g.lineTo(hx + 16, fy - 16); g.fill();
+      g.strokeStyle = '#5a4a3e'; g.lineWidth = 2; g.stroke();
+      const rx = ex - 46; g.fillStyle = '#5a3a22'; g.fillRect(rx, 26, 30, 2); g.fillRect(rx, 50, 30, 2);
+      [['#c0c8d4', 0], ['#a8b0bc', 8], ['#d4dbe6', 16], ['#9aa6b8', 24]].forEach(([col, d]) => { g.fillStyle = col; g.fillRect(rx + 3 + d, 28, 1.6, 20); g.fillStyle = '#6a4426'; g.fillRect(rx + 2 + d, 44, 3.6, 4); });
+      g.fillStyle = '#7a8494'; g.beginPath(); g.arc(ex - 4, 40, 7, 0, Math.PI * 2); g.fill(); g.fillStyle = '#a8742e'; g.beginPath(); g.arc(ex - 4, 40, 2.2, 0, Math.PI * 2); g.fill();
+    }
+    // the sign over the shop
+    const text = ench ? 'THE ENCHANTER' : 'THE ARMORER'; g.font = '700 7px Inter, system-ui, sans-serif'; const sw = g.measureText(text).width + 12, sy = 9;
+    g.strokeStyle = '#2a1a0e'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(ex - sw / 2 + 4, 6); g.lineTo(ex - sw / 2 + 4, sy); g.moveTo(ex + sw / 2 - 4, 6); g.lineTo(ex + sw / 2 - 4, sy); g.stroke();
+    g.fillStyle = '#5a3a22'; g.fillRect(ex - sw / 2, sy, sw, 11); g.strokeStyle = '#a8742e'; g.strokeRect(ex - sw / 2 + 0.5, sy + 0.5, sw - 1, 10);
+    g.fillStyle = ench ? '#e9d5ff' : '#ffd9a8'; g.textAlign = 'center'; g.fillText(text, ex, sy + 8); g.textAlign = 'left';
     return c;
   }
-  // The counter: dark wood front with panels and a gold trim, a lighter top with a little depth.
-  function drawCounter(G) {
-    const { floorY, cw, ex, cTop } = G, x0 = ex - cw / 2;
-    let lg = ctx.createLinearGradient(0, cTop, 0, floorY); lg.addColorStop(0, '#6a4024'); lg.addColorStop(1, '#2e1a0c');
-    ctx.fillStyle = lg; ctx.fillRect(x0, cTop + 2, cw, floorY - cTop - 1);
-    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.7; const np = 3, pw = (cw - 8) / np;
-    for (let i = 0; i < np; i++) ctx.strokeRect(x0 + 4 + i * pw + 1, cTop + 6, pw - 2, floorY - cTop - 10);
-    ctx.fillStyle = 'rgba(245,194,66,.55)'; for (let i = 0; i < np; i++) { const mx = x0 + 4 + i * pw + pw / 2, my = cTop + (floorY - cTop) / 2 + 1; ctx.beginPath(); ctx.moveTo(mx, my - 2); ctx.lineTo(mx + 1.6, my); ctx.lineTo(mx, my + 2); ctx.lineTo(mx - 1.6, my); ctx.fill(); }
-    lg = ctx.createLinearGradient(0, cTop - 2, 0, cTop + 3); lg.addColorStop(0, '#b07a46'); lg.addColorStop(1, '#7a4a26');
-    ctx.fillStyle = lg; ctx.fillRect(x0 - 3, cTop - 1.5, cw + 6, 4);
-    ctx.fillStyle = '#f5c242'; ctx.globalAlpha = 0.6; ctx.fillRect(x0 - 3, cTop + 2.5, cw + 6, 0.8); ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x0 - 2, floorY, cw + 4, 1.5);
+  function drawShopCounter(ex, fy, ench) {
+    const cw = 54, top = fy - 13;
+    let lg = ctx.createLinearGradient(0, top, 0, fy); lg.addColorStop(0, ench ? '#6a4024' : '#3a3a42'); lg.addColorStop(1, ench ? '#2e1a0c' : '#1e1e24'); ctx.fillStyle = lg; ctx.fillRect(ex - cw / 2, top + 2, cw, fy - top);
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.6; for (let i = 0; i < 3; i++) ctx.strokeRect(ex - cw / 2 + 3 + i * 16, top + 5, 15, fy - top - 7);
+    ctx.fillStyle = ench ? '#b07a46' : '#6a6a76'; ctx.fillRect(ex - cw / 2 - 2, top - 1, cw + 4, 3.5);
+    if (ench) {
+      ctx.fillStyle = '#efe2bf'; ctx.fillRect(ex - 24, top - 5, 2, 4); flame(ctx, ex - 23, top - 5, 3.5 + Math.sin(tAnim * 8) * 0.5, Math.sin(tAnim * 5));
+      ctx.fillStyle = '#1e3a8a'; ctx.fillRect(ex + 14, top - 2.5, 9, 2); ctx.fillStyle = '#7c2d12'; ctx.fillRect(ex + 15, top - 4.5, 7, 2);
+    } else {
+      ctx.fillStyle = '#4a505c'; ctx.beginPath(); ctx.moveTo(ex + 16, top - 1); ctx.lineTo(ex + 28, top - 1); ctx.lineTo(ex + 28, top - 4); ctx.lineTo(ex + 32, top - 6); ctx.lineTo(ex + 13, top - 6); ctx.lineTo(ex + 17, top - 4); ctx.fill();
+      ctx.fillStyle = '#8a92a0'; ctx.fillRect(ex + 13, top - 6.5, 19, 1);
+    }
+    return top;
   }
   function drawEnchShop(now) {
-    if (shopKey !== W + 'x' + H) { shopBg = buildShop(); shopKey = W + 'x' + H; }
+    const kind = shopKind(), ench = kind === 'ench', key = W + 'x' + H + kind;
+    if (shopKey !== key) { shopBg = buildShop(kind); shopKey = key; }
     ctx.drawImage(shopBg, 0, 0, W, H);
-    const G = shopGeo(), { floorY, cw, ex, cTop, eh, ew, hh, hw } = G;
-    // a rune circle turning slowly on the wall behind the Enchanter
-    const rr = Math.min(eh * 0.55, W * 0.13), ry = G.eTop + eh * 0.28;
-    ctx.save(); ctx.translate(ex, ry); ctx.globalAlpha = 0.5 + 0.15 * Math.sin(tAnim * 1.5);
-    const halo = ctx.createRadialGradient(0, 0, rr * 0.2, 0, 0, rr * 1.3); halo.addColorStop(0, 'rgba(167,139,250,.35)'); halo.addColorStop(1, 'rgba(167,139,250,0)');
-    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(0, 0, rr * 1.3, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#c4b5fd'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, rr * 0.78, 0, Math.PI * 2); ctx.stroke();
-    ctx.rotate(tAnim * 0.15);
-    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; ctx.save(); ctx.rotate(a); ctx.translate(0, -rr * 0.89); ctx.beginPath(); ctx.moveTo(-1.2, -1.4); ctx.lineTo(1.2, -1.4); ctx.lineTo(0, 1.6); ctx.closePath(); ctx.stroke(); ctx.restore(); }
-    ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 - Math.PI / 2, b = a + Math.PI * 2 / 3; ctx.moveTo(Math.cos(a) * rr * 0.78, Math.sin(a) * rr * 0.78); ctx.lineTo(Math.cos(b) * rr * 0.78, Math.sin(b) * rr * 0.78); } ctx.stroke();
-    ctx.restore(); ctx.globalAlpha = 1;
-    // two hanging lanterns
-    for (const lx of [W * 0.36, W * 0.56]) {
-      const ly = Math.max(10, H * 0.12), sw = Math.sin(tAnim * 1.1 + lx) * 0.8;
-      ctx.strokeStyle = '#2a1a0e'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(lx, 5); ctx.lineTo(lx + sw, ly - 4); ctx.stroke();
-      const lgw = ctx.createRadialGradient(lx + sw, ly, 0, lx + sw, ly, 22); lgw.addColorStop(0, 'rgba(255,200,110,.35)'); lgw.addColorStop(1, 'rgba(255,200,110,0)');
-      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = lgw; ctx.beginPath(); ctx.arc(lx + sw, ly, 22, 0, Math.PI * 2); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = '#3a2618'; ctx.fillRect(lx + sw - 3, ly - 4.5, 6, 1.5); ctx.fillRect(lx + sw - 3, ly + 3.5, 6, 1.5);
-      ctx.fillStyle = 'rgba(255,214,140,.85)'; ctx.fillRect(lx + sw - 2.4, ly - 3, 4.8, 6.5);
-      flame(ctx, lx + sw, ly + 2.5, 4 + Math.sin(tAnim * 7 + lx) * 0.6, Math.sin(tAnim * 4 + lx));
+    const fy = Math.round(H * 0.7), ex = Math.round(W * FOE_X);
+    // hanging lanterns and the room light
+    for (const lx of [W * 0.22, W * 0.42]) {
+      const ly = 18, s = Math.sin(tAnim * 1.1 + lx) * 0.6;
+      ctx.strokeStyle = '#2a1a0e'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(lx, 6); ctx.lineTo(lx + s, ly - 4); ctx.stroke();
+      shopGlow(ctx, lx + s, ly, 26, '255,200,110', 0.3);
+      ctx.fillStyle = '#3a2618'; ctx.fillRect(lx + s - 3, ly - 4.5, 6, 1.5); ctx.fillRect(lx + s - 3, ly + 3.5, 6, 1.5);
+      ctx.fillStyle = 'rgba(255,214,140,.9)'; ctx.fillRect(lx + s - 2.4, ly - 3, 4.8, 6.5); flame(ctx, lx + s, ly + 2.5, 4 + Math.sin(tAnim * 7 + lx) * 0.5, Math.sin(tAnim * 4 + lx));
     }
-    // the Enchanter behind the counter, facing the door, breathing a little
-    const es = sprite('enchanter', 0, false), br = Math.sin(tAnim * 1.4) * 0.6;
-    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, cTop + 4); ctx.clip(); ctx.translate(ex, 0); ctx.scale(-1, 1); ctx.drawImage(es, -ew / 2, G.eTop + br, ew, eh); ctx.restore();
-    // the crystal in his hands pulses (it sits at 86,84 of the 120 x 160 frame; flipped, so on his left)
-    const ox = ex - (86 / 120 - 0.5) * ew, oy = G.eTop + br + 84 / 160 * eh;
-    const og = ctx.createRadialGradient(ox, oy, 0, ox, oy, eh * 0.22 + Math.sin(tAnim * 3) * 2); og.addColorStop(0, 'rgba(233,213,255,.55)'); og.addColorStop(1, 'rgba(167,139,250,0)');
-    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = og; ctx.beginPath(); ctx.arc(ox, oy, eh * 0.25, 0, Math.PI * 2); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
-    drawCounter(G);
-    // on the counter: a candle, a stack of books, and whatever you have picked in the panel below
-    const x0 = ex - cw / 2;
-    ctx.fillStyle = '#efe2bf'; ctx.fillRect(x0 + 3, cTop - 6, 2.4, 5); flame(ctx, x0 + 4.2, cTop - 6, 4 + Math.sin(tAnim * 8) * 0.7, Math.sin(tAnim * 5));
-    [['#1e3a8a', 0], ['#7c2d12', 2.2], ['#14532d', 4.4]].forEach(([col, y], i) => { ctx.fillStyle = col; ctx.fillRect(x0 + cw - 13 + i * 0.6, cTop - 2.2 - y, 10 - i, 2.2); ctx.fillStyle = 'rgba(255,230,170,.5)'; ctx.fillRect(x0 + cw - 13 + i * 0.6, cTop - 1.4 - y, 10 - i, 0.4); });
-    const isz = Math.max(9, Math.min(16, H * 0.11)), picks = [EW.dst && L.itemOf(S, EW.dst), EW.src && L.itemOf(S, EW.src)];
+    shopGlow(ctx, W * 0.4, fy + 6, W * 0.45, '255,190,110', 0.16);
+    if (ench) {
+      // a rune circle turning slowly behind the Enchanter
+      ctx.save(); ctx.translate(ex, fy - 44); ctx.globalAlpha = 0.55 + 0.15 * Math.sin(tAnim * 1.5); ctx.strokeStyle = 'rgba(196,181,253,.8)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.stroke();
+      ctx.rotate(tAnim * 0.15); ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 - Math.PI / 2, b = a + Math.PI * 2 / 3; ctx.moveTo(Math.cos(a) * 17, Math.sin(a) * 17); ctx.lineTo(Math.cos(b) * 17, Math.sin(b) * 17); } ctx.stroke();
+      ctx.restore(); ctx.globalAlpha = 1; shopGlow(ctx, ex, fy - 44, 30, '167,139,250', 0.28);
+    } else {
+      // the forge fire
+      const hx = ex + 30, fg = ctx.createLinearGradient(0, fy - 40, 0, fy - 16); fg.addColorStop(0, '#3a1a08'); fg.addColorStop(1, '#ff7a1a'); ctx.fillStyle = fg; ctx.fillRect(hx - 11, fy - 36, 22, 20);
+      for (let i = 0; i < 4; i++) flame(ctx, hx - 7 + i * 4.5, fy - 17, 8 + (i % 2) * 3 + Math.sin(tAnim * 6 + i) * 1.2, Math.sin(tAnim * 5 + i));
+      shopGlow(ctx, hx, fy - 26, 40, '255,140,50', 0.32 + 0.05 * Math.sin(tAnim * 4));
+      if (Math.random() < 0.15) particles.push({ x: hx + (Math.random() - 0.5) * 14, y: fy - 22, vx: (Math.random() - 0.5) * 6, vy: -10 - Math.random() * 12, life: 1 + Math.random(), age: 0, c: Math.random() < 0.5 ? '#ffb347' : '#ff6a1f', s: 1 });
+    }
+    // the shopkeeper at monster size behind the counter, facing the party
+    const k = sprite(ench ? 'enchanter' : 'armorer', 0, false), kw = k.lw * 3, kh = k.lh * 3, br = Math.sin(tAnim * 1.4) * 0.5;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, fy - 11); ctx.clip(); ctx.translate(ex, 0); ctx.scale(-1, 1); ctx.drawImage(k, -kw / 2, fy - 4 - kh + br, kw, kh); ctx.restore();
+    const top = drawShopCounter(ex, fy, ench);
+    // what you picked sits on the counter
+    const picks = (ench ? [EW.dst, EW.src] : [AW.a, AW.b]).map(u => u && L.itemOf(S, u));
     picks.forEach((it, i) => {
-      if (!it) return; const im = shopIcon(it), px = ex + (i ? 1 : -1) * cw * 0.17, py = cTop - isz - 1 + Math.sin(tAnim * 2 + i) * 0.6;
-      const rg = ctx.createRadialGradient(px, py + isz / 2, 0, px, py + isz / 2, isz); rg.addColorStop(0, (RARITY_COLOR[it.rar] || '#fff') + '88'); rg.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(px, py + isz / 2, isz, 0, Math.PI * 2); ctx.fill();
-      if (im.complete && im.naturalWidth) ctx.drawImage(im, px - isz / 2, py, isz, isz);
+      if (!it) return; const im = shopIcon(it), sz = 10, px = ex + (i ? 6 : -14), py = top - sz - 1 + Math.sin(tAnim * 2 + i) * 0.5;
+      shopGlow(ctx, px + sz / 2, py + sz / 2, sz, '255,230,160', 0.25);
+      if (im.complete && im.naturalWidth) ctx.drawImage(im, px, py, sz, sz);
     });
-    if (EW.dst && EW.src && Math.random() < 0.3) { const a = picks[1] ? ex + cw * 0.17 : ex; particles.push({ x: a, y: cTop - isz / 2, vx: -cw * 0.34 * (0.8 + Math.random() * 0.4), vy: -6 - Math.random() * 6, life: 1, age: 0, c: Math.random() < 0.5 ? '#c4b5fd' : '#f0abfc', s: 1 }); }
-    // your hero walks in from the doorway and stops in front of the counter
-    const m = L.memberById('you');
-    if (m) {
-      const t = Math.min(1, (now - (S.enchAt || now)) / 1800), x0h = W * 0.085, x1 = G.standX, hx = x0h + (x1 - x0h) * (1 - Math.pow(1 - t, 2));
-      const spr = sprite(m.cls, lookHue(m), false), step = t < 1 ? Math.abs(Math.sin(tAnim * 9)) * 1.4 : Math.sin(tAnim * 1.6) * 0.4;
-      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(hx, floorY + 2.5, hw * 0.34, 2.2, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.drawImage(spr, hx - hw / 2, floorY + 3 - hh - step, hw, hh);
+    // the party, exactly where it stands in a fight
+    for (const p of partyLayout()) {
+      const m = L.memberById(p.id); if (!m) continue;
+      const spr = sprite(m.cls, lookHue(m), false), b = Math.sin(tAnim * 1.6 + p.x) * 0.4;
+      ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(p.x + spr.lw, p.y + spr.lh * 2 - 1, 8, 2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.drawImage(spr, p.x, p.y + b, spr.lw * 2, spr.lh * 2);
     }
-    // sparkles drifting up from the crystal
-    if (Math.random() < 0.25) particles.push({ x: ox + (Math.random() - 0.5) * 5, y: oy, vx: (Math.random() - 0.5) * 8, vy: -8 - Math.random() * 10, life: 1.2 + Math.random(), age: 0, c: Math.random() < 0.5 ? '#c4b5fd' : '#f0abfc', s: 1 });
     const dt = 1 / 60;
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i]; p.age += dt; if (p.age > p.life) { particles.splice(i, 1); continue; }
@@ -600,10 +574,16 @@
     }
     ctx.globalAlpha = 1;
   }
-  // A shower of sparks on the counter when an enchant moves.
+  const shopIcons = {};
+  function shopIcon(it) {
+    const k = it.cls + '|' + it.slot + '|' + it.rar;
+    if (!shopIcons[k]) { const im = new Image(); im.src = SP.itemIcon(it.cls, it.slot, it.rar); shopIcons[k] = im; }
+    return shopIcons[k];
+  }
+  // A shower of sparks on the counter when something is made.
   function shopBurst() {
-    const G = shopGeo(); for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, v = 10 + Math.random() * 30;
-      particles.push({ x: G.ex - G.cw * 0.17, y: G.cTop - 6, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 15, g: 30, life: 0.8 + Math.random() * 0.6, age: 0, c: ['#f5c242', '#c4b5fd', '#f0abfc', '#ffffff'][i % 4], s: 2 }); }
+    const ex = Math.round(W * FOE_X), y = Math.round(H * 0.7) - 18, cols = shopKind() === 'ench' ? ['#f5c242', '#c4b5fd', '#f0abfc', '#ffffff'] : ['#ffb347', '#ff6a1f', '#fff3c0', '#ffffff'];
+    for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, v = 10 + Math.random() * 30; particles.push({ x: ex - 8, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 15, g: 30, life: 0.8 + Math.random() * 0.6, age: 0, c: cols[i % 4], s: 2 }); }
   }
 
   // ---------- the Nexus breach (click-rhythm brake, core.js NX_*) ----------
@@ -1293,14 +1273,17 @@
         md.querySelector('#c-store').onclick = openStore; md.querySelector('#c-x').onclick = closeModal;
       });
   }
+  // The camp card (v102): what this place is, one main action, then a row with the Hold's tents.
   function campBarHtml() {
-    const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now()), store = '<button class="btn ghost small" data-camp="ench" data-tip="Go to the Enchanter’s shop to enchant and disenchant gear. You come back to this floor when you leave.">Enchanter</button><button class="btn ghost small" data-camp="store" data-tip="Draughts, lantern oil and tonics.">Store</button>';
-    if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Main camp</b><small>Everything can change here</small></div>' + (S.maxFloor > 1 || S.campReturn ? '<button class="btn small" data-camp="down" data-tip="Head back down. You start at the top of the region you left.">' + downLabel() + '</button>' : '') + store + '</div>';
-    if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Field camp · ' + Math.ceil(left) + 's</b><small>Change gear, then carry on</small></div>' + store + '</div>';
+    const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now());
+    const tent = (k, img, label, tip, extra) => '<button data-camp="' + k + '" data-tip="' + tip + '"' + (extra || '') + '>' + (img ? '<img src="' + SP.spriteURL(img, 2, 0) + '" alt="">' : '') + '<span>' + label + '</span></button>';
+    const row = draught => '<div class="cbseg">' + tent('ench', 'enchanter', 'Enchanter', 'Enchant and disenchant gear. You come back to this floor when you leave.') + tent('arm', 'armorer', 'Armorer', 'Upgrade, merge, or melt gear for gold. You come back to this floor when you leave.') +
+      tent('store', '', icon('coin') + 'Store', 'Draughts, lantern oil and tonics.') + (draught ? tent('drink', '', icon('flame') + 'Draught · ' + n, n ? 'Change gear here for 60 seconds and keep your floor.' : 'No Draughts left. Buy more in the Store.', n ? '' : ' disabled') : '') + '</div>';
+    if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><div class="cbtop"><span class="cb-ic">' + icon('flame') + '</span><div><b>Main camp</b><small>Everything can change here</small></div></div>' + (S.maxFloor > 1 || S.campReturn ? '<button class="btn cbmain" data-camp="down" data-tip="Head back down. You start at the top of the region you left.">' + downLabel() + '</button>' : '') + row(false) + '</div>';
+    if (left > 0) return '<div class="campbar on"><div class="cbtop"><span class="cb-ic">' + icon('flame') + '</span><div><b>Field camp · ' + Math.ceil(left) + 's</b><small>Change gear, then carry on</small></div></div>' + row(false) + '</div>';
     const top = Math.min(S.maxFloor, L.regionTop(S.floor));
-    return '<div class="campbar"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep</b><small>Floor ' + S.floor + ' ' + tipI('Gear changes need a camp. A Campfire Draught makes a field camp right here and keeps your floor. The main camp lets you change everything, but you restart at floor ' + top + ', the top of this region.') + '</small></div>' +
-      '<button class="btn small" data-camp="go" data-tip="Change everything at the main camp. You restart at floor ' + top + '.">Return to camp</button>' +
-      '<button class="btn ghost small" data-camp="drink"' + (n ? '' : ' disabled') + ' data-tip="' + (n ? 'Change gear here for 60 seconds and keep your floor.' : 'No Draughts left. Buy more in the Store.') + '">Draught · ' + n + '</button>' + store + '</div>';
+    return '<div class="campbar"><div class="cbtop"><span class="cb-ic">' + icon('lock') + '</span><div><b>In the Deep · floor ' + S.floor + '</b><small>Gear changes need a camp ' + tipI('A Campfire Draught makes a field camp right here and keeps your floor. The main camp lets you change everything, but you restart at floor ' + top + ', the top of this region.') + '</small></div></div>' +
+      '<button class="btn cbmain" data-camp="go" data-tip="Change everything at the main camp. You restart at floor ' + top + '.">' + icon('flame') + 'Return to camp</button>' + row(true) + '</div>';
   }
   // Sub-views keep the Gear and Skills tabs short: one thing at a time.
   const subView = (tabId, key, def) => {
@@ -1329,7 +1312,7 @@
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-camp]'); if (!b) return;
     const a = b.dataset.camp;
-    if (a === 'go') goCamp(); else if (a === 'ench') enchanterModal(); else if (a === 'down') descend(); else if (a === 'drink') drinkDraught(); else if (a === 'store') openStore(); else campModal();
+    if (a === 'go') goCamp(); else if (a === 'ench') enchanterModal(); else if (a === 'arm') armorerModal(); else if (a === 'hold') openHold(); else if (a === 'down') descend(); else if (a === 'drink') drinkDraught(); else if (a === 'store') openStore(); else campModal();
   });
   setInterval(paintCamp, 500);
 
@@ -1942,18 +1925,74 @@
         md.querySelector('#ev-go').onclick = () => { pre(); visitEnch(); };
       });
   }
-  function visitEnch() {
-    if (!L.visiting(S) && !L.visitEnchanter(S, Date.now())) return false;
+  function visitEnch(kind) {
+    kind = kind === 'arm' ? 'arm' : 'ench';
+    if (L.visiting(S)) S.shopK = kind; else if (!L.visitEnchanter(S, Date.now(), kind)) return false;
     closeModal(); sfx.relic(); particles.length = 0; paintEnchOv(); updatePanel(true);
     const a = document.querySelector('.stagehead') || $('arena'); if (a && a.scrollIntoView && innerWidth < 900) a.scrollIntoView({ block: 'start', behavior: 'smooth' });
     return true;
   }
   function leaveEnch() {
     if (!L.leaveEnchanter(S)) return;
-    closeModal(); sfx.buy(); particles.length = 0; ewReset('on'); paintEnchOv(); updatePanel(true); save();
+    closeModal(); sfx.buy(); particles.length = 0; ewReset('on'); awReset('up'); paintEnchOv(); updatePanel(true); save();
     toast('star', 'Back to the dive', 'The party carries on from floor ' + S.floor + '.', '');
   }
-  function enchanterModal(t) { if (!L.visiting(S)) ewReset(t || 'on'); visitEnch(); }
+  function enchanterModal(t) { if (!L.visiting(S)) ewReset(t || 'on'); visitEnch('ench'); }
+  function armorerModal(t) { if (!L.visiting(S) || shopKind() !== 'arm') awReset(t || 'up'); visitEnch('arm'); }
+  // The Armorer: upgrade an item with gold, merge two copies, or scrap spare gear for gold (more gold than the Enchanter
+  // pays, but no Dust). AW: mode 'up' | 'merge' | 'smelt'; a = the item picked, b = the copy merged into it.
+  const AW = { mode: 'up', a: null, b: null, done: null };
+  function awReset(mode, keep) { Object.assign(AW, { mode: mode || AW.mode, a: null, b: null, done: keep ? AW.done : null }); }
+  const riskTxt = v => Math.round(v * 1000) / 10 + '%';
+  function armPanelHtml() {
+    const gold = '<span class="epdust">' + icon('coin') + '<b>' + fmt(S.gold) + '</b> gold</span>';
+    const tabs = '<div class="ewtabs forge" role="tablist">' + [['up', 'Upgrade'], ['merge', 'Merge'], ['smelt', 'Scrap for gold']].map(([k, n]) => '<button role="tab" class="' + (AW.mode === k ? 'on' : '') + '" data-awmode="' + k + '">' + n + '</button>').join('') + '</div>';
+    const head = '<div class="ephead"><b>The Armorer’s counter</b>' + gold + '</div>' + tabs + (AW.done ? '<div class="ewdone">' + icon('star') + '<span>' + AW.done + '</span></div>' : '');
+    const A = AW.a && L.itemOf(S, AW.a), B = AW.b && L.itemOf(S, AW.b);
+    if (AW.a && !A) AW.a = null; if (AW.b && !B) AW.b = null;
+    const byWorn = (a, b) => (!!L.wearer(S, b.uid) - !!L.wearer(S, a.uid)) || (L.itemScore(b) - L.itemScore(a));
+    if (AW.mode === 'smelt') {
+      const list = scrapList(), g = list.reduce((a, it) => a + L.smeltValue(it), 0);
+      return head + '<h3 class="ewq">Which gear should the Armorer melt down for gold?</h3><p class="ewhint">The forge pays ' + L.SMELT_MULT + '× the gold of a normal scrap, but gives no Dust. Worn and locked items are never melted.</p>' +
+        '<div class="ewrar">' + L.RARITY.map(r => '<button class="ewchip r-' + r.id + (scrapOpts[r.id] ? ' sel' : '') + '" data-ewrar="' + r.id + '"><b style="color:var(--rc)">' + r.name + '</b><small>' + S.bag.filter(x => x.rar === r.id && enchSpare(x)).length + ' spare</small></button>').join('') + '</div>' +
+        '<label class="chk"><input type="checkbox" data-ewopt="keepBest"' + (scrapOpts.keepBest ? ' checked' : '') + '><span><b>Keep the best spare of each kind</b></span></label>' +
+        '<label class="chk"><input type="checkbox" data-ewopt="keepUp"' + (scrapOpts.keepUp ? ' checked' : '') + '><span><b>Keep upgraded pieces</b></span></label>' +
+        '<div class="ewsum">' + (list.length ? '<p><b>' + list.length + '</b> ' + (list.length === 1 ? 'piece becomes' : 'pieces become') + ' <b>' + fmt(g) + ' gold</b>.</p>' : '<p>Nothing matches. Tick more rarities above.</p>') +
+        '<button class="btn danger" data-awgo="smelt"' + (list.length ? '' : ' disabled') + '>Melt ' + list.length + '</button></div>';
+    }
+    let steps, cur = 0, body = '', picked = '';
+    if (AW.mode === 'up') {
+      steps = ['Item', 'Upgrade'];
+      if (!A) {
+        body = '<h3 class="ewq">Which item do you want to upgrade?</h3><p class="ewhint">Each upgrade raises an item one level for gold. Worn gear works too.</p>' +
+          ewList(S.bag.filter(x => x.up < L.UP_MAX).sort(byWorn).slice(0, 60).map(x => ewItemRow(x, 'data-awa="' + x.uid + '"', 'Upgrade to +' + (x.up + 1) + ewWorn(x), '<span class="ewcost gold' + (S.gold < L.upgradeCost(x) ? ' short' : '') + '">' + icon('coin') + fmt(L.upgradeCost(x)) + '</span>')), 'Nothing left to upgrade.');
+      } else {
+        cur = 1; picked = ewPicked('Upgrading', A, ewName(A), 'a');
+        const c = L.upgradeCost(A), max = A.up >= L.UP_MAX;
+        body = '<div class="ewsum">' + (max ? '<p><b>' + ewName(A) + '</b> is fully upgraded.</p>' : '<p><b>' + ewName(A) + '</b> becomes <b>+' + (A.up + 1) + '</b>.</p><p>Costs ' + icon('coin') + '<b>' + fmt(c) + ' gold</b>' + (S.gold < c ? '. You have ' + fmt(S.gold) + '.' : '.') + '</p>') +
+          '<button class="btn" data-awgo="up"' + (max || S.gold < c ? ' disabled' : '') + '>' + (max ? 'Fully upgraded' : S.gold < c ? 'Not enough gold' : 'Upgrade for ' + fmt(c) + ' gold') + '</button></div>';
+      }
+    } else {
+      steps = ['Item', 'Copy to merge in', 'Confirm'];
+      if (A) picked += ewPicked('Merging', A, ewName(A), 'a');
+      if (B) picked += ewPicked('With', B, ewName(B), 'b');
+      if (!A) {
+        body = '<h3 class="ewq">Which item do you want to merge?</h3><p class="ewhint">Two copies of the same item become one, a level higher. If it fails, both are lost.</p>' +
+          ewList(S.bag.filter(x => !x.lk && x.up < L.UP_MAX && S.bag.some(y => y !== x && !y.lk && L.mergeable(x, y))).sort(byWorn).slice(0, 60).map(x => ewItemRow(x, 'data-awa="' + x.uid + '"', S.bag.filter(y => y !== x && !y.lk && L.mergeable(x, y)).length + ' matching ' + (S.bag.filter(y => y !== x && !y.lk && L.mergeable(x, y)).length === 1 ? 'copy' : 'copies') + ewWorn(x), '')), 'No item has a matching copy yet. Copies of the same item can be merged.');
+      } else if (!B) {
+        cur = 1;
+        body = '<h3 class="ewq">Which copy should go into it?</h3><p class="ewhint">The copy is used up. The lower the result, the lower the risk.</p>' +
+          ewList(S.bag.filter(y => y !== A && !y.lk && L.mergeable(A, y)).sort((p, q) => q.up - p.up).map(x => ewItemRow(x, 'data-awb="' + x.uid + '"', 'Result +' + L.mergeRisk(S, A, x).to + ewWorn(x), '<span class="ewcost">' + riskTxt(L.mergeRisk(S, A, x).risk) + ' risk</span>')), 'No matching copy left.');
+      } else {
+        cur = 2; const r = L.mergeRisk(S, A, B), worn = L.wearer(S, A.uid) || L.wearer(S, B.uid);
+        body = '<div class="ewsum"><div class="mgodds"><div><small>Result</small><b>+' + r.to + '</b></div><div class="ok"><small>Success</small><b>' + riskTxt(1 - r.risk) + '</b></div><div class="bad"><small>Both destroyed</small><b>' + riskTxt(r.risk) + '</b></div></div>' +
+          '<p class="ewhint">Base risk ' + riskTxt(r.base) + ', cut by ' + Math.round(r.cut * 100) + '% from Luck and Intelligence.</p>' + (worn ? '<p class="warn">A worn piece is part of this merge. If it fails, that slot ends up empty.</p>' : '') +
+          '<button class="btn danger" data-awgo="merge">Merge to +' + r.to + '</button></div>';
+      }
+    }
+    const stepper = '<ol class="ewsteps">' + steps.map((s, i) => '<li class="' + (i < cur ? 'done' : i === cur ? 'cur' : '') + '"><i>' + (i < cur ? '&#10003;' : i + 1) + '</i>' + s + '</li>').join('') + '</ol>';
+    return head + stepper + (picked ? '<div class="ewpicked">' + picked + '</div>' : '') + body;
+  }
   // pieces of the panel
   const ewTile = x => '<div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>';
   const ewName = x => esc(L.gearName(x)) + (x.up ? ' +' + x.up : '');
@@ -2045,17 +2084,39 @@
   function paintEnchPanel(force) {
     const el = $('enchpanel'); if (!el) return; const on = L.visiting(S);
     el.hidden = !on; if (!on) { el.dataset.h = ''; return; }
-    const h = enchPanelHtml(); if (!force && el.dataset.h === h) return;
-    const sc = el.querySelector('.ewlist'), top = sc ? sc.scrollTop : 0, same = el.dataset.step === EW.mode + !!EW.dst + !!EW.src + EW.idx;
-    el.innerHTML = h; el.dataset.h = h; el.dataset.step = EW.mode + !!EW.dst + !!EW.src + EW.idx;
+    const arm = shopKind() === 'arm', h = arm ? armPanelHtml() : enchPanelHtml(); if (!force && el.dataset.h === h) return;
+    const step = arm ? 'a' + AW.mode + !!AW.a + !!AW.b : EW.mode + !!EW.dst + !!EW.src + EW.idx;
+    const sc = el.querySelector('.ewlist'), top = sc ? sc.scrollTop : 0, same = el.dataset.step === step;
+    el.innerHTML = h; el.dataset.h = h; el.dataset.step = step;
     if (!same) el.scrollTop = 0;
     const sc2 = el.querySelector('.ewlist'); if (sc2 && same) sc2.scrollTop = top;
     const sum = el.querySelector('.ewsum'); if (sum && !same && sum.scrollIntoView) sum.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
   function ewSet(o) { Object.assign(EW, o, { done: null }); paintEnchPanel(true); paintEnchOv(); }
   $('enchpanel') && $('enchpanel').addEventListener('click', e => {
-    const t = e.target.closest('[data-ewmode],[data-ewdst],[data-ewsrc],[data-ewsrcitem],[data-ewidx],[data-ewslot],[data-ewundo],[data-ewrar],[data-ewgo]'); if (!t) return;
+    const t = e.target.closest('[data-ewmode],[data-ewdst],[data-ewsrc],[data-ewsrcitem],[data-ewidx],[data-ewslot],[data-ewundo],[data-ewrar],[data-ewgo],[data-awmode],[data-awa],[data-awb],[data-awgo]'); if (!t) return;
     const d = t.dataset;
+    if (d.awmode) { awReset(d.awmode); return paintEnchPanel(true); }
+    if (d.awa) { Object.assign(AW, { a: d.awa, b: null, done: null }); return paintEnchPanel(true); }
+    if (d.awb) { Object.assign(AW, { b: d.awb, done: null }); return paintEnchPanel(true); }
+    if (d.ewundo && shopKind() === 'arm') { if (d.ewundo === 'a') Object.assign(AW, { a: null, b: null }); else AW.b = null; AW.done = null; return paintEnchPanel(true); }
+    if (d.awgo === 'up') {
+      const it = L.itemOf(S, AW.a); if (!it || !L.upgrade(S, it.uid)) return;
+      save(); updateGear(true); updateSeats(true); sfx.relic(); shopBurst();
+      AW.done = esc(L.gearName(it)) + ' is now +' + it.up + '.'; return paintEnchPanel(true);
+    }
+    if (d.awgo === 'merge') {
+      const res = L.mergeItems(S, AW.a, AW.b, null, events); if (!res) return;
+      save(); updateGear(true); updateSeats(true);
+      if (res.ok) { sfx.relic(); shopBurst(); awReset('merge'); AW.done = esc(L.gearName(res.item)) + ' is now +' + res.item.up + '. +' + fmt(res.xp) + ' hero XP.'; }
+      else { sfx.coin(); awReset('merge'); AW.done = 'The merge failed and both ' + esc(L.gearName(res.a)) + ' pieces were lost. +' + fmt(res.xp) + ' hero XP for trying.'; }
+      return paintEnchPanel(true);
+    }
+    if (d.awgo === 'smelt') {
+      const l = scrapList(); if (!l.length) return; let g = 0; for (const it of l) g += L.smelt(S, it.uid);
+      sfx.coin(); updateGear(true); save(); shopBurst();
+      AW.done = 'Melted ' + l.length + (l.length === 1 ? ' piece' : ' pieces') + ' for ' + fmt(g) + ' gold.'; return paintEnchPanel(true);
+    }
     if (d.ewmode) { ewReset(d.ewmode); EW.done = null; paintEnchPanel(true); paintEnchOv(); return; }
     if (d.ewdst) return ewSet({ dst: d.ewdst, slot: null });
     if (d.ewsrc) return ewSet({ src: d.ewsrc, idx: +d.ewi });
@@ -2083,44 +2144,25 @@
     }
   });
   $('enchpanel') && $('enchpanel').addEventListener('change', e => { const c = e.target.closest('[data-ewopt]'); if (c) { scrapOpts[c.dataset.ewopt] = c.checked; paintEnchPanel(true); } });
-  // In the shop the stage header names the shop, and the Enchanter's question hangs above him where the monsters stand.
+  // In the shop the stage header names the shop and holds the way out. Everything else is in the counter panel.
   function paintEnchOv() {
-    const on = L.visiting(S), ar = $('arena');
+    const on = L.visiting(S), arm = on && shopKind() === 'arm';
     document.body.classList.toggle('atench', on);
     let hd = $('shophead');
     if (!hd && on) {
       hd = document.createElement('div'); hd.id = 'shophead'; hd.className = 'shophead';
-      hd.addEventListener('click', e => { if (e.target.closest('[data-ev="leave"]')) leaveEnch(); });
+      hd.addEventListener('click', e => { if (e.target.closest('[data-ev="leave"]')) leaveEnch(); const sw = e.target.closest('[data-ev="swap"]'); if (sw) { if (sw.dataset.k === 'arm') awReset(); else ewReset(); visitEnch(sw.dataset.k); } });
       const sh = document.querySelector('.stagehead'); sh && sh.insertBefore(hd, sh.firstChild);
     }
     if (hd) {
       hd.hidden = !on;
-      const h = '<img src="' + SP.spriteURL('enchanter', 2, 0) + '" alt=""><div><b>The Enchanter’s Shop</b><small>Your dive is paused on floor ' + S.floor + '</small></div><button class="btn small leave" data-ev="leave">' + icon('flame') + 'Leave shop</button>';
+      const h = '<img src="' + SP.spriteURL(arm ? 'armorer' : 'enchanter', 2, 0) + '" alt=""><div><b>' + (arm ? 'The Armorer' : 'The Enchanter') + '</b><small>Your dive is paused on floor ' + S.floor + '</small></div>' +
+        '<button class="btn ghost small" data-ev="swap" data-k="' + (arm ? 'ench' : 'arm') + '">' + (arm ? 'Enchanter' : 'Armorer') + '</button><button class="btn small leave" data-ev="leave">Leave</button>';
       if (on && hd.dataset.h !== h) { hd.innerHTML = h; hd.dataset.h = h; }
     }
-    let el = $('enchov');
-    if (!el && on && ar) {
-      el = document.createElement('div'); el.id = 'enchov'; el.className = 'enchov';
-      el.addEventListener('pointerdown', e => e.stopPropagation());
-      el.addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-ewmode]'); if (!b) return; ewReset(b.dataset.ewmode); paintEnchPanel(true); paintEnchOv(); const p = $('enchpanel'); if (p && innerWidth < 900) p.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
-      ar.appendChild(el);
-    }
+    const old = $('enchov'); if (old) old.remove();
     paintEnchPanel();
-    if (!el) return;
-    el.hidden = !on; if (!on) { el.dataset.h = ''; return; }
-    const say = EW.mode === 'dis' ? 'Something to break down? Pick it below.' : EW.mode === 'scrap' ? 'Old gear? I’ll turn it into Dust.' : 'What shall I enchant for you?';
-    const h = '<p>' + say + '</p><div class="evrow">' + [['on', 'Enchant an item'], ['dis', 'Disenchant'], ['scrap', 'Scrap for Dust']].map(([k, n]) => '<button class="evb' + (EW.mode === k ? ' main' : '') + '" data-ewmode="' + k + '">' + n + '</button>').join('') + '</div><i class="evtail"></i>';
-    if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; }
-    placeEnchOv();
   }
-  // Keep the bubble inside the arena, with its tail over the Enchanter's head.
-  function placeEnchOv() {
-    const el = $('enchov'), ar = $('arena'); if (!el || el.hidden || !ar) return;
-    ar.classList.toggle('short', ar.clientHeight < 250);
-    const aw = ar.clientWidth, bw = el.offsetWidth, ex = aw * SHOP.ex, left = Math.max(6, Math.min(aw - bw - 6, ex - bw / 2));
-    el.style.left = left + 'px'; SHOP.top = (el.offsetTop + el.offsetHeight + 6) * 240 / Math.max(1, aw); const t = el.querySelector('.evtail'); if (t) t.style.left = Math.max(14, Math.min(bw - 14, ex - left)) + 'px';
-  }
-  window.addEventListener('resize', () => placeEnchOv());
   // ---------- merge: two copies of the same item become one at +1, or both are lost ----------
   function mergePicker(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
@@ -2923,7 +2965,7 @@
   try { sess = JSON.parse(localStorage.getItem(TOK_KEY) || 'null'); } catch (e) {}
   const signedIn = () => !!(sess && sess.refresh);
   function storeSess() { try { sess ? localStorage.setItem(TOK_KEY, JSON.stringify(sess)) : localStorage.removeItem(TOK_KEY); } catch (e) {} }
-  function saveObj() { S.lastSeen = Date.now(); const o = Object.assign({}, S); delete o.foe; delete o._frenzyAcc; return o; }
+  function saveObj() { S.lastSeen = Date.now(); const o = Object.assign({}, S); delete o.foe; delete o._frenzyAcc; delete o.enchAt; delete o.shopK; return o; }
   function summary(o) { return 'Floor ' + (o.maxFloorEver || 1) + ', ' + fmt(o.embers || 0) + ' Embers, ' + fmtTime((o.stats && o.stats.playTime) || 0) + ' played'; }
   function claims(jwt) { try { return JSON.parse(decodeURIComponent(escape(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); } catch (e) { return {}; } }
 
@@ -4297,7 +4339,7 @@
     // the surface and the Hold
     s += '<path d="M0 0H' + W + 'V64Q' + W * 0.75 + ' 82 ' + W * 0.5 + ' 70T0 74z" fill="#0c1020"/>' + Array.from({ length: 18 }, (_, k) => '<circle cx="' + ((k * 97) % W) + '" cy="' + (8 + (k * 29) % 40) + '" r="' + (k % 3 ? 0.8 : 1.4) + '" fill="#e8e2ff" opacity=".55"/>').join('') +
       '<g transform="translate(40 18)" fill="#3b3226" stroke="#c9a46a"><rect x="0" y="24" width="56" height="30"/><rect x="4" y="10" width="12" height="16"/><rect x="40" y="10" width="12" height="16"/><rect x="22" y="0" width="12" height="26"/><rect x="24" y="38" width="8" height="16" fill="#1a130c"/></g><circle cx="68" cy="34" r="22" fill="url(#mglow)" class="flick"/>' +
-      '<text x="108" y="38" class="wt">The Hold</text><text x="108" y="54" class="ws">Iron Covenant fortress above the tear</text>';
+      '<text x="108" y="38" class="wt">The Hold</text><text x="108" y="54" class="ws">Iron Covenant fortress · tap to visit</text><rect x="30" y="8" width="260" height="56" fill="transparent" data-camp="hold" class="holdhit"><title>Visit the Hold</title></rect>';
     // the road
     const road = [{ x: 68, y: 74 }].concat(pos), seg = (a, b) => {
       if (a.row === b.row || a.row === undefined) return 'C' + a.x + ' ' + ((a.y + b.y) / 2 + (a.row === undefined ? 20 : 0)) + ' ' + b.x + ' ' + ((a.y + b.y) / 2) + ' ' + b.x + ' ' + b.y;
@@ -4366,6 +4408,50 @@
     }
     if (cur >= x.first && cur <= x.last) { const p = pts[cur - x.first]; s += '<g class="youhere"><path d="M' + p.x + ' ' + (p.y - 13) + 'l-6 -11h12z" fill="#f5c242" stroke="#1a120b"/><text x="' + p.x + '" y="' + (p.y - 28) + '" class="mh">' + esc(me || 'You') + '</text></g>'; }
     return s + '</svg>';
+  }
+  // ---------- the Hold (v102): tap the Hold on the map to see its tents and travel to one ----------
+  const HOLD_TENTS = [
+    ['camp', 'Campfire', 'lantern', '#e0702a', 'Rest, heal and change gear'],
+    ['ench', 'Enchanter', 'enchanter', '#7c4dea', 'Enchant and disenchant'],
+    ['arm', 'Armorer', 'armorer', '#9aa3b2', 'Upgrade, merge, melt'],
+    ['store', 'Store', 'healer', '#2f9e63', 'Tonics, oil, draughts'],
+  ];
+  function drawHold(cv) {
+    const cw = cv.clientWidth || 600, ch = cv.clientHeight || 280, dpr = window.devicePixelRatio || 1, W2 = 360, H2 = Math.round(W2 * ch / cw), k = cw * dpr / W2;
+    cv.width = Math.round(W2 * k); cv.height = Math.round(H2 * k); const x = cv.getContext('2d'); x.setTransform(k, 0, 0, k, 0, 0); x.imageSmoothingQuality = 'high';
+    let g = x.createLinearGradient(0, 0, 0, H2); g.addColorStop(0, '#0b1230'); g.addColorStop(0.55, '#1a1a2e'); g.addColorStop(1, '#2a2218'); x.fillStyle = g; x.fillRect(0, 0, W2, H2);
+    for (let i = 0; i < 60; i++) { x.fillStyle = 'rgba(255,255,255,' + (0.3 + (i % 5) / 10) + ')'; x.fillRect((i * 97) % W2, (i * 53) % 46, 0.8, 0.8); }
+    const gy = H2 * 0.42;
+    x.fillStyle = '#1e2030'; x.fillRect(0, gy - 36, W2, 40); for (let i = 0; i < W2; i += 14) x.fillRect(i, gy - 42, 8, 8);
+    [[40, 24], [300, 22], [166, 28]].forEach(([tx, tw]) => { const ty = gy - 70; x.fillStyle = '#262a3e'; x.fillRect(tx, ty, tw, 72); for (let i = 0; i < tw; i += 8) x.fillRect(tx + i, ty - 6, 5, 6); x.fillStyle = 'rgba(255,200,110,.7)'; x.fillRect(tx + tw / 2 - 2, ty + 14, 4, 7); });
+    g = x.createLinearGradient(0, gy, 0, H2); g.addColorStop(0, '#3a3024'); g.addColorStop(1, '#1a140e'); x.fillStyle = g; x.fillRect(0, gy, W2, H2 - gy);
+    const ty = gy + (H2 - gy) * 0.42;
+    x.fillStyle = '#5a4a36'; x.beginPath(); x.ellipse(W2 / 2, ty + 20, 160, 12, 0, 0, Math.PI * 2); x.fill();
+    HOLD_TENTS.forEach(([id, n, who, col], i) => {
+      const tx = 48 + i * 88;
+      if (id === 'camp') { x.fillStyle = '#3a2618'; x.fillRect(tx - 10, ty - 2, 20, 3); for (let q = 0; q < 4; q++) flame(x, tx - 6 + q * 4, ty - 2, 10 + (q % 2) * 4, 0); const gg = x.createRadialGradient(tx, ty - 8, 0, tx, ty - 8, 40); gg.addColorStop(0, 'rgba(255,150,60,.4)'); gg.addColorStop(1, 'rgba(255,150,60,0)'); x.fillStyle = gg; x.fillRect(tx - 40, ty - 48, 80, 80); return; }
+      x.fillStyle = col; x.globalAlpha = 0.92; x.beginPath(); x.moveTo(tx - 28, ty); x.lineTo(tx, ty - 44); x.lineTo(tx + 28, ty); x.fill(); x.globalAlpha = 1;
+      x.fillStyle = 'rgba(0,0,0,.35)'; x.beginPath(); x.moveTo(tx, ty - 44); x.lineTo(tx + 28, ty); x.lineTo(tx + 6, ty); x.fill();
+      x.fillStyle = '#1a120a'; x.beginPath(); x.moveTo(tx - 9, ty); x.lineTo(tx, ty - 20); x.lineTo(tx + 9, ty); x.fill();
+      x.strokeStyle = '#2a1a0e'; x.lineWidth = 1; x.beginPath(); x.moveTo(tx, ty - 44); x.lineTo(tx, ty - 52); x.stroke(); x.fillStyle = col; x.fillRect(tx, ty - 52, 8, 4);
+      const s = sprite(who, 0, false), sw = s.lw * 2, sh = s.lh * 2; x.save(); x.translate(tx + 24, 0); x.scale(-1, 1); x.drawImage(s, -sw / 2, ty + 3 - sh, sw, sh); x.restore();
+    });
+    const party = S.party.filter(Boolean);
+    party.forEach((id, i) => { const m = L.memberById(id); if (!m) return; const s = sprite(m.cls, lookHue(m), false); x.drawImage(s, W2 / 2 - party.length * 9 + i * 18 - 3, ty + 4 - (i % 2) * 3, s.lw * 2, s.lh * 2); });
+    return { ty: ty / H2, xs: HOLD_TENTS.map((_, i) => (48 + i * 88) / W2) };
+  }
+  function openHold() {
+    modal('<div class="maphead"><div><h2>The Hold</h2><small>Iron Covenant fortress above the tear. Tap a tent to go there. Your dive on floor ' + S.floor + ' waits for you.</small></div><button class="iconbtn" id="hold-x" aria-label="Close">&times;</button></div>' +
+      '<div class="holdview"><canvas id="holdcv"></canvas><div class="holdtents">' + HOLD_TENTS.map(([id, n, , , sub]) => '<button data-hold="' + id + '"><b>' + n + '</b><small>' + sub + '</small></button>').join('') + '</div></div>' +
+      '<div class="row"><button class="btn ghost" id="hold-map">&larr; Map of the Deep</button></div>', md => {
+        md.classList.add('holdsheet');
+        const cv = $('holdcv'); requestAnimationFrame(() => drawHold(cv));
+        md.querySelector('#hold-x').onclick = closeModal; md.querySelector('#hold-map').onclick = openMap;
+        md.querySelectorAll('[data-hold]').forEach(b => b.onclick = () => {
+          const k = b.dataset.hold; closeModal();
+          if (k === 'camp') { if (S.floor > L.CAMP_FLOOR) campModal(); } else if (k === 'ench') enchanterModal(); else if (k === 'arm') armorerModal(); else openStore();
+        });
+      });
   }
   function openMap() {
     const cyc = L.depthCycle(S.floor), base = cyc * 10 * L.BIOMES.length;
@@ -4878,6 +4964,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 102, date: 'November 24, 2026', title: 'The Hold’s tents', items: [
+      'The Enchanter’s shop is rebuilt: your whole party stands where it does in a fight and the Enchanter stands behind his counter where a monster would. All the choices are in the counter panel below.',
+      'New: the Armorer. Upgrade gear with gold, merge two copies into one, or melt spare gear for twice the gold of a normal scrap (no Dust).',
+      'The camp card is cleaner: one big Return to camp button, then a row with the Enchanter, Armorer, Store and your Draughts.',
+      'Tap The Hold at the top of the Map of the Deep to see its tents (Campfire, Enchanter, Armorer, Store) and travel to one.',
+    ] },
     { v: 100, date: 'November 24, 2026', title: 'The Mercy Corps on the road', items: [
       'Rare Mercy Corps encounters, from floor 5, while you are playing. Now and then a monster holds a Mercy Corps companion captive: defeat it to free them and get +30% hero XP for 15 minutes.',
       'Sometimes you find a Mercy Corps companion lying wounded on the path instead. Nobody fights: your healers pour their healing into them, Lantern Hymn mends a big chunk, and every tap is a bandage. Heal them to full within 45 seconds for Mercy’s Thanks, +15% damage and healing for 15 minutes. If time runs out, other medics carry them to safety, and nothing is lost.',

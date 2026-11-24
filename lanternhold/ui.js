@@ -1,4 +1,4 @@
-/* lh-build 202611240201 */
+/* lh-build 202611240206 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -801,7 +801,37 @@
     const box = $('toasts'); box.appendChild(t);
     while (box.children.length > (innerWidth < 560 ? 2 : 3)) box.firstChild.remove();
     t.onclick = () => t.remove();
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 400); }, 4200);
+    // Stays up longer, and waits while the pointer rests on it. Every pop-up is kept in the bell too.
+    let left = 7000, at = Date.now(), timer = 0;
+    const go = () => { timer = setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 400); }, left); at = Date.now(); };
+    t.onmouseenter = () => { clearTimeout(timer); left = Math.max(1500, left - (Date.now() - at)); };
+    t.onmouseleave = go; go();
+    noteLog(ic, title, sub, cls);
+  }
+  // ---------- notifications: the last 50 pop-ups, kept on this device ----------
+  var NOTE_KEY = 'lh_notes', notes = [];
+  try { notes = JSON.parse(localStorage.getItem(NOTE_KEY) || '[]'); if (!Array.isArray(notes)) notes = []; } catch (e) {}
+  function noteLog(ic, title, sub, cls) {
+    if (!notes) notes = [];
+    notes.push({ ic, title: String(title || ''), sub: String(sub || ''), cls: cls || '', t: Date.now(), n: 1 });
+    if (notes.length > 50) notes = notes.slice(-50);
+    try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) {}
+    paintNoteDot();
+  }
+  function paintNoteDot() {
+    const d = $('notedot'); if (!d) return;
+    const n = notes.filter(x => x.n).length; d.hidden = !n; d.textContent = n > 9 ? '9+' : n || '';
+    $('btn-notes').setAttribute('aria-label', n ? 'Notifications, ' + n + ' new' : 'Notifications');
+  }
+  const agoText = t => { const s = Math.max(0, (Date.now() - t) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + ' min ago' : s < 86400 ? Math.floor(s / 3600) + ' h ago' : Math.floor(s / 86400) + ' d ago'; };
+  function openBell() {
+    const list = notes.slice().reverse();
+    modal('<h2>Notifications</h2>' + (list.length ? '<ul class="notelist">' + list.map(x => '<li class="toast ' + esc(x.cls) + (x.n ? ' new' : '') + '">' + icon(x.ic) + '<div><b>' + esc(x.title) + '</b>' + (x.sub ? '<small>' + esc(x.sub) + '</small>' : '') + '<time>' + agoText(x.t) + '</time></div></li>').join('') + '</ul>' : '<p>Nothing yet. Pop-ups from the corner of the screen are kept here so you can read them again.</p>') +
+      '<div class="row">' + (list.length ? '<button class="btn ghost" id="nt-clear">Clear all</button>' : '') + '<button class="btn" id="nt-x">Close</button></div>', md => {
+      md.querySelector('#nt-x').onclick = closeModal;
+      const c = md.querySelector('#nt-clear'); if (c) c.onclick = () => { notes = []; try { localStorage.removeItem(NOTE_KEY); } catch (e) {} closeModal(); paintNoteDot(); };
+    });
+    notes.forEach(x => { x.n = 0; }); try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) {} paintNoteDot();
   }
   function modal(html, onMount) {
     $('modalbody').className = 'sheet'; $('modalbody').innerHTML = html; $('modal').hidden = false;
@@ -4036,7 +4066,8 @@
         'Press <b>Chat</b> at the bottom right to open the window, and the dash to tuck it away again. A bubble on the button counts unread messages.',
         '<b>Whispers</b> are private chats, one per player. Each conversation is a tab along the top of the Whispers channel: their messages on the left, yours on the right. Tap <b>+</b> to start a new one, or tap a name in any channel and choose Whisper.',
         'Banner chat reaches only players under your banner.',
-        'Ctrl+click an item to link it. Tap a name to mute or report. No links, and be kind.']],
+        'Ctrl+click an item to link it. Tap a name to mute or report. No links, and be kind.',
+        'Missed a pop-up? The <b>bell</b> at the top keeps your last 50 notifications to read again.']],
       ['Trading Post', 'i:bag', 'Buy and sell gear for gold, or mail it to a player.', [
         '<b>Sell</b>: tap an item in Gear, choose <b>Sell on market</b>. Listings last a week.',
         '<b>Mail</b>: send to someone you recruited or chatted with, as a gift or for a price.',
@@ -4074,18 +4105,20 @@
       });
   }
   $('btn-guide').addEventListener('click', () => openGuide());
+  $('btn-notes').addEventListener('click', openBell); paintNoteDot();
 
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 75, date: 'November 24, 2026', title: 'Whispers and the notification bell', items: [
+      'Each whisper conversation now has its own tab along the top of the Whispers channel, and the latest one opens on its own.',
+      'Their messages sit on the left and yours on the right, like a messenger app.',
+      'Tap + to start a new whisper with someone who has been chatting lately. No more hunting for a name to tap.',
+      'New: the bell at the top keeps your last 50 pop-ups, so you can reread any that went by too fast. Pop-ups also stay up longer, and wait while your pointer rests on one.'] },
     { v: 74, date: 'November 24, 2026', title: 'Region trials', items: [
       'The hero level gates between regions are gone. Instead each region has a trial: defeat ' + L.TRIAL_ELITES + ' alliance elites there (the bannered warband foes) and beat its guardian, and the way to the next region opens.',
       'Progress shows on screen as you fight, and in Codex, Progress. Hero level still opens new parts of the game, like camp jobs, the Ember Ring and rekindling.',
       'If you were held at a gate, you are through: the trial counts as done for the region you are in. Beat its guardian again and keep going.'] },
-    { v: 74, date: 'November 23, 2026', title: 'Whispers, messenger style', items: [
-      'Each whisper conversation now has its own tab along the top of the Whispers channel, and the latest one opens on its own.',
-      'Their messages sit on the left and yours on the right, like a messenger app.',
-      'Tap + to start a new whisper with someone who has been chatting lately. No more hunting for a name to tap.'] },
     { v: 73, date: 'November 23, 2026', title: 'Power level and hero level', items: [
       'The level shown on each Party card is now called power level. It is what training with gold raises, and what gear needs.',
       'Your hero level (from XP, which opens new parts of the game) is now always called hero level, so the two never get mixed up. A hero can be hero level 11 with a power level of 142.',

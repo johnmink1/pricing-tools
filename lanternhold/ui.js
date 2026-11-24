@@ -1,4 +1,4 @@
-/* lh-build 202611241427 */
+/* lh-build 202611241453 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -266,11 +266,11 @@
     el.className = 'spwarn ' + (cls || ''); el.innerHTML = text; el.hidden = false;
     clearTimeout(spWarn.t); spWarn.t = setTimeout(() => { el.hidden = true; }, (L.SPECIAL_WARN || 1.5) * 1000 + 700);
   }
-  function partyLayout() {
-    const floorY = Math.round(H * 0.7);
+  function partyLayout(fx, fyy) {
+    const floorY = fyy || Math.round(H * 0.7);
     const seated = S.party.filter(Boolean);
     const order = seated; // marching order: first seat stands nearest the foe
-    const front = Math.round(W * FOE_X) - 58;
+    const front = (fx || Math.round(W * FOE_X)) - 58;
     return order.map((id, i) => ({ id, x: front - i * 21, y: floorY - 30 + (i % 2 ? -5 : 1) }));
   }
 
@@ -463,7 +463,14 @@
   // The shop is drawn in the battle frame at battle scale: the whole party stands where it stands in a fight and the
   // shopkeeper stands where a monster would, at monster size, behind a counter. A sign names the shop. All choices
   // live in the counter panel under the scene (one set of controls).
-  let shopBg = null, shopKey = '';
+  let shopBg = null, shopKey = '', SG = { k: 1, vw: 240, vh: 100, ex: 176, fy: 88 };
+  // v105 (John: "seems squished... autoscale those based on window size"): the shop is drawn in a virtual room scaled so
+  // the party, the shopkeeper, the counter and the sign (a 198 x 100 focus box) fill the arena at any window shape. The
+  // room grows sideways or upward around them, so nothing is squashed or left tiny in a corner.
+  function shopGeo() {
+    const k = Math.min(W / 198, H / 100), vw = W / k, vh = H / k;
+    return (SG = { k, vw, vh, ex: Math.round(vw / 2 + 48), fy: Math.round(88 + (vh - 100) * 0.8) });
+  }
   const shopKind = () => S.shopK === 'arm' ? 'arm' : 'ench';
   function shopGlow(g, cx, cy, r, rgb, a) { const q = g.createRadialGradient(cx, cy, 0, cx, cy, r); q.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); q.addColorStop(1, 'rgba(' + rgb + ',0)'); g.globalCompositeOperation = 'lighter'; g.fillStyle = q; g.fillRect(cx - r, cy - r, r * 2, r * 2); g.globalCompositeOperation = 'source-over'; }
   function shopShelf(g, sx, y, w, seed) {
@@ -475,9 +482,9 @@
     g.fillStyle = '#6a4426'; g.fillRect(sx, y, w, 2); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(sx, y + 2, w, 1.5);
   }
   function buildShop(kind) {
-    const c = document.createElement('canvas'); c.width = Math.round(W * R); c.height = Math.round(H * R);
-    const g = c.getContext('2d'); g.scale(R, R);
-    const fy = Math.round(H * 0.7), ench = kind === 'ench', ex = Math.round(W * FOE_X);
+    const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
+    const g = c.getContext('2d'); g.scale(R * SG.k, R * SG.k);
+    const W = SG.vw, H = SG.vh, fy = SG.fy, ench = kind === 'ench', ex = SG.ex;
     let lg = g.createLinearGradient(0, 0, 0, fy);
     if (ench) { lg.addColorStop(0, '#1a1128'); lg.addColorStop(1, '#352350'); } else { lg.addColorStop(0, '#17130f'); lg.addColorStop(1, '#3a2a20'); }
     g.fillStyle = lg; g.fillRect(0, 0, W, fy);
@@ -485,23 +492,23 @@
     else { g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = 6, k = 0; y < fy; y += 9, k++) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); for (let x = (k % 2) * 10; x < W; x += 20) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 9); g.stroke(); } } }
     const wy = fy - 16; lg = g.createLinearGradient(0, wy, 0, fy); lg.addColorStop(0, ench ? '#4a2f1c' : '#2a2420'); lg.addColorStop(1, ench ? '#2a190e' : '#16120e'); g.fillStyle = lg; g.fillRect(0, wy, W, fy - wy);
     g.fillStyle = ench ? '#6a4426' : '#4a3e34'; g.fillRect(0, wy - 1.5, W, 2);
-    for (const px of [W * 0.04, W * 0.5, W * 0.97]) { const pg = g.createLinearGradient(px - 3, 0, px + 3, 0); pg.addColorStop(0, '#2a1a0e'); pg.addColorStop(0.5, '#5a3a22'); pg.addColorStop(1, '#2a1a0e'); g.fillStyle = pg; g.fillRect(px - 3, 0, 6, fy); }
+    for (let px = (ex - 53) % 110 - 110; px < W + 110; px += 110) { const pg = g.createLinearGradient(px - 3, 0, px + 3, 0); pg.addColorStop(0, '#2a1a0e'); pg.addColorStop(0.5, '#5a3a22'); pg.addColorStop(1, '#2a1a0e'); g.fillStyle = pg; g.fillRect(px - 3, 0, 6, fy); }
     g.fillStyle = '#3a2618'; g.fillRect(0, 0, W, 6);
     lg = g.createLinearGradient(0, fy, 0, H); lg.addColorStop(0, ench ? '#5a3a22' : '#3a322c'); lg.addColorStop(1, '#1a120a'); g.fillStyle = lg; g.fillRect(0, fy, W, H - fy);
     g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = fy + 4, k = 0; y < H; y += 4 + k * 1.6, k++) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
     if (ench) {
-      shopShelf(g, ex - 46, 30, 30, 7); shopShelf(g, ex - 46, 48, 30, 19); shopShelf(g, ex + 18, 30, 30, 23); shopShelf(g, ex + 18, 48, 30, 31);
+      shopShelf(g, ex - 46, fy - 60, 30, 7); shopShelf(g, ex - 46, fy - 42, 30, 19); shopShelf(g, ex + 18, fy - 60, 30, 23); shopShelf(g, ex + 18, fy - 42, 30, 31);
     } else {
       // forge hearth behind the smith, a weapon rack and a shield on the wall
       const hx = ex + 30; g.fillStyle = '#2a2420'; g.fillRect(hx - 6, 6, 12, fy - 56);
       g.beginPath(); g.moveTo(hx - 16, fy - 16); g.lineTo(hx - 16, fy - 40); g.quadraticCurveTo(hx, fy - 54, hx + 16, fy - 40); g.lineTo(hx + 16, fy - 16); g.fill();
       g.strokeStyle = '#5a4a3e'; g.lineWidth = 2; g.stroke();
-      const rx = ex - 46; g.fillStyle = '#5a3a22'; g.fillRect(rx, 26, 30, 2); g.fillRect(rx, 50, 30, 2);
-      [['#c0c8d4', 0], ['#a8b0bc', 8], ['#d4dbe6', 16], ['#9aa6b8', 24]].forEach(([col, d]) => { g.fillStyle = col; g.fillRect(rx + 3 + d, 28, 1.6, 20); g.fillStyle = '#6a4426'; g.fillRect(rx + 2 + d, 44, 3.6, 4); });
-      g.fillStyle = '#7a8494'; g.beginPath(); g.arc(ex - 4, 40, 7, 0, Math.PI * 2); g.fill(); g.fillStyle = '#a8742e'; g.beginPath(); g.arc(ex - 4, 40, 2.2, 0, Math.PI * 2); g.fill();
+      const rx = ex - 46; g.fillStyle = '#5a3a22'; g.fillRect(rx, fy - 62, 30, 2); g.fillRect(rx, fy - 38, 30, 2);
+      [['#c0c8d4', 0], ['#a8b0bc', 8], ['#d4dbe6', 16], ['#9aa6b8', 24]].forEach(([col, d]) => { g.fillStyle = col; g.fillRect(rx + 3 + d, fy - 60, 1.6, 20); g.fillStyle = '#6a4426'; g.fillRect(rx + 2 + d, fy - 44, 3.6, 4); });
+      g.fillStyle = '#7a8494'; g.beginPath(); g.arc(ex - 4, fy - 52, 7, 0, Math.PI * 2); g.fill(); g.fillStyle = '#a8742e'; g.beginPath(); g.arc(ex - 4, fy - 52, 2.2, 0, Math.PI * 2); g.fill();
     }
     // the sign over the shop
-    const text = ench ? 'THE ENCHANTER' : 'THE ARMORER'; g.font = '700 7px Inter, system-ui, sans-serif'; const sw = g.measureText(text).width + 12, sy = 9;
+    const text = ench ? 'THE ENCHANTER' : 'THE ARMORER'; g.font = '700 7px Inter, system-ui, sans-serif'; const sw = g.measureText(text).width + 12, sy = fy - 80;
     g.strokeStyle = '#2a1a0e'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(ex - sw / 2 + 4, 6); g.lineTo(ex - sw / 2 + 4, sy); g.moveTo(ex + sw / 2 - 4, 6); g.lineTo(ex + sw / 2 - 4, sy); g.stroke();
     g.fillStyle = '#5a3a22'; g.fillRect(ex - sw / 2, sy, sw, 11); g.strokeStyle = '#a8742e'; g.strokeRect(ex - sw / 2 + 0.5, sy + 0.5, sw - 1, 10);
     g.fillStyle = ench ? '#e9d5ff' : '#ffd9a8'; g.textAlign = 'center'; g.fillText(text, ex, sy + 8); g.textAlign = 'left';
@@ -523,18 +530,22 @@
   }
   function drawEnchShop(now) {
     const kind = shopKind(), ench = kind === 'ench', key = W + 'x' + H + kind;
-    if (shopKey !== key) { shopBg = buildShop(kind); shopKey = key; }
+    if (shopKey !== key) { shopGeo(); shopBg = buildShop(kind); shopKey = key; }
     ctx.drawImage(shopBg, 0, 0, W, H);
-    const fy = Math.round(H * 0.7), ex = Math.round(W * FOE_X);
+    ctx.save(); ctx.scale(SG.k, SG.k);
+    drawShopRoom(SG.vw, SG.fy, SG.ex, ench);
+    ctx.restore();
+  }
+  function drawShopRoom(W, fy, ex, ench) {
     // hanging lanterns and the room light
-    for (const lx of [W * 0.22, W * 0.42]) {
-      const ly = 18, s = Math.sin(tAnim * 1.1 + lx) * 0.6;
+    for (const lx of [ex - 120, ex - 72]) {
+      const ly = fy - 70, s = Math.sin(tAnim * 1.1 + lx) * 0.6;
       ctx.strokeStyle = '#2a1a0e'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(lx, 6); ctx.lineTo(lx + s, ly - 4); ctx.stroke();
       shopGlow(ctx, lx + s, ly, 26, '255,200,110', 0.3);
       ctx.fillStyle = '#3a2618'; ctx.fillRect(lx + s - 3, ly - 4.5, 6, 1.5); ctx.fillRect(lx + s - 3, ly + 3.5, 6, 1.5);
       ctx.fillStyle = 'rgba(255,214,140,.9)'; ctx.fillRect(lx + s - 2.4, ly - 3, 4.8, 6.5); flame(ctx, lx + s, ly + 2.5, 4 + Math.sin(tAnim * 7 + lx) * 0.5, Math.sin(tAnim * 4 + lx));
     }
-    shopGlow(ctx, W * 0.4, fy + 6, W * 0.45, '255,190,110', 0.16);
+    shopGlow(ctx, ex - 77, fy + 6, 108, '255,190,110', 0.16);
     if (ench) {
       // a rune circle turning slowly behind the Enchanter
       ctx.save(); ctx.translate(ex, fy - 44); ctx.globalAlpha = 0.55 + 0.15 * Math.sin(tAnim * 1.5); ctx.strokeStyle = 'rgba(196,181,253,.8)'; ctx.lineWidth = 0.8;
@@ -560,7 +571,7 @@
       if (im.complete && im.naturalWidth) ctx.drawImage(im, px, py, sz, sz);
     });
     // the party, exactly where it stands in a fight
-    for (const p of partyLayout()) {
+    for (const p of partyLayout(ex, fy)) {
       const m = L.memberById(p.id); if (!m) continue;
       const spr = sprite(m.cls, lookHue(m), false), b = Math.sin(tAnim * 1.6 + p.x) * 0.4;
       ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(p.x + spr.lw, p.y + spr.lh * 2 - 1, 8, 2, 0, 0, Math.PI * 2); ctx.fill();
@@ -582,7 +593,7 @@
   }
   // A shower of sparks on the counter when something is made.
   function shopBurst() {
-    const ex = Math.round(W * FOE_X), y = Math.round(H * 0.7) - 18, cols = shopKind() === 'ench' ? ['#f5c242', '#c4b5fd', '#f0abfc', '#ffffff'] : ['#ffb347', '#ff6a1f', '#fff3c0', '#ffffff'];
+    const ex = SG.ex, y = SG.fy - 18, cols = shopKind() === 'ench' ? ['#f5c242', '#c4b5fd', '#f0abfc', '#ffffff'] : ['#ffb347', '#ff6a1f', '#fff3c0', '#ffffff'];
     for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, v = 10 + Math.random() * 30; particles.push({ x: ex - 8, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 15, g: 30, life: 0.8 + Math.random() * 0.6, age: 0, c: cols[i % 4], s: 2 }); }
   }
 
@@ -857,7 +868,7 @@
 
   // ---------- events ----------
   let pendingGold = 0, lastGoldFloat = 0, sealedToast = false, lockToast = 0;
-  const RARITY_COLOR = { common: '#d8cfb8', fine: '#8fcf6a', rare: '#6cc4e8', epic: '#c78bff', set: '#f2c14e' };
+  const RARITY_COLOR = { common: '#d8cfb8', fine: '#8fcf6a', rare: '#6cc4e8', epic: '#c78bff', set: '#f2c14e', legend: '#ff8a3d' };
   // ---------- fight log (John, 2026-11-23): a short record of what happened in recent fights ----------
   const FLOG = [], FLOG_MAX = 120, flogThrottle = {};
   let flogTaken = 0, flogDirty = false;
@@ -1729,7 +1740,7 @@
     toast('map', 'Farming floor ' + f, 'Descend automatically is off, so the party stays on floor ' + f + ' and fights it again and again. Turn it back on to keep going down.', '');
     document.querySelectorAll('[data-farm]').forEach(x => { x.textContent = +x.dataset.farm === f ? 'Farming here' : 'Farm floor ' + x.dataset.farm; });
   });
-  const bound = it => it.rset != null || it.rar === 'goblin';
+  const bound = it => it.rset != null || it.rar === 'goblin' || it.wb != null;
   function itemEffect(it) {
     const st = L.itemStats(it);
     return st.map(([k, v], i) => '+' + Math.round(v * 100) + '% ' + k.toLowerCase()).join(', ') + (it.aff ? ', ' + affText(it) : '');
@@ -1839,7 +1850,8 @@
     if (m.cls !== it.cls) { const o = gearOwners().find(id => L.memberById(id).cls === it.cls); if (o) { gearWho = o; m = L.memberById(o); } }
     const set = it.set && L.SETS.find(x => x.id === it.set), rs = it.rset != null && L.REGION_SETS[it.rset];
     const fits = m.cls === it.cls, rar = L.RARITY.find(r => r.id === it.rar);
-    const cost = L.upgradeCost(it), maxed = it.up >= L.UP_MAX;
+    const leg = it.wb != null && L.WB_SETS[it.wb], shHave = leg ? L.shardsOf(S)[it.wb] || 0 : 0;
+    const cost = leg ? L.wbUpCost(it) : L.upgradeCost(it), maxed = it.up >= L.UP_MAX;
     const reps = fits && !w ? L.replaces(S, gearWho, it) : [], ci = reps[0];
     const curStats = {}; for (const r of reps) for (const [k, v] of itemStats(r)) curStats[k] = (curStats[k] || 0) + v;
     const nextStats = maxed ? null : Object.fromEntries(itemStats(Object.assign({}, it, { up: it.up + 1 })));
@@ -1862,11 +1874,12 @@
       (it.jset ? (() => { const js = L.JOB_SETS[it.jset], n = wearer ? L.jobSetCount(S, w, it.jset) : 0; return '<div class="iset"><b>' + js.name + (wearer ? ' <em>' + n + '/3 worn</em>' : '') + '</b><small>A job set for the ' + jobName(it.jset) + '. It helps whoever wears it while they work that job at camp.</small><small><em>2 pieces</em> +' + Math.round(L.JOB_SET_TWO * 100) + '% ' + jobName(it.jset) + ' output</small><small><em>3 pieces</em> +' + Math.round(L.JOB_SET_THREE * 100) + '% ' + jobName(it.jset) + ' output</small></div>'; })() : '') +
       (set ? '<div class="iset"><b>' + set.name + '</b><small><em>2 pieces</em> ' + set.two + '</small><small><em>3 pieces</em> ' + set.three + '</small><small class="lore">' + esc(set.lore) + '</small>' + setWhere('class') + '</div>' : '') +
       (rs ? (() => { const n = wearer ? (L.rsetCounts(S, w)[it.rset] || 0) : 0; return '<div class="iset rset"><b>' + rs.name + (wearer ? ' <em>' + n + '/4 worn</em>' : '') + '</b><small>A region set from ' + esc(regionName(it.rset)) + '. Head, chest, legs and feet, for any class. The bonuses multiply all of the wearer’s gear.</small><small><em>2 pieces</em> ' + rsetTwoText(it.rset) + '</small><small><em>4 pieces</em> ' + rsetFourText(it.rset) + '</small><small class="lore">' + esc(rs.lore) + '</small>' + setWhere('rset', it.rset) + '</div>'; })() : '') +
+      (leg ? (() => { const n = wearer ? (L.wbCounts(S, w)[it.wb] || 0) : 0, k = { hp: 'health', dps: 'damage', heal: 'healing (health for non-healers)', gold: 'gold for the whole party' }[leg.k]; return '<div class="iset legset"><b>' + leg.name + (wearer ? ' <em>' + n + '/4 worn</em>' : '') + '</b><small>A world boss Legendary. Weapon, chest, ring and amulet. Bound to you. Upgrade it with ' + leg.word + ' shards, not gold.</small><small><em>2 pieces</em> +' + Math.round(L.WB_TWO[leg.k] * 100) + '% ' + k + '</small><small><em>4 pieces</em> +' + Math.round(L.WB_FOUR * 100) + '% damage and health (healing for healers)</small><small class="lore">' + esc(leg.lore) + '</small></div>'; })() : '') +
       (it.rar === 'goblin' ? '<div class="iset gobset"><b>The Loot Goblin’s Sack</b><small>+' + pct100(L.GOBLIN_SACK_GOLD) + ' gold for the whole party while worn. Roughly one Loot Goblin in ' + Math.round(1 / L.GOBLIN_SACK_CHANCE).toLocaleString('en-US') + ' drops it.</small><small class="lore">Still lumpy with whatever he stole last. Nobody has been brave enough to empty it.</small></div>' : '') +
       (wearer ? '<div class="iworn"><img src="' + SP.spriteURL(wearer.cls, 2, lookHue(wearer)) + '" alt="">Worn by <b>' + esc(wearer.name) + '</b></div>' : '') +
       '<div class="iacts">' +
       (w ? '<button class="btn ghost" id="i-off">Take off</button>' : fits ? (L.canWear(S, gearWho, it) ? '<button class="btn" id="i-on">Equip on ' + esc(m.name) + '</button>' : '<button class="btn" disabled>' + esc(m.name) + ' needs power level ' + L.reqLevel(it) + '</button>') : '<button class="btn" disabled>No ' + L.CLASSES[it.cls].name + ' in your roster yet</button>') +
-      (maxed ? '<button class="btn ghost" disabled>Fully upgraded</button>' : '<button class="btn ghost iup" id="i-up"' + (cost > S.gold ? ' disabled' : '') + '><span>Upgrade to +' + (it.up + 1) + '</span><small>' + icon('coin') + fmt(cost) + ' &middot; ' + Object.entries(nextStats).map(([k, v]) => k.toLowerCase() + ' ' + pc(v)).join(', ') + '</small></button>') +
+      (maxed ? '<button class="btn ghost" disabled>Fully upgraded</button>' : '<button class="btn ghost iup" id="i-up"' + ((leg ? cost > shHave : cost > S.gold) ? ' disabled' : '') + '><span>Upgrade to +' + (it.up + 1) + '</span><small>' + (leg ? icon('relic') + cost + ' ' + leg.word + ' shard' + (cost === 1 ? '' : 's') + ' (you have ' + shHave + ')' : icon('coin') + fmt(cost)) + ' &middot; ' + Object.entries(nextStats).map(([k, v]) => k.toLowerCase() + ' ' + pc(v)).join(', ') + '</small></button>') +
       '</div><div class="itools">' +
       tool('i-lk', 'lock', it.lk ? 'Unlock' : 'Lock', it.lk ? 'on' : '') +
       (S.bag.some(x => L.mergeable(it, x)) ? tool('i-merge', 'relic', 'Merge', it.lk ? 'off' : '') : '') +
@@ -1947,6 +1960,8 @@
   const AW = { mode: 'up', a: null, b: null, done: null };
   function awReset(mode, keep) { Object.assign(AW, { mode: mode || AW.mode, a: null, b: null, done: keep ? AW.done : null }); }
   const riskTxt = v => Math.round(v * 1000) / 10 + '%';
+  const upCostTag = x => { if (x.wb != null) { const c = L.wbUpCost(x), h = L.shardsOf(S)[x.wb] || 0; return '<span class="ewcost legc' + (h < c ? ' short' : '') + '">' + icon('relic') + c + ' shard' + (c === 1 ? '' : 's') + '</span>'; }
+    const c = L.upgradeCost(x); return '<span class="ewcost gold' + (S.gold < c ? ' short' : '') + '">' + icon('coin') + fmt(c) + '</span>'; };
   function armPanelHtml() {
     const gold = '<span class="epdust">' + icon('coin') + '<b>' + fmt(S.gold) + '</b> gold</span>';
     const tabs = '<div class="ewtabs forge" role="tablist">' + [['up', 'Upgrade'], ['merge', 'Merge'], ['smelt', 'Scrap for gold']].map(([k, n]) => '<button role="tab" class="' + (AW.mode === k ? 'on' : '') + '" data-awmode="' + k + '">' + n + '</button>').join('') + '</div>';
@@ -1968,12 +1983,12 @@
       steps = ['Item', 'Upgrade'];
       if (!A) {
         body = '<h3 class="ewq">Which item do you want to upgrade?</h3><p class="ewhint">Each upgrade raises an item one level for gold. Worn gear works too.</p>' +
-          ewList(S.bag.filter(x => x.up < L.UP_MAX).sort(byWorn).slice(0, 60).map(x => ewItemRow(x, 'data-awa="' + x.uid + '"', 'Upgrade to +' + (x.up + 1) + ewWorn(x), '<span class="ewcost gold' + (S.gold < L.upgradeCost(x) ? ' short' : '') + '">' + icon('coin') + fmt(L.upgradeCost(x)) + '</span>')), 'Nothing left to upgrade.');
+          ewList(S.bag.filter(x => x.up < L.UP_MAX).sort(byWorn).slice(0, 60).map(x => ewItemRow(x, 'data-awa="' + x.uid + '"', 'Upgrade to +' + (x.up + 1) + ewWorn(x), upCostTag(x))), 'Nothing left to upgrade.');
       } else {
         cur = 1; picked = ewPicked('Upgrading', A, ewName(A), 'a');
-        const c = L.upgradeCost(A), max = A.up >= L.UP_MAX;
-        body = '<div class="ewsum">' + (max ? '<p><b>' + ewName(A) + '</b> is fully upgraded.</p>' : '<p><b>' + ewName(A) + '</b> becomes <b>+' + (A.up + 1) + '</b>.</p><p>Costs ' + icon('coin') + '<b>' + fmt(c) + ' gold</b>' + (S.gold < c ? '. You have ' + fmt(S.gold) + '.' : '.') + '</p>') +
-          '<button class="btn" data-awgo="up"' + (max || S.gold < c ? ' disabled' : '') + '>' + (max ? 'Fully upgraded' : S.gold < c ? 'Not enough gold' : 'Upgrade for ' + fmt(c) + ' gold') + '</button></div>';
+        const lg = A.wb != null && L.WB_SETS[A.wb], c = lg ? L.wbUpCost(A) : L.upgradeCost(A), have = lg ? L.shardsOf(S)[A.wb] || 0 : S.gold, unit = lg ? lg.word + ' shard' + (c === 1 ? '' : 's') : 'gold', max = A.up >= L.UP_MAX;
+        body = '<div class="ewsum">' + (max ? '<p><b>' + ewName(A) + '</b> is fully upgraded.</p>' : '<p><b>' + ewName(A) + '</b> becomes <b>+' + (A.up + 1) + '</b>.</p><p>Costs ' + icon(lg ? 'relic' : 'coin') + '<b>' + fmt(c) + ' ' + unit + '</b>' + (have < c ? '. You have ' + fmt(have) + '.' : '.') + '</p>') +
+          '<button class="btn" data-awgo="up"' + (max || have < c ? ' disabled' : '') + '>' + (max ? 'Fully upgraded' : have < c ? 'Not enough ' + (lg ? 'shards' : 'gold') : 'Upgrade for ' + fmt(c) + ' ' + unit) + '</button></div>';
       }
     } else {
       steps = ['Item', 'Copy to merge in', 'Confirm'];
@@ -4288,7 +4303,7 @@
       '<div class="dos-go"><button class="btn small" data-go="' + to + '">Travel to floor ' + to + '</button>' + (to > x.first ? '<button class="btn small ghost" data-go="' + x.first + '">Region entrance</button>' : '') + '</div>' + lootList(x.first) + '</div>';
   }
   // Possible loot (John, 2026-11-23): the region's drops with this player's real odds per kill, from L.regionLoot.
-  const LOOT_COLOR = Object.assign({}, RARITY_COLOR, { relic: '#ff9f5a', sigil: '#9fd0ff', goblin: '#7dff6a' });
+  const LOOT_COLOR = Object.assign({}, RARITY_COLOR, { relic: '#ff9f5a', sigil: '#9fd0ff', goblin: '#7dff6a', legend: '#ff8a3d' });
   function lootPct(p) {
     if (p >= 0.995) return '100%';
     if (p >= 0.1) return Math.round(p * 100) + '%';
@@ -4967,6 +4982,13 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 105, date: 'November 24, 2026', title: 'Legendary world boss loot', items: [
+      'World bosses now drop Legendary loot. When an event ends, a draw picks who wins the boss’s Legendary (if one drops) and who gets each of its boss shards.',
+      'Every whole point of boss score is one ticket, and anyone who hit the boss gets at least one. The more phases the server breaks, the better the odds of a Legendary and the more shards drop.',
+      'Each world boss has its own four-piece Legendary set (weapon, chest, ring, amulet) with 2-piece and 4-piece bonuses. Legendaries are bound to the winner.',
+      'Boss shards upgrade that boss’s Legendary pieces at the Armorer. Buy and sell shards on the new Boss shards market.',
+      'The Enchanter and the Armorer now scale to your window, so the party and the shopkeeper fill the scene on wide, tall and phone screens.',
+    ] },
     { v: 104, date: 'November 24, 2026', title: 'Leaving the shops', items: [
       'Fixed: pressing Return to camp, Descend or Draught while in the Enchanter or Armorer now leaves the shop.',
     ] },
@@ -5461,8 +5483,10 @@
   // Letters and listings from before the gold rescale are shown and paid in today's gold.
   const nowGold = (g, at) => at && at < L.ECON_AT ? Math.max(1, Math.round(L.regold(g, L.lvl(S, 'you')))) : g;
   const bagFull = () => L.packCount(S) >= L.bagCap(S);
-  const tradeTile = it => it.sig ? '<div class="tile sigtile">' + sigil + '</div>' : (L.normItem(it), '<div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>');
-  const tradeName = it => it.sig ? it.sig.toLocaleString() + ' ' + TOKEN : esc(L.gearName(it)) + (it.up ? ' +' + it.up : '');
+  const shTile = k => '<div class="tile shtile sh' + k + '">' + icon('relic') + '</div>';
+  const shName = (k, n) => n + ' ' + (L.WB_SETS[k] ? L.WB_SETS[k].word : 'boss') + ' shard' + (n === 1 ? '' : 's');
+  const tradeTile = it => it.shard != null ? shTile(it.shard) : it.sig ? '<div class="tile sigtile">' + sigil + '</div>' : (L.normItem(it), '<div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>');
+  const tradeName = it => it.shard != null ? shName(it.shard, it.n) : it.sig ? it.sig.toLocaleString() + ' ' + TOKEN : esc(L.gearName(it)) + (it.up ? ' +' + it.up : '');
   const tradeSub = it => (L.normItem(it), 0) || L.RARITY.find(r => r.id === it.rar).name + ' ' + L.CLASSES[it.cls].name.toLowerCase() + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it);
   const tradeErr = (e, what) => {
     const c = e && e.code;
@@ -5511,6 +5535,29 @@
     }
     return h + '</div>';
   }
+  // Boss shards (v105): each world boss drops a few shards of its own, drawn by lottery among everyone who fought.
+  // They upgrade that boss's Legendary set and trade here for gold. Listed shards leave your stash until sold or taken down.
+  async function loadShards() {
+    trade.sh = null; trade.msg = 'Opening the shard stall…'; paintTrade();
+    try { const [a, m] = await Promise.all([chatCall('GET', '/shards'), chatCall('GET', '/shards?mine=1')]); trade.sh = { me: a.me, l: a.l || [], mine: m.l || [] }; trade.msg = ''; }
+    catch (e) { trade.msg = e && e.status === 404 ? 'The shard stall opens soon.' : tradeErr(e); }
+    paintTrade();
+  }
+  function shardsView() {
+    const have = L.shardsOf(S);
+    let h = '<div class="sigex"><div class="shhave">' + L.WB_SETS.map((b, k) => '<span class="shchip sh' + k + '">' + icon('relic') + '<b>' + (have[k] || 0) + '</b> ' + b.word + '</span>').join('') + '</div>' +
+      '<p class="note small">Boss shards drop from world bosses, drawn by lottery among everyone who fought. Each boss’s shards upgrade its own Legendary set.</p>';
+    if (trade.msg) h += '<p class="note">' + esc(trade.msg) + '</p>';
+    const x = trade.sh; if (!x) return h + '</div>';
+    const others = x.l.filter(l => l.seller !== x.me).sort((a, b) => a.price / a.n - b.price / b.n);
+    const row = (l, act) => '<div class="trow">' + shTile(l.k) + '<div class="tinfo"><b>' + shName(l.k, l.n) + '</b><small>' + (act === 'buy' ? 'From ' + esc(l.name) + ' &middot; ' : '') + fmt(Math.round(l.price / l.n)) + ' gold each</small></div><div class="tact"><span class="price">' + icon('coin') + fmt(l.price) + '</span>' +
+      (act === 'buy' ? '<button class="btn small" data-hbuy="' + l.id + '"' + (l.price > S.gold ? ' disabled title="Not enough gold"' : '') + '>Buy</button>' : '<button class="btn ghost small" data-hcancel="' + l.id + '">Take down</button>') + '</div></div>';
+    h += '<h3 class="sub">For sale</h3>' + (others.length ? '<div class="tlist">' + others.map(l => row(l, 'buy')).join('') + '</div>' : '<div class="mkempty">' + icon('relic') + '<b>No shards for sale right now</b><small>Check back after the next world boss.</small></div>');
+    h += '<h3 class="sub">Sell shards</h3><div class="sigform"><label>Boss<select id="h-k">' + L.WB_SETS.map((b, k) => '<option value="' + k + '">' + b.word + ' (' + (have[k] || 0) + ')</option>').join('') + '</select></label><label>Shards<input id="h-n" type="number" min="1" max="99" step="1" value="1"></label><label>Total price in gold<input id="h-p" type="number" min="1" step="1"></label><button class="btn" id="h-list">List</button></div>' +
+      '<p class="note small">Your shards are held while they are listed. When they sell, the gold arrives in your mailbox.</p>';
+    if (x.mine.length) h += '<h3 class="sub">Your listings</h3><div class="tlist">' + x.mine.map(l => row(l, 'mine')).join('') + '</div>';
+    return h + '</div>';
+  }
   async function loadMail(quiet) {
     if (!quiet) { trade.msg = 'Checking your mail…'; paintTrade(); }
     try { trade.mail = await chatCall('GET', '/mail'); for (const l of trade.mail.inbox.concat(trade.mail.outbox)) if (l.type === 'offer') l.price = nowGold(l.price, l.at); trade.msg = ''; } catch (e) { if (!quiet) trade.msg = tradeErr(e); }
@@ -5531,7 +5578,7 @@
     if (!trade.cls) { const m = L.memberById('you'); trade.cls = m ? m.cls : 'tank'; }
     paintTrade();
     if (!CL || !signedIn()) return;
-    if (trade.view === 'market') loadMarket(); else if (trade.view === 'sigils') loadSigils(); else loadMail();
+    if (trade.view === 'market') loadMarket(); else if (trade.view === 'sigils') loadSigils(); else if (trade.view === 'shards') loadShards(); else loadMail();
   }
   const SLOT_FILTER = [['all', 'All slots'], ['main', 'Main hand'], ['off', 'Offhand'], ['head', 'Helmet'], ['neck', 'Trinket'], ['chest', 'Chest'], ['robe', 'Robe'], ['legs', 'Legs'], ['feet', 'Feet'], ['ring', 'Ring']];
   const RAR_FILTER = [['all', 'Any rarity'], ['fine', 'Fine and up'], ['rare', 'Rare and up'], ['epic', 'Epic and set']];
@@ -5557,6 +5604,7 @@
     if (!CL) h = '<p class="note">The Trading Post is not available right now. Try again later.</p>';
     else if (!signedIn()) h = '<div class="mkempty">' + icon('lock') + '<b>Sign in to trade</b><small>The market and mailbox need a free account so other players can see your listings.</small><button class="btn small" id="t-signin">Sign in</button></div>';
     else if (trade.view === 'sigils') h += sigilsView();
+    else if (trade.view === 'shards') h += shardsView();
     else if (trade.view === 'market') {
       h += '<div class="whoseg tradecls">' + L.CLASS_ORDER.map(c => '<button class="whochip c-' + c + (!trade.mine && trade.cls === c ? ' on' : '') + '" data-tc="' + c + '"><img src="' + SP.spriteURL(c, 2) + '" alt=""><span>' + L.CLASSES[c].name + '</span></button>').join('') +
         '<button class="whochip' + (trade.mine ? ' on' : '') + '" data-tc="mine"><span>My listings</span></button></div>';
@@ -5665,6 +5713,23 @@
       const r = await chatCall('POST', '/sigils/cancel', { id: d.scancel });
       if (prof) prof.bal = r.bal; toast('coin', 'Listing taken down', r.n.toLocaleString() + ' ' + TOKEN + ' are back in your account.', ''); loadSigils();
     }, 'sig');
+    if (t.id === 'h-list') tradeAct(async () => {
+      const k = +$('h-k').value, n = Math.floor(+$('h-n').value), p = Math.floor(+$('h-p').value), have = L.shardsOf(S);
+      if (!(n >= 1 && n <= 99) || !(p >= 1)) { toast('lock', 'Check the numbers', 'Enter how many shards to sell (up to 99) and a total price in gold.', 'warn'); return; }
+      if ((have[k] || 0) < n) { toast('lock', 'Not enough shards', 'You have ' + shName(k, have[k] || 0) + '.', 'warn'); return; }
+      await chatCall('POST', '/shards/list', { k, n, price: p, name: S.hero.name });
+      have[k] -= n; afterTrade(); sfx.coin(); toast('coin', 'Listed', shName(k, n) + ' for ' + fmt(p) + ' gold.', ''); loadShards();
+    });
+    if (d.hbuy) tradeAct(async () => {
+      const l = trade.sh && trade.sh.l.find(x => x.id === d.hbuy); if (!l || l.price > S.gold) return;
+      const r = await chatCall('POST', '/shards/buy', { id: l.id, name: S.hero.name });
+      S.gold -= r.price; L.shardsOf(S)[r.k] = (L.shardsOf(S)[r.k] || 0) + r.n; afterTrade(); sfx.coin();
+      toast('relic', 'Shards bought', '+' + shName(r.k, r.n) + ' for ' + fmt(r.price) + ' gold.', 'feat'); loadShards();
+    });
+    if (d.hcancel) tradeAct(async () => {
+      const r = await chatCall('POST', '/shards/cancel', { id: d.hcancel });
+      L.shardsOf(S)[r.k] = (L.shardsOf(S)[r.k] || 0) + r.n; afterTrade(); toast('relic', 'Listing taken down', shName(r.k, r.n) + ' are back in your stash.', ''); loadShards();
+    });
     if (d.tview) { listingModal(d.tview); return; }
     if (d.tc) { if (d.tc === 'mine') trade.mine = true; else { trade.mine = false; trade.cls = d.tc; } loadMarket(); return; }
     if (d.tclaim || t.id === 't-claimall') tradeAct(async () => {
@@ -5804,6 +5869,9 @@
     if (st) {
       if (!st.w.live && st.me.score > 0 && !st.me.cl) claim = st.w.id;
       else if (st.prev && st.prev.score > 0 && !st.prev.cl) claim = st.prev.id;
+      const lw = S.wbLoot || {};
+      if (!claim && !st.w.live && st.me.score > 0 && !lw[st.w.id]) claim = st.w.id;
+      else if (!claim && st.prev && st.prev.score > 0 && !lw[st.prev.id]) claim = st.prev.id;
     }
     const next = live ? 0 : (now < w.start ? w.start : w.start + 7 * 864e5);
     return { now, w, live, name, me, ready, claim, next, total: st && st.w.id === w.id ? st.total : 0 };
@@ -5831,13 +5899,14 @@
       '<div class="wbphase"><div class="wbph"><b>Phase ' + (ph.broken + 1) + '</b><span>' + pct + '%</span></div><div class="bar wbbar2"><i style="width:' + pct + '%"></i></div><small>' + ph.broken + (ph.broken === 1 ? ' phase' : ' phases') + ' broken so far · ' + (st ? st.n : 0) + (st && st.n === 1 ? ' delver has' : ' delvers have') + ' joined</small></div></div></div>' +
       '<ul class="passfx"><li><b>Assaults</b><span>Two minutes against the boss at the strength of your deepest floor. One every 15 minutes. Strike and use your abilities for more damage.</span></li>' +
       '<li><b>Rewards</b><span>After the weekend: 3 Sigils for taking part, 1 more for every phase the server breaks (up to 5), and 5 more for the top three. Plus a big purse of gold.</span></li>' +
+      '<li><b>Legendary loot</b><span>' + (() => { const k = Math.floor(Date.parse(x.w.id + 'T00:00:00Z') / 6048e5) % 4, s2 = L.WB_SETS[k]; return 'Each phase broken adds a 12% chance (up to 75%) that ' + esc(x.name) + ' drops a piece of <b>' + esc(s2.name) + '</b>. One winner is drawn from everyone who fought: every whole point of your damage is one ticket. ' + esc(s2.word) + ' shards (5, plus 3 per phase) are drawn the same way. They upgrade the set and trade in the Market.'; })() + '</span></li>' +
       '<li><b>When</b><span>Every weekend, Friday to Sunday (all times UTC).' + (x.w.id === '2026-11-23' ? ' This first one is a preview and runs until Friday.' : '') + '</span></li></ul>' +
       (top.length ? '<h3 class="sub">Top delvers</h3><ol class="wbtop">' + top.map(t => '<li><span class="c-' + esc(t.cls) + '">' + esc(t.name) + '</span><b>' + Math.floor(t.score).toLocaleString('en-US') + '</b></li>').join('') + '</ol>' : '') +
       (x.me && x.me.score > 0 ? '<p class="passstate">Your damage this event: <b>' + Math.floor(x.me.score).toLocaleString('en-US') + '</b>' + (rank ? ', rank ' + rank : '') + '.</p>' : '') +
       '<div class="row">' + (x.claim ? '<button class="btn" id="wb-claim">Claim your reward</button>' : !CL || !signedIn() ? '<button class="btn" id="wb-in">Sign in to fight</button>' : x.live ? (x.ready > 0 ? '<button class="btn" disabled>Next assault in ' + wbDur(x.ready) + '</button>' : '<button class="btn" id="wb-go">Join the assault</button>') : '') + '<button class="btn ghost" id="wb-no">Close</button></div>', md => {
       md.querySelector('#wb-x').onclick = closeModal; md.querySelector('#wb-no').onclick = closeModal;
       const go = md.querySelector('#wb-go'); if (go) go.onclick = () => { closeModal(); joinAssault(); };
-      const cl = md.querySelector('#wb-claim'); if (cl) cl.onclick = () => claimBoss(x.claim, cl);
+      const cl = md.querySelector('#wb-claim'); if (cl) cl.onclick = () => { const st2 = wb.st, done = st2 && ((st2.w.id === x.claim && st2.me.cl) || (st2.prev && st2.prev.id === x.claim && st2.prev.cl)); if (done) { closeModal(); lootBoss(x.claim).then(() => { loadBoss().then(paintBoss); }); } else claimBoss(x.claim, cl); };
       const si = md.querySelector('#wb-in'); if (si) si.onclick = () => { closeModal(); authForm('in'); };
     });
   }
@@ -5869,7 +5938,20 @@
       closeModal(); sfx.relic();
       toast('crown', 'World boss reward', '+' + r.sig + ' Sigils and ' + fmt(g) + ' gold. You ranked ' + r.rank + ' of ' + r.n + '.', 'feat');
     } catch (e) { if (btn) btn.disabled = false; toast('lock', 'Could not claim yet', 'Try again in a moment.', 'warn'); }
-    wb.busy = false; loadBoss().then(paintBoss); updatePanel(true);
+    wb.busy = false; await lootBoss(id); loadBoss().then(paintBoss); updatePanel(true);
+  }
+  // The boss's loot (v105): the server's seeded draw says whether you won the Legendary and how many shards you drew.
+  async function lootBoss(id) {
+    S.wbLoot = S.wbLoot || {}; if (S.wbLoot[id]) return;
+    let r; try { r = await chatCall('POST', '/boss/loot', { id }); } catch (e) { if (e && (e.code === 'claimed' || e.code === 'none')) { S.wbLoot[id] = 1; save(); } return; }
+    if (!r || !r.ok) return;
+    S.wbLoot[id] = 1; const b = L.WB_SETS[r.boss] ? r.boss : 0, set = L.WB_SETS[b], sh = L.shardsOf(S);
+    sh[b] = (sh[b] || 0) + (r.sh || 0);
+    let it = null; if (r.leg) { it = L.makeLegend(S, b); S.bag.push(it); S.stats.legends = (S.stats.legends || 0) + 1; }
+    save(); try { pushCloud(true); } catch (e) {} updateGear(true);
+    const odds = Math.round(r.tk / Math.max(1, r.all) * 1000) / 10;
+    if (it) { sfx.boss && sfx.boss(); toast('crown', 'LEGENDARY: ' + L.gearName(it), 'You won the draw for ' + set.name + ' with ' + fmt(r.tk) + ' of ' + fmt(r.all) + ' tickets (' + odds + '%).' + (r.sh ? ' Plus ' + shName(b, r.sh) + '.' : ''), 'feat'); }
+    else toast('relic', set.word + ' loot', (r.sh ? 'You drew ' + shName(b, r.sh) + '. ' : 'No shards this time. ') + (r.who ? r.who + ' won the Legendary.' : 'No Legendary dropped this time.') + ' Your tickets: ' + fmt(r.tk) + ' of ' + fmt(r.all) + ' (' + odds + '%).', '');
   }
   $('wbbar').addEventListener('click', () => {
     const x = wbState();
@@ -6388,5 +6470,5 @@
   requestAnimationFrame(render);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
   window.addEventListener('pagehide', save);
-  window.LHDebug = { get S() { return S; }, save, L, events };
+  window.LHDebug = { get S() { return S; }, save, L, events, lootBoss };
 })();

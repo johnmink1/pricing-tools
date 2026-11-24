@@ -1,6 +1,6 @@
 # Lanternhold handoff (24 Nov 2026)
 
-This handoff stands on its own for the new Lanternhold project. It is current as of **v104, build 202611241427**, live at https://lanternhold.born2gamellc.com.
+This handoff stands on its own for the new Lanternhold project. It is current as of **v105, build 202611241453**, live at https://lanternhold.born2gamellc.com.
 
 ## Where the code lives
 
@@ -9,7 +9,7 @@ This handoff stands on its own for the new Lanternhold project. It is current as
 | Path | What it is |
 |---|---|
 | `lanternhold/core.js` | All game rules: classes, foes, loot, crafting, events, the `api` export list. Any new function must be added to that big export list at the bottom. |
-| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v105**. |
+| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v106**. |
 | `lanternhold/style.css`, `index.html` | Styles and markup. |
 | `lanternhold/vector.js` | Illustrated SVG sprites (`ART.enchanter`, `ART.armorer`, classes, foes). |
 | `lanternhold/sprites.js` | Pixel fallback sprites and `itemIcon`. |
@@ -18,7 +18,7 @@ This handoff stands on its own for the new Lanternhold project. It is current as
 | `lanternhold-wiki/build.js` | Generates the public wiki (`/wiki`) from the game files. Never hand-edit the wiki. Check with `node lanternhold-wiki/build.js` and then `rm -rf out`. |
 | `lanternhold-music/` | The music renderer. |
 | `infra/lanternhold-accounts.yaml` | CloudFormation stack `lanternhold` in us-east-1. It holds Cognito, DynamoDB, the HTTP API and the inline Lambdas. |
-| `infra/lambda/*.js` | Lambda sources: heroes, market, mail, admin, profile, warden, exchange, store, perks, authchal, wixlogin, invite, worldboss, looks, reset. `python3 infra/build.py` minifies them into the YAML. The inline limit is 4 KB each. |
+| `infra/lambda/*.js` | Lambda sources: heroes, market, mail, admin, profile, warden, exchange, store, perks, authchal, wixlogin, invite, worldboss, looks, reset, loot. `python3 infra/build.py` minifies them into the YAML. The inline limit is 4 KB each. |
 | `infra/chat`, `infra/ring` | Chat and Ember Ring (PvP) server code. |
 
 **`johnmink1/lanternhold`** is only the GitHub Pages mirror. Its `deploy.yml` copies `lanternhold/` from pricing-tools and builds the wiki. It runs every ~10 minutes, or on demand.
@@ -68,7 +68,7 @@ There is no working AWS CLI. The cloud container's keys are invalid, and VENGEAN
 
 **Lanternholder** costs 500 Sigils for 30 days, or $4.99/month.
 
-## Live as of v102
+## Live as of v105
 
 - **v86–v91:** mana and stamina, wearer-only enchants, Ghost Lantern, status effects (burn, poison, stun, disarm), mastery XP, shielded foes, wandering merchant, bounty board, Lantern Keeper.
 - **v92–v98:** XP bar tooltip, Keeper lantern, ambushes at 6% (×2 XP per creature), XP in the fight log, Lanternholder rename, Sigil shop.
@@ -95,6 +95,14 @@ There is no working AWS CLI. The cloud container's keys are invalid, and VENGEAN
 
 - **v103:** fix for John's report "did you get rid of the things?". Visiting a shop from the main camp showed the campfire scene, because `render()` checked `resting` before `visiting`. Now the shop visit wins.
 - **v104:** Return to camp, Descend, a Draught, or any floor travel now ends a shop visit. Core `gotoFloor` and `useDraught` clear `enchAt` and `shopK`. Before this, John had to press Leave first.
+
+- **v105: world boss Legendary loot** (John: a chance of a Legendary, drawn by lottery among everyone who fought, one ticket per rounded point of damage; a set per boss; boss shards upgrade them and trade on the market).
+  - Server: `infra/lambda/loot.js` (function `lanternhold-loot`). `POST /boss/loot {id}` runs a seeded draw once the event has ended (seed = event id, so every claim agrees). Tickets = max(1, floor(boss score)). Legendary chance = min(75%, 12% × phases broken); shards = 5 + 3 × min(phases, 10), each its own draw. A claim is recorded once (`lc` on the boss row).
+  - Shard market on the same Lambda: `GET /shards` (`?mine=1`), `POST /shards/list|buy|cancel`. Listings live in the trade table under `sh#` / `ss#<seller>`; a sale sends a `sale` letter with the gold to the seller's mailbox.
+  - Core: rarity `legend`, `WB_SETS` (Colossus = hp, Sovereign = dps, Nyxmaw = heal, Leviathan = gold), 4 pieces each (main, chest/robe, ring, neck), 2-piece +15% (gold +25%), 4-piece +30% damage and health. Legendaries are bound, can't be merged, and upgrade with that boss's shards (`s.shards[boss]`, cost = next level) instead of gold. `makeLegend` caps item level so the winner can wear it.
+  - UI: `lootBoss(id)` runs after the Sigil claim; Market > Boss shards view; set block in the item window. `LHDebug.lootBoss` exists for tests.
+  - **The stack update for this Lambda must be deployed through CloudShell.** Until it is, the game says "The shard stall opens soon." and loot claims retry later.
+  - Also in v105: the Enchanter and Armorer scenes scale to the arena (`shopGeo()`: a 198 × 100 focus box fills the arena, the room grows around it).
 
 ## Open asks and things to watch
 

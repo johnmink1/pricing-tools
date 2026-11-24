@@ -1,4 +1,4 @@
-/* lh-build 202611241509 */
+/* lh-build 202611241515 */
 /* Lanternhold illustrated sprites. Each sprite is drawn as layered SVG (outline, shading, rim light, detail),
    tinted per companion or biome, rendered once to an image and then drawn on the arena canvas. */
 (function (root) {
@@ -290,6 +290,40 @@
       P('M57 82 H63 V86 H57Z', iron, ' stroke-width="1"'), P('M57 90 H63 V94 H57Z', iron, ' stroke-width="1"'),
       // soot smudge
       E(70, 48, 3, 1.6, '#3a2a20', ' opacity=".35"'),
+    ].join('');
+  } };
+  // The Quartermaster, Old Thessaly (John, 2026-11-24, v107): keeps the Store. Grey hair in a bun, a green shawl over a
+  // russet dress, an apron with a ledger pencil, and a tonic held up for the party to see.
+  ART.quartermaster = { w: 120, h: 160, draw(c) {
+    const dress = c.mat('#8a3b2a'), dressD = c.t('#4a1a12'), shawl = c.mat('#2f7d55'), shawlD = c.t('#14432c'), apron = c.lg(['#f6efe0', '#d9cdb4'], 0, 0, 1, 1);
+    const skin = c.lg([SK.light, SK.mid], 0, 0, 1, 1), hair = c.lg(['#f4f4f6', '#c9ccd6', '#8e93a3'], 0, 0, 0, 1), glass = c.lg(['#ffffff', '#bff3d4', '#22c55e'], 0, 0, 1, 1);
+    return [
+      // long dress to the floor
+      P('M38 70 Q30 110 26 152 Q60 160 94 152 Q90 110 82 70 Q60 60 38 70Z', dress),
+      Pn('M64 70 Q72 110 76 156 Q86 156 94 152 Q90 110 82 70Z', dressD, ' opacity=".45"'),
+      // apron with a pocket and a pencil
+      P('M44 84 H76 L80 146 Q60 152 40 146Z', apron),
+      P('M50 112 H70 V126 H50Z', c.mat('#e8dcc0'), ' stroke-width="1.4"'), P('M64 104 L66 104 L66 116 L64 116Z', '#f5c242', ' stroke-width="0.8"'),
+      L_('M44 86 Q60 80 76 86', '#a8946a', 1.6),
+      // shawl over the shoulders, knotted at the chest
+      P('M30 72 Q60 56 90 72 Q86 92 60 96 Q34 92 30 72Z', shawl), Pn('M60 60 Q86 64 90 72 Q86 90 64 95Z', shawlD, ' opacity=".4"'),
+      ...[[36, 86], [44, 91], [52, 94], [68, 94], [76, 91], [84, 86]].map(([x, y]) => L_('M' + x + ' ' + y + ' L' + x + ' ' + (y + 6), '#1f5c3c', 1.2)),
+      P('M56 88 Q60 84 64 88 Q60 92 56 88Z', shawlD),
+      // arms: one at her side, one raising a green tonic
+      P('M30 74 Q22 96 28 112 L38 110 Q36 96 40 86Z', dress), Eo(32, 114, 5.5, 5, skin),
+      P('M86 74 Q100 78 98 92 L90 96 Q88 86 82 82Z', dress), Eo(95, 92, 5.5, 5, skin),
+      C(96, 78, 16, c.rg([['#d9ffe9', 0.7], ['#4ade80', 0.3], ['#16a34a', 0]]), ''),
+      P('M92 66 H100 V72 Q106 76 106 82 Q106 90 96 90 Q86 90 86 82 Q86 76 92 72Z', glass, ' stroke-width="1.4"'),
+      P('M91 62 H101 V66 H91Z', c.mat('#8a5a2a'), ' stroke-width="1"'), L_('M90 80 Q96 84 102 80', '#ffffff', 1, ' opacity=".7"'),
+      // head, grey bun, kind face, round spectacles
+      C(60, 22, 9, hair), L_('M53 20 Q60 16 67 20', '#8e93a3', 1),
+      P('M46 42 Q46 26 60 25 Q74 26 74 42 Q74 56 60 60 Q46 56 46 42Z', skin),
+      P('M45 42 Q44 24 60 23 Q76 24 75 42 Q72 32 60 31 Q48 32 45 42Z', hair),
+      E(54, 44, 1.8, 2.1, '#1a2440'), E(66, 44, 1.8, 2.1, '#1a2440'), C(54.6, 43.3, 0.7, '#ffffff'), C(66.6, 43.3, 0.7, '#ffffff'),
+      L_('M50.5 44 A3.6 3.6 0 1 0 57.5 44 A3.6 3.6 0 1 0 50.5 44 M62.5 44 A3.6 3.6 0 1 0 69.5 44 A3.6 3.6 0 1 0 62.5 44 M57.5 43.5 H62.5', '#b08a3a', 1),
+      P('M55 51 Q60 55 65 51', 'none', ' stroke-width="1.3"'),
+      E(51, 50, 2.6, 1.5, '#ff8a7a', ' opacity=".35"'), E(69, 50, 2.6, 1.5, '#ff8a7a', ' opacity=".35"'),
+      L_('M49 38 Q53 36 57 38 M63 38 Q67 36 71 38', '#a3a8b6', 1.1),
     ].join('');
   } };
   ART.necro = { w: 120, h: 160, draw(c) {

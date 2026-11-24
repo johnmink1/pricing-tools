@@ -1,4 +1,4 @@
-/* lh-build 202611240419 */
+/* lh-build 202611240432 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -589,6 +589,19 @@
       ctx.save(); ctx.translate(fx + sw, fy); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0, sw, sh); ctx.restore();
       ctx.globalAlpha = 1;
       foeAnim.cx = fxC; foeAnim.cy = fy + sh / 2; foeAnim.w = sw; foeAnim.h = sh;
+      // a shielded foe sits in a pale blue bubble that thins and cracks as it wears down
+      const shv = S.foe && S.foe.shield > 0 ? S.foe.shield : 0;
+      if (shv > 0) {
+        const rx = sw * 0.62, ry = sh * 0.62, pul = 0.5 + 0.5 * Math.sin(tAnim * 4);
+        ctx.save();
+        const sg = ctx.createRadialGradient(fxC, fy + sh / 2, Math.min(rx, ry) * 0.6, fxC, fy + sh / 2, Math.max(rx, ry));
+        sg.addColorStop(0, 'rgba(120,200,255,0)'); sg.addColorStop(1, 'rgba(120,200,255,' + (0.12 + 0.22 * shv) + ')');
+        ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(fxC, fy + sh / 2, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(170,225,255,' + (0.35 + 0.45 * shv + 0.15 * pul) + ')'; ctx.lineWidth = 1 + shv;
+        ctx.setLineDash(shv < 0.4 ? [6, 4] : []); ctx.stroke(); ctx.setLineDash([]);
+        if (shv < 0.6) { ctx.strokeStyle = 'rgba(220,245,255,0.7)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(fxC - rx * 0.5, fy + sh * 0.2); ctx.lineTo(fxC - rx * 0.2, fy + sh * 0.4); ctx.lineTo(fxC - rx * 0.35, fy + sh * 0.55); if (shv < 0.3) { ctx.moveTo(fxC + rx * 0.4, fy + sh * 0.7); ctx.lineTo(fxC + rx * 0.15, fy + sh * 0.5); ctx.lineTo(fxC + rx * 0.3, fy + sh * 0.35); } ctx.stroke(); }
+        ctx.restore();
+      }
     }
     if (foeAnim.dying) {
       const d = foeAnim.dying, a = 0.7 * (1 - (tAnim - d.t) / 0.25);
@@ -718,6 +731,8 @@
       case 'ambush': if (e.first) flog('fight', e.guarded ? nm(e.target) + ' guards the rear from an ambush' : '<b class="bad">Ambush!</b> ' + nm(e.target) + ' is hit from behind'); break;
       case 'pack': flog('fight', '<b class="bad">Ambush pack:</b> ' + e.n + ' monsters attack together'); break;
       case 'ward': flog('fight', 'The foe raises a ward', 'ward', 4000); break;
+      case 'shieldup': flog('fight', '<b class="bad">' + (e.again ? 'The guardian raises its shield again' : 'The foe hides behind a shield') + '</b>: the party deals ' + Math.round(L.SHIELD_CUT * 100) + '% less damage until it breaks'); break;
+      case 'shieldbreak': flog('fight', '<b class="good">Shield broken</b>' + (e.tap ? ' by your strikes' : ' (it wore away)') + ': full damage again'); break;
       case 'wipe': flog('party', '<b class="bad">The party is beaten</b>' + (e.name ? ' by ' + esc(e.name) : '')); break;
       case 'bossfail': flog('fight', '<b class="bad">The lantern ran out</b> before the guardian fell'); break;
       case 'newfloor': flog('fight', 'Reached a new depth: <b>floor ' + e.floor + '</b>'); break;
@@ -808,6 +823,12 @@
         const a = mAnim(e.id), mu = L.dotMult(e.id, e.k); floatText((e.k === 'burn' ? 'Burning' : 'Poisoned') + (mu >= 2 ? ' x2' : mu < 0.5 ? ' (resists)' : ''), e.k === 'burn' ? 'crit' : 'heal', a.x / W, (a.y - 14) / H);
       } else if (e.type === 'poison') {
         const a = mAnim(e.id); if (Math.random() < 0.5) floatText('Poisoned', 'heal', a.x / W, (a.y - 12) / H);
+      } else if (e.type === 'shieldup') {
+        floatText(e.again ? 'Shield up again!' : 'Shielded! Tap to break it', 'skill', FOE_X, 0.22); tone(660, 0.18, 'sine', 0.04, 880);
+        if (!S.stats.shieldSeen) { S.stats.shieldSeen = 1; toast('shield', 'A shielded foe', 'While its shield is up your party deals ' + Math.round(L.SHIELD_CUT * 100) + '% less damage. Tap the foe to knock the shield down (about ' + Math.round(1 / L.SHIELD_TAP) + ' taps). Left alone it wears away in about ' + L.SHIELD_DECAY.foe + ' seconds.', ''); }
+      } else if (e.type === 'shieldbreak') {
+        floatText('Shield broken!', 'crit', FOE_X, 0.24); burst(foeAnim.cx || W * FOE_X, foeAnim.cy || H * 0.5, 26, ['#bfe6ff', '#ffffff', '#7fb8e8'], 55);
+        if (e.tap) sfx.relic(); else tone(330, 0.2, 'sine', 0.04, 220);
       } else if (e.type === 'ward') {
         floatText('Ward', 'skill', FOE_X, 0.3); burst(foeAnim.cx, foeAnim.cy, 18, ['#bfe6ff', '#ffffff', '#7fb8e8'], 35);
       } else if (e.type === 'regionlock') {
@@ -2212,7 +2233,8 @@
       } else {
         $('hpbar').style.width = Math.max(0, f.hp / f.max * 100) + '%';
         $('wardbar').style.width = Math.min(100, (f.ward || 0) / f.max * 100) + '%';
-        $('hptext').textContent = fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max) + (f.ward > 0 ? ' + ' + fmt(f.ward) + ' ward' : '');
+        $('hptext').textContent = fmt(Math.max(0, f.hp)) + ' / ' + fmt(f.max) + (f.ward > 0 ? ' + ' + fmt(f.ward) + ' ward' : '') + (f.shield > 0 ? ' · Shield ' + Math.ceil(f.shield * 100) + '%: tap to break' : '');
+        $('hpbar').parentNode.classList.toggle('shielded', f.shield > 0);
       }
       $('lanternwrap').hidden = !f.boss && !f.goblin && !f.world; $('lanternwrap').classList.toggle('flee', !!f.goblin); $('lanternwrap').classList.toggle('wb', !!f.world); $('hpbar').parentNode.classList.toggle('wb', !!f.world);
       { const n = (S.items && S.items.oil) || 0; $('b-oil').hidden = !f.boss || !n || S.lantern <= 0; $('b-oil').textContent = 'Pour lantern oil (' + n + ')'; }
@@ -4156,6 +4178,11 @@
         '<b>Stunned</b> heroes cannot attack, heal or use abilities for ' + L.CC.stun.sec + ' seconds. Ground Slam, Tidal Crash and Belly Flop stun.',
         '<b>Disarmed</b> heroes fight barehanded for ' + L.CC.disarm.sec + ' seconds: ' + Math.round(L.CC.disarm.dmg * 100) + '% damage, half healing and no abilities, until they grab their weapon back. Shield Charge and Disarming Lash disarm.',
         'Tanks shake off stuns and disarms twice as fast, and nothing stuns or disarms a tank behind Shield Wall. Dodging or blocking the hit avoids it too.']],
+      ['Shielded foes', 'i:shield', 'Some monsters fight behind a shield. Tap them to break it.', [
+        'From floor ' + L.SHIELD_FLOOR + ', some monsters and many guardians raise a pale blue shield. While it is up your party deals ' + Math.round(L.SHIELD_CUT * 100) + '% less damage.',
+        'Every tap on the fight knocks about ' + Math.round(L.SHIELD_TAP * 100) + '% off the shield, and a critical tap twice that. About ' + Math.round(1 / L.SHIELD_TAP) + ' taps break it.',
+        'If you are not tapping, the shield wears away on its own in about ' + L.SHIELD_DECAY.foe + ' seconds (' + L.SHIELD_DECAY.boss + ' for a guardian). Guardians raise it once more at half health.',
+        'The health bar shows how much shield is left, and the bubble around the foe cracks as it weakens.']],
       ['Ghost Lantern', 'i:lantern', 'Now and then a Ghost Lantern drifts into the fight. Tap it to shatter it for a reward.', [
         'It only appears while you are playing (from floor ' + L.GHOST_FLOOR + '), never while you are away.',
         'While it floats there it slowly saps your party’s damage or healing, up to ' + Math.round(L.GHOST_MAX * 100) + '% at most. The tag under it shows how much and how long it has left.',
@@ -4369,6 +4396,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 90, date: 'November 24, 2026', title: 'Shielded foes', items: [
+      'New: shielded monsters. From floor 12 some monsters, and many guardians, fight inside a pale blue shield. While it is up your party deals 65% less damage.',
+      'Tap the fight to break it: each tap knocks about 10% off (a critical tap 20%), so about 10 taps does it, and your party is back to full strength.',
+      'Not watching? The shield wears away on its own in about 14 seconds (16 for a guardian), so idle runs never get stuck. Guardians raise it once more at half health.'
+    ] },
     { v: 89, date: 'November 24, 2026', title: 'Mastery hero XP', items: [
       'Region mastery now speeds up hero levels too. Every mastery goal adds +1% hero XP, and a region with all three goals done adds +2% more (+5% per fully mastered region).',
       'It counts the mastery you already have, so many heroes get a boost right away. Your total shows under Region mastery in the Codex.'

@@ -1,4 +1,4 @@
-/* lh-build 202611240419 */
+/* lh-build 202611240432 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -120,8 +120,13 @@
     venom:  { name: 'Venomous', desc: 'Its hits poison, dealing damage over time' },
     cleave: { name: 'Cleaves', desc: 'Its hits also strike the next hero in line' },
     swift:  { name: 'Swift', desc: 'Attacks harder and faster' },
+    shield: { name: 'Shielded', desc: 'Fights behind a shield: your party deals far less damage until it breaks. Tap the foe to break it fast; it also wears down on its own' },
   };
-  const MOD_KEYS = Object.keys(MODS);
+  const MOD_KEYS = Object.keys(MODS).filter(k => k !== 'shield');
+  // Shielded foes (John, 2026-11-24): while the shield is up the party deals SHIELD_CUT less damage. Every tap knocks
+  // SHIELD_TAP off it (a critical tap twice that), and it wears away by itself in SHIELD_DECAY seconds so idle players
+  // are never stuck. Guardians raise it once more at half health.
+  const SHIELD_FLOOR = 12, SHIELD_CHANCE = 0.08, SHIELD_BOSS_CHANCE = 0.4, SHIELD_CUT = 0.65, SHIELD_TAP = 0.1, SHIELD_DECAY = { foe: 14, boss: 16 };
   // Special attacks (John, 2026-11-24): guardians, and some monsters, wind up a big move every so often.
   // kind 'all' hits the whole party, 'splash' hits a hero and the ones beside them, 'pos' marks one spot in the line
   // (tanks cannot draw it away). A dot leaves a burn or poison that keeps ticking for DOT_FIGHTS fights.
@@ -1752,6 +1757,7 @@
     let hpx = hp;
     if (pack) { hpx = hp * pack * 0.85; ambush = 2; }
     const mods = chest ? [] : rollMods(f, boss, elite, b, r);
+    if (!chest && !pack && f >= SHIELD_FLOOR && r() < (boss ? SHIELD_BOSS_CHANCE : SHIELD_CHANCE)) mods.push('shield');
     const sp = chest ? null : rollSpecial(f, boss, elite, sprite, b, r);
     return { sp, spAt: 0, spWind: null, name, sprite, boss, chest, elite, side, ambush, pack, hp: hpx, max: hpx, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) * (pack ? 1 + 0.3 * (pack - 1) : 1) * (mods.includes('swift') ? 1.35 : 1), mods, ward: 0, wardAt: 0 };
   }
@@ -1828,6 +1834,7 @@
       const foe = s.foe, mult = (foe.boss ? 1 + relicVal(s, 'lens') : 1) * (1 + fxOn(s, 'vuln', now || Date.now()));
       let dmg = amount * mult;
       if (foe.world) { s.wb.score += dmg / s.wb.unit; drain(s, dmg); return; }
+      if (foe.shield > 0) dmg *= 1 - SHIELD_CUT;
       if (foe.ward > 0) { const soak = Math.min(foe.ward, dmg); foe.ward -= soak; dmg -= soak; amount = dmg / mult; if (dmg <= 0) return; }
       if (dmg < foe.hp) { foe.hp -= dmg; drain(s, dmg); return; }
       amount -= foe.hp / mult; drain(s, foe.hp);
@@ -2199,8 +2206,14 @@
         return;
       }
     }
-    // monster tricks: wards, regeneration and poison
+    // monster tricks: shields, wards, regeneration and poison
     const fm = s.foe.mods || [];
+    if (fm.includes('shield')) {
+      const f0 = s.foe;
+      if (f0.shield == null) { f0.shield = 1; events && events.push({ type: 'shieldup' }); }
+      else if (f0.boss && !f0.shield2 && f0.shield <= 0 && f0.hp < f0.max * 0.5) { f0.shield2 = 1; f0.shield = 1; events && events.push({ type: 'shieldup', again: true }); }
+      if (f0.shield > 0) { f0.shield = Math.max(0, f0.shield - dt / SHIELD_DECAY[f0.boss ? 'boss' : 'foe']); if (f0.shield <= 0) events && events.push({ type: 'shieldbreak', tap: false }); }
+    }
     if (fm.includes('regen') && s.foe.hp < s.foe.max) s.foe.hp = Math.min(s.foe.max, s.foe.hp + s.foe.max * (s.foe.boss ? 0.004 : 0.012) * dt);
     if (fm.includes('ward') && now >= (s.foe.wardAt || 0)) { s.foe.ward = s.foe.max * (s.foe.boss ? 0.05 : 0.15); s.foe.wardAt = now + 12000; events && events.push({ type: 'ward' }); }
     if (s.poison) for (const id in s.poison) {
@@ -2287,6 +2300,7 @@
     if (crit) { dmg *= 5; s.stats.crits++; }
     if (!auto) s.stats.clicks++;
     events && events.push({ type: 'hit', dmg, crit, auto });
+    if (s.foe && s.foe.shield > 0 && !auto) { s.foe.shield = Math.max(0, s.foe.shield - SHIELD_TAP * (crit ? 2 : 1)); if (s.foe.shield <= 0) { s.stats.shields = (s.stats.shields || 0) + 1; events && events.push({ type: 'shieldbreak', tap: true }); } }
     const sc0 = s.wb ? s.wb.score : 0;
     damageFoe(s, dmg, now, rng, events);
     if (s.wb && !auto) s.wb.ck = (s.wb.ck || 0) + s.wb.score - sc0;
@@ -2404,7 +2418,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

@@ -1,4 +1,4 @@
-/* lh-build 202611240148 */
+/* lh-build 202611240206 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -801,7 +801,37 @@
     const box = $('toasts'); box.appendChild(t);
     while (box.children.length > (innerWidth < 560 ? 2 : 3)) box.firstChild.remove();
     t.onclick = () => t.remove();
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 400); }, 4200);
+    // Stays up longer, and waits while the pointer rests on it. Every pop-up is kept in the bell too.
+    let left = 7000, at = Date.now(), timer = 0;
+    const go = () => { timer = setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 400); }, left); at = Date.now(); };
+    t.onmouseenter = () => { clearTimeout(timer); left = Math.max(1500, left - (Date.now() - at)); };
+    t.onmouseleave = go; go();
+    noteLog(ic, title, sub, cls);
+  }
+  // ---------- notifications: the last 50 pop-ups, kept on this device ----------
+  var NOTE_KEY = 'lh_notes', notes = [];
+  try { notes = JSON.parse(localStorage.getItem(NOTE_KEY) || '[]'); if (!Array.isArray(notes)) notes = []; } catch (e) {}
+  function noteLog(ic, title, sub, cls) {
+    if (!notes) notes = [];
+    notes.push({ ic, title: String(title || ''), sub: String(sub || ''), cls: cls || '', t: Date.now(), n: 1 });
+    if (notes.length > 50) notes = notes.slice(-50);
+    try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) {}
+    paintNoteDot();
+  }
+  function paintNoteDot() {
+    const d = $('notedot'); if (!d) return;
+    const n = notes.filter(x => x.n).length; d.hidden = !n; d.textContent = n > 9 ? '9+' : n || '';
+    $('btn-notes').setAttribute('aria-label', n ? 'Notifications, ' + n + ' new' : 'Notifications');
+  }
+  const agoText = t => { const s = Math.max(0, (Date.now() - t) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + ' min ago' : s < 86400 ? Math.floor(s / 3600) + ' h ago' : Math.floor(s / 86400) + ' d ago'; };
+  function openBell() {
+    const list = notes.slice().reverse();
+    modal('<h2>Notifications</h2>' + (list.length ? '<ul class="notelist">' + list.map(x => '<li class="toast ' + esc(x.cls) + (x.n ? ' new' : '') + '">' + icon(x.ic) + '<div><b>' + esc(x.title) + '</b>' + (x.sub ? '<small>' + esc(x.sub) + '</small>' : '') + '<time>' + agoText(x.t) + '</time></div></li>').join('') + '</ul>' : '<p>Nothing yet. Pop-ups from the corner of the screen are kept here so you can read them again.</p>') +
+      '<div class="row">' + (list.length ? '<button class="btn ghost" id="nt-clear">Clear all</button>' : '') + '<button class="btn" id="nt-x">Close</button></div>', md => {
+      md.querySelector('#nt-x').onclick = closeModal;
+      const c = md.querySelector('#nt-clear'); if (c) c.onclick = () => { notes = []; try { localStorage.removeItem(NOTE_KEY); } catch (e) {} closeModal(); paintNoteDot(); };
+    });
+    notes.forEach(x => { x.n = 0; }); try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) {} paintNoteDot();
   }
   function modal(html, onMount) {
     $('modalbody').className = 'sheet'; $('modalbody').innerHTML = html; $('modal').hidden = false;
@@ -3227,9 +3257,10 @@
     if (!S.hero) { log.innerHTML = '<div class="chatempty"><p>Create your hero first.</p></div>'; $('chatform').hidden = true; return; }
     $('chatform').hidden = false;
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-    paintDmBar();
-    const dm = chat.ch === 'dm', other = m => m.from === chat.me ? { pid: m.to, name: m.toName || 'them' } : { pid: m.from, name: m.name };
-    log.innerHTML = list.length ? list.map(m => dm ? '<div class="msg dm' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-dm="' + esc(other(m).pid) + '" data-dmname="' + esc(other(m).name) + '" title="Whisper back">' + (m.from === chat.me ? '<small class="dmdir">To</small>' + esc(m.toName || '') : '<small class="dmdir">From</small>' + chatName(m)) + '</button><span>' + renderText(m.text) + '</span></div>' : m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
+    const dm = chat.ch === 'dm';
+    if (dm) return paintWhispers(log, list, atBottom);
+    $('dmto').hidden = true;
+    log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
       : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : chat.ch === 'dm' ? 'No whispers yet. Tap a player’s name in any channel and choose Whisper to message them privately.' : 'Quiet down here. Say hello.') + '</p></div>';
     if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
   }
@@ -3279,10 +3310,34 @@
     } catch (e) { if (e.status === 403) { chatNote('You are no longer in that party.', true); } }
     chat.timer = setTimeout(pollChat, CHAT_POLL_OPEN);
   }
-  function paintDmBar() {
-    const bar = $('dmto'), on = chat.ch === 'dm' && signedIn() && S.hero;
-    bar.hidden = !on; if (!on) return;
-    bar.innerHTML = chat.dmTo ? '<span>Whispering to <b>' + esc(chat.dmTo.name) + '</b></span><button type="button" class="iconbtn" id="dm-clear" aria-label="Stop whispering to ' + esc(chat.dmTo.name) + '">&times;</button>' : '<span>Tap a name to pick who to whisper.</span>';
+  // Whispers read like a messenger: one conversation at a time, picked from the chips on top.
+  // Their messages sit on the left, yours on the right.
+  const dmOther = m => m.from === chat.me ? { pid: m.to, name: m.toName || 'them' } : { pid: m.from, name: m.name };
+  chat.dmSeen = {};
+  function dmPartners(list) {
+    const by = new Map();
+    for (const m of list) { const o = dmOther(m); if (!o.pid) continue; const p = by.get(o.pid) || { pid: o.pid, name: o.name, last: '' }; if (m.from !== chat.me) p.name = m.name; p.last = m.id; by.set(o.pid, p); }
+    const out = [...by.values()].sort((a, b) => a.last < b.last ? 1 : -1);
+    if (chat.dmTo && !by.has(chat.dmTo.pid)) out.unshift({ pid: chat.dmTo.pid, name: chat.dmTo.name, last: '' });
+    return out;
+  }
+  const dmUnread = (list, pid) => list.some(m => m.from === pid && m.id > (chat.dmSeen[pid] || chat.seen.dm || ''));
+  function paintWhispers(log, list, atBottom) {
+    const people = dmPartners(list), bar = $('dmto');
+    if (!chat.dmTo && people.length) chat.dmTo = { pid: people[0].pid, name: people[0].name };
+    $('chatin').placeholder = chat.dmTo ? 'Whisper to ' + chat.dmTo.name : 'Pick someone to whisper';
+    bar.hidden = false;
+    bar.innerHTML = people.length ? people.map(p => '<button type="button" class="dmchip' + (chat.dmTo && p.pid === chat.dmTo.pid ? ' on' : '') + (dmUnread(list, p.pid) && !(chat.dmTo && p.pid === chat.dmTo.pid) ? ' unread' : '') + '" data-dmpick="' + esc(p.pid) + '" data-dmname="' + esc(p.name) + '">' + esc(p.name) + '</button>').join('') + '<button type="button" class="dmchip dmnew" id="dm-new" aria-label="New whisper" title="New whisper">+</button>'
+      : '<span>No conversations yet.</span><button type="button" class="dmchip dmnew wide" id="dm-new">+ New whisper</button>';
+    const conv = chat.dmTo ? list.filter(m => dmOther(m).pid === chat.dmTo.pid) : [];
+    if (chat.dmTo && conv.length && viewing('dm')) chat.dmSeen[chat.dmTo.pid] = conv[conv.length - 1].id;
+    let prev = null;
+    log.innerHTML = conv.length ? conv.map(m => {
+      const mine = m.from === chat.me, first = !prev || prev.from !== m.from; prev = m;
+      return '<div class="bub' + (mine ? ' mine' : '') + (first ? ' first' : '') + '">' + (first && !mine ? '<small class="bubname">' + chatName(m) + '</small>' : '') + '<span>' + renderText(m.text) + '</span></div>';
+    }).join('')
+      : '<div class="chatempty"><p>' + (chat.dmTo ? 'Start your conversation with ' + esc(chat.dmTo.name) + '. Only the two of you can see it.' : 'No whispers yet. Tap a player’s name in any channel and choose Whisper to message them privately.') + '</p></div>';
+    if (atBottom || conv.length < 25) log.scrollTop = log.scrollHeight;
   }
   function whisperTo(pid, name) {
     if (!pid || pid === chat.me) return;
@@ -3327,14 +3382,24 @@
         md.querySelector('#c-dm').onclick = () => { closeModal(); whisperTo(from, name); };
       });
     });
-    $('dmto').addEventListener('click', e => { if (e.target.closest('#dm-clear')) { chat.dmTo = null; setChannel('dm'); } });
+    // New whisper: pick from players you've seen in chat, so nobody has to hunt for a name to tap.
+    function newWhisper() {
+      const seen = new Map();
+      for (const k of Object.keys(chat.msgs)) for (const m of chat.msgs[k]) if (m.from && m.from !== 'sys' && m.from !== chat.me && !chat.muted.has(m.from) && k !== 'dm') seen.set(m.from, { pid: m.from, name: m.name, id: m.id });
+      const people = [...seen.values()].sort((a, b) => a.id < b.id ? 1 : -1).slice(0, 24);
+      modal('<h2>New whisper</h2>' + (people.length ? '<p>Players who have been chatting lately.</p><div class="dmpicklist">' + people.map(p => '<button class="btn ghost small" data-pick="' + esc(p.pid) + '" data-pname="' + esc(p.name) + '">' + esc(p.name) + '</button>').join('') + '</div>' : '<p>Nobody has chatted lately. Players show up here once they post in Global, Banner, Trade or Party.</p>') + '<div class="row"><button class="btn ghost" id="dp-x">Cancel</button></div>', md => {
+        md.querySelector('#dp-x').onclick = closeModal;
+        md.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { closeModal(); whisperTo(b.dataset.pick, b.dataset.pname); });
+      });
+    }
+    $('dmto').addEventListener('click', e => { if (e.target.closest('#dm-new')) { newWhisper(); return; } const c = e.target.closest('[data-dmpick]'); if (c) { chat.dmTo = { pid: c.dataset.dmpick, name: c.dataset.dmname }; paintChat(); $('chatin').focus(); } });
     setTimeout(bgPoll, 4000);
     $('chatform').addEventListener('submit', async e => {
       e.preventDefault();
       const inp = $('chatin'); let text = inp.value.trim(); if (!text || !S.hero) return;
       for (const l of chat.links) text = text.replace(l.label, l.token);
       text = text.replace(/\[\[(?!i:)/g, '[');
-      if (chat.ch === 'dm' && !chat.dmTo) { chatNote('Tap a player’s name, here or in another channel, to pick who to whisper.', true); return; }
+      if (chat.ch === 'dm' && !chat.dmTo) { chatNote('Pick who to whisper first: tap a player’s name in Global, Banner, Trade or Party and choose Whisper.', true); return; }
       inp.disabled = true;
       try {
         await chatCall('POST', '/chat', { ch: chat.ch, leader: chat.leader || undefined, to: chat.ch === 'dm' ? chat.dmTo.pid : undefined, text, name: S.hero.name, cls: S.hero.cls });
@@ -3999,9 +4064,10 @@
         '<b>#lanternhold-chat</b> for players, <b>#lanternhold-bugs</b> for bug reports and <b>#lanternhold-ideas</b> for suggestions.']],
       ['Chat', 'i:chat', 'Global, Trade, Party and Banner channels.', [
         'Press <b>Chat</b> at the bottom right to open the window, and the dash to tuck it away again. A bubble on the button counts unread messages.',
-        'Tap a name to <b>whisper</b>: a private chat with that player, kept in the Whispers channel.',
+        '<b>Whispers</b> are private chats, one per player. Each conversation is a tab along the top of the Whispers channel: their messages on the left, yours on the right. Tap <b>+</b> to start a new one, or tap a name in any channel and choose Whisper.',
         'Banner chat reaches only players under your banner.',
-        'Ctrl+click an item to link it. Tap a name to mute or report. No links, and be kind.']],
+        'Ctrl+click an item to link it. Tap a name to mute or report. No links, and be kind.',
+        'Missed a pop-up? The <b>bell</b> at the top keeps your last 50 notifications to read again.']],
       ['Trading Post', 'i:bag', 'Buy and sell gear for gold, or mail it to a player.', [
         '<b>Sell</b>: tap an item in Gear, choose <b>Sell on market</b>. Listings last a week.',
         '<b>Mail</b>: send to someone you recruited or chatted with, as a gift or for a price.',
@@ -4039,10 +4105,16 @@
       });
   }
   $('btn-guide').addEventListener('click', () => openGuide());
+  $('btn-notes').addEventListener('click', openBell); paintNoteDot();
 
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 75, date: 'November 24, 2026', title: 'Whispers and the notification bell', items: [
+      'Each whisper conversation now has its own tab along the top of the Whispers channel, and the latest one opens on its own.',
+      'Their messages sit on the left and yours on the right, like a messenger app.',
+      'Tap + to start a new whisper with someone who has been chatting lately. No more hunting for a name to tap.',
+      'New: the bell at the top keeps your last 50 pop-ups, so you can reread any that went by too fast. Pop-ups also stay up longer, and wait while your pointer rests on one.'] },
     { v: 74, date: 'November 24, 2026', title: 'Region trials', items: [
       'The hero level gates between regions are gone. Instead each region has a trial: defeat ' + L.TRIAL_ELITES + ' alliance elites there (the bannered warband foes) and beat its guardian, and the way to the next region opens.',
       'Progress shows on screen as you fight, and in Codex, Progress. Hero level still opens new parts of the game, like camp jobs, the Ember Ring and rekindling.',

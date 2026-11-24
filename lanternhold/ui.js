@@ -1,4 +1,4 @@
-/* lh-build 202611240318 */
+/* lh-build 202611240323 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -876,7 +876,7 @@
   function noteLog(ic, title, sub, cls) {
     if (!notes) notes = [];
     notes.push({ ic, title: String(title || ''), sub: String(sub || ''), cls: cls || '', t: Date.now(), n: 1 });
-    if (notes.length > 50) notes = notes.slice(-50);
+    if (notes.length > 120) notes = notes.slice(-120);
     try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) {}
     paintNoteDot();
   }
@@ -886,12 +886,35 @@
     $('btn-notes').setAttribute('aria-label', n ? 'Notifications, ' + n + ' new' : 'Notifications');
   }
   const agoText = t => { const s = Math.max(0, (Date.now() - t) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + ' min ago' : s < 86400 ? Math.floor(s / 3600) + ' h ago' : Math.floor(s / 86400) + ' d ago'; };
+  // Bell categories (John, 2026-11-24): tabs so players can read just the log they want. Worked out from the
+  // pop-up's icon, style and title, so notes saved before this change sort into tabs too.
+  const NOTE_CATS = [['all', 'All'], ['loot', 'Loot'], ['fight', 'Fights'], ['prog', 'Progress'], ['players', 'Players'], ['other', 'Other']];
+  function noteCat(x) {
+    const ic = x.ic || '', c = x.cls || '', t = (x.title + ' ' + x.sub).toLowerCase();
+    if (/loot|relic/.test(c) || /^(bag|gear-|relic)/.test(ic) || /sigils? found|loot goblin|sack/.test(t)) return 'loot';
+    if (/^(user|users|chat|coin)$/.test(ic) || /whisper|guild|market|trade|sold|bought|listing|duel|ember ring|pvp|recruit|friend|player/.test(t)) return 'players';
+    if (/^(sword|crown|skull|shield|cross|oil|lamp|flare)$/.test(ic) || /fell|fallen|ambush|guardian|defeated|special attack|lantern|wipe|retreat|nexus|back to the stair/.test(t)) return 'fight';
+    if (/feat/.test(c) || /^(star|map|flame|hammer|book)$/.test(ic) || /level|unlocked|journal|trial|mastery|chapter|campfire|camp job/.test(t)) return 'prog';
+    return 'other';
+  }
+  let noteTab = 'all';
+  try { noteTab = localStorage.getItem('lh_notetab') || 'all'; } catch (e) {}
   function openBell() {
-    const list = notes.slice().reverse();
-    modal('<h2>Notifications</h2>' + (list.length ? '<ul class="notelist">' + list.map(x => '<li class="toast ' + esc(x.cls) + (x.n ? ' new' : '') + '">' + icon(x.ic) + '<div><b>' + esc(x.title) + '</b>' + (x.sub ? '<small>' + esc(x.sub) + '</small>' : '') + '<time>' + agoText(x.t) + '</time></div></li>').join('') + '</ul>' : '<p>Nothing yet. Pop-ups from the corner of the screen are kept here so you can read them again.</p>') +
-      '<div class="row">' + (list.length ? '<button class="btn ghost" id="nt-clear">Clear all</button>' : '') + '<button class="btn" id="nt-x">Close</button></div>', md => {
+    const all = notes.slice().reverse().map(x => Object.assign({ cat: noteCat(x) }, x));
+    const count = k => k === 'all' ? all.length : all.filter(x => x.cat === k).length;
+    if (noteTab !== 'all' && !count(noteTab)) noteTab = 'all';
+    const tabs = () => '<div class="notetabs" role="tablist">' + NOTE_CATS.filter(([k]) => k === 'all' || count(k)).map(([k, n]) => '<button role="tab" data-ntab="' + k + '" aria-selected="' + (k === noteTab) + '" class="' + (k === noteTab ? 'on' : '') + '">' + n + ' <i>' + count(k) + '</i>' + (all.some(x => x.n && (k === 'all' || x.cat === k)) ? '<em></em>' : '') + '</button>').join('') + '</div>';
+    const rows = () => { const list = all.filter(x => noteTab === 'all' || x.cat === noteTab); return list.length ? '<ul class="notelist">' + list.map(x => '<li class="toast ' + esc(x.cls) + (x.n ? ' new' : '') + '">' + icon(x.ic) + '<div><b>' + esc(x.title) + '</b>' + (x.sub ? '<small>' + esc(x.sub) + '</small>' : '') + '<time>' + agoText(x.t) + '</time></div></li>').join('') + '</ul>' : '<p>Nothing yet. Pop-ups from the corner of the screen are kept here so you can read them again.</p>'; };
+    modal('<h2>Notifications</h2>' + (all.length ? tabs() : '') + '<div id="nt-rows">' + rows() + '</div>' +
+      '<div class="row">' + (all.length ? '<button class="btn ghost" id="nt-clear">Clear all</button>' : '') + '<button class="btn" id="nt-x">Close</button></div>', md => {
       md.querySelector('#nt-x').onclick = closeModal;
       const c = md.querySelector('#nt-clear'); if (c) c.onclick = () => { notes = []; try { localStorage.removeItem(NOTE_KEY); } catch (e) {} closeModal(); paintNoteDot(); };
+      md.addEventListener('click', e => {
+        const b = e.target.closest('[data-ntab]'); if (!b) return;
+        noteTab = b.dataset.ntab; try { localStorage.setItem('lh_notetab', noteTab); } catch (x) {}
+        md.querySelectorAll('[data-ntab]').forEach(t => { const on = t.dataset.ntab === noteTab; t.classList.toggle('on', on); t.setAttribute('aria-selected', on); });
+        md.querySelector('#nt-rows').innerHTML = rows();
+      });
     });
     notes.forEach(x => { x.n = 0; }); try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) {} paintNoteDot();
   }
@@ -4169,7 +4192,7 @@
         '<b>Whispers</b> are private chats, one per player. Each conversation is a tab along the top of the Whispers channel: their messages on the left, yours on the right. Tap <b>+</b> to start a new one, or tap a name in any channel and choose Whisper.',
         'Banner chat reaches only players under your banner.',
         'Ctrl+click an item to link it. Tap a name to mute or report. No links, and be kind.',
-        'Missed a pop-up? The <b>bell</b> at the top keeps your last 50 notifications to read again.']],
+        'Missed a pop-up? The <b>bell</b> at the top keeps your last 120 notifications, sorted into tabs (Loot, Fights, Progress, Players), to read again.']],
       ['Trading Post', 'i:bag', 'Buy and sell gear for gold, or mail it to a player.', [
         '<b>Sell</b>: tap an item in Gear, choose <b>Sell on market</b>. Listings last a week.',
         '<b>Mail</b>: send to someone you recruited or chatted with, as a gift or for a price.',
@@ -4220,6 +4243,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 84, date: 'November 24, 2026', title: 'Notification tabs', items: [
+      'The bell now sorts notifications into tabs: Loot, Fights, Progress, Players and Other. Tap one to read just that log. Each tab shows how many it holds and a dot for new ones.',
+      'The bell keeps the last 120 notifications instead of 50.'
+    ] },
     { v: 83, date: 'November 24, 2026', title: 'Quieter guardian farming', items: [
       'The "guardian defeated, the way down is open" pop-up now shows only the first time you beat a guardian, not on every kill while you farm it.'
     ] },

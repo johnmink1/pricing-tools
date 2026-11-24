@@ -274,7 +274,7 @@ ref({
           for (const [f, x] of Object.entries(L.FOE_SPECIAL)) if (x === id) { const fo = L.FOES.find(q => q.id === f) || (L.BIOMES.find(q => q.foe && q.foe.id === f) || {}).foe; if (fo) by.push(fo.name); }
           if (id === 'volley') by.push('Grand War soldiers');
           return ['<b>' + esc(sp.name) + '</b>', esc([...new Set(by)].join(', ')), esc(sp.desc) + (sp.dot ? ' (' + (sp.dot === 'burn' ? 'burn' : 'poison') + ', ' + L.DOT_FIGHTS + ' fights)' : '')]; })) +
-      '<h2 id="ambush">Ambushes</h2><p>From floor ' + L.PACK_FLOOR + ', ' + pct(L.PACK_CHANCE) + ' of fights are ambush packs of 2 to 4 monsters. They hit the rear of your marching order first and pay ' + L.PACK_GOLD + '× gold each.</p>' +
+      '<h2 id="ambush">Ambushes</h2><p>From floor ' + L.PACK_FLOOR + ', ' + pct(L.PACK_CHANCE) + ' of fights are ambush packs of 2 to 4 monsters. They hit the rear of your marching order first and pay ' + L.PACK_GOLD + '× gold and ' + L.PACK_XP + '× hero XP for each monster in the pack, so a pack of 3 gives ' + 3 * L.PACK_XP + '× XP.</p>' +
       '<h2 id="loot-goblin">Loot Goblin</h2><div class="grid2">' + card('goblin-card', 'Loot Goblin', { pic: pic('goblin', 0, 'Loot Goblin'), body: kv([['Appears from', 'Floor ' + L.GOBLIN_FLOOR], ['Time to kill', L.GOBLIN_TIME + ' seconds'], ['Reward', L.GOBLIN_GOLD + '× gold']]) + '<p>If it escapes it steals one item from your pack (never worn or locked gear) and hides a few floors deeper.</p>' }) +
       card('chest', 'Treasure chests', { pic: pic('chest', 0, 'Treasure chest'), body: (cl ? '<p>' + esc(cl.text) + '</p>' : '') }) + '</div>' + related(['regions', 'world-boss']);
   },

@@ -1,4 +1,4 @@
-/* lh-build 202611241558 */
+/* lh-build 202611241603 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -4048,6 +4048,7 @@
     for (const k of Object.keys(chat.msgs)) for (const m of chat.msgs[k]) if (m.from && m.from !== 'sys' && m.from !== chat.me && m.name) seen.set(m.from, { pid: m.from, name: m.name, id: m.id || '' });
     const out = [...seen.values()].sort((a, b) => a.id < b.id ? 1 : -1);
     for (const g of S.guests || []) if (g.name && !out.some(p => p.name === g.name)) out.push({ pid: g.id, name: g.name, id: '' });
+    for (const h of (typeof boardList !== 'undefined' && boardList) || []) if (h && h.name && !out.some(p => p.name === h.name)) out.push({ pid: h.id, name: h.name, id: '' });
     return out;
   }
   // @mentions (John, 24 Nov 2026): Banner and Trade are checked in the background too, only to catch pings.
@@ -4296,8 +4297,11 @@
     const atBox = document.createElement('div'); atBox.className = 'atbox'; atBox.id = 'atbox'; atBox.hidden = true; $('chatform').appendChild(atBox);
     let atSel = 0, atList = [];
     const atQuery = () => { const inp = $('chatin'), v = inp.value.slice(0, inp.selectionStart == null ? inp.value.length : inp.selectionStart), m = v.match(/(^|\s)@([A-Za-z' \-]{0,16})$/); return m ? { q: m[2], at: v.length - m[2].length - 1 } : null; };
+    let atBoard = false;
     function paintAt() {
       const a = atQuery(), mine = S.hero ? S.hero.name.toLowerCase() : '';
+      // The Players Guild board adds every registered hero to the list; fetch it once, the first time @ is typed.
+      if (a && !atBoard && !(boardList && boardList.length)) { atBoard = true; api('GET', null, '/heroes').then(r => { if (r && r.heroes && !(boardList && boardList.length)) boardList = r.heroes; paintAt(); }).catch(() => {}); }
       atList = a ? knownChatters().filter(p => p.name.toLowerCase() !== mine && p.name.toLowerCase().startsWith(a.q.toLowerCase())).slice(0, 6) : [];
       if (a && a.q.includes(' ') && !atList.length) atList = [];
       atBox.hidden = !atList.length; if (atSel >= atList.length) atSel = 0;
@@ -5165,6 +5169,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 115, date: 'November 24, 2026', title: '@ mentions find everyone', items: [
+      'The @ list now includes every hero on the Players Guild board, not only people who chatted lately.'] },
     { v: 114, date: 'November 24, 2026', title: '@ mentions in chat', items: [
       'Type @ in chat and start a name to mention another player. Pick from the list with a tap, Tab or Enter.',
       'When someone mentions you in Global, Banner, Trade or Party, you get a pop-up and a sound, it goes in the bell, and the chat button and channel tab light up. The message is highlighted in gold.',

@@ -1,4 +1,4 @@
-/* lh-build 202611241356 */
+/* lh-build 202611241407 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -934,7 +934,11 @@ body.resting .arena{cursor:default}
 @media (max-width:560px){.adm-row{flex-wrap:wrap}.adm-n{flex-basis:100%}}
 .adm-danger{margin-top:18px;padding:12px;border:1px solid #283e63;border-radius:12px;background:#0c131e}
 .adm-conf{display:block;margin:8px auto 14px;width:160px;text-align:center;font:800 18px/1 inherit;letter-spacing:.2em;background:#0a0d12;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px}
-@media (max-width:520px){.adm-stats{grid-template-columns:repeat(2,1fr)}}
+.adm-spawn{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin:6px 0 10px}
+.adm-spawn .btn{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:8px 10px;height:auto;white-space:normal}
+.adm-spawn .btn small{color:var(--muted);font-size:11px;font-weight:400}
+.adm-sp select{flex:1;min-width:0;background:#0b0d12;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;font-size:13px}
+@media (max-width:520px){.adm-stats{grid-template-columns:repeat(2,1fr)}.adm-spawn{grid-template-columns:1fr 1fr}}
 /* gear tab: party first, campfire roster folded away */
 .whoseg{flex-direction:column;gap:8px}
 .whogroup>small,.whogroup>summary{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:0 2px 5px;letter-spacing:.03em;text-transform:uppercase}

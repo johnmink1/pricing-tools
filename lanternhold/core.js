@@ -1,4 +1,4 @@
-/* lh-build 202611241422 */
+/* lh-build 202611241427 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -1717,7 +1717,7 @@
   function useDraught(s, now) {
     now = now || Date.now();
     if (!s.items || !(s.items.draught > 0)) return false;
-    s.items.draught--; s.campUntil = Math.max(now, s.campUntil || 0) + (DRAUGHT_TIME + kup(s, 'draught')) * 1000; return true;
+    s.enchAt = 0; s.shopK = null; s.items.draught--; s.campUntil = Math.max(now, s.campUntil || 0) + (DRAUGHT_TIME + kup(s, 'draught')) * 1000; return true;
   }
   function useOil(s) {
     if (!s.foe || !isBossFloor(s.floor) || !s.items || !(s.items.oil > 0) || s.lantern <= 0) return false;
@@ -2133,6 +2133,7 @@
   function gotoFloor(s, f) {
     f = Math.max(1, Math.min(s.maxFloor, f, actTwoOpen() ? Infinity : ACT_ONE_END));
     s.floor = f; s.foeIdx = 0; s.foe = null; s.lantern = 0; s.foeSwing = 0;
+    s.enchAt = 0; s.shopK = null; // travelling anywhere ends a shop visit (v104)
   }
 
   function healParty(s, amount, isFraction) {

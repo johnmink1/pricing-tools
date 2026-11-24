@@ -1,4 +1,4 @@
-/* lh-build 202611241422 */
+/* lh-build 202611241427 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1313,6 +1313,8 @@
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-camp]'); if (!b) return;
     const a = b.dataset.camp;
+    // leaving for camp, heading down or drinking a draught ends a shop visit first (v104)
+    if (L.visiting(S) && (a === 'go' || a === 'down' || a === 'drink')) { L.leaveEnchanter(S); particles.length = 0; ewReset('on'); awReset('up'); paintEnchOv(); updatePanel(true); }
     if (a === 'go') goCamp(); else if (a === 'ench') enchanterModal(); else if (a === 'arm') armorerModal(); else if (a === 'hold') openHold(); else if (a === 'down') descend(); else if (a === 'drink') drinkDraught(); else if (a === 'store') openStore(); else campModal();
   });
   setInterval(paintCamp, 500);
@@ -4965,6 +4967,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 104, date: 'November 24, 2026', title: 'Leaving the shops', items: [
+      'Fixed: pressing Return to camp, Descend or Draught while in the Enchanter or Armorer now leaves the shop.',
+    ] },
     { v: 103, date: 'November 24, 2026', title: 'Shops at camp', items: [
       'Fixed: visiting the Enchanter or the Armorer from the main camp showed the campfire instead of the shop.',
     ] },

@@ -1,4 +1,4 @@
-/* lh-build 202611241413 */
+/* lh-build 202611241422 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -686,9 +686,10 @@
     const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now; tAnim += dt;
     ctx.setTransform(R, 0, 0, R, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     const nowMs = Date.now();
+    // a shop visit wins over the camp scene: the Hold's tents can be visited from the main camp too (v103)
+    if (L.visiting(S)) { document.body.classList.remove('resting'); drawEnchShop(nowMs); requestAnimationFrame(render); return; }
     document.body.classList.toggle('resting', L.resting(S, nowMs));
     if (L.resting(S, nowMs)) { drawCamp(nowMs); requestAnimationFrame(render); return; }
-    if (L.visiting(S)) { drawEnchShop(nowMs); requestAnimationFrame(render); return; }
     const b = L.biomeOf(S.floor);
     const key = b.name + W + 'x' + H;
     if (key !== bgKey) { bgCanvas = buildBackground(b, Math.floor((S.floor - 1) / 10) + 3); bgKey = key; }
@@ -4964,6 +4965,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 103, date: 'November 24, 2026', title: 'Shops at camp', items: [
+      'Fixed: visiting the Enchanter or the Armorer from the main camp showed the campfire instead of the shop.',
+    ] },
     { v: 102, date: 'November 24, 2026', title: 'The Hold’s tents', items: [
       'The Enchanter’s shop is rebuilt: your whole party stands where it does in a fight and the Enchanter stands behind his counter where a monster would. All the choices are in the counter panel below.',
       'New: the Armorer. Upgrade gear with gold, merge two copies into one, or melt spare gear for twice the gold of a normal scrap (no Dust).',

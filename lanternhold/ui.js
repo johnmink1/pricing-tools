@@ -1,4 +1,4 @@
-/* lh-build 202611240222 */
+/* lh-build 202611240225 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1028,7 +1028,7 @@
   }
   function drink(id, fromStore) {
     const t = L.tonicById(id);
-    if (!L.drinkTonic(S, id, Date.now())) return;
+    if (!L.drinkTonic(S, id, Date.now())) { if ((S.items[id] || 0) > 0 && L.tonicLeft(S, id) > 0) toast(t.icon, t.name + ' is nearly full', 'A tonic can stack up to 60 minutes. Drink another when it runs lower.', 'warn'); return; }
     sfx.relic(); save(); toast(t.icon, t.name, t.desc.replace(/ for .*$/, '') + ' for ' + fmtTime(L.tonicLeft(S, id)) + '.', 'feat');
     if (fromStore) openStore(); paintTonics();
   }
@@ -1037,11 +1037,12 @@
   function paintTonics() {
     const now = Date.now(), box = $('tonicbar');
     const act = L.TONICS.filter(t => L.tonicLeft(S, t.id, now) > 0), carry = L.TONICS.filter(t => !L.tonicLeft(S, t.id, now) && (S.items[t.id] || 0) > 0);
-    const key = act.map(t => t.id).join() + '|' + carry.map(t => t.id + S.items[t.id]).join();
+    const key = act.map(t => t.id + (S.items[t.id] || 0)).join() + '|' + carry.map(t => t.id + S.items[t.id]).join();
     box.hidden = !act.length && !carry.length;
     if (key !== tonicKey) {
       tonicKey = key;
-      box.innerHTML = act.map(t => '<button class="tonic on" data-tonic="' + t.id + '" title="' + esc(t.name + ': ' + t.desc) + '">' + icon(t.icon) + '<span></span></button>').join('') +
+      // An active tonic still shows how many more you carry, so a stack never seems to vanish when you drink one.
+      box.innerHTML = act.map(t => '<button class="tonic on" data-tonic="' + t.id + '" title="' + esc(t.name + ': ' + t.desc) + ((S.items[t.id] || 0) > 0 ? ' Tap to drink another and add time (' + S.items[t.id] + ' left).' : '') + '">' + icon(t.icon) + '<span></span>' + ((S.items[t.id] || 0) > 0 ? '<i class="tcount">&times;' + S.items[t.id] + '</i>' : '') + '</button>').join('') +
         carry.map(t => '<button class="tonic" data-tonic="' + t.id + '" title="Drink ' + esc(t.name) + ': ' + esc(t.desc) + '">' + icon(t.icon) + '<span>&times;' + S.items[t.id] + '</span></button>').join('');
     }
     box.querySelectorAll('.tonic.on').forEach(b => { b.querySelector('span').textContent = fmtTime(L.tonicLeft(S, b.dataset.tonic, now)); });
@@ -4122,6 +4123,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 77, date: 'November 24, 2026', title: 'Tonic stacks stay visible', items: [
+      'An active tonic now shows how many more of it you carry next to its timer, so drinking one no longer makes the rest of your stack seem to disappear. Tap it to drink another and add time.',
+      'If a tonic is already near its 60-minute cap, tapping it tells you so instead of doing nothing.'] },
     { v: 76, date: 'November 24, 2026', title: 'Room at the fire, and closing whispers', items: [
       'Companions in your party no longer count against the campfire. You can keep your 4 party companions plus 4 more resting at the fire, and the fire still grows at hero levels 10, 20 and 30.',
       'Whisper tabs have a small &times; to close a conversation. It comes back if that player whispers you again.'] },

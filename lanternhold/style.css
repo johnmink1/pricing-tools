@@ -1,4 +1,4 @@
-/* lh-build 202611240222 */
+/* lh-build 202611240225 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1229,6 +1229,7 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 .tonic.on{border-color:rgba(245,194,66,.7);background:rgba(245,194,66,.09)}
 .tonic.on svg{color:#f5c242}
 .tonic:hover{border-color:#f5c242}
+.tonic .tcount{font-style:normal;font-size:11px;font-weight:700;color:#9fb0c8;padding-left:4px;border-left:1px solid #ffffff22}
 .tleft{color:#f5c242;font-weight:700}
 .store .tact{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .store .tact .btn svg{width:14px;height:14px;vertical-align:-2px;margin-right:3px}

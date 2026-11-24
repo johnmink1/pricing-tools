@@ -1,4 +1,4 @@
-/* lh-build 202611241542 */
+/* lh-build 202611241551 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -4943,7 +4943,7 @@
         'A <b>Forager</b> at camp improves all drops.']],
       ['Job gear', 'i:hammer', 'Some pieces boost a camp job (orange dot).', [
         'Fine 2%, rare 6%, epic 15% chance to roll one.',
-        'Each job has a 3-piece job set from floor 20 once your hero reaches level 25: <b>2 pieces +40%</b>, <b>3 pieces +100%</b>.']],
+        'Each job has a 3-piece job set from floor 20 once your hero reaches level ' + L.unlockOf('jset').lv + ': <b>2 pieces +40%</b>, <b>3 pieces +100%</b>.']],
       ['Your pack', 'i:bag', 'The pack holds 40 items to start.', [
         'Kindling adds <b>+10 slots</b> up to six times. Lanternholder adds 10.',
         'When full, the weakest common item is sold automatically.',
@@ -4959,7 +4959,7 @@
       ['The campfire roster', 'i:users', 'Your party’s 4 companion seats never count. On top of them, the campfire holds 4 resting companions, plus one more at hero levels 10, 20 and 30.', [
         'When a new companion arrives and the fire is full, dismiss someone for good to keep them, or turn them away.',
         'Up to 3 more spots can be added for ' + L.ROSTER_COST + ' Sigils each. They are yours for good.']],
-      ['Camp jobs', 'i:hammer', 'Opens at hero level 10 with one job slot; one more slot at levels 15, 20, 25, 30 and 35.', [
+      ['Camp jobs', 'i:hammer', 'Opens at hero level ' + L.JOB_SLOT_LV[0] + ' with one job slot; one more slot at levels ' + L.JOB_SLOT_LV.slice(1).join(', ') + '.', [
         '<b>Forager</b>: gear drops. <b>Runesmith</b>: damage. <b>Herbalist</b>: healing.',
         '<b>Armorer</b>: health. <b>Prospector</b>: gold. <b>Lamplighter</b>: lantern oil.',
         'Grows with level; <b>+50%</b> when the job suits their class. A <i>Hard worker</i> trait adds more.']],
@@ -5108,6 +5108,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 113, date: 'November 24, 2026', title: 'Faster hero levels', items: [
+      'Hero levels come much faster: about twice as fast early on and four to seven times as fast from level 20. Your hero keeps all the XP it has, so most heroes jump up several levels right away.',
+      'Every part of the game opens sooner: Gear at 2, the Campfire at 3, Map travel and Market buying at 5, Camp jobs at 6, the Players Guild at 8, the Ember Ring at 10, Market selling at 12, Rekindling at 15, and the world boss and job sets at 18.',
+      'Camp job slots now open at hero levels 6, 10, 15, 20, 25 and 30.'] },
     { v: 112, date: 'November 24, 2026', title: 'Smoother full screen', items: [
       'Going in and out of full screen (the button or F11) no longer leaves the page wider than your window. The wider layout now turns on whenever the game really fills your screen, F11 included, and turns off the moment it doesn’t.'] },
     { v: 111, date: 'November 24, 2026', title: 'Full screen help', items: [

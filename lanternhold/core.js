@@ -1,4 +1,4 @@
-/* lh-build 202611241542 */
+/* lh-build 202611241551 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -614,8 +614,10 @@
   const STAT_CLASS = { tank: ['str', 'con'], healer: ['wis', 'cha'], rogue: ['dex', 'lck'], mage: ['int', 'wis'], necro: ['int', 'con'] };
   const STAT_BASE = 10, STAT_AFFINITY = 1.5, STAT_MAX = 99;
   // Hero XP (pacing v2, John 2026-11-23): steeper, so hero level paces the unlock ladder over weeks, not hours.
-  // Fitted so a steady player reaches level 10 in about 8 hours of play, 20 in about 50 and 40 in about 300 (Act One's end).
-  const XP_A = 330, XP_POW = 2.27;
+  // v3 fit: a steady player reaches level 10 in about 2 hours of play, 15 in about 6, 20 in about 11 and 40 in about 40.
+  // Pacing v3 (John, 24 Nov 2026: "the leveling has to be a bit faster"): flatter curve, about 2x faster by level 10
+  // and 4-7x faster from level 20 on, and every unlock below comes sooner, so all of the game opens in the first day.
+  const XP_A = 160, XP_POW = 1.9;
   const xpNeed = lv => Math.round(XP_A * Math.pow(lv, XP_POW) * Math.pow(Math.min(1, lv / 10), 1.5) + 40);
   const xpNeedOld = lv => Math.round(12 * lv * lv + 20);
   function heroLevel(s) {
@@ -640,19 +642,19 @@
   // ---------- Pacing: hero-level unlocks, region gates, campfire roster, region mastery (John, 2026-11-23) ----------
   // Features open by hero level, which carries over through rekindles, so each one is a goal to build toward.
   const UNLOCKS = [
-    { id: 'gear',     lv: 3,  name: 'Gear',              icon: 'bag',    desc: 'Equip the weapons and armor monsters drop.' },
-    { id: 'camp',     lv: 5,  name: 'The Campfire',      icon: 'flame',  desc: 'Rest companions at camp, swap your party and train who stays behind.' },
-    { id: 'map',      lv: 8,  name: 'Map travel',        icon: 'map',    desc: 'Travel back to any floor you have reached from the Map of the Deep.' },
-    { id: 'buy',      lv: 8,  name: 'Market: buying',    icon: 'coin',   desc: 'Buy gear other players have listed.' },
-    { id: 'jobs',     lv: 10, name: 'Camp jobs',         icon: 'hammer', desc: 'Put resting companions to work. One job to start, one more every 5 hero levels.' },
-    { id: 'guild',    lv: 12, name: 'Players Guild',     icon: 'crown',  desc: 'Recruit other players\u2019 heroes into your party.' },
-    { id: 'ring',     lv: 15, name: 'The Ember Ring',    icon: 'duel',   desc: 'Duel other players\u2019 parties for Laurels.' },
-    { id: 'sell',     lv: 18, name: 'Market: selling',   icon: 'coin',   desc: 'Sell and send gear, and trade on the Sigil exchange.' },
-    { id: 'rekindle', lv: 20, name: 'Rekindling',        icon: 'star',   desc: 'Start a new descent from floor ' + REKINDLE_FLOOR + ' or deeper for Embers and Kindling.' },
-    { id: 'boss',     lv: 25, name: 'World boss',        icon: 'skull',  desc: 'Join the weekend assaults on the shared world boss.' },
-    { id: 'jset',     lv: 25, name: 'Job sets',          icon: 'hammer', desc: 'Guardians and chests start dropping job set pieces.' },
+    { id: 'gear',     lv: 2,  name: 'Gear',              icon: 'bag',    desc: 'Equip the weapons and armor monsters drop.' },
+    { id: 'camp',     lv: 3,  name: 'The Campfire',      icon: 'flame',  desc: 'Rest companions at camp, swap your party and train who stays behind.' },
+    { id: 'map',      lv: 5,  name: 'Map travel',        icon: 'map',    desc: 'Travel back to any floor you have reached from the Map of the Deep.' },
+    { id: 'buy',      lv: 5,  name: 'Market: buying',    icon: 'coin',   desc: 'Buy gear other players have listed.' },
+    { id: 'jobs',     lv: 6, name: 'Camp jobs',         icon: 'hammer', desc: 'Put resting companions to work. One job to start, then more at hero levels 10, 15, 20, 25 and 30.' },
+    { id: 'guild',    lv: 8, name: 'Players Guild',     icon: 'crown',  desc: 'Recruit other players\u2019 heroes into your party.' },
+    { id: 'ring',     lv: 10, name: 'The Ember Ring',    icon: 'duel',   desc: 'Duel other players\u2019 parties for Laurels.' },
+    { id: 'sell',     lv: 12, name: 'Market: selling',   icon: 'coin',   desc: 'Sell and send gear, and trade on the Sigil exchange.' },
+    { id: 'rekindle', lv: 15, name: 'Rekindling',        icon: 'star',   desc: 'Start a new descent from floor ' + REKINDLE_FLOOR + ' or deeper for Embers and Kindling.' },
+    { id: 'boss',     lv: 18, name: 'World boss',        icon: 'skull',  desc: 'Join the weekend assaults on the shared world boss.' },
+    { id: 'jset',     lv: 18, name: 'Job sets',          icon: 'hammer', desc: 'Guardians and chests start dropping job set pieces.' },
   ];
-  const JOB_SLOT_LV = [10, 15, 20, 25, 30, 35];
+  const JOB_SLOT_LV = [6, 10, 15, 20, 25, 30];
   // Region trials (John, 2026-11-24, replacing hero-level region gates): to go past a region's guardian into the
   // next region, beat that guardian and defeat TRIAL_ELITES alliance elites in the region. Act One has 15 regions.
   const REGIONS = 15, TRIAL_ELITES = 10;

@@ -1,4 +1,4 @@
-/* lh-build 202611240351 */
+/* lh-build 202611240414 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -661,11 +661,17 @@
 
   // floating numbers (DOM, crisp text)
   let floaters = 0;
+  let recentFloats = [];
   function floatText(text, cls, xFrac, yFrac) {
     if (floaters > 26) return;
     const el = document.createElement('div');
     el.className = 'float ' + (cls || '');
     el.textContent = text;
+    // keep text inside the arena and stack it when two pop up at the same spot
+    const t = performance.now(); xFrac = Math.max(0.09, Math.min(0.91, xFrac));
+    recentFloats = recentFloats.filter(f => t - f.t < 450);
+    for (let k = 0; k < 4 && recentFloats.some(f => Math.abs(f.x - xFrac) < 0.08 && Math.abs(f.y - yFrac) < 0.06); k++) yFrac -= 0.07;
+    yFrac = Math.max(0.06, yFrac); recentFloats.push({ t, x: xFrac, y: yFrac });
     el.style.left = (xFrac * 100) + '%'; el.style.top = (yFrac * 100) + '%';
     arena.appendChild(el); floaters++;
     setTimeout(() => { el.remove(); floaters--; }, 900);
@@ -2253,6 +2259,53 @@
     }
     handleEvents(); updateStage();
   }
+  // ---------- Ghost Lantern (John, 2026-11-24) ----------
+  // Shows up only while you are actively playing. It saps a little damage or healing (never more than 10%)
+  // until you tap it. Tap to shatter it for a small reward; ignore it and it fades with nothing lost.
+  let lastAct = Date.now();
+  ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => window.addEventListener(ev, () => { lastAct = Date.now(); }, { passive: true, capture: true }));
+  const GHOST_SVG = '<svg viewBox="0 0 40 52" aria-hidden="true"><defs><radialGradient id="gg" cx="50%" cy="55%" r="55%"><stop offset="0" stop-color="#e9fbff"/><stop offset=".5" stop-color="#8fd8ff"/><stop offset="1" stop-color="#5a7dff" stop-opacity="0"/></radialGradient></defs>' +
+    '<circle cx="20" cy="30" r="19" fill="url(#gg)" opacity=".55"/><path d="M14 8h12M20 3v5" stroke="#b9c9e8" stroke-width="2.4" stroke-linecap="round" fill="none"/>' +
+    '<path d="M11 13h18l3 5v18l-4 6H12l-4-6V18z" fill="#203450" stroke="#a9c3ec" stroke-width="2"/><path d="M13 19h14v16l-3 4h-8l-3-4z" fill="#bff0ff" opacity=".9"/>' +
+    '<circle cx="17" cy="26" r="2" fill="#1b2a44"/><circle cx="23" cy="26" r="2" fill="#1b2a44"/><path d="M17.5 32q2.5 2 5 0" stroke="#1b2a44" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>';
+  function paintGhost() {
+    let el = $('ghostlamp'); const g = S.ghost, now = Date.now();
+    if (!g || now >= g.until) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('button'); el.id = 'ghostlamp'; el.className = 'ghostlamp'; el.type = 'button';
+      el.innerHTML = GHOST_SVG + '<small></small>';
+      ['pointerdown', 'mousedown', 'touchstart'].forEach(ev => el.addEventListener(ev, e => e.stopPropagation()));
+      el.addEventListener('click', e => { e.stopPropagation(); breakGhost(); });
+      arena.appendChild(el);
+    }
+    el.style.left = (g.x * 100) + '%';
+    const sap = Math.round(L.ghostSap(S, g.k, now) * 100), left = Math.ceil((g.until - now) / 1000);
+    el.querySelector('small').textContent = '-' + sap + '% ' + L.GHOST_STATS[g.k] + ' · ' + left + 's';
+    el.setAttribute('aria-label', 'Ghost Lantern: sapping ' + sap + '% party ' + L.GHOST_STATS[g.k] + '. Tap to shatter it.');
+    el.classList.toggle('fading', left <= 5);
+  }
+  function breakGhost() {
+    const r = L.ghostBreak(S, Date.now());
+    const el = $('ghostlamp'); if (el) el.remove();
+    if (!r) return;
+    sfx.relic(); save();
+    const what = r.kind === 'gold' ? '+' + fmt(r.n) + ' gold' : r.kind === 'dust' ? '+' + fmt(r.n) + ' Dust' : 'a free ' + r.name;
+    floatText('Shattered! ' + (r.kind === 'tonic' ? r.name : what), 'skill', 0.5, 0.18);
+    toast('lantern', 'Ghost Lantern shattered', 'It left behind ' + what + (r.kind === 'tonic' ? '. Drink it from the tonic bar under the fight.' : '.') + ' Your party is back to full strength.', 'loot');
+  }
+  setInterval(() => {
+    if (!S || !S.hero) return;
+    const now = Date.now(), ev = [];
+    try { L.ghostTick(S, now, !document.hidden && now - lastAct < 90000, Math.random, ev); } catch (e) { return; }
+    for (const e of ev) {
+      if (e.type === 'ghost') {
+        sfx.boss && sfx.boss();
+        if (!(S.stats.ghostSeen > 0)) { S.stats.ghostSeen = 1; toast('lantern', 'A Ghost Lantern drifts in', 'It slowly saps your party’s ' + L.GHOST_STATS[e.k] + ', up to 10%. Tap it in the fight to shatter it for a reward. Leave it and it fades on its own.', ''); }
+        floatText('A Ghost Lantern drifts in!', 'nexus', 0.5, 0.12);
+      } else if (e.type === 'ghostgone') floatText('The Ghost Lantern fades', 'auto', 0.5, 0.14);
+    }
+    paintGhost();
+  }, 500);
   arena.addEventListener('pointerdown', e => { e.preventDefault(); doStrike(e); });
   arena.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); doStrike(); } });
   window.addEventListener('keydown', e => {
@@ -4074,8 +4127,14 @@
         'The blue bar under a hero is <b>mana</b>, the gold bar is <b>stamina</b>. Both hold ' + L.RES_MAX + ' and refill on their own: mana at ' + L.RES_REGEN.mana + ' a second, stamina at ' + L.RES_REGEN.stamina + ' a second.',
         'Abilities cost ' + L.AB_COST + ' and class specials cost ' + L.SPEC_COST + '. If a hero is short, the ability waits until the bar refills.',
         'Healing costs mana. A healer that runs <b>out of mana</b> stops healing and only swings basic attacks until its mana is back to ' + L.RES_WAKE + '. Its bar blinks while it is empty.',
+        '<b>Lantern Hymn</b> can be sung with any mana left, and uses up to ' + L.AB_COST + ', but never while the healer is out of mana. Resting at camp fills every bar.',
         'Faster regen comes from <b>Flow</b> enchants on the hero’s own gear, and for your hero from cooldown skills.',
         'Other gear stats for the wearer: <b>Leech</b> heals the hero for part of its damage, <b>Bulwark</b> gives a chance to block a hit outright, <b>Plating</b> cuts damage taken. A hero’s profile shows its totals.']],
+      ['Ghost Lantern', 'i:lantern', 'Now and then a Ghost Lantern drifts into the fight. Tap it to shatter it for a reward.', [
+        'It only appears while you are playing (from floor ' + L.GHOST_FLOOR + '), never while you are away.',
+        'While it floats there it slowly saps your party’s damage or healing, up to ' + Math.round(L.GHOST_MAX * 100) + '% at most. The tag under it shows how much and how long it has left.',
+        'Tap it to shatter it: you get a burst of gold, some Dust or a free tonic, and the stat comes straight back.',
+        'Leave it and it fades after ' + L.GHOST_LIFE + ' seconds. Nothing is lost for good.']],
       ['Guardians', 's:golem,wyrm,lich', 'Every 5th floor has a guardian. Beat it before the lantern oil runs out.', [
         'Guardians drop better gear and, from floor 10, sometimes a relic.',
         '<b>Lantern Oil</b> from the Store buys 15 more seconds.',
@@ -4284,6 +4343,14 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 87, date: 'November 24, 2026', title: 'Ghost Lantern, and a balance pass', items: [
+      'New: the Ghost Lantern. Now and then, while you are playing, a ghost lantern drifts into the fight and slowly saps your party’s damage or healing (10% at most). Tap it to shatter it for gold, Dust or a free tonic. Ignore it and it fades after 30 seconds with nothing lost.',
+      'Healers: Lantern Hymn can now be sung with whatever mana is left (it uses up to 30), but still never while out of mana. Healing costs a little less mana. Parties fall far less often than they did in v86.',
+      'Resting at camp now fills every mana and stamina bar.',
+      'Tank and healer heroes hit harder (3× and 5× their old damage) so every class reaches the deep floors at a similar pace. Companions are unchanged.',
+      'Damage numbers and messages that pop up at the same spot now stack instead of landing on top of each other, and stay inside the fight window.',
+      'Phones: the bottom tab bar no longer sticks out a couple of pixels and lets the page wiggle sideways.'
+    ] },
     { v: 86, date: 'November 24, 2026', title: 'Mana, stamina and new gear stats', items: [
       'Healers, mages and necromancers now have a blue mana bar. Rogues and tanks have a gold stamina bar. Both refill over time.',
       'Abilities and class specials cost mana or stamina. If a hero is short, it waits for the bar to refill.',

@@ -1,4 +1,4 @@
-/* lh-build 202611240419 */
+/* lh-build 202611240432 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2046,3 +2046,5 @@ body.resting .taptip{display:none}
 @media (max-width:720px){.ghostlamp svg{width:38px;height:50px}.ghostlamp small{font-size:10px}}
 @media (prefers-reduced-motion:reduce){.ghostlamp{animation:none}}
 .skill.stun{opacity:.6;border-color:#ffd27a55}
+.bar.hp.shielded{box-shadow:0 0 0 1px #8fd0ff,0 0 10px rgba(120,200,255,.45)}
+.mod.m-shield{background:#14304a;color:#bfe6ff;border-color:#4f8fc0}

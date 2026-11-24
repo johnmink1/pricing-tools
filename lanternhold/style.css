@@ -1,4 +1,4 @@
-/* lh-build 202611241427 */
+/* lh-build 202611241453 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2192,3 +2192,15 @@ body.atench #ghostlamp,body.atench #merchant,body.atench #spwarn,body.atench .fl
 /* the Armorer's tabs (v102) */
 .ewtabs.forge button.on{background:linear-gradient(180deg,#e0702a,#b04a14);color:#fff}
 .ewcost.gold{color:var(--gold)}
+/* v105: Legendary world boss loot and boss shards */
+.r-legend{--rc:#ff8a3d}.pgear .r-legend{color:#ff8a3d}.ilink.r-legend{--rc:#ff8a3d}.mkname.r-legend{color:#ffa463}
+.tile.r-legend{box-shadow:inset 0 0 12px rgba(0,0,0,.6),0 0 12px rgba(255,138,61,.45)}
+.mkcard.r-legend{border-color:rgba(255,138,61,.45)}
+.iset.legset{border-color:#ff8a3d66;background:linear-gradient(180deg,#22160f,#120d0a)}.iset.legset b{color:#ffa463}
+.ewcost.legc{color:#ffa463}
+.shtile{display:grid;place-items:center;--sc:#ff8a3d;color:var(--sc);box-shadow:inset 0 0 10px rgba(0,0,0,.6),0 0 8px color-mix(in srgb,var(--sc) 35%,transparent)}
+.shtile svg{width:60%;height:60%}
+.sh0{--sc:#7dd3fc}.sh1{--sc:#fbbf24}.sh2{--sc:#c084fc}.sh3{--sc:#2dd4bf}
+.shhave{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.shchip{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--sc) 45%,transparent);color:var(--text);font-size:13px}
+.shchip svg{width:13px;height:13px;color:var(--sc)}.shchip b{color:var(--sc)}

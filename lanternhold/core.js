@@ -1,4 +1,4 @@
-/* lh-build 202611241427 */
+/* lh-build 202611241453 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -962,6 +962,7 @@
     { id: 'epic',   name: 'Epic',   pct: 0.24, w: 2,  prefix: 'Lantern-blessed ' },
     { id: 'set',    name: 'Set',    pct: 0.18, w: 0,  prefix: '' },
     { id: 'goblin', name: 'Goblin', pct: 0.26, w: 0,  prefix: '' },
+    { id: 'legend', name: 'Legendary', pct: 0.34, w: 0, prefix: '' },
   ];
   // Region sets (John, 2026-11-23): every region of the Deep drops its own four-piece armor set, for any class.
   // Pieces only drop on that region's floors and only rarely (guardians are the best bet), so a full set is a long
@@ -986,6 +987,19 @@
     { word: 'Lampmother',   name: 'The Lampmother’s Embrace',  k: 'hp',   lore: 'What she wore at the Threshold, before the lantern was lit.' },
   ];
   const RSET_SLOTS = ['head', 'chest', 'legs', 'feet'];
+  // World boss Legendaries (John, 2026-11-24): each world boss has its own four-piece Legendary set. After an event the
+  // server draws one winner (if a Legendary drops) and every boss shard among everyone who fought, one ticket per whole
+  // point of boss score (infra/lambda/loot.js). Shards of that boss upgrade its pieces; they trade on the shard market.
+  // Pieces are bound to the winner. Stored on the item as wb (boss index, same order as WB_NAMES) and rar 'legend'.
+  const WB_SETS = [
+    { word: 'Colossus',  name: 'Regalia of the Rift Colossus',  k: 'hp',   piece: { main: 'Crystal Maul',  chest: 'Riftplate',    ring: 'Signet',  neck: 'Heartstone' }, lore: 'Cut from the void crystal of the giant itself. It hums when the Rift stirs.' },
+    { word: 'Sovereign', name: 'The Hollow Sovereign’s Court',  k: 'dps',  piece: { main: 'Scepter-Blade', chest: 'Mantle',       ring: 'Crown-Ring', neck: 'Torc' }, lore: 'The Sovereign ruled nothing but echoes. Its court regalia still answers to a command.' },
+    { word: 'Nyxmaw',    name: 'Maw-Tooth Panoply',              k: 'heal', piece: { main: 'Fang',          chest: 'Hide',         ring: 'Coil',    neck: 'Tooth' }, lore: 'Pulled from the Maw of the Nyx. It mends what it once would have devoured.' },
+    { word: 'Leviathan', name: 'Ashen Leviathan’s Hoard',        k: 'gold', piece: { main: 'Harpoon',       chest: 'Scaleguard',   ring: 'Band',    neck: 'Pearl' }, lore: 'Treasure from the belly of the ash-whale, still warm, still smelling of smoke.' },
+  ];
+  const WB_SLOTS = ['main', 'chest', 'ring', 'neck'];
+  const WB_PCT = 0.34, WB_TWO = { hp: 0.15, dps: 0.15, heal: 0.15, gold: 0.25 }, WB_FOUR = 0.3;
+  const wbUpCost = it => (it.up || 0) + 1; // boss shards of that boss to raise a Legendary one level
   const RSET_PIECE = {
     plate:   { head: 'Helm', chest: 'Hauberk',  legs: 'Greaves',   feet: 'Sabatons' },
     leather: { head: 'Hood', chest: 'Jerkin',   legs: 'Breeches',  feet: 'Boots' },
@@ -1026,7 +1040,7 @@
   const AFFIX_CHANCE = { fine: 0.02, rare: 0.06, epic: 0.15 };
   const GEAR_CAP = 40, BAG_STEP = 10, BAG_UPS_MAX = 6;
   let uidSeq = 0;
-  const gearPct = it => (it.rset != null ? RSET_PCT : RARITY.find(r => r.id === it.rar).pct) * (1 + 0.03 * it.ilvl) * (1 + 0.2 * it.up);
+  const gearPct = it => (it.wb != null ? WB_PCT : it.rset != null ? RSET_PCT : RARITY.find(r => r.id === it.rar).pct) * (1 + 0.03 * it.ilvl) * (1 + 0.2 * it.up);
   // What an item adds, as [label, fraction] pairs.
   function itemStats(it) {
     const p = gearPct(it), w = weightOf(it), out = [];
@@ -1037,6 +1051,7 @@
   const itemScore = it => { const w = weightOf(it); return gearPct(it) * (w.dps + w.hp); };
   function gearName(it) {
     if (it.rar === 'goblin') return 'Loot Goblin’s Sack';
+    if (it.wb != null && WB_SETS[it.wb]) return WB_SETS[it.wb].word + ' ' + WB_SETS[it.wb].piece[it.slot === 'robe' ? 'chest' : it.slot];
     if (it.rset != null && REGION_SETS[it.rset]) return REGION_SETS[it.rset].word + ' ' + rsetPiece(it);
     if (it.jset) return JOB_SETS[it.jset].pieces[it.slot];
     if (it.set) return SETS.find(x => x.id === it.set).pieces[it.slot];
@@ -1259,12 +1274,13 @@
   const UP_MAX = 10;
   function upgrade(s, uid) {
     const it = itemOf(s, uid); if (!it || it.up >= UP_MAX) return false;
+    if (it.wb != null) { const c = wbUpCost(it), sh = shardsOf(s); if ((sh[it.wb] || 0) < c) return false; sh[it.wb] -= c; it.up++; return true; }
     const c = upgradeCost(it); if (c > s.gold) return false;
     s.gold -= c; it.up++; return true;
   }
   const salvageValue = it => foeGold(Math.max(1, it.ilvl), false) * 3 * (1 + RARITY.findIndex(r => r.id === it.rar)) * (1 + it.up);
   // Dust (John, 2026-11-23): scrapping gear also gives Dust, more for rarer and deeper pieces. Moving an enchant costs Dust.
-  const DUST = { common: 1, fine: 3, rare: 8, epic: 20, set: 15, goblin: 60 };
+  const DUST = { common: 1, fine: 3, rare: 8, epic: 20, set: 15, goblin: 60, legend: 100 };
   const dustValue = it => Math.max(1, Math.round((DUST[it.rar] || 1) * (1 + it.ilvl / 25) * (1 + 0.25 * (it.up || 0))));
   const enchCost = x => 5 * x.t * x.t;
   function salvage(s, uid) {
@@ -1296,11 +1312,11 @@
   const ENCH_KEYS = Object.keys(ENCH), ENCH_MAX = 4;
   // Rings and trinkets lean toward regen and life steal; armor leans toward block and defense; weapons toward life steal.
   const ENCH_BIAS = { ring: ['i', 'i', 'j'], neck: ['i', 'j', 'j'], main: ['j', 'j'], off: ['k', 'k', 'l'], chest: ['l', 'l', 'k'], robe: ['l', 'i'], head: ['l', 'k'], legs: ['l', 'k'], feet: ['k', 'i'] };
-  const SOCK_BASE = { common: 0, fine: 1, rare: 2, epic: 3, set: 2, goblin: 3 }, ENCH_FILL = { common: 0.3, fine: 0.4, rare: 0.5, epic: 0.7, set: 0.5, goblin: 0.8 };
+  const SOCK_BASE = { common: 0, fine: 1, rare: 2, epic: 3, set: 2, goblin: 3, legend: 3 }, ENCH_FILL = { common: 0.3, fine: 0.4, rare: 0.5, epic: 0.7, set: 0.5, goblin: 0.8, legend: 0.9 };
   const sockets = it => Math.min(ENCH_MAX, (SOCK_BASE[it.rar] || 0) + (it.ilvl >= 30 ? 1 : 0) + (it.ilvl >= 80 ? 1 : 0));
   const enchList = it => { const o = [], e = it && it.en || ''; for (let i = 0; i + 1 < e.length; i += 2) if (ENCH[e[i]]) o.push({ id: e[i], t: +e[i + 1] }); return o; };
   const enchStr = l => l.map(x => x.id + x.t).join('');
-  const enchTierMax = it => Math.min(9, 1 + Math.floor(it.ilvl / 12) + (it.rar === 'epic' || it.rar === 'set' || it.rar === 'goblin' ? 1 : 0));
+  const enchTierMax = it => Math.min(9, 1 + Math.floor(it.ilvl / 12) + (it.rar === 'epic' || it.rar === 'set' || it.rar === 'goblin' || it.rar === 'legend' ? 1 : 0));
   function rollEnch(it, r) {
     let e = ''; const n = sockets(it), tm = enchTierMax(it);
     const pool = ENCH_KEYS.concat(ENCH_BIAS[it.slot] || []);
@@ -1348,7 +1364,7 @@
   // item level and the better camp-job affix. Every merge can fail and destroy BOTH pieces. The risk climbs with the
   // level you are merging up to; your hero's Luck and Intelligence points shave it down (by up to half).
   const mergeKey = it => [it.cls, it.slot, it.rar, it.set || '', it.jset || '', it.rset != null ? it.rset : ''].join('|');
-  const mergeable = (a, b) => !!a && !!b && a !== b && mergeKey(a) === mergeKey(b) && Math.max(a.up, b.up) < UP_MAX;
+  const mergeable = (a, b) => !!a && !!b && a !== b && a.wb == null && b.wb == null && mergeKey(a) === mergeKey(b) && Math.max(a.up, b.up) < UP_MAX;
   function mergeRisk(s, a, b) {
     const to = Math.max(a.up, b.up) + 1, base = Math.min(0.9, 0.08 + 0.06 * (to - 1));
     const at = s.attr || {}, cut = Math.min(0.5, (at.lck || 0) * 0.006 + (at.int || 0) * 0.004);
@@ -1441,6 +1457,28 @@
     }
     return v;
   }
+  // Legendary set pieces worn by one member: { bossIndex: count }, and the bonus they give one stat.
+  function wbCounts(s, id) {
+    const g = equipped(s, id), out = {};
+    for (const p in g) { const it = itemOf(s, g[p]); if (it && it.wb != null) out[it.wb] = (out[it.wb] || 0) + 1; }
+    return out;
+  }
+  function wbBonus(s, id, kind) {
+    const c = wbCounts(s, id), cls = memberById(id).cls; let v = 0;
+    for (const i in c) {
+      const n = c[i], k = WB_SETS[i] && WB_SETS[i].k; if (!k || n < 2) continue;
+      if (k === kind || (k === 'heal' && kind === 'hp' && cls !== 'healer')) v += WB_TWO[k];
+      if (n >= 4 && (kind === 'dps' || kind === 'hp' || (kind === 'heal' && cls === 'healer'))) v += WB_FOUR;
+    }
+    return v;
+  }
+  const shardsOf = s => { if (!Array.isArray(s.shards)) s.shards = [0, 0, 0, 0]; return s.shards; };
+  // A Legendary from world boss b, for the hero's class, at the player's deepest depth.
+  // The winner can always wear it: item level follows their deepest floor, capped by the hero's level.
+  function makeLegend(s, b, rng) {
+    const r = rng || Math.random, cls = heroCls(s) || 'tank', slot = WB_SLOTS[Math.floor(r() * WB_SLOTS.length)];
+    return rollEnch({ uid: Date.now().toString(36) + (uidSeq++), cls, slot: slot === 'chest' && CLOTH[cls] ? 'robe' : slot, rar: 'legend', wb: b, lk: 1, ilvl: Math.max(1, Math.min(s.maxFloorEver || s.floor || 1, Math.floor(lvl(s, 'you') / 1.5))), up: 0 }, r);
+  }
   // Party-wide gold find from worn gear: gold region sets and the Loot Goblin's Sack.
   function gearGold(s) {
     let v = 0;
@@ -1449,6 +1487,7 @@
       const g = equipped(s, id), c = {};
       for (const p in g) { const it = itemOf(s, g[p]); if (!it) continue; if (it.gob) v += GOBLIN_SACK_GOLD; if (it.rset != null) c[it.rset] = (c[it.rset] || 0) + 1; }
       for (const i in c) if (c[i] >= 2 && REGION_SETS[i] && REGION_SETS[i].k === 'gold') v += rsetTwo(+i);
+      const w = wbCounts(s, id); for (const i in w) if (w[i] >= 2 && WB_SETS[i] && WB_SETS[i].k === 'gold') v += WB_TWO.gold;
     }
     return v;
   }
@@ -1472,7 +1511,7 @@
       if (kind === 'dps' && cls === 'mage') pct += 0.25;
     }
     // Region set bonuses multiply the whole gear bonus, so they keep their worth at any depth.
-    return (1 + pct) * (1 + rsetBonus(s, id, kind));
+    return (1 + pct) * (1 + rsetBonus(s, id, kind)) * (1 + wbBonus(s, id, kind));
   }
   // ---------- Kindling ----------
   // Earned only by rekindling. Spent on the skill tree, bag space and extra gear slots.
@@ -2686,7 +2725,7 @@
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, SPAWN_EVENTS, spawnEvent, visiting, visitEnchanter, leaveEnchanter, SMELT_MULT, smeltValue, smelt, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, WB_SETS, WB_SLOTS, WB_PCT, WB_TWO, WB_FOUR, wbUpCost, wbCounts, wbBonus, shardsOf, makeLegend, SPAWN_EVENTS, spawnEvent, visiting, visitEnchanter, leaveEnchanter, SMELT_MULT, smeltValue, smelt, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

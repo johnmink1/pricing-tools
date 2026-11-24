@@ -1319,6 +1319,109 @@ Resources:
       AuthorizerId: !Ref JwtAuthorizer
       Target: !Sub 'integrations/${WorldBossIntegration}'
 
+  # World boss loot (v105): the seeded Legendary and boss-shard draw after each event, and the boss-shard market.
+  LootFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: loot-data
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:Query, dynamodb:UpdateItem]
+                Resource: !GetAtt BossTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:Query, dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:ConditionCheckItem]
+                Resource: !GetAtt TradeTable.Arn
+
+  LootFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lanternhold-loot
+      Runtime: nodejs22.x
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 10
+      Role: !GetAtt LootFunctionRole.Arn
+      Environment:
+        Variables:
+          BOSS: !Ref BossTable
+          TRADE: !Ref TradeTable
+      Code:
+        ZipFile: |
+          // built from infra/lambda/loot.js by infra/build.py
+          const f=require("@aws-sdk/client-dynamodb"),g=require("crypto"),k=new f.DynamoDBClient({}),{BOSS:T,TRADE:h}=process.env,l=(e,i)=>({statusCode:e,body:JSON.stringify(i||{error:1})}),r=e=>({S:String(e)}),S=e=>({N:String(e)}),E=e=>g.createHash("sha256").update("lh:"+e).digest("hex").slice(0,16),w=(e,i)=>parseInt(g.createHash("sha256").update(e+"#"+i).digest("hex").slice(0,8),16)/4294967296,I=.12,O=.75,D=5,M=3,P=6048e5,q=e=>{let i=0,s=1e3;for(;e>=s&&i<30;)e-=s,s*=2,i++;return i},K=e=>Date.parse(e+"T00:00:00Z")+(e==="2026-11-23"?4:3)*864e5,z=e=>Math.floor(Date.parse(e+"T00:00:00Z")/P)%4,x=e=>/^[A-Za-z][A-Za-z '-]{1,15}$/.test(e),N=()=>Date.now().toString(36).padStart(9,"0")+g.randomBytes(3).toString("hex"),b=async(e,i,s)=>(await k.send(new f.QueryCommand({TableName:e,KeyConditionExpression:i+"=:p",ExpressionAttributeValues:{":p":r(s)}}))).Items||[],C=e=>({id:e.sk.S,seller:e.seller.S,name:e.name.S,k:+e.k.N,n:+e.n.N,price:+e.price.N,at:+e.at.N});function A(e,i){const s=i.find(t=>t.s.S==="#"),m=i.filter(t=>t.s.S!=="#"&&+t.score.N>0).sort((t,p)=>t.s.S<p.s.S?-1:1),u={};let c=0;for(const t of m)c+=u[t.s.S]=Math.max(1,Math.floor(+t.score.N));const n=t=>{let p=t*c;for(const y of m)if((p-=u[y.s.S])<0)return y.s.S;return m.length?m[m.length-1].s.S:""},d=q(s?+s.total.N:0),o={},a=c&&w(e,"leg")<Math.min(O,I*d)?n(w(e,"who")):"";if(c)for(let t=0;t<D+M*Math.min(d,10);t++){const p=n(w(e,"s"+t));o[p]=(o[p]||0)+1}return{leg:a,sh:o,tk:u,all:c,ph:d}}exports.handler=async e=>{const i=e.requestContext.authorizer&&e.requestContext.authorizer.jwt&&e.requestContext.authorizer.jwt.claims;if(!i||!i.sub)return l(401);const s=E(i.sub),m=Date.now(),u=e.routeKey;let c={};try{c=JSON.parse(e.isBase64Encoded?Buffer.from(e.body||"","base64").toString():e.body||"{}")}catch{return l(400)}if(u==="POST /boss/loot"){const n=String(c.id||"");if(!/^\d{4}-\d\d-\d\d$/.test(n)||m<K(n))return l(409,{error:"open"});const d=await b(T,"w",n),o=A(n,d);if(!o.tk[s])return l(404,{error:"none"});try{await k.send(new f.UpdateItemCommand({TableName:T,Key:{w:r(n),s:r(s)},UpdateExpression:"SET lc=:t",ConditionExpression:"attribute_not_exists(lc)",ExpressionAttributeValues:{":t":S(m)}}))}catch(t){if(t.name==="ConditionalCheckFailedException")return l(409,{error:"claimed"});throw t}const a=o.leg&&d.find(t=>t.s.S===o.leg);return l(200,{ok:!0,boss:z(n),leg:o.leg===s,who:a&&a.nm?a.nm.S:"",sh:o.sh[s]||0,tk:o.tk[s],all:o.all,ph:o.ph})}if(u==="GET /shards"){const n=(await b(h,"pk",(e.queryStringParameters||{}).mine?"ss#"+s:"sh#")).map(C);return l(200,{me:s,l:n})}if(u==="POST /shards/list"){const n=Math.floor(+c.k),d=Math.floor(+c.n),o=Math.floor(+c.price);if(!(n>=0&&n<4&&d>=1&&d<=99&&o>=1&&o<1e60)||!x(String(c.name||"")))return l(400);if((await b(h,"pk","ss#"+s)).length>=10)return l(400,{error:"full"});const a=N(),t={seller:r(s),name:r(c.name),k:S(n),n:S(d),price:S(o),at:S(m)};return await k.send(new f.TransactWriteItemsCommand({TransactItems:[{Put:{TableName:h,Item:Object.assign({pk:r("sh#"),sk:r(a)},t)}},{Put:{TableName:h,Item:Object.assign({pk:r("ss#"+s),sk:r(a)},t)}}]})),l(200,{ok:!0,id:a})}if(u==="POST /shards/buy"||u==="POST /shards/cancel"){const n=String(c.id||""),d=u==="POST /shards/buy";if(!/^[0-9a-z]{15}$/.test(n))return l(400);const o=(await k.send(new f.GetItemCommand({TableName:h,Key:{pk:r("sh#"),sk:r(n)}}))).Item;if(!o)return l(404,{error:"gone"});const a=C(o);if(d?a.seller===s||!x(String(c.name||"")):a.seller!==s)return l(403);const t=[{Delete:{TableName:h,Key:{pk:r("sh#"),sk:r(n)},ConditionExpression:"attribute_exists(sk)"}},{Delete:{TableName:h,Key:{pk:r("ss#"+a.seller),sk:r(n)}}}];d&&t.push({Put:{TableName:h,Item:{pk:r("inbox#"+a.seller),sk:r(N()),type:r("sale"),from:r(s),fromName:r(c.name),item:r(JSON.stringify({shard:a.k,n:a.n})),gold:r(a.price),at:S(m)}}});try{await k.send(new f.TransactWriteItemsCommand({TransactItems:t}))}catch(p){if(p.name==="TransactionCanceledException")return l(404,{error:"gone"});throw p}return l(200,{ok:!0,k:a.k,n:a.n,price:a.price})}return l(404)};
+
+  LootIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt LootFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  LootInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LootFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+
+  LootClaimRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /boss/loot
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${LootIntegration}'
+
+  ShardsGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /shards
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${LootIntegration}'
+
+  ShardsListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /shards/list
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${LootIntegration}'
+
+  ShardsBuyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /shards/buy
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${LootIntegration}'
+
+  ShardsCancelRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /shards/cancel
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${LootIntegration}'
+
   # The Ember Ring (PvP): hero builds, ratings, Laurels and Ringwarden kit ranks, one row per player.
   ArenaTable:
     Type: AWS::DynamoDB::Table

@@ -164,7 +164,7 @@ ref({
         '<div class="clshead">' + pic(c, 0, k.name, 'big') + '<div><h2><a class="anchor" href="#' + c + '">' + esc(k.name) + '</a></h2>' +
         '<p class="sub">Ability: <b>' + esc(k.ability.name) + '</b>. ' + esc(k.ability.desc) + ' Cooldown ' + k.ability.cd + 's.</p>' +
         kv([['Health', k.hp + ' at level 1'], ['Damage', k.dps + ' per second at level 1']].concat(extras).concat([
-          ['Favoured stats', fav.join(' and ') + ' (×' + L.STAT_AFFINITY + ')'], ['Default seat', seat], RING_ARMS[c] ? ['Ember Ring arms', esc(RING_ARMS[c])] : null])) + '</div></div>' +
+          ['Favoured stats', fav.join(' and ') + ' (×' + L.STAT_AFFINITY + ')'], L.RES_KIND && L.RES_KIND[c] ? ['Resource', (L.RES_KIND[c] === 'mana' ? 'Mana' : 'Stamina') + ' (' + L.RES_MAX + ', refills ' + L.RES_REGEN[L.RES_KIND[c]] + '/s). Ability costs ' + L.AB_COST + (L.RES_KIND[c] === 'mana' && c === 'healer' ? '; healing drains mana too' : '')] : null, ['Default seat', seat], RING_ARMS[c] ? ['Ember Ring arms', esc(RING_ARMS[c])] : null])) + '</div></div>' +
         (specs.length ? '<h3>Hero specializations</h3><p class="note">Your own hero learns these from the last tier of each skill branch. Keys 6 to 8.</p><div class="grid3">' + specs.map(a =>
           '<div class="mini"><b>' + esc(a.name) + '</b><small>' + esc(a.desc) + '</small><span class="tier">Cooldown ' + a.cd + 's' + (a.dur ? ' · lasts ' + a.dur + 's' : '') + '</span></div>').join('') + '</div>' : '') +
         '<h3>Skill tree</h3><p class="note">Three branches of four skills, paid for with Kindling. A skill needs the one above it first. Reset free at camp.</p>' + treeHtml +
@@ -341,10 +341,10 @@ ref({
 ref({
   slug: 'enchantments', title: 'Enchantments and Dust', nav: 'Enchantments', icon: 'star',
   desc: 'Lanternhold enchantments: every enchant, what each tier gives, caps, sockets, disenchanting and Dust costs.',
-  lede: 'Sockets on gear hold enchants that help the whole party while anyone in it wears the item. Sigils never buy enchants.',
+  lede: 'Sockets on gear hold enchants. Most help the whole party while anyone in it wears the item; four help only the wearer. Sigils never buy enchants.',
   body: () => {
     const fmt = (e, v) => e.fmt === 's' ? '+' + (Math.round(v * 10) / 10) + 's' : pct(v, 1);
-    return '<h2 id="list">Enchants</h2>' + table(['Enchant', 'Gives', 'Per tier', 'Tier V', 'Party cap'], Object.values(L.ENCH).map(e => ['<b>' + esc(e.name) + '</b>', esc(e.what), fmt(e, e.v), fmt(e, e.v * 5), fmt(e, e.cap)])) +
+    return '<h2 id="list">Enchants</h2>' + table(['Enchant', 'Gives', 'Helps', 'Per tier', 'Tier V', 'Cap'], Object.values(L.ENCH).map(e => ['<b>' + esc(e.name) + '</b>', esc(e.what), e.per ? 'Wearer only' : 'Whole party', fmt(e, e.v), fmt(e, e.v * 5), fmt(e, e.cap)])) + '<p>Flow, Leech, Bulwark and Plating help only the hero wearing the item. Rings and trinkets roll Flow and Leech more often, armor and shields roll Bulwark and Plating, and weapons roll Leech. Flow speeds mana regen for healers, mages and necromancers, and stamina regen for rogues and tanks.</p>' +
       '<h2 id="sockets">Sockets</h2><p>Fine items have 1 socket, rare 2, epic 3 and set pieces 2. Items from floor 30 and floor 80 on get one more each, up to 4. Common items get sockets from floor 30. Higher item levels roll higher tiers.</p>' +
       '<h2 id="disenchant">Disenchanting</h2><p>Disenchant destroys an item and moves one of its enchants into a socket on another item, of any class. Moving an enchant costs Dust: 5 × tier².</p>' +
       table(['Tier', 'I', 'II', 'III', 'IV', 'V', 'VI'], [['Dust'].concat([1, 2, 3, 4, 5, 6].map(t => String(L.enchCost({ t }))))], 'small') +

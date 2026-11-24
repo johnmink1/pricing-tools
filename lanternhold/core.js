@@ -1,4 +1,4 @@
-/* lh-build 202611240332 */
+/* lh-build 202611240351 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -446,6 +446,16 @@
     const m = memberById(id); if (m.cls !== 'healer') return 0;
     return CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0));
   }
+  // Mana and stamina (John, 2026-11-24). Healers, mages and necromancers run on mana; rogues and tanks on stamina.
+  // Every ability costs some. A healer also spends mana to heal: run dry and it stops healing and only attacks
+  // until it has regained RES_WAKE, then heals again. Regen comes from the class, the hero's cooldown skills and gear.
+  const RES_KIND = { healer: 'mana', mage: 'mana', necro: 'mana', rogue: 'stamina', tank: 'stamina' };
+  const RES_MAX = 100, RES_REGEN = { mana: 3.5, stamina: 5 }, AB_COST = 30, SPEC_COST = 25, HEAL_DRAIN = 6, RES_WAKE = 30;
+  const resKind = id => { const m = memberById(id); return m ? RES_KIND[m.cls] : null; };
+  function resOf(s, id) { s.res = s.res || {}; const v = s.res[id]; return v == null || !(v >= 0) ? RES_MAX : Math.min(RES_MAX, v); }
+  function resRegen(s, id) { const k = resKind(id); return k ? RES_REGEN[k] * (1 + wearVal(s, id, 'regen') + (id === 'you' ? Math.min(0.5, sk(s, 'cd')) : 0)) : 0; }
+  function spendRes(s, id, n) { const v = resOf(s, id); if (v < n) return false; s.res[id] = v - n; return true; }
+  const oom = (s, id) => !!(s.oom && s.oom[id]);
   function clickDamage(s, now) { return (1 + totalDps(s, now) * 0.05) * (1 + relicVal(s, 'whet')); }
   function goldMult(s) { return emberMult(s) * (1 + masteryVal(s, 'gold')) * (1 + gearGold(s)) * (1 + kup(s, 'purse')) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
   function critChance(s) { return 0.04 + relicVal(s, 'dice') + sk(s, 'crit'); }
@@ -817,6 +827,7 @@
     const ab = heroSpecs(s).find(a => a.id === abId); if (!ab) return false;
     const key = 'you:' + ab.id, st = s.abil[key] || { readyAt: 0, until: 0 };
     if (st.readyAt > now) return false;
+    if (!spendRes(s, 'you', SPEC_COST)) { events && events.push({ type: 'nores', id: 'you', k: resKind('you') }); return false; }
     st.readyAt = now + ab.cd * 1000 * (1 - Math.min(0.5, sk(s, 'cd')) * 0.5);
     st.until = now + abilityDuration(s, ab) * 1000; s.abil[key] = st;
     const fx = ab.fx; s.fx = s.fx || {};
@@ -891,7 +902,7 @@
     else if (it.slot === 'armor') it.slot = CLOTH[it.cls] && !it.set ? 'robe' : 'chest';
     else if (it.slot === 'trinket') it.slot = 'neck';
     if (typeof it.en !== 'string') { if (it.uid) rollEnch(it, seeded(it.uid)); else it.en = ''; }
-    else if (enchList(it).length > sockets(it) || !/^([a-h][1-9])*$/.test(it.en)) it.en = enchStr(enchList(it).slice(0, sockets(it)));
+    else if (enchList(it).length > sockets(it) || !/^([a-l][1-9])*$/.test(it.en)) it.en = enchStr(enchList(it).slice(0, sockets(it)));
     return it;
   }
   const RARITY = [
@@ -1214,8 +1225,15 @@
     f: { name: 'Mending', k: 'pheal',   v: 0.01,   cap: 1,    fmt: 'pct', what: 'party healing' },
     g: { name: 'Warding', k: 'guard',   v: 0.005,  cap: 0.25, fmt: 'pct', what: 'less damage taken' },
     h: { name: 'Wick',    k: 'lantern', v: 0.3,    cap: 10,   fmt: 's',   what: 'lantern time' },
+    // Per-wearer stats (John, 2026-11-24): they help only the hero wearing the piece.
+    i: { name: 'Flow',    k: 'regen',   v: 0.04,   cap: 1,    fmt: 'pct', what: 'mana or stamina regen', per: 1 },
+    j: { name: 'Leech',   k: 'leech',   v: 0.004,  cap: 0.08, fmt: 'pct', what: 'life steal', per: 1 },
+    k: { name: 'Bulwark', k: 'block',   v: 0.005,  cap: 0.25, fmt: 'pct', what: 'block chance', per: 1 },
+    l: { name: 'Plating', k: 'def',     v: 0.006,  cap: 0.3,  fmt: 'pct', what: 'defense', per: 1 },
   };
   const ENCH_KEYS = Object.keys(ENCH), ENCH_MAX = 4;
+  // Rings and trinkets lean toward regen and life steal; armor leans toward block and defense; weapons toward life steal.
+  const ENCH_BIAS = { ring: ['i', 'i', 'j'], neck: ['i', 'j', 'j'], main: ['j', 'j'], off: ['k', 'k', 'l'], chest: ['l', 'l', 'k'], robe: ['l', 'i'], head: ['l', 'k'], legs: ['l', 'k'], feet: ['k', 'i'] };
   const SOCK_BASE = { common: 0, fine: 1, rare: 2, epic: 3, set: 2, goblin: 3 }, ENCH_FILL = { common: 0.3, fine: 0.4, rare: 0.5, epic: 0.7, set: 0.5, goblin: 0.8 };
   const sockets = it => Math.min(ENCH_MAX, (SOCK_BASE[it.rar] || 0) + (it.ilvl >= 30 ? 1 : 0) + (it.ilvl >= 80 ? 1 : 0));
   const enchList = it => { const o = [], e = it && it.en || ''; for (let i = 0; i + 1 < e.length; i += 2) if (ENCH[e[i]]) o.push({ id: e[i], t: +e[i + 1] }); return o; };
@@ -1223,7 +1241,8 @@
   const enchTierMax = it => Math.min(9, 1 + Math.floor(it.ilvl / 12) + (it.rar === 'epic' || it.rar === 'set' || it.rar === 'goblin' ? 1 : 0));
   function rollEnch(it, r) {
     let e = ''; const n = sockets(it), tm = enchTierMax(it);
-    for (let i = 0; i < n; i++) if (r() < (ENCH_FILL[it.rar] || 0)) e += ENCH_KEYS[Math.floor(r() * ENCH_KEYS.length)] + (1 + Math.floor(r() * tm));
+    const pool = ENCH_KEYS.concat(ENCH_BIAS[it.slot] || []);
+    for (let i = 0; i < n; i++) if (r() < (ENCH_FILL[it.rar] || 0)) e += pool[Math.floor(r() * pool.length)] + (1 + Math.floor(r() * tm));
     it.en = e; return it;
   }
   // Older items get their enchants rolled once, seeded from the item id, so a reload never rerolls them.
@@ -1236,11 +1255,22 @@
     const now = Date.now();
     if (enCache.s === s && now - enCache.t < 500) return enCache.v;
     const v = {};
-    for (const id of s.party) { if (!id) continue; const g = s.gear[id] || {}; for (const p in g) { const it = itemOf(s, g[p]); if (!it || (p === 'legs' && robeOn(s, id))) continue; for (const x of enchList(it)) { const d = ENCH[x.id]; v[d.k] = Math.min(d.cap, (v[d.k] || 0) + enchVal1(x)); } } }
+    for (const id of s.party) { if (!id) continue; const g = s.gear[id] || {}; for (const p in g) { const it = itemOf(s, g[p]); if (!it || (p === 'legs' && robeOn(s, id))) continue; for (const x of enchList(it)) { const d = ENCH[x.id]; if (d.per) continue; v[d.k] = Math.min(d.cap, (v[d.k] || 0) + enchVal1(x)); } } }
     enCache = { s, t: now, v }; return v;
   }
+  // One hero's own gear stats (the per-wearer enchants), cached briefly like enchTotals.
+  let wearCache = { s: null, t: 0, v: {} };
+  function wearTotals(s, id) {
+    const now = Date.now();
+    if (wearCache.s !== s || now - wearCache.t > 500) wearCache = { s, t: now, v: {} };
+    if (wearCache.v[id]) return wearCache.v[id];
+    const v = {}, g = (s.gear && s.gear[id]) || {};
+    for (const p in g) { const it = itemOf(s, g[p]); if (!it || (p === 'legs' && robeOn(s, id))) continue; for (const x of enchList(it)) { const d = ENCH[x.id]; if (!d.per) continue; v[d.k] = Math.min(d.cap, (v[d.k] || 0) + enchVal1(x)); } }
+    return (wearCache.v[id] = v);
+  }
+  const wearVal = (s, id, key) => (id && s.gear && s.bag && !String(id).startsWith('p_') ? wearTotals(s, id)[key] || 0 : 0);
   const enchVal = (s, key) => (s.gear && s.bag ? enchTotals(s)[key] || 0 : 0);
-  const enchDirty = () => { enCache = { s: null, t: 0, v: null }; };
+  const enchDirty = () => { enCache = { s: null, t: 0, v: null }; wearCache = { s: null, t: 0, v: {} }; };
   // Move enchant number `idx` of `src` into socket `slot` of `dst` (an empty socket, or one to overwrite). src is destroyed.
   function disenchant(s, srcUid, idx, dstUid, slot) {
     const a = itemOf(s, srcUid), b = itemOf(s, dstUid);
@@ -1921,7 +1951,9 @@
   function soak(s, t, dmg, now, rng) {
     const m = memberById(t), c = CLASSES[m.cls];
     if (c.dodge && (rng || Math.random)() < c.dodge + (setBonus(s, t) >= 2 ? 0.1 : 0) + (t === 'you' ? sk(s, 'dodge') : 0)) return -1;
+    const bl = wearVal(s, t, 'block'); if (bl > 0 && (rng || Math.random)() < bl) return -2;
     if (c.armor) dmg *= 1 - c.armor;
+    dmg *= 1 - wearVal(s, t, 'def');
     if (m.cls === 'tank' && abilityActive(s, t, now)) dmg *= 0.3 * (t === 'you' ? 1 - sk(s, 'power') : 1);
     dmg *= 1 - Math.min(0.5, sk(s, 'guard'));
     dmg *= 1 - fxOn(s, 'shield', now);
@@ -1965,7 +1997,7 @@
       for (const [id, mult] of hits) {
         // never a one-shot: one special takes at most 35% of a hero's health (20% each when it hits everyone)
         const d = Math.min(soak(s, id, foe.atk * mult * enr, now, rng), maxHpOf(s, id) * (sp.kind === 'all' ? 0.2 : 0.35));
-        if (d < 0) { out.push({ id, dodge: true }); continue; }
+        if (d < 0) { out.push({ id, dodge: true, block: d === -2 }); continue; }
         out.push({ id, dmg: d });
         const fell = hurtHero(s, id, d, now, events);
         if (!fell && sp.dot) addDot(s, id, sp.dot, foe.atk * DOTS[sp.dot].dps, events);
@@ -1996,7 +2028,7 @@
       return;
     }
     dmg = soak(s, t, dmg, now, rng);
-    if (dmg < 0) { events && events.push({ type: 'dodge', target: t }); return; }
+    if (dmg < 0) { events && events.push({ type: dmg === -2 ? 'block' : 'dodge', target: t }); return; }
     s.hp[t] = (s.hp[t] == null ? maxHpOf(s, t) : s.hp[t]) - dmg;
     events && events.push({ type: 'foehit', target: t, dmg, behind: !!pick.behind });
     if (mods.includes('venom')) { s.poison = s.poison || {}; s.poison[t] = { dps: dmg * 0.12, until: now + 5000 }; events && events.push({ type: 'poison', id: t }); }
@@ -2027,6 +2059,7 @@
     const m = memberById(id), c = CLASSES[m.cls], ab = c.ability;
     const st = s.abil[id] || { readyAt: 0, until: 0 };
     if (st.readyAt > now) return false;
+    if (!spendRes(s, id, AB_COST)) { events && events.push({ type: 'nores', id, k: resKind(id) }); return false; }
     const sb = setBonus(s, id), me = id === 'you', pw = me ? 1 + sk(s, 'power') : 1;
     st.readyAt = now + ab.cd * 1000 * (m.cls === 'rogue' && sb >= 3 ? 0.6 : 1) * (me ? 1 - Math.min(0.5, sk(s, 'cd')) : 1);
     st.until = now + abilityDuration(s, ab) * 1000 * (m.cls === 'tank' && sb >= 3 ? 2 : 1) * (me ? 1 + sk(s, 'dur') : 1);
@@ -2078,6 +2111,9 @@
     }
     // story recruits and revivals
     for (const id of s.party) if (id && s.down[id] && s.down[id] <= now) { delete s.down[id]; s.hp[id] = maxHpOf(s, id) * 0.4; }
+    // mana and stamina come back over time; an out-of-mana healer wakes up again at RES_WAKE
+    s.res = s.res || {}; s.oom = s.oom || {};
+    for (const id of s.party) { if (!id || !resKind(id)) continue; s.res[id] = Math.min(RES_MAX, resOf(s, id) + resRegen(s, id) * dt); if (s.oom[id] && s.res[id] >= RES_WAKE) { delete s.oom[id]; events && events.push({ type: 'resback', id }); } }
     s.minions = s.minions.filter(m => m.until > now && m.hp > 0);
     if (!alive(s).length) return; // nobody to fight
     if (nexusOn(s)) return; // the Nexus Guardian holds the floor: the foe behind it waits and nothing lands
@@ -2112,15 +2148,20 @@
     }
     // healing
     for (const hid of s.party) {
-      const hps = healPerSec(s, hid); if (!(hps > 0)) continue;
+      const hps = healPerSec(s, hid); if (!(hps > 0) || oom(s, hid)) continue;
       // each healer tends the most hurt first; the farther away, the weaker the heal
-      let need = hps * dt;
+      let need = hps * dt; const cap = need;
       const order = alive(s).sort((a, b) => s.hp[a] / maxHpOf(s, a) - s.hp[b] / maxHpOf(s, b));
       for (const id of order) { const eff = healReach(s, hid, id), gap = maxHpOf(s, id) - s.hp[id]; if (gap <= 0) continue; const h = Math.min(gap, need * eff); s.hp[id] += h; need -= h / eff; if (need <= 1e-9) break; }
+      // healing costs mana in proportion to how hard the healer worked this tick
+      const used = cap > 0 ? (cap - Math.max(0, need)) / cap : 0;
+      if (used > 0) { s.res[hid] = Math.max(0, resOf(s, hid) - HEAL_DRAIN * used * dt); if (s.res[hid] <= 0) { s.oom[hid] = 1; events && events.push({ type: 'oom', id: hid }); } }
     }
+    // life steal: a share of each hero's own damage heals that hero
+    for (const id of s.party) { if (!id || s.down[id]) continue; const ls = wearVal(s, id, 'leech'); if (ls > 0) { const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + memberDps(s, id, now) * ls * dt); } }
     // abilities
-    if (s.autoCast) for (const id of s.party) if (id && !s.down[id]) { const st = s.abil[id]; if ((!st || st.readyAt <= now) && wantsCast(s, id, now)) castAbility(s, id, now, events); }
-    if (s.autoCast && !s.down.you) for (const ab of heroSpecs(s)) { const st = s.abil['you:' + ab.id]; if ((!st || st.readyAt <= now) && wantsSpec(s, ab, now)) castSpec(s, ab.id, now, events); }
+    if (s.autoCast) for (const id of s.party) if (id && !s.down[id] && resOf(s, id) >= AB_COST + (memberById(id).cls === 'healer' && !s.party.some(x => x && s.down[x]) ? 20 : 0)) { const st = s.abil[id]; if ((!st || st.readyAt <= now) && wantsCast(s, id, now)) castAbility(s, id, now, events); }
+    if (s.autoCast && !s.down.you) for (const ab of heroSpecs(s)) { if (resOf(s, 'you') < SPEC_COST) break; const st = s.abil['you:' + ab.id]; if ((!st || st.readyAt <= now) && wantsSpec(s, ab, now)) castSpec(s, ab.id, now, events); }
     specialTick(s, now, rng, events);
     if (!alive(s).length || !s.foe) return;
     // foe swings
@@ -2297,7 +2338,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

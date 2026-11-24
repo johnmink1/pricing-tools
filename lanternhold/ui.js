@@ -1,4 +1,4 @@
-/* lh-build 202611240332 */
+/* lh-build 202611240351 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -323,6 +323,14 @@
       ctx.fillStyle = 'rgba(4,7,13,0.85)'; rrect(ctx, p.x + 2, p.y + 34.6, 20, 2.8, 1.4); ctx.fill();
       ctx.fillStyle = down ? '#555' : hp > 0.5 ? '#8fcf6a' : hp > 0.25 ? '#e9c34a' : '#e8604a';
       if (hp > 0) { rrect(ctx, p.x + 2.5, p.y + 35.1, Math.max(1.8, 19 * hp), 1.8, 0.9); ctx.fill(); }
+      // mana (blue) or stamina (gold) just under the health bar; an out-of-mana healer's bar blinks
+      const rk = L.resKind(p.id);
+      if (rk && !down) {
+        const rv = L.resOf(S, p.id) / L.RES_MAX, dry = L.oom(S, p.id);
+        ctx.fillStyle = 'rgba(4,7,13,0.85)'; rrect(ctx, p.x + 2, p.y + 37.8, 20, 2.2, 1.1); ctx.fill();
+        ctx.fillStyle = rk === 'mana' ? (dry ? 'rgba(122,170,255,' + (0.35 + 0.35 * Math.sin(tAnim * 9)) + ')' : '#5aa8ff') : '#e9b84a';
+        if (rv > 0) { rrect(ctx, p.x + 2.4, p.y + 38.2, Math.max(1.4, 19.2 * rv), 1.4, 0.7); ctx.fill(); }
+      }
       if (p.id === 'you') { ctx.fillStyle = '#f5c242'; ctx.beginPath(); ctx.moveTo(p.x + 10, p.y - 5.5); ctx.lineTo(p.x + 14, p.y - 5.5); ctx.lineTo(p.x + 12, p.y - 3); ctx.fill(); }
       // a special attack winding up: a red ring under whoever it will land on
       const wd = S.foe && S.foe.spWind, spd = wd && L.SPECIALS[S.foe.sp];
@@ -687,6 +695,9 @@
       case 'fall': flog('party', '<b class="bad">' + nm(e.id) + ' falls</b>'); break;
       case 'revive': flog('party', '<b class="good">' + nm(e.id) + ' is back up</b>'); break;
       case 'dodge': flog('party', nm(e.target) + ' dodges', 'dg' + e.target, 5000); break;
+      case 'block': flog('party', nm(e.target) + ' blocks a hit', 'bk' + e.target, 5000); break;
+      case 'oom': flog('party', '<b class="bad">' + nm(e.id) + ' is out of mana</b> and can only attack until it recovers'); break;
+      case 'resback': flog('party', nm(e.id) + ' has mana again', 'rb' + e.id, 3000); break;
       case 'poison': flog('party', nm(e.id) + ' is poisoned', 'ps' + e.id, 6000); break;
       case 'special': { const sp = L.SPECIALS[e.sp] || {}, hit = e.hits.filter(h => !h.dodge); flog('fight', '<b class="bad">' + esc((S.foe && S.foe.name) || 'The foe') + ': ' + esc(sp.name || 'special') + '</b> hits ' + (e.kind === 'all' ? 'the whole party' : hit.map(h => nm(h.id)).join(', ') || 'nobody') + (hit.length ? ' for ' + fmt(hit.reduce((a, h) => a + h.dmg, 0)) : '') + (sp.dot ? ' and leaves them ' + (sp.dot === 'burn' ? 'burning' : 'poisoned') + ' for ' + L.DOT_FIGHTS + ' fights' : '')); break; }
       case 'ambush': if (e.first) flog('fight', e.guarded ? nm(e.target) + ' guards the rear from an ambush' : '<b class="bad">Ambush!</b> ' + nm(e.target) + ' is hit from behind'); break;
@@ -748,6 +759,13 @@
           if (!S.stats.ambushes) toast('lock', 'Ambush from behind', e.guarded ? L.memberById(e.target).name + ' guarded the rear and took it on the shield.' : 'Some monsters strike the back of the line first. Put a sturdy member, or a second tank, at the rear.', 'warn');
           S.stats.ambushes = (S.stats.ambushes || 0) + 1;
         }
+      } else if (e.type === 'block') {
+        const a = mAnim(e.target); floatText('Block', 'dodge', a.x / W, (a.y - 6) / H);
+      } else if (e.type === 'oom') {
+        const a = mAnim(e.id); floatText('Out of mana', 'hurt', a.x / W, (a.y - 14) / H);
+        if (!S.stats.oomSeen) { S.stats.oomSeen = 1; toast('cross', L.memberById(e.id).name + ' ran out of mana', 'A healer spends mana to heal. With none left it only attacks until its mana comes back to ' + L.RES_WAKE + '. Gear with Flow speeds up mana and stamina regen.', 'warn'); }
+      } else if (e.type === 'nores') {
+        const a = mAnim(e.id); floatText('Not enough ' + (e.k || 'mana'), 'dodge', a.x / W, (a.y - 14) / H);
       } else if (e.type === 'dodge') {
         const a = mAnim(e.target); floatText('Dodge', 'dodge', a.x / W, (a.y - 6) / H);
       } else if (e.type === 'fall') {
@@ -761,7 +779,7 @@
       } else if (e.type === 'special') {
         const sp = L.SPECIALS[e.sp] || {}, col = sp.dot === 'burn' ? ['#ff7a3d', '#ffd26a', '#ff3d2a'] : sp.dot === 'poison' ? ['#8fd16a', '#c9f0a0', '#4a8a2a'] : ['#ff8a78', '#ffe0c0', '#c84a3a'];
         foeAnim.lunge = tAnim + 0.25; foeAnim.shake = tAnim + 0.2;
-        for (const h of e.hits) { const a = mAnim(h.id); if (h.dodge) { floatText('Dodge', 'dodge', a.x / W, (a.y - 6) / H); continue; } a.hit = tAnim + 0.18; floatText('-' + fmt(h.dmg), 'hurt', a.x / W, (a.y - 4) / H); burst(a.x, a.y, 10, col, 32); }
+        for (const h of e.hits) { const a = mAnim(h.id); if (h.dodge) { floatText(h.block ? 'Block' : 'Dodge', 'dodge', a.x / W, (a.y - 6) / H); continue; } a.hit = tAnim + 0.18; floatText('-' + fmt(h.dmg), 'hurt', a.x / W, (a.y - 4) / H); burst(a.x, a.y, 10, col, 32); }
         floatText(sp.name || 'Special', 'crit', FOE_X - 0.1, 0.28);
         sfx.thud(); tone(90, 0.3, 'square', 0.04, 60);
       } else if (e.type === 'dot') {
@@ -1154,6 +1172,7 @@
   let seatsHtml = '', seatsAt = 0;
   function paintHp() {
     document.querySelectorAll('#seats [data-hp]').forEach(i => { const id = i.dataset.hp; i.style.width = Math.max(0, (S.hp[id] || 0) / L.maxHpOf(S, id) * 100) + '%'; });
+    document.querySelectorAll('#seats [data-res]').forEach(i => { const id = i.dataset.res; i.style.width = (L.resOf(S, id) / L.RES_MAX * 100) + '%'; i.parentNode.classList.toggle('dry', L.oom(S, id)); });
   }
   // Companion traits: position, kinship and camp. Working ones glow.
   function traitChips(id, compact) {
@@ -1198,7 +1217,7 @@
         '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
         '<div class="lv">' + (down ? 'Fallen. Back up in ' + Math.ceil((down - now) / 1000) + 's' : memberStatsLine(id, now)) + '</div>' +
         traitChips(id, 'seat') +
-        '<div class="hpbar"><i data-hp="' + id + '"></i></div></div><div class="acts">' + btn + '</div></div>';
+        '<div class="hpbar"><i data-hp="' + id + '"></i></div>' + (L.resKind(id) ? '<div class="resbar r-' + L.resKind(id) + '" title="' + (L.resKind(id) === 'mana' ? 'Mana' : 'Stamina') + '"><i data-res="' + id + '"></i></div>' : '') + '</div><div class="acts">' + btn + '</div></div>';
     }
     if (html !== seatsHtml) {
       box.innerHTML = html; seatsHtml = html;
@@ -1430,17 +1449,19 @@
     box.querySelectorAll('[data-spec]').forEach(b => {
       const ab = specs.find(a => a.id === b.dataset.spec); if (!ab) return;
       const st = S.abil['you:' + ab.id], active = st && st.until > now && ab.dur > 0, cd = st && st.readyAt > now ? (st.readyAt - now) / 1000 : 0, down = !!S.down.you;
-      b.classList.toggle('active', !!active); b.classList.toggle('ready', !cd && !down); b.disabled = down;
-      b.querySelector('small').textContent = down ? 'Your hero has fallen' : active ? 'Active ' + fmtTime((st.until - now) / 1000) : cd ? 'Ready in ' + fmtTime(cd) : 'Ready';
+      const lack = !cd && !active && L.resOf(S, 'you') < L.SPEC_COST, rn = L.resKind('you') === 'mana' ? 'mana' : 'stamina';
+      b.classList.toggle('active', !!active); b.classList.toggle('ready', !cd && !down && !lack); b.classList.toggle('lack', lack); b.disabled = down;
+      b.querySelector('small').textContent = down ? 'Your hero has fallen' : active ? 'Active ' + fmtTime((st.until - now) / 1000) : cd ? 'Ready in ' + fmtTime(cd) : lack ? 'Needs ' + L.SPEC_COST + ' ' + rn : 'Ready';
       b.querySelector('.cd').style.transform = 'scaleX(' + (cd && !active ? cd / ab.cd : 0) + ')';
     });
     box.querySelectorAll('[data-cast]').forEach(b => {
       const id = b.dataset.cast, m = L.memberById(id), ab = L.CLASSES[m.cls].ability, st = S.abil[id];
       const active = st && st.until > now && ab.dur > 0, cd = st && st.readyAt > now ? (st.readyAt - now) / 1000 : 0;
       const down = !!S.down[id];
-      b.classList.toggle('active', !!active); b.classList.toggle('ready', !cd && !down); b.disabled = down;
+      const lack = !cd && !active && L.resOf(S, id) < L.AB_COST, rn = L.resKind(id) === 'mana' ? 'mana' : 'stamina';
+      b.classList.toggle('active', !!active); b.classList.toggle('ready', !cd && !down && !lack); b.classList.toggle('lack', lack); b.disabled = down;
       const sm = b.querySelector('small'), ov = b.querySelector('.cd');
-      sm.textContent = down ? m.name + ' has fallen' : active ? 'Active ' + fmtTime((st.until - now) / 1000) : cd ? 'Ready in ' + fmtTime(cd) : m.name + ' · Ready';
+      sm.textContent = down ? m.name + ' has fallen' : active ? 'Active ' + fmtTime((st.until - now) / 1000) : cd ? 'Ready in ' + fmtTime(cd) : lack ? (L.oom(S, id) ? 'Out of mana' : 'Needs ' + L.AB_COST + ' ' + rn) : m.name + ' · Ready';
       ov.style.transform = 'scaleX(' + (cd && !active ? cd / ab.cd : 0) + ')';
     });
   }
@@ -1660,7 +1681,7 @@
     const n = L.sockets(it), l = L.enchList(it); if (!n) return '';
     let h = '';
     for (let i = 0; i < n; i++) h += l[i] ? '<div class="esock on"><i></i><b>' + enchName(l[i]) + '</b><small>' + L.enchText(l[i]) + '</small></div>' : '<div class="esock"><i></i><small>Empty socket</small></div>';
-    return '<div class="iench"><div class="ienh">Enchant sockets ' + tipI('Sockets come from rarity and item level (one more at floor 30 and at floor 80). Enchants help the whole party while anyone in it wears the item. Use Disenchant on another item to move one of its enchants here.') + '</div>' + h + '</div>';
+    return '<div class="iench"><div class="ienh">Enchant sockets ' + tipI('Sockets come from rarity and item level (one more at floor 30 and at floor 80). Most enchants help the whole party while anyone in it wears the item. Flow, Leech, Bulwark and Plating help only the hero wearing it. Use Disenchant on another item to move one of its enchants here.') + '</div>' + h + '</div>';
   }
   function enchantPicker(o) {
     let src = o.src || null, idx = 0, dst = o.dst || null, slot = -1;
@@ -1802,6 +1823,12 @@
     if (c.armor) stats.push(['Blocks', Math.round(c.armor * 100) + '% of hits']);
     if (c.dodge) stats.push(['Dodges', Math.round(c.dodge * 100) + '% of hits']);
     if (c.drain) stats.push(['Life drain', 'heals party as it hits']);
+    const rk = L.resKind(id);
+    if (rk) stats.push([rk === 'mana' ? 'Mana' : 'Stamina', Math.round(L.resOf(S, id)) + ' / ' + L.RES_MAX + ', regen ' + L.resRegen(S, id).toFixed(1) + '/s']);
+    const wv = k => L.wearVal(S, id, k);
+    if (wv('leech')) stats.push(['Life steal', (wv('leech') * 100).toFixed(1) + '% of damage']);
+    if (wv('block')) stats.push(['Gear block', (wv('block') * 100).toFixed(1) + '% chance']);
+    if (wv('def')) stats.push(['Defense', (wv('def') * 100).toFixed(1) + '% less damage']);
     stats.push(['Power', m.player ? 'Full (player hero)' : Math.round(L.NPC_POWER * 100) + '% (story companion)']);
     const gear = S.gear[id] || {};
     const gearList = L.openPos(S, id).filter(sl => !(sl === 'legs' && L.robeOn(S, id))).map(sl => { const it = gear[sl] && L.itemOf(S, gear[sl]); return '<li><span>' + L.SLOT_NAME[sl] + '</span>' + (it ? '<b class="r-' + it.rar + '">' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b>' : '<i>Empty</i>') + '</li>'; }).join('');
@@ -4043,6 +4070,12 @@
       ['Monsters', 's:slime,rat,skeleton', 'Monsters hit back. If the whole party falls, it retreats a floor and tries again.', [
         'Retreats last about a minute. Use it to train and check gear.',
         '<b>Grand War soldiers</b> (with a banner) are tougher and drop more.']],
+      ['Mana and stamina', 'i:flare', 'Healers, mages and necromancers use mana. Rogues and tanks use stamina.', [
+        'The blue bar under a hero is <b>mana</b>, the gold bar is <b>stamina</b>. Both hold ' + L.RES_MAX + ' and refill on their own: mana at ' + L.RES_REGEN.mana + ' a second, stamina at ' + L.RES_REGEN.stamina + ' a second.',
+        'Abilities cost ' + L.AB_COST + ' and class specials cost ' + L.SPEC_COST + '. If a hero is short, the ability waits until the bar refills.',
+        'Healing costs mana. A healer that runs <b>out of mana</b> stops healing and only swings basic attacks until its mana is back to ' + L.RES_WAKE + '. Its bar blinks while it is empty.',
+        'Faster regen comes from <b>Flow</b> enchants on the hero’s own gear, and for your hero from cooldown skills.',
+        'Other gear stats for the wearer: <b>Leech</b> heals the hero for part of its damage, <b>Bulwark</b> gives a chance to block a hit outright, <b>Plating</b> cuts damage taken. A hero’s profile shows its totals.']],
       ['Guardians', 's:golem,wyrm,lich', 'Every 5th floor has a guardian. Beat it before the lantern oil runs out.', [
         'Guardians drop better gear and, from floor 10, sometimes a relic.',
         '<b>Lantern Oil</b> from the Store buys 15 more seconds.',
@@ -4086,9 +4119,10 @@
         '<b>Mass merge</b> in the Gear tab pairs up spare copies (never worn or locked ones) up to the level you pick, and shows the expected losses first.',
         'If the merge fails, <b>both pieces are destroyed</b>. Risk starts at 8% for +1 and climbs about 6% per level.',
         'Each point of <b>Luck</b> and <b>Intelligence</b> cuts that risk, up to half. Locked items cannot be merged.']],
-      ['Enchantments', 'i:star', 'Sockets hold enchants that help the whole party.', [
+      ['Enchantments', 'i:star', 'Sockets hold enchants that help your party or the hero who wears them.', [
         'Fine items have 1 socket, rare 2, epic 3 and set pieces 2. Items from floor 30 and floor 80 on get one more each, up to 4. Common items get sockets from floor 30.',
-        'Enchants: <b>Might</b> (damage), <b>Vigor</b> (health), <b>Keen</b> (crits), <b>Fortune</b> (gold), <b>Finder</b> (gear drops), <b>Mending</b> (healing), <b>Warding</b> (less damage taken) and <b>Wick</b> (lantern time). Tiers run I to IX, higher from deeper floors.',
+        'Enchants: <b>Might</b> (damage), <b>Vigor</b> (health), <b>Keen</b> (crits), <b>Fortune</b> (gold), <b>Finder</b> (gear drops), <b>Mending</b> (healing), <b>Warding</b> (less damage taken) and <b>Wick</b> (lantern time) help the whole party. Tiers run I to IX, higher from deeper floors.',
+        'Four enchants help <b>only the hero wearing the item</b>: <b>Flow</b> (mana or stamina regen, up to +100%), <b>Leech</b> (life steal, up to 8%), <b>Bulwark</b> (block chance, up to 25%) and <b>Plating</b> (defense, up to 30% less damage). Rings and trinkets roll Flow and Leech more often, armor and shields roll Bulwark and Plating more often, and weapons roll Leech.',
         '<b>Disenchant</b> destroys an item and moves one of its enchants into a socket on another item of any class. A full socket can be overwritten.',
         'Moving an enchant costs <b>Dust</b>: 5 for tier I, 20 for II, 45 for III and so on (5 &times; tier&sup2;).',
         'Merging two items keeps the best enchants of both, as many as the result has sockets.']],
@@ -4250,6 +4284,14 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 86, date: 'November 24, 2026', title: 'Mana, stamina and new gear stats', items: [
+      'Healers, mages and necromancers now have a blue mana bar. Rogues and tanks have a gold stamina bar. Both refill over time.',
+      'Abilities and class specials cost mana or stamina. If a hero is short, it waits for the bar to refill.',
+      'Healing costs mana. A healer that runs out of mana stops healing and fights with basic attacks until its mana comes back.',
+      'New enchants that help only the hero wearing the item: Flow (mana or stamina regen), Leech (life steal), Bulwark (block chance) and Plating (defense).',
+      'Rings and trinkets roll Flow and Leech more often. Armor and shields roll Bulwark and Plating more often. Weapons roll Leech.',
+      'Hero profiles show mana or stamina, regen, life steal, block and defense. Your existing gear and enchants are unchanged.'
+    ] },
     { v: 85, date: 'November 24, 2026', title: 'Fight panel fix', items: [
       'Fixed: after changing floors, the fight panel could keep showing the last guardian (with its lantern timer) while your party was really fighting something else. Between foes it now says the next foe is on the way.'
     ] },

@@ -1,4 +1,4 @@
-/* lh-build 202611241721 */
+/* lh-build 202611241743 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2295,8 +2295,8 @@ body.atench #bannerlamp{display:none!important}
 .chatpops{position:fixed;right:12px;bottom:calc(var(--dockh) + 6px);z-index:39;display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;gap:8px;max-width:calc(100vw - 24px);pointer-events:none}
 .chatpops[hidden]{display:none}
 .cpop{pointer-events:auto;width:300px;height:380px;max-height:calc(100vh - var(--dockh) - 80px);display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.55);overflow:hidden}
-.cpop.min{height:auto;width:200px}
-.cpop.min .cplog,.cpop.min .cpform,.cpop.min .cpnote{display:none!important}
+/* A minimized chat folds back into its dock icon (John: no row of floating title bars). */
+.cpop.min{display:none!important}
 .cpop header{display:flex;align-items:center;gap:7px;padding:7px 6px 7px 10px;background:linear-gradient(180deg,#1d2a44,#142036);border-bottom:1px solid var(--line2);cursor:pointer;user-select:none}
 .cpop header>svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;color:#c9d6ee;flex:none}
 .cpop .ptit{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
@@ -2320,6 +2320,9 @@ body.hasdock{padding-bottom:calc(var(--dockh) + 6px)}
 }
 @media (min-width:901px) and (min-height:620px){
   .stage .arena{max-height:66cqw}
-  body.atench .stage .arena{max-height:none}
+  /* v117 fix (John: on Merge, Mass merge and Scrap the scene grew and hid the shop tabs): the shop scene never takes more
+     than ~44% of the screen, and the counter's tabs stay pinned at the top of the panel while it scrolls. */
+  body.atench .stage .arena{max-height:clamp(220px,44vh,560px)}
+  body.atench #enchpanel .ewtabs{position:sticky;top:-1px;z-index:3;background:var(--panel);box-shadow:0 6px 10px -6px rgba(0,0,0,.6)}
 }
 body.hasdock #toasts{bottom:calc(var(--dockh) + 16px)}

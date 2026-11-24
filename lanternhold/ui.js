@@ -1,4 +1,4 @@
-/* lh-build 202611241721 */
+/* lh-build 202611241743 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -4481,7 +4481,7 @@
     let p = POPS.find(q => q.ch === ch && (ch !== 'dm' || q.pid === pid));
     if (p) p.min = false; else { p = { ch, pid, name, min: false }; POPS.push(p); }
     if (pid && chat.dmHidden[pid]) { delete chat.dmHidden[pid]; try { localStorage.setItem('lh_dm_hidden', JSON.stringify(chat.dmHidden)); } catch (e) {} }
-    // At most three windows stay open; the oldest open one tucks down to its title.
+    // At most three windows stay open; the oldest open one folds back into its dock icon.
     const open = POPS.filter(q => !q.min); if (open.length > 3) open[0].min = true;
     lastPop = p; popSave(); paintPops(true); pollPops();
     const el = popEl(p); if (el) setTimeout(() => { const i = el.querySelector('input'); if (i) i.focus(); }, 30);
@@ -5429,8 +5429,9 @@
       'One inventory: every spare piece in one list. Filter by weapons, off-hands, armour or jewellery, by rarity and by who can use it, and sort by best, level, rarity, type or newest. Each item shows which classes can use it.',
       'The banner lantern: the more Grand War territories your banner holds right now, the stronger you are here. +1% damage, health, healing and gold per territory, up to +15%. Hover the lantern at the top right to see it.',
       '@ mentions are loud now: a toast, a chime, a flashing @you line, a glowing chat button and a count on the browser tab.',
-      'Chat bar on wider screens, bottom right: an icon for each channel and a tab for each whisper, each with its unread or @ count. Click one and that chat pops out in its own small window. Keep several open at once; click a title to tuck it away. The game leaves room for the bar, so it never covers your skills.',
+      'Chat bar on wider screens, bottom right: an icon for each channel and a tab for each whisper, each with its unread or @ count. Click one and that chat pops out in its own small window. Keep several open at once; click a title to tuck it back into the bar. The game leaves room for the bar, so it never covers your skills.',
       'The Armorer and the Enchanter use the same filters as your pack on every tab: weapons, off-hands, armour or jewellery, rarity, who can use it, and sort. Scrap and mass merge only touch what the filters show.',
+      'Shops: the Armorer and Enchanter tabs stay in view on every tab; the shop scene no longer grows tall enough to push them off screen.',
       'Big and ultrawide screens: the game grows with your screen and the fight scene keeps a sensible shape, so your party is bigger and no longer stands under a giant empty wall.',
       'Mercy Corps wounded companions have their own art: a bandaged medic on a bedroll.'] },
     { v: 116, date: 'November 24, 2026', title: 'Specialist shops and a Help channel', items: [

@@ -1,4 +1,4 @@
-/* lh-build 202611241325 */
+/* lh-build 202611241343 */
 /* Lanternhold illustrated sprites. Each sprite is drawn as layered SVG (outline, shading, rim light, detail),
    tinted per companion or biome, rendered once to an image and then drawn on the arena canvas. */
 (function (root) {
@@ -210,6 +210,53 @@
     ].join('');
   } };
 
+  // The Enchanter (John, 2026-11-24): the old shopkeeper behind the counter, hooded, half-moon spectacles,
+  // a long braided beard, a rune stole and a crystal held in both hands. Faces right like the heroes; the shop flips him.
+  ART.enchanter = { w: 120, h: 160, draw(c) {
+    const robe = c.mat('#5b2f8f'), robeD = c.t('#2a1450'), lining = c.mat('#1f8a86'), trim = c.lg(['#fff0b8', '#f5c242', '#a87418']);
+    const skin = c.lg([SK.light, SK.mid], 0, 0, 1, 1), beard = c.lg(['#ffffff', '#dfe5ee', '#a3aec0'], 0, 0, 0, 1);
+    const star = (x, y, r, col) => P('M' + x + ' ' + (y - r) + ' L' + (x + r * 0.3) + ' ' + (y - r * 0.3) + ' L' + (x + r) + ' ' + y + ' L' + (x + r * 0.3) + ' ' + (y + r * 0.3) + ' L' + x + ' ' + (y + r) + ' L' + (x - r * 0.3) + ' ' + (y + r * 0.3) + ' L' + (x - r) + ' ' + y + ' L' + (x - r * 0.3) + ' ' + (y - r * 0.3) + 'Z', col, ' stroke-width="0.6"');
+    return [
+      // robe, wide at the hem
+      P('M36 66 Q26 110 20 152 Q60 162 100 152 Q94 110 84 66 Q60 56 36 66Z', robe),
+      Pn('M64 66 Q72 110 78 156 Q90 156 100 152 Q94 110 84 66Z', robeD, ' opacity=".45"'),
+      L_('M42 84 Q36 120 30 150', '#ffffff', 1.2, ' opacity=".16"'),
+      P('M20 146 Q60 157 100 146 L100 153 Q60 164 20 153Z', trim),
+      ...[[34, 138], [52, 146], [72, 146], [88, 138]].map(([x, y]) => star(x, y, 3, '#fff0b8')),
+      // rune stole hanging from the shoulders
+      P('M46 66 L52 66 L54 140 L44 142Z', lining), P('M68 66 L74 66 L76 142 L66 140Z', lining),
+      ...[[49, 92], [49, 112], [49, 130], [71, 92], [71, 112], [71, 130]].map(([x, y]) => L_('M' + (x - 2) + ' ' + (y - 3) + ' L' + (x + 2) + ' ' + (y - 3) + ' L' + x + ' ' + (y + 3) + 'Z', '#a8fff4', 1, ' opacity=".9"')),
+      P('M43 140 L55 138 L56 146 L42 148Z', trim), P('M65 138 L77 140 L78 148 L64 146Z', trim),
+      // belt of little vials
+      P('M36 100 Q60 108 84 100 L84 107 Q60 115 36 107Z', c.mat('#6a3f1e')),
+      ...[[40, '#f472b6'], [79, '#34d399'], [85, '#60a5fa']].map(([x, col]) => P('M' + (x - 2.5) + ' 106 H' + (x + 2.5) + ' V114 Q' + x + ' 118 ' + (x - 2.5) + ' 114Z', col, ' stroke-width="1.2"')),
+      // the crystal, held out in both hands
+      C(86, 84, 26, c.rg([['#f5e9ff', 0.85], ['#c084fc', 0.45], ['#7c3aed', 0]]), ''),
+      P('M36 70 Q22 82 30 96 Q50 102 76 94 L72 86 Q52 90 44 84Z', robe),
+      P('M82 70 Q98 80 92 96 L78 98 Q80 88 74 82Z', robe),
+      Eo(78, 96, 5.5, 4.5, skin), Eo(93, 95, 5, 4.5, skin),
+      P('M86 66 L97 84 L86 100 L75 84Z', c.lg(['#ffffff', '#e9d5ff', '#a855f7', '#6d28d9'], 0, 0, 1, 1), ' stroke-width="1.6"'),
+      L_('M86 70 L80 84 L86 96', '#ffffff', 1.1, ' opacity=".85"'), L_('M86 66 V100 M75 84 H97', '#f5e9ff', 0.6, ' opacity=".6"'),
+      // hood: violet outside, teal lining around the face
+      P('M32 62 Q28 30 46 12 Q58 0 70 4 Q90 12 90 46 Q92 62 84 70 Q60 60 36 70Z', robe),
+      Pn('M72 8 Q90 16 90 46 Q90 60 84 70 Q80 40 72 8Z', robeD, ' opacity=".5"'),
+      P('M42 60 Q40 32 60 24 Q80 30 78 60 Q60 68 42 60Z', lining),
+      // face, bushy brows, half-moon spectacles
+      P('M47 44 Q47 31 60 30 Q73 31 73 44 Q73 56 60 60 Q47 56 47 44Z', skin),
+      E(55, 45, 1.9, 2.2, '#1a2440'), E(66, 45, 1.9, 2.2, '#1a2440'), C(55.6, 44.3, 0.7, '#ffffff'), C(66.6, 44.3, 0.7, '#ffffff'),
+      P('M49 40 Q54 36 58 39 Q54 39 49 41Z', '#eef2f7', ' stroke-width="1"'), P('M63 39 Q67 36 72 40 L72 41 Q67 39 63 39Z', '#eef2f7', ' stroke-width="1"'),
+      L_('M51 46 Q55 50 59 46 M62 46 Q66 50 70 46 M59 46 H62', '#f5c242', 1.1),
+      E(52, 51, 2.6, 1.5, '#ff8a7a', ' opacity=".3"'), E(69, 51, 2.6, 1.5, '#ff8a7a', ' opacity=".3"'),
+      // long beard, braided at the tip with a gold ring
+      P('M47 48 Q49 58 54 55 Q57 60 60 57 Q63 60 66 55 Q71 58 73 48 Q76 66 68 80 Q64 86 62 96 L58 96 Q56 86 52 80 Q44 66 47 48Z', beard),
+      P('M56.5 52 Q60 49 63.5 52 Q60 55 56.5 52Z', '#eef2f7', ' stroke-width="1"'),
+      L_('M56 64 Q58 74 59 86 M64 64 Q63 74 61 86', '#a3aec0', 0.9),
+      P('M57 94 H63 V99 H57Z', trim, ' stroke-width="1.2"'), P('M58 99 Q60 108 62 99Z', beard, ' stroke-width="1.2"'),
+      // a gold rim on the hood
+      
+      L_('M42 60 Q40 32 60 24 Q80 30 78 60', '#f5c242', 1.2, ' opacity=".75"'),
+    ].join('');
+  } };
   ART.necro = { w: 120, h: 160, draw(c) {
     const robe = c.mat('#4c3280'), robeD = c.t('#1e1236'), trim = c.lg(['#c9c2d8', '#8a7fa8']), bone = c.lg(['#fffaf0', '#e8dfc8', '#a89c80']);
     const wood = c.lg(['#4a3a2a', '#1e140c'], 0, 0, 1, 0), green = '#7affc8';

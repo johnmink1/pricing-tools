@@ -1,4 +1,4 @@
-/* lh-build 202611241325 */
+/* lh-build 202611241343 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -459,82 +459,151 @@
     }
   }
 
-  // ---------- the Enchanter's shop (John, 2026-11-24): the party leaves the Deep and walks into the shop ----------
-  let shopBg = null, shopKey = '', enchImg = null;
+  // ---------- the Enchanter's shop (John, 2026-11-24) ----------
+  // The party leader leaves the Deep and walks into the shop. The Enchanter stands behind his counter on the right,
+  // where the monsters usually are; the choices hang above him in a speech bubble (#enchov); the work happens in the
+  // counter panel under the scene, and the items you pick appear on the counter.
+  const SHOP = { ex: 0.7 };
+  let shopBg = null, shopKey = '';
+  const shopIcons = {};
+  function shopIcon(it) {
+    const k = it.cls + '|' + it.slot + '|' + it.rar;
+    if (!shopIcons[k]) { const im = new Image(); im.src = SP.itemIcon(it.cls, it.slot, it.rar); shopIcons[k] = im; }
+    return shopIcons[k];
+  }
+  function shopGeo() {
+    const floorY = Math.round(H * 0.8), cw = Math.round(W * 0.34), ex = Math.round(W * SHOP.ex), cTop = Math.round(floorY - Math.max(14, H * 0.24));
+    // the Enchanter is as big as fits under his speech bubble (SHOP.top, measured in placeEnchOv); the hero matches him
+    const room = cTop - (SHOP.top || 0), eh = Math.max(40, Math.min(H * 0.74, room / 0.6)), ew = eh * 0.75;
+    const hh = Math.max(28, Math.min(eh * 0.82, floorY - (SHOP.top || 0) + 2)), hw = hh * 0.75;
+    return { floorY, cw, ex, cTop, eh, ew, hh, hw, eTop: cTop - eh * 0.6, standX: ex - cw / 2 - hw * 0.5 };
+  }
   function buildShop() {
     const c = document.createElement('canvas'); c.width = Math.round(W * R); c.height = Math.round(H * R);
     const g = c.getContext('2d'); g.scale(R, R);
-    const floorY = Math.round(H * 0.72);
-    // back wall: dark plum plaster with timber beams
-    let lg = g.createLinearGradient(0, 0, 0, floorY); lg.addColorStop(0, '#1c1230'); lg.addColorStop(1, '#2e1f45'); g.fillStyle = lg; g.fillRect(0, 0, W, floorY);
-    g.fillStyle = '#3a2618'; for (let x = 0; x < W; x += 60) g.fillRect(x, 0, 5, floorY);
-    g.fillRect(0, 10, W, 4);
-    // shelves of bottles and books behind the counter
-    const shelf = (x, y, w) => {
-      g.fillStyle = '#5a3a22'; g.fillRect(x, y, w, 3); g.fillStyle = '#2a1a0e'; g.fillRect(x, y + 3, w, 1.5);
-      let seed = Math.round(x * 7 + y * 13);
-      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-      for (let bx = x + 3; bx < x + w - 5; bx += 6 + rnd() * 4) {
-        const k = rnd();
-        if (k < 0.55) { const col = ['#a78bfa', '#60a5fa', '#34d399', '#f472b6', '#fbbf24'][Math.floor(rnd() * 5)], bh = 6 + rnd() * 5;
-          g.fillStyle = col; g.globalAlpha = 0.85; g.fillRect(bx, y - bh, 4, bh); g.globalAlpha = 1; g.fillStyle = '#d6c7a1'; g.fillRect(bx + 1, y - bh - 2, 2, 2); }
-        else { const bh = 7 + rnd() * 4; g.fillStyle = ['#7c2d12', '#1e3a8a', '#14532d', '#581c87'][Math.floor(rnd() * 4)]; g.fillRect(bx, y - bh, 4, bh); g.fillStyle = 'rgba(255,220,150,.35)'; g.fillRect(bx, y - bh + 2, 4, 1); }
+    const { floorY, ex } = shopGeo();
+    // back wall: deep plum plaster with a faint diamond pattern, a dark wood wainscot and two timber posts
+    let lg = g.createLinearGradient(0, 0, 0, floorY); lg.addColorStop(0, '#1a1128'); lg.addColorStop(0.6, '#2c1c42'); lg.addColorStop(1, '#352350');
+    g.fillStyle = lg; g.fillRect(0, 0, W, floorY);
+    g.fillStyle = 'rgba(255,220,160,.045)';
+    for (let y = 8; y < floorY - 14; y += 12) for (let x = (y / 12 % 2) * 8; x < W; x += 16) { g.beginPath(); g.moveTo(x, y - 2.5); g.lineTo(x + 2, y); g.lineTo(x, y + 2.5); g.lineTo(x - 2, y); g.fill(); }
+    const wy = floorY - Math.max(10, H * 0.13);
+    lg = g.createLinearGradient(0, wy, 0, floorY); lg.addColorStop(0, '#4a2f1c'); lg.addColorStop(1, '#2a190e'); g.fillStyle = lg; g.fillRect(0, wy, W, floorY - wy);
+    g.fillStyle = '#6a4426'; g.fillRect(0, wy - 1.5, W, 2);
+    g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 0.6; for (let x = 10; x < W; x += 22) g.strokeRect(x, wy + 2.5, 18, floorY - wy - 5);
+    const post = x => { const pg = g.createLinearGradient(x - 3, 0, x + 3, 0); pg.addColorStop(0, '#2a1a0e'); pg.addColorStop(0.5, '#5a3a22'); pg.addColorStop(1, '#2a1a0e'); g.fillStyle = pg; g.fillRect(x - 3, 0, 6, floorY); };
+    post(Math.round(W * 0.2)); post(Math.round(W * 0.985));
+    lg = g.createLinearGradient(0, 0, 0, 7); lg.addColorStop(0, '#2a1a0e'); lg.addColorStop(1, '#4a2f1c'); g.fillStyle = lg; g.fillRect(0, 0, W, 6);
+    // the open doorway the party came in by, with the blue dark of the Deep beyond it
+    const dx = Math.round(W * 0.085), dw = Math.max(16, W * 0.075), dh = Math.max(26, (floorY - 6) * 0.62);
+    const arch = () => { g.beginPath(); g.moveTo(dx - dw / 2, floorY); g.lineTo(dx - dw / 2, floorY - dh + dw / 2); g.arc(dx, floorY - dh + dw / 2, dw / 2, Math.PI, 0); g.lineTo(dx + dw / 2, floorY); g.closePath(); };
+    lg = g.createLinearGradient(0, floorY - dh, 0, floorY); lg.addColorStop(0, '#0a0f1e'); lg.addColorStop(1, '#16223a'); g.fillStyle = lg; arch(); g.fill();
+    g.strokeStyle = '#7a5434'; g.lineWidth = 2.2; arch(); g.stroke();
+    g.fillStyle = 'rgba(120,160,255,.08)'; g.beginPath(); g.moveTo(dx - dw / 2, floorY); g.lineTo(dx + dw / 2, floorY); g.lineTo(dx + dw * 1.6, H); g.lineTo(dx - dw, H); g.fill();
+    // shelves of potions and books on both sides of the Enchanter
+    const shelf = (x, y, w, seed0) => {
+      let seed = seed0; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let bx = x + 2; bx < x + w - 4; bx += 4.5 + rnd() * 3) {
+        if (rnd() < 0.55) { const col = ['#a78bfa', '#60a5fa', '#34d399', '#f472b6', '#fbbf24'][Math.floor(rnd() * 5)], bh = 4 + rnd() * 3;
+          g.fillStyle = col; g.globalAlpha = 0.9; g.beginPath(); g.ellipse(bx + 1.6, y - bh * 0.4, 1.8, bh * 0.45, 0, 0, Math.PI * 2); g.fill(); g.fillRect(bx + 1, y - bh, 1.2, bh * 0.5); g.globalAlpha = 1;
+          g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(bx + 0.9, y - bh * 0.6, 0.6, 1.2); }
+        else { const bh = 5 + rnd() * 2.5; g.fillStyle = ['#7c2d12', '#1e3a8a', '#14532d', '#581c87', '#713f12'][Math.floor(rnd() * 5)]; g.fillRect(bx, y - bh, 3, bh); g.fillStyle = 'rgba(255,220,150,.4)'; g.fillRect(bx, y - bh + 1.2, 3, 0.6); }
       }
+      g.fillStyle = '#6a4426'; g.fillRect(x, y, w, 2); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x, y + 2, w, 1.5);
     };
-    const sx = Math.round(W * 0.5), sw = Math.round(W * 0.46);
-    shelf(sx, 40, sw); shelf(sx, 62, sw); shelf(sx, 84, sw);
-    // a round window with moonlight on the left
-    const wx = Math.round(W * 0.2), wy = 46;
-    g.fillStyle = '#3a2618'; g.beginPath(); g.arc(wx, wy, 17, 0, Math.PI * 2); g.fill();
-    const wg = g.createRadialGradient(wx, wy, 2, wx, wy, 15); wg.addColorStop(0, '#9fb7ff'); wg.addColorStop(1, '#2b3a6b'); g.fillStyle = wg; g.beginPath(); g.arc(wx, wy, 14, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#3a2618'; g.lineWidth = 2; g.beginPath(); g.moveTo(wx - 14, wy); g.lineTo(wx + 14, wy); g.moveTo(wx, wy - 14); g.lineTo(wx, wy + 14); g.stroke();
-    // the doorway the party came in by
-    g.fillStyle = '#120b1c'; g.beginPath(); g.moveTo(4, floorY); g.lineTo(4, floorY - 44); g.quadraticCurveTo(20, floorY - 58, 36, floorY - 44); g.lineTo(36, floorY); g.fill();
-    g.strokeStyle = '#5a3a22'; g.lineWidth = 2.5; g.stroke();
-    // floorboards
-    lg = g.createLinearGradient(0, floorY, 0, H); lg.addColorStop(0, '#4a2f1c'); lg.addColorStop(1, '#22150c'); g.fillStyle = lg; g.fillRect(0, floorY, W, H - floorY);
-    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = floorY + 6; y < H; y += 7) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
-    // a rug in front of the counter
-    g.fillStyle = '#5b21b6'; g.globalAlpha = 0.55; g.beginPath(); g.ellipse(W * 0.5, floorY + 18, 46, 7, 0, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+    const top = Math.max(16, floorY * 0.3), gap = Math.max(10, floorY * 0.2);
+    for (let i = 0; i < 2; i++) { shelf(Math.round(W * 0.43), Math.round(top + gap * i + 8), Math.round(W * 0.12), 11 + i * 7); shelf(Math.round(W * 0.86), Math.round(top + gap * i + 8), Math.round(W * 0.115), 29 + i * 5); }
+    // a round window with moonlight between the door and the post
+    const wx = Math.round(W * 0.31), wyy = Math.round(Math.max(18, floorY * 0.36)), wr = Math.max(8, Math.min(14, floorY * 0.13));
+    g.fillStyle = '#3a2618'; g.beginPath(); g.arc(wx, wyy, wr + 2.5, 0, Math.PI * 2); g.fill();
+    const wg = g.createRadialGradient(wx - wr * 0.3, wyy - wr * 0.3, 1, wx, wyy, wr); wg.addColorStop(0, '#c7d6ff'); wg.addColorStop(1, '#33467a'); g.fillStyle = wg; g.beginPath(); g.arc(wx, wyy, wr, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#3a2618'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(wx - wr, wyy); g.lineTo(wx + wr, wyy); g.moveTo(wx, wyy - wr); g.lineTo(wx, wyy + wr); g.stroke();
+    // floorboards, darker towards the front, with a warm pool of light by the counter
+    lg = g.createLinearGradient(0, floorY, 0, H); lg.addColorStop(0, '#5a3a22'); lg.addColorStop(1, '#24160c'); g.fillStyle = lg; g.fillRect(0, floorY, W, H - floorY);
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = floorY + 4, k = 0; y < H; y += 4 + k * 1.5, k++) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    const pool = g.createRadialGradient(ex - W * 0.12, floorY + 4, 2, ex - W * 0.12, floorY + 4, W * 0.32); pool.addColorStop(0, 'rgba(255,190,110,.22)'); pool.addColorStop(1, 'rgba(255,190,110,0)');
+    g.fillStyle = pool; g.fillRect(0, floorY - 2, W, H - floorY + 2);
     return c;
+  }
+  // The counter: dark wood front with panels and a gold trim, a lighter top with a little depth.
+  function drawCounter(G) {
+    const { floorY, cw, ex, cTop } = G, x0 = ex - cw / 2;
+    let lg = ctx.createLinearGradient(0, cTop, 0, floorY); lg.addColorStop(0, '#6a4024'); lg.addColorStop(1, '#2e1a0c');
+    ctx.fillStyle = lg; ctx.fillRect(x0, cTop + 2, cw, floorY - cTop - 1);
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.7; const np = 3, pw = (cw - 8) / np;
+    for (let i = 0; i < np; i++) ctx.strokeRect(x0 + 4 + i * pw + 1, cTop + 6, pw - 2, floorY - cTop - 10);
+    ctx.fillStyle = 'rgba(245,194,66,.55)'; for (let i = 0; i < np; i++) { const mx = x0 + 4 + i * pw + pw / 2, my = cTop + (floorY - cTop) / 2 + 1; ctx.beginPath(); ctx.moveTo(mx, my - 2); ctx.lineTo(mx + 1.6, my); ctx.lineTo(mx, my + 2); ctx.lineTo(mx - 1.6, my); ctx.fill(); }
+    lg = ctx.createLinearGradient(0, cTop - 2, 0, cTop + 3); lg.addColorStop(0, '#b07a46'); lg.addColorStop(1, '#7a4a26');
+    ctx.fillStyle = lg; ctx.fillRect(x0 - 3, cTop - 1.5, cw + 6, 4);
+    ctx.fillStyle = '#f5c242'; ctx.globalAlpha = 0.6; ctx.fillRect(x0 - 3, cTop + 2.5, cw + 6, 0.8); ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x0 - 2, floorY, cw + 4, 1.5);
   }
   function drawEnchShop(now) {
     if (shopKey !== W + 'x' + H) { shopBg = buildShop(); shopKey = W + 'x' + H; }
-    if (!enchImg) { enchImg = new Image(); enchImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(ENCH_SVG.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="104" ')); }
     ctx.drawImage(shopBg, 0, 0, W, H);
-    const floorY = Math.round(H * 0.72), cx = Math.round(W * 0.62), cTop = Math.round(floorY - Math.max(18, H * 0.14)), eh = Math.max(56, H * 0.46), ew = eh * 40 / 52;
-    // the Enchanter behind the counter, swaying a little, orb glowing
-    const sway = Math.sin(tAnim * 1.3) * 0.8;
-    if (enchImg.complete && enchImg.naturalWidth) ctx.drawImage(enchImg, cx - ew / 2, cTop - eh * 0.72 + sway, ew, eh);
-    const ox = cx + ew * 0.33, oy = cTop - eh * 0.72 + eh * 0.58 + sway, og = ctx.createRadialGradient(ox, oy, 0, ox, oy, 22 + Math.sin(tAnim * 3) * 3);
-    og.addColorStop(0, 'rgba(216,180,254,.55)'); og.addColorStop(1, 'rgba(167,139,250,0)');
-    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = og; ctx.fillRect(ox - 30, oy - 30, 60, 60); ctx.globalCompositeOperation = 'source-over';
-    // the counter
-    let lg = ctx.createLinearGradient(0, cTop, 0, floorY); lg.addColorStop(0, '#7a4a26'); lg.addColorStop(1, '#3a2010');
-    ctx.fillStyle = lg; ctx.fillRect(cx - 40, cTop, 80, floorY - cTop + 2);
-    ctx.fillStyle = '#9a6a3a'; ctx.fillRect(cx - 43, cTop - 3, 86, 4);
-    ctx.fillStyle = 'rgba(0,0,0,.25)'; for (let i = -30; i <= 30; i += 20) ctx.fillRect(cx + i, cTop + 4, 1.2, floorY - cTop - 4);
-    // a candle and an open book on the counter
-    ctx.fillStyle = '#e7d7b0'; ctx.fillRect(cx - 34, cTop - 9, 3, 6); flame(ctx, cx - 32.5, cTop - 9, 5 + Math.sin(tAnim * 8) * 0.8, Math.sin(tAnim * 5));
-    ctx.fillStyle = '#f5ecd2'; ctx.fillRect(cx - 24, cTop - 5, 9, 3); ctx.fillRect(cx - 14, cTop - 5, 9, 3); ctx.fillStyle = '#6b4f2a'; ctx.fillRect(cx - 15, cTop - 5, 1, 3);
-    // your hero walks in from the doorway and stops at the counter
+    const G = shopGeo(), { floorY, cw, ex, cTop, eh, ew, hh, hw } = G;
+    // a rune circle turning slowly on the wall behind the Enchanter
+    const rr = Math.min(eh * 0.55, W * 0.13), ry = G.eTop + eh * 0.28;
+    ctx.save(); ctx.translate(ex, ry); ctx.globalAlpha = 0.5 + 0.15 * Math.sin(tAnim * 1.5);
+    const halo = ctx.createRadialGradient(0, 0, rr * 0.2, 0, 0, rr * 1.3); halo.addColorStop(0, 'rgba(167,139,250,.35)'); halo.addColorStop(1, 'rgba(167,139,250,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(0, 0, rr * 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#c4b5fd'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, rr * 0.78, 0, Math.PI * 2); ctx.stroke();
+    ctx.rotate(tAnim * 0.15);
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; ctx.save(); ctx.rotate(a); ctx.translate(0, -rr * 0.89); ctx.beginPath(); ctx.moveTo(-1.2, -1.4); ctx.lineTo(1.2, -1.4); ctx.lineTo(0, 1.6); ctx.closePath(); ctx.stroke(); ctx.restore(); }
+    ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 - Math.PI / 2, b = a + Math.PI * 2 / 3; ctx.moveTo(Math.cos(a) * rr * 0.78, Math.sin(a) * rr * 0.78); ctx.lineTo(Math.cos(b) * rr * 0.78, Math.sin(b) * rr * 0.78); } ctx.stroke();
+    ctx.restore(); ctx.globalAlpha = 1;
+    // two hanging lanterns
+    for (const lx of [W * 0.36, W * 0.56]) {
+      const ly = Math.max(10, H * 0.12), sw = Math.sin(tAnim * 1.1 + lx) * 0.8;
+      ctx.strokeStyle = '#2a1a0e'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(lx, 5); ctx.lineTo(lx + sw, ly - 4); ctx.stroke();
+      const lgw = ctx.createRadialGradient(lx + sw, ly, 0, lx + sw, ly, 22); lgw.addColorStop(0, 'rgba(255,200,110,.35)'); lgw.addColorStop(1, 'rgba(255,200,110,0)');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = lgw; ctx.beginPath(); ctx.arc(lx + sw, ly, 22, 0, Math.PI * 2); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#3a2618'; ctx.fillRect(lx + sw - 3, ly - 4.5, 6, 1.5); ctx.fillRect(lx + sw - 3, ly + 3.5, 6, 1.5);
+      ctx.fillStyle = 'rgba(255,214,140,.85)'; ctx.fillRect(lx + sw - 2.4, ly - 3, 4.8, 6.5);
+      flame(ctx, lx + sw, ly + 2.5, 4 + Math.sin(tAnim * 7 + lx) * 0.6, Math.sin(tAnim * 4 + lx));
+    }
+    // the Enchanter behind the counter, facing the door, breathing a little
+    const es = sprite('enchanter', 0, false), br = Math.sin(tAnim * 1.4) * 0.6;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, cTop + 4); ctx.clip(); ctx.translate(ex, 0); ctx.scale(-1, 1); ctx.drawImage(es, -ew / 2, G.eTop + br, ew, eh); ctx.restore();
+    // the crystal in his hands pulses (it sits at 86,84 of the 120 x 160 frame; flipped, so on his left)
+    const ox = ex - (86 / 120 - 0.5) * ew, oy = G.eTop + br + 84 / 160 * eh;
+    const og = ctx.createRadialGradient(ox, oy, 0, ox, oy, eh * 0.22 + Math.sin(tAnim * 3) * 2); og.addColorStop(0, 'rgba(233,213,255,.55)'); og.addColorStop(1, 'rgba(167,139,250,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = og; ctx.beginPath(); ctx.arc(ox, oy, eh * 0.25, 0, Math.PI * 2); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+    drawCounter(G);
+    // on the counter: a candle, a stack of books, and whatever you have picked in the panel below
+    const x0 = ex - cw / 2;
+    ctx.fillStyle = '#efe2bf'; ctx.fillRect(x0 + 3, cTop - 6, 2.4, 5); flame(ctx, x0 + 4.2, cTop - 6, 4 + Math.sin(tAnim * 8) * 0.7, Math.sin(tAnim * 5));
+    [['#1e3a8a', 0], ['#7c2d12', 2.2], ['#14532d', 4.4]].forEach(([col, y], i) => { ctx.fillStyle = col; ctx.fillRect(x0 + cw - 13 + i * 0.6, cTop - 2.2 - y, 10 - i, 2.2); ctx.fillStyle = 'rgba(255,230,170,.5)'; ctx.fillRect(x0 + cw - 13 + i * 0.6, cTop - 1.4 - y, 10 - i, 0.4); });
+    const isz = Math.max(9, Math.min(16, H * 0.11)), picks = [EW.dst && L.itemOf(S, EW.dst), EW.src && L.itemOf(S, EW.src)];
+    picks.forEach((it, i) => {
+      if (!it) return; const im = shopIcon(it), px = ex + (i ? 1 : -1) * cw * 0.17, py = cTop - isz - 1 + Math.sin(tAnim * 2 + i) * 0.6;
+      const rg = ctx.createRadialGradient(px, py + isz / 2, 0, px, py + isz / 2, isz); rg.addColorStop(0, (RARITY_COLOR[it.rar] || '#fff') + '88'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(px, py + isz / 2, isz, 0, Math.PI * 2); ctx.fill();
+      if (im.complete && im.naturalWidth) ctx.drawImage(im, px - isz / 2, py, isz, isz);
+    });
+    if (EW.dst && EW.src && Math.random() < 0.3) { const a = picks[1] ? ex + cw * 0.17 : ex; particles.push({ x: a, y: cTop - isz / 2, vx: -cw * 0.34 * (0.8 + Math.random() * 0.4), vy: -6 - Math.random() * 6, life: 1, age: 0, c: Math.random() < 0.5 ? '#c4b5fd' : '#f0abfc', s: 1 }); }
+    // your hero walks in from the doorway and stops in front of the counter
     const m = L.memberById('you');
     if (m) {
-      const t = Math.min(1, (now - (S.enchAt || now)) / 1800), x0 = 20, x1 = cx - 60, hx = x0 + (x1 - x0) * (1 - Math.pow(1 - t, 2));
-      const spr = sprite(m.cls, lookHue(m), false), w2 = spr.lw * 2, h2 = spr.lh * 2, step = t < 1 ? Math.abs(Math.sin(tAnim * 9)) * 1.6 : Math.sin(tAnim * 1.6) * 0.5;
-      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(hx, floorY + 5, 11, 2.5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.drawImage(spr, hx - w2 / 2, floorY + 6 - h2 - step, w2, h2);
-      ctx.fillStyle = '#f5c242'; ctx.beginPath(); ctx.moveTo(hx - 2, floorY - h2 + 0.5 - step); ctx.lineTo(hx + 2, floorY - h2 + 0.5 - step); ctx.lineTo(hx, floorY - h2 + 3 - step); ctx.fill();
+      const t = Math.min(1, (now - (S.enchAt || now)) / 1800), x0h = W * 0.085, x1 = G.standX, hx = x0h + (x1 - x0h) * (1 - Math.pow(1 - t, 2));
+      const spr = sprite(m.cls, lookHue(m), false), step = t < 1 ? Math.abs(Math.sin(tAnim * 9)) * 1.4 : Math.sin(tAnim * 1.6) * 0.4;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(hx, floorY + 2.5, hw * 0.34, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.drawImage(spr, hx - hw / 2, floorY + 3 - hh - step, hw, hh);
     }
-    // drifting sparkles from the orb
-    if (Math.random() < 0.25) particles.push({ x: ox + (Math.random() - 0.5) * 6, y: oy, vx: (Math.random() - 0.5) * 10, vy: -10 - Math.random() * 10, life: 1.2 + Math.random(), age: 0, c: Math.random() < 0.5 ? '#c4b5fd' : '#f0abfc', s: 1 });
+    // sparkles drifting up from the crystal
+    if (Math.random() < 0.25) particles.push({ x: ox + (Math.random() - 0.5) * 5, y: oy, vx: (Math.random() - 0.5) * 8, vy: -8 - Math.random() * 10, life: 1.2 + Math.random(), age: 0, c: Math.random() < 0.5 ? '#c4b5fd' : '#f0abfc', s: 1 });
     const dt = 1 / 60;
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i]; p.age += dt; if (p.age > p.life) { particles.splice(i, 1); continue; }
-      p.x += p.vx * dt; p.y += p.vy * dt;
-      ctx.globalAlpha = Math.min(1, (p.life - p.age) * 1.5); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, 0.7, 0, Math.PI * 2); ctx.fill();
+      p.x += p.vx * dt; p.y += p.vy * dt; if (p.g) p.vy += p.g * dt;
+      ctx.globalAlpha = Math.min(1, (p.life - p.age) * 1.5); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.s > 1 ? 1.1 : 0.7, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+  // A shower of sparks on the counter when an enchant moves.
+  function shopBurst() {
+    const G = shopGeo(); for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, v = 10 + Math.random() * 30;
+      particles.push({ x: G.ex - G.cw * 0.17, y: G.cTop - 6, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 15, g: 30, life: 0.8 + Math.random() * 0.6, age: 0, c: ['#f5c242', '#c4b5fd', '#f0abfc', '#ffffff'][i % 4], s: 2 }); }
   }
 
   // ---------- the Nexus breach (click-rhythm brake, core.js NX_*) ----------
@@ -1776,8 +1845,8 @@
         const locked = () => { toast('lock', 'This item is locked', 'Unlock it first to sell, send or salvage it.', 'warn'); };
         md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin' + (w ? ', and Equip best leaves it in its slot.' : '.') : L.gearName(it) + ' can be scrapped and sold again.', ''); };
         const gate = f => () => { if (it.lk) return locked(); if (!gateUse('sell')) return; if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
-        const en = md.querySelector('#i-ench'); if (en) en.onclick = () => L.visiting(S) ? enchantPicker({ dst: uid, home: true }) : atEnchanter('on');
-        const ds = md.querySelector('#i-dis'); if (ds) ds.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to disenchant it.', 'warn'); if (w) return toast('flare', 'Take it off first', 'Worn gear cannot be disenchanted.', 'warn'); L.visiting(S) ? enchantPicker({ src: uid, home: true }) : atEnchanter('dis'); };
+        const en = md.querySelector('#i-ench'); if (en) en.onclick = () => atEnchanter('on', uid);
+        const ds = md.querySelector('#i-dis'); if (ds) ds.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to disenchant it.', 'warn'); if (w) return toast('flare', 'Take it off first', 'Worn gear cannot be disenchanted.', 'warn'); atEnchanter('dis', uid); };
         const mg = md.querySelector('#i-merge'); if (mg) mg.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to merge it.', 'warn'); mergePicker(uid); };
         const mk = md.querySelector('#i-mkt'); if (mk) mk.onclick = gate(sellItem);
         const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
@@ -1808,125 +1877,202 @@
     for (let i = 0; i < n; i++) h += l[i] ? '<div class="esock on"><i></i><b>' + enchName(l[i]) + '</b><small>' + L.enchText(l[i]) + '</small></div>' : '<div class="esock"><i></i><small>Empty socket</small></div>';
     return '<div class="iench"><div class="ienh">Enchant sockets ' + tipI('Sockets come from rarity and item level (one more at floor 30 and at floor 80). Most enchants help the whole party while anyone in it wears the item. Flow, Leech, Bulwark and Plating help only the hero wearing it. Use Disenchant on another item to move one of its enchants here.') + '</div>' + h + '</div>';
   }
-  function enchantPicker(o) {
-    let src = o.src || null, idx = 0, dst = o.dst || null, slot = -1;
-    const fixedSrc = !!o.src;
-    const tileOf = x => '<div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>';
-    const sub = x => { const wn = L.wearer(S, x.uid); return L.RARITY.find(r => r.id === x.rar).name + ' ' + L.CLASSES[x.cls].name.toLowerCase() + ' ' + L.SLOT_NAME[x.slot].toLowerCase() + (wn ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(wn).name) + '</i>' : ''); };
-    const fill = x => L.enchList(x).length + '/' + L.sockets(x);
-    const draw = () => {
-      const A = src && L.itemOf(S, src), B = dst && L.itemOf(S, dst);
-      let body = '';
-      if (fixedSrc) {
-        const la = L.enchList(A); if (idx >= la.length) idx = 0;
-        body += '<div class="enstep"><small>1. Enchant to move</small><div class="enchips">' + la.map((x, i) => '<button class="enchip' + (i === idx ? ' sel' : '') + '" data-ei="' + i + '"><b>' + enchName(x) + '</b><small>' + L.enchText(x) + '</small></button>').join('') + '</div></div>';
-        const ts = S.bag.filter(x => x !== A && L.sockets(x)).sort((a, b) => (!!L.wearer(S, b.uid) - !!L.wearer(S, a.uid)) || ((L.sockets(b) - L.enchList(b).length) - (L.sockets(a) - L.enchList(a).length)) || (L.itemScore(b) - L.itemScore(a)));
-        body += '<div class="enstep"><small>2. Item to enchant</small><div class="mglist">' + (ts.length ? ts.slice(0, 60).map(x => '<div class="pkrow r-' + x.rar + (B === x ? ' sel' : '') + '" data-dst="' + x.uid + '" role="button" tabindex="0">' + tileOf(x) + '<span class="pkt"><b>' + esc(L.gearName(x)) + (x.up ? ' +' + x.up : '') + '</b><small>' + sub(x) + '</small></span><span class="cmp eq">' + fill(x) + '</span></div>').join('') : '<p class="note">No other item has an enchant socket yet.</p>') + '</div></div>';
-      } else {
-        const srcs = []; for (const x of S.bag) if (x !== B && !x.lk && !L.wearer(S, x.uid)) L.enchList(x).forEach((e, i) => srcs.push({ x, e, i }));
-        srcs.sort((p, q) => q.e.t - p.e.t);
-        body += '<div class="enstep"><small>1. Pick an enchant to take. Its item is destroyed.</small><div class="mglist">' + srcs.slice(0, 80).map(r => '<div class="pkrow r-' + r.x.rar + (src === r.x.uid && idx === r.i ? ' sel' : '') + '" data-src="' + r.x.uid + '" data-i="' + r.i + '" role="button" tabindex="0">' + tileOf(r.x) + '<span class="pkt"><b>' + enchName(r.e) + '</b><small>' + L.enchText(r.e) + ' &middot; from ' + esc(L.gearName(r.x)) + '</small></span></div>').join('') + '</div></div>';
-      }
-      const lb = B ? L.enchList(B) : [], n = B ? L.sockets(B) : 0;
-      if (B) {
-        if (slot < 0 || slot >= n || slot > lb.length) slot = lb.length < n ? lb.length : 0;
-        body += '<div class="enstep"><small>' + (fixedSrc ? '3' : '2') + '. Socket on ' + esc(L.gearName(B)) + '</small><div class="enchips">' + Array.from({ length: n }, (_, i) => i > lb.length ? '' : '<button class="enchip' + (i === slot ? ' sel' : '') + (lb[i] ? ' full' : '') + '" data-sl="' + i + '"><b>' + (lb[i] ? enchName(lb[i]) : 'Empty') + '</b><small>' + (lb[i] ? 'Replace it' : 'Open socket') + '</small></button>').join('') + '</div></div>';
-      }
-      const A2 = src && L.itemOf(S, src), mv = A2 && L.enchList(A2)[idx], cost = mv ? L.enchCost(mv) : 0, ok = mv && B && (S.dust || 0) >= cost;
-      const costLine = mv ? '<p class="encost' + ((S.dust || 0) < cost ? ' short' : '') + '">' + icon('dust') + ' Costs <b>' + fmt(cost) + ' Dust</b>. You have ' + fmt(S.dust || 0) + '. Scrap gear to get more.</p>' : '';
-      const warn = ok ? '<p class="note warn">' + esc(L.gearName(A2)) + (A2.up ? ' +' + A2.up : '') + ' will be destroyed' + (lb[slot] ? ', and ' + enchName(lb[slot]) + ' on ' + esc(L.gearName(B)) + ' is replaced' : '') + '.</p>' : '';
-      modal('<div class="mergebox picker enchbox"><h2>' + icon(fixedSrc ? 'flare' : 'star') + (fixedSrc ? 'Disenchant ' + esc(L.gearName(A)) : 'Enchant ' + esc(L.gearName(B))) + '</h2>' + body + costLine + warn +
-        '<div class="row"><button class="btn ghost" id="en-back">Back</button><button class="btn" id="en-go"' + (ok ? '' : ' disabled') + '>' + (ok ? 'Move ' + enchName(mv) : mv && B ? 'Not enough Dust' : 'Pick both items') + '</button></div></div>', md => {
-          md.querySelectorAll('[data-ei]').forEach(e => e.onclick = () => { idx = +e.dataset.ei; draw(); });
-          md.querySelectorAll('[data-dst]').forEach(e => e.onclick = () => { dst = e.dataset.dst; slot = -1; draw(); });
-          md.querySelectorAll('[data-src]').forEach(e => e.onclick = () => { src = e.dataset.src; idx = +e.dataset.i; draw(); });
-          md.querySelectorAll('[data-sl]').forEach(e => e.onclick = () => { slot = +e.dataset.sl; draw(); });
-          md.querySelector('#en-back').onclick = () => o.home ? (closeModal(), paintEnchPanel()) : itemModal(o.src || o.dst);
-          md.querySelector('#en-go').onclick = () => {
-            const r = L.disenchant(S, src, idx, dst, slot); if (!r) return;
-            save(); updateGear(true); updateSeats(true); sfx.relic();
-            toast('star', 'Enchant moved', enchName(r.moved) + ' is now on ' + L.gearName(r.item) + '. -' + fmt(r.cost) + ' Dust', '');
-            if (o.home) { closeModal(); paintEnchPanel(); } else itemModal(r.item.uid);
-          };
-        });
-    };
-    draw();
-  }
-
   // ---------- the Enchanter (John, 2026-11-24) ----------
-  // Enchanting and disenchanting happen on a visit to the Enchanter, like stopping at the campfire:
-  // the dive pauses while you are there (nobody fights or advances), then you leave and carry on from the same floor.
-  const ENCH_SVG = '<svg viewBox="0 0 40 52" aria-hidden="true"><defs><radialGradient id="eorb"><stop offset="0" stop-color="#e9d5ff"/><stop offset=".55" stop-color="#a78bfa"/><stop offset="1" stop-color="#6d28d9" stop-opacity="0"/></radialGradient></defs>' +
-    '<path d="M20 3 10 20h20z" fill="#4c1d95"/><circle cx="20" cy="22" r="6" fill="#f2d3b1"/><path d="M8 50c1-14 5-22 12-22s11 8 12 22z" fill="#5b21b6"/><path d="M20 28v22" stroke="#c4b5fd" stroke-width="1.4"/>' +
-    '<path d="M14 20h12" stroke="#c4b5fd" stroke-width="2"/><circle cx="33" cy="30" r="7" fill="url(#eorb)"/><circle cx="33" cy="30" r="2.6" fill="#f5f3ff"/><path d="M28 36l-3 6" stroke="#f2d3b1" stroke-width="3" stroke-linecap="round"/></svg>';
-  function atEnchanter(t) {
-    if (t) enchTab = t;
-    if (L.visiting(S)) { closeModal(); paintEnchOv(); return; }
-    modal('<div class="merchbox enchvisit"><div class="merchhead">' + ENCH_SVG + '<div><h2>That is done at the Enchanter</h2><small>Enchanting and disenchanting happen in the Enchanter’s shop. Your party leaves the Deep while you are there and goes back to floor ' + S.floor + ' when you leave.</small></div></div>' +
-      '<div class="row"><button class="btn ghost" id="ev-no">Not now</button><button class="btn" id="ev-go">' + icon('star') + ' Go to the Enchanter</button></div></div>', md => {
+  // Enchanting and disenchanting happen on a visit to the Enchanter, like stopping at the campfire: the dive pauses
+  // while you are there, then you leave and carry on from the same floor. v99: everything is done in the counter panel
+  // under the shop scene, one plain question at a time, with what you picked shown on the counter. No pop-ups.
+  // EW: mode 'on' (pick the item, then the enchant for it), 'dis' (pick a spare item, then where its enchant goes) or 'scrap'.
+  const EW = { mode: 'on', dst: null, src: null, idx: null, slot: null, done: null };
+  function ewReset(mode, keep) { Object.assign(EW, { mode: mode || EW.mode, dst: null, src: null, idx: null, slot: null, done: keep ? EW.done : null }); }
+  const enchSpare = x => !x.lk && !L.wearer(S, x.uid);
+  function atEnchanter(t, uid) {
+    const pre = () => { ewReset(t || 'on'); if (uid) { if (t === 'dis') EW.src = uid; else EW.dst = uid; } };
+    if (L.visiting(S)) { pre(); closeModal(); paintEnchOv(); return; }
+    modal('<div class="merchbox enchvisit"><div class="merchhead"><img src="' + SP.spriteURL('enchanter', 4, 0) + '" alt=""><div><h2>That is done at the Enchanter</h2><small>Enchanting and disenchanting happen in the Enchanter’s shop. Your party leaves the Deep while you are there and goes back to floor ' + S.floor + ' when you leave.</small></div></div>' +
+      '<div class="row"><button class="btn ghost" id="ev-no">Not now</button><button class="btn" id="ev-go">Go to the Enchanter</button></div></div>', md => {
         md.querySelector('#ev-no').onclick = closeModal;
-        md.querySelector('#ev-go').onclick = () => { visitEnch(); };
+        md.querySelector('#ev-go').onclick = () => { pre(); visitEnch(); };
       });
   }
   function visitEnch() {
-    if (!L.visitEnchanter(S, Date.now())) return false;
+    if (!L.visiting(S) && !L.visitEnchanter(S, Date.now())) return false;
     closeModal(); sfx.relic(); particles.length = 0; paintEnchOv(); updatePanel(true);
-    toast('star', 'You enter the Enchanter’s shop', 'The party leaves the Deep for now. Pick what to work on above the counter, then Leave shop to go back to floor ' + S.floor + '.', '');
+    const a = document.querySelector('.stagehead') || $('arena'); if (a && a.scrollIntoView && innerWidth < 900) a.scrollIntoView({ block: 'start', behavior: 'smooth' });
     return true;
   }
   function leaveEnch() {
     if (!L.leaveEnchanter(S)) return;
-    closeModal(); sfx.buy(); paintEnchOv(); updatePanel(true); save();
-    toast('star', 'Back to the dive', 'The party leaves the Enchanter and carries on from floor ' + S.floor + '.', '');
+    closeModal(); sfx.buy(); particles.length = 0; ewReset('on'); paintEnchOv(); updatePanel(true); save();
+    toast('star', 'Back to the dive', 'The party carries on from floor ' + S.floor + '.', '');
   }
-  // Opening the Enchanter (button, item tools) walks the party into the shop. Everything happens in the scene and in
-  // the counter panel below it; only the final "which enchant, which socket" step uses the picker.
-  function enchanterModal(t) {
-    if (t) enchTab = t;
-    if (!L.visiting(S)) visitEnch(); else { closeModal(); paintEnchOv(); }
-    const a = $('arena'); if (a && a.scrollIntoView && innerWidth < 900) a.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  function enchanterModal(t) { if (!L.visiting(S)) ewReset(t || 'on'); visitEnch(); }
+  // pieces of the panel
+  const ewTile = x => '<div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>';
+  const ewName = x => esc(L.gearName(x)) + (x.up ? ' +' + x.up : '');
+  const ewDots = x => { const n = L.sockets(x), l = L.enchList(x); let h = '<span class="ewdots" title="' + l.length + ' of ' + n + ' sockets used">'; for (let i = 0; i < n; i++) h += '<i' + (l[i] ? ' class="on"' : '') + '></i>'; return h + '</span>'; };
+  const ewWorn = x => { const w = L.wearer(S, x.uid); return w ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(w).name) + '</i>' : ''; };
+  const ewCost = e => '<span class="ewcost' + ((S.dust || 0) < L.enchCost(e) ? ' short' : '') + '">' + icon('dust') + fmt(L.enchCost(e)) + '</span>';
+  function ewTargets(excl) {
+    return S.bag.filter(x => x.uid !== excl && L.sockets(x)).sort((a, b) => (!!L.wearer(S, b.uid) - !!L.wearer(S, a.uid)) || ((L.sockets(b) - L.enchList(b).length) - (L.sockets(a) - L.enchList(a).length)) || (L.itemScore(b) - L.itemScore(a)));
   }
-  let enchTab = 'on';
+  function ewSources(excl) {
+    const out = []; for (const x of S.bag) if (x.uid !== excl && enchSpare(x)) L.enchList(x).forEach((e, i) => out.push({ x, e, i }));
+    return out.sort((p, q) => q.e.t - p.e.t || L.enchCost(p.e) - L.enchCost(q.e));
+  }
+  function ewList(rows, empty) { return rows.length ? '<div class="ewlist">' + rows.join('') + '</div>' : '<p class="ewempty">' + empty + '</p>'; }
+  function ewItemRow(x, attr, sub, right) {
+    return '<button class="ewrow r-' + x.rar + '" ' + attr + '>' + ewTile(x) + '<span class="ewt"><b>' + ewName(x) + '</b><small>' + sub + '</small></span>' + (right || '') + '</button>';
+  }
+  // What you have picked so far, each with a way to change it.
+  function ewPicked(label, x, what, undo) {
+    return '<div class="ewpick">' + ewTile(x) + '<span class="ewt"><small>' + label + '</small><b>' + what + '</b></span><button class="btn ghost small" data-ewundo="' + undo + '">Change</button></div>';
+  }
   function enchPanelHtml() {
-    const free = x => !x.lk && !L.wearer(S, x.uid);
-    const srcs = S.bag.filter(x => free(x) && L.enchList(x).length);
-    const dsts = S.bag.filter(x => L.sockets(x)).sort((a, b) => (!!L.wearer(S, b.uid) - !!L.wearer(S, a.uid)) || ((L.sockets(b) - L.enchList(b).length) - (L.sockets(a) - L.enchList(a).length)) || (L.itemScore(b) - L.itemScore(a)));
-    const row = (x, act) => '<div class="pkrow r-' + x.rar + '" data-' + act + '="' + x.uid + '" role="button" tabindex="0"><div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div><span class="pkt"><b>' + esc(L.gearName(x)) + (x.up ? ' +' + x.up : '') + '</b><small>' + (L.enchList(x).map(enchName).join(', ') || 'No enchants yet') + (L.wearer(S, x.uid) ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(L.wearer(S, x.uid)).name) + '</i>' : '') + '</small></span><span class="cmp eq">' + L.enchList(x).length + '/' + L.sockets(x) + '</span></div>';
-    const list = enchTab === 'dis'
-      ? (srcs.length ? srcs.slice(0, 60).map(x => row(x, 'edis')).join('') : '<p class="note">Nothing to disenchant. Spare items with enchants show up here.</p>')
-      : (dsts.length ? dsts.slice(0, 60).map(x => row(x, 'eon')).join('') : '<p class="note">None of your items has an enchant socket yet. Rarer gear and gear from deeper floors has more.</p>');
-    return '<div class="ephead"><div><b>The Enchanter’s counter</b><small>' + (enchTab === 'dis' ? 'Pick a spare item to break down. One enchant moves to another item; this one is destroyed.' : 'Pick an item to enchant, worn or not. Then choose a spare enchant to move into it.') + '</small></div><span class="epdust">' + icon('dust') + '<b>' + fmt(S.dust || 0) + '</b> Dust</span></div>' +
-      '<div class="mglist eplist">' + list + '</div><p class="note small">Moving an enchant costs Dust: 5 for tier I, 20 for II, 45 for III, and more for higher tiers.</p>';
+    const dust = '<span class="epdust" data-tip="Dust pays for moving enchants. Scrap spare gear to get more.">' + icon('dust') + '<b>' + fmt(S.dust || 0) + '</b> Dust</span>';
+    const tabs = '<div class="ewtabs" role="tablist">' + [['on', 'Enchant an item'], ['dis', 'Disenchant'], ['scrap', 'Scrap for Dust']].map(([k, n]) => '<button role="tab" class="' + (EW.mode === k ? 'on' : '') + '" data-ewmode="' + k + '">' + n + '</button>').join('') + '</div>';
+    let body = '', steps = [], cur = 0;
+    const done = EW.done ? '<div class="ewdone">' + icon('star') + '<span>' + EW.done + '</span></div>' : '';
+    if (EW.mode === 'scrap') {
+      const list = scrapList(), gold = list.reduce((a, it) => a + L.salvageValue(it), 0), dd = list.reduce((a, it) => a + L.dustValue(it), 0);
+      body = '<h3 class="ewq">Which gear should the Enchanter break down for Dust?</h3><p class="ewhint">Worn and locked items are never scrapped. You also get gold.</p>' +
+        '<div class="ewrar">' + L.RARITY.map(r => '<button class="ewchip r-' + r.id + (scrapOpts[r.id] ? ' sel' : '') + '" data-ewrar="' + r.id + '"><b style="color:var(--rc)">' + r.name + '</b><small>' + S.bag.filter(x => x.rar === r.id && enchSpare(x)).length + ' spare</small></button>').join('') + '</div>' +
+        '<label class="chk"><input type="checkbox" data-ewopt="keepBest"' + (scrapOpts.keepBest ? ' checked' : '') + '><span><b>Keep the best spare of each kind</b></span></label>' +
+        '<label class="chk"><input type="checkbox" data-ewopt="keepUp"' + (scrapOpts.keepUp ? ' checked' : '') + '><span><b>Keep upgraded pieces</b></span></label>' +
+        '<div class="ewsum">' + (list.length ? '<p><b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' become <b>' + fmt(dd) + ' Dust</b> and <b>' + fmt(gold) + ' gold</b>.</p>' : '<p>Nothing matches. Tick more rarities above.</p>') +
+        '<button class="btn danger" data-ewgo="scrap"' + (list.length ? '' : ' disabled') + '>Scrap ' + list.length + '</button></div>';
+      return '<div class="ephead"><b>The Enchanter’s counter</b>' + dust + '</div>' + tabs + done + body;
+    }
+    const A = EW.src && L.itemOf(S, EW.src), B = EW.dst && L.itemOf(S, EW.dst);
+    if (EW.src && !A) EW.src = null; if (EW.dst && !B) EW.dst = null;
+    const la = A ? L.enchList(A) : [];
+    if (A && la.length === 1) EW.idx = 0; if (A && EW.idx != null && !la[EW.idx]) EW.idx = null;
+    const mv = A && EW.idx != null ? la[EW.idx] : null;
+    const lb = B ? L.enchList(B) : [], n = B ? L.sockets(B) : 0, full = B && lb.length >= n;
+    if (B && !full) EW.slot = lb.length; else if (B && EW.slot != null && EW.slot >= n) EW.slot = null;
+    let picked = '';
+    if (EW.mode === 'on') {
+      steps = ['Item', 'Enchant', 'Confirm'];
+      if (B) picked += ewPicked('Enchanting', B, ewName(B) + ' ' + ewDots(B), 'dst');
+      if (mv) picked += ewPicked('Adding', A, enchName(mv) + ' <small>' + L.enchText(mv) + '</small>', 'src');
+      if (!B) {
+        cur = 0;
+        body = '<h3 class="ewq">Which item do you want to enchant?</h3><p class="ewhint">Gear your party is wearing works too. The dots show its sockets.</p>' +
+          ewList(ewTargets().slice(0, 60).map(x => ewItemRow(x, 'data-ewdst="' + x.uid + '"', (L.enchList(x).map(enchName).join(', ') || 'No enchants yet') + ewWorn(x), ewDots(x))), 'None of your items has an enchant socket yet. Rarer gear and gear from deeper floors has more.');
+      } else if (!mv) {
+        cur = 1;
+        const src = ewSources(B.uid);
+        body = '<h3 class="ewq">Which enchant should go on it?</h3><p class="ewhint">These come from your spare gear. The spare item is used up.</p>' +
+          ewList(src.slice(0, 80).map(r => ewItemRow(r.x, 'data-ewsrc="' + r.x.uid + '" data-ewi="' + r.i + '"', '<span class="ewen">' + enchName(r.e) + '</span> ' + L.enchText(r.e) + ' &middot; from ' + ewName(r.x), ewCost(r.e))), 'No spare enchants. Enchants come on found gear; keep a spare piece that has one and it will show up here.');
+      }
+    } else {
+      steps = ['Spare item', 'Where it goes', 'Confirm'];
+      if (A) picked += ewPicked('Taking from', A, mv ? enchName(mv) + ' <small>' + L.enchText(mv) + '</small>' : ewName(A), 'src');
+      if (B) picked += ewPicked('Putting on', B, ewName(B) + ' ' + ewDots(B), 'dst');
+      if (!A) {
+        cur = 0;
+        body = '<h3 class="ewq">Which spare item do you want to break down?</h3><p class="ewhint">You keep one of its enchants and move it to another item. The spare item is used up.</p>' +
+          ewList(S.bag.filter(x => enchSpare(x) && L.enchList(x).length).slice(0, 60).map(x => ewItemRow(x, 'data-ewsrcitem="' + x.uid + '"', L.enchList(x).map(e => '<span class="ewen">' + enchName(e) + '</span>').join(', '), '')), 'Nothing to disenchant. Spare items with enchants show up here. Worn and locked items do not.');
+      } else if (!mv) {
+        cur = 0;
+        body = '<h3 class="ewq">Which enchant do you want to keep?</h3><div class="ewchips">' + la.map((e, i) => '<button class="ewchip" data-ewidx="' + i + '"><b>' + enchName(e) + '</b><small>' + L.enchText(e) + '</small>' + ewCost(e) + '</button>').join('') + '</div>';
+      } else if (!B) {
+        cur = 1;
+        body = '<h3 class="ewq">Which item should get ' + enchName(mv) + '?</h3><p class="ewhint">Gear your party is wearing works too. The dots show its sockets.</p>' +
+          ewList(ewTargets(A.uid).slice(0, 60).map(x => ewItemRow(x, 'data-ewdst="' + x.uid + '"', (L.enchList(x).map(enchName).join(', ') || 'No enchants yet') + ewWorn(x), ewDots(x))), 'No other item has an enchant socket yet.');
+      }
+    }
+    if (A && B && mv) {
+      cur = 2;
+      const cost = L.enchCost(mv), have = S.dust || 0, rep = EW.slot != null ? lb[EW.slot] : null;
+      if (full) body += '<h3 class="ewq">' + ewName(B) + ' is full. Which enchant should ' + enchName(mv) + ' replace?</h3><div class="ewchips">' + lb.map((e, i) => '<button class="ewchip' + (EW.slot === i ? ' sel' : '') + '" data-ewslot="' + i + '"><b>' + enchName(e) + '</b><small>' + L.enchText(e) + '</small></button>').join('') + '</div>';
+      const ready = EW.slot != null, ok = ready && have >= cost;
+      body += '<div class="ewsum"><p><b>' + enchName(mv) + '</b> goes onto <b>' + ewName(B) + '</b>' + (rep ? ', replacing ' + enchName(rep) : '') + '.</p>' +
+        '<p class="warn">' + ewName(A) + ' is used up' + (L.enchList(A).length > 1 ? ' with its other enchants' : '') + '.</p>' +
+        '<p>Costs ' + icon('dust') + '<b>' + fmt(cost) + ' Dust</b>' + (have < cost ? '. You have ' + fmt(have) + '. Scrap spare gear for more.' : '.') + '</p>' +
+        '<button class="btn" data-ewgo="move"' + (ok ? '' : ' disabled') + '>' + (!ready ? 'Pick the enchant to replace' : have < cost ? 'Not enough Dust' : (EW.mode === 'dis' ? 'Move it for ' : 'Enchant for ') + fmt(cost) + ' Dust') + '</button></div>';
+    }
+    const stepper = '<ol class="ewsteps">' + steps.map((s, i) => '<li class="' + (i < cur ? 'done' : i === cur ? 'cur' : '') + '"><i>' + (i < cur ? '&#10003;' : i + 1) + '</i>' + s + '</li>').join('') + '</ol>';
+    return '<div class="ephead"><b>The Enchanter’s counter</b>' + dust + '</div>' + tabs + done + stepper + (picked ? '<div class="ewpicked">' + picked + '</div>' : '') + body;
   }
-  function paintEnchPanel() {
+  function paintEnchPanel(force) {
     const el = $('enchpanel'); if (!el) return; const on = L.visiting(S);
     el.hidden = !on; if (!on) { el.dataset.h = ''; return; }
-    const h = enchPanelHtml(); if (el.dataset.h === h) return;
-    el.innerHTML = h; el.dataset.h = h;
+    const h = enchPanelHtml(); if (!force && el.dataset.h === h) return;
+    const sc = el.querySelector('.ewlist'), top = sc ? sc.scrollTop : 0, same = el.dataset.step === EW.mode + !!EW.dst + !!EW.src + EW.idx;
+    el.innerHTML = h; el.dataset.h = h; el.dataset.step = EW.mode + !!EW.dst + !!EW.src + EW.idx;
+    if (!same) el.scrollTop = 0;
+    const sc2 = el.querySelector('.ewlist'); if (sc2 && same) sc2.scrollTop = top;
+    const sum = el.querySelector('.ewsum'); if (sum && !same && sum.scrollIntoView) sum.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
+  function ewSet(o) { Object.assign(EW, o, { done: null }); paintEnchPanel(true); paintEnchOv(); }
   $('enchpanel') && $('enchpanel').addEventListener('click', e => {
-    const on = e.target.closest('[data-eon]'), ds = e.target.closest('[data-edis]');
-    if (on) enchantPicker({ dst: on.dataset.eon, home: true }); else if (ds) enchantPicker({ src: ds.dataset.edis, home: true });
+    const t = e.target.closest('[data-ewmode],[data-ewdst],[data-ewsrc],[data-ewsrcitem],[data-ewidx],[data-ewslot],[data-ewundo],[data-ewrar],[data-ewgo]'); if (!t) return;
+    const d = t.dataset;
+    if (d.ewmode) { ewReset(d.ewmode); EW.done = null; paintEnchPanel(true); paintEnchOv(); return; }
+    if (d.ewdst) return ewSet({ dst: d.ewdst, slot: null });
+    if (d.ewsrc) return ewSet({ src: d.ewsrc, idx: +d.ewi });
+    if (d.ewsrcitem) return ewSet({ src: d.ewsrcitem, idx: null });
+    if (d.ewidx) return ewSet({ idx: +d.ewidx });
+    if (d.ewslot) return ewSet({ slot: +d.ewslot });
+    if (d.ewundo) {
+      // changing an earlier pick clears everything picked after it
+      const order = EW.mode === 'on' ? ['dst', 'src'] : ['src', 'dst'], k = order.indexOf(d.ewundo), clr = { slot: null };
+      order.slice(k).forEach(f => { clr[f] = null; if (f === 'src') clr.idx = null; });
+      return ewSet(clr);
+    }
+    if (d.ewrar) { scrapOpts[d.ewrar] = !scrapOpts[d.ewrar]; return paintEnchPanel(true); }
+    if (d.ewgo === 'scrap') {
+      const l = scrapList(); if (!l.length) return; let g = 0, dd = 0; for (const it of l) { dd += L.dustValue(it); g += L.salvage(S, it.uid); }
+      sfx.coin(); updateGear(true); save(); shopBurst();
+      EW.done = 'Scrapped ' + l.length + (l.length === 1 ? ' piece' : ' pieces') + ' for ' + fmt(dd) + ' Dust and ' + fmt(g) + ' gold.';
+      return paintEnchPanel(true);
+    }
+    if (d.ewgo === 'move') {
+      const r = L.disenchant(S, EW.src, EW.idx, EW.dst, EW.slot); if (!r) return;
+      save(); updateGear(true); updateSeats(true); sfx.relic(); shopBurst();
+      const msg = enchName(r.moved) + ' is now on ' + esc(L.gearName(r.item)) + '. ' + esc(L.gearName(r.lost)) + ' was used up. -' + fmt(r.cost) + ' Dust.';
+      ewReset(EW.mode); EW.done = msg; paintEnchPanel(true); paintEnchOv();
+    }
   });
-  // In the shop the action buttons hang above the Enchanter, where the monsters usually stand.
+  $('enchpanel') && $('enchpanel').addEventListener('change', e => { const c = e.target.closest('[data-ewopt]'); if (c) { scrapOpts[c.dataset.ewopt] = c.checked; paintEnchPanel(true); } });
+  // In the shop the stage header names the shop, and the Enchanter's question hangs above him where the monsters stand.
   function paintEnchOv() {
-    let el = $('enchov'); const on = L.visiting(S);
-    if (!el) {
-      if (!on) return;
+    const on = L.visiting(S), ar = $('arena');
+    document.body.classList.toggle('atench', on);
+    let hd = $('shophead');
+    if (!hd && on) {
+      hd = document.createElement('div'); hd.id = 'shophead'; hd.className = 'shophead';
+      hd.addEventListener('click', e => { if (e.target.closest('[data-ev="leave"]')) leaveEnch(); });
+      const sh = document.querySelector('.stagehead'); sh && sh.insertBefore(hd, sh.firstChild);
+    }
+    if (hd) {
+      hd.hidden = !on;
+      const h = '<img src="' + SP.spriteURL('enchanter', 2, 0) + '" alt=""><div><b>The Enchanter’s Shop</b><small>Your dive is paused on floor ' + S.floor + '</small></div><button class="btn small leave" data-ev="leave">' + icon('flame') + 'Leave shop</button>';
+      if (on && hd.dataset.h !== h) { hd.innerHTML = h; hd.dataset.h = h; }
+    }
+    let el = $('enchov');
+    if (!el && on && ar) {
       el = document.createElement('div'); el.id = 'enchov'; el.className = 'enchov';
       el.addEventListener('pointerdown', e => e.stopPropagation());
-      el.addEventListener('click', e => {
-        e.stopPropagation(); const b = e.target.closest('[data-ev]'); if (!b) return; const a = b.dataset.ev;
-        if (a === 'leave') leaveEnch(); else if (a === 'scrap') openScrap(); else { enchTab = a; paintEnchOv(); paintEnchPanel(); }
-      });
-      $('arena').appendChild(el);
+      el.addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-ewmode]'); if (!b) return; ewReset(b.dataset.ewmode); paintEnchPanel(true); paintEnchOv(); const p = $('enchpanel'); if (p && innerWidth < 900) p.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
+      ar.appendChild(el);
     }
-    el.hidden = !on; document.body.classList.toggle('atench', on);
     paintEnchPanel();
-    if (!on) { el.dataset.h = ''; return; }
-    const h = '<div class="evrow" aria-label="The Enchanter"><button class="evb' + (enchTab === 'on' ? ' main' : '') + '" data-ev="on">Enchant</button><button class="evb' + (enchTab === 'dis' ? ' main' : '') + '" data-ev="dis">Disenchant</button><button class="evb" data-ev="scrap">Scrap for Dust</button><button class="evb leave" data-ev="leave">Leave shop</button></div>';
+    if (!el) return;
+    el.hidden = !on; if (!on) { el.dataset.h = ''; return; }
+    const say = EW.mode === 'dis' ? 'Something to break down? Pick it below.' : EW.mode === 'scrap' ? 'Old gear? I’ll turn it into Dust.' : 'What shall I enchant for you?';
+    const h = '<p>' + say + '</p><div class="evrow">' + [['on', 'Enchant an item'], ['dis', 'Disenchant'], ['scrap', 'Scrap for Dust']].map(([k, n]) => '<button class="evb' + (EW.mode === k ? ' main' : '') + '" data-ewmode="' + k + '">' + n + '</button>').join('') + '</div><i class="evtail"></i>';
     if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; }
+    placeEnchOv();
   }
+  // Keep the bubble inside the arena, with its tail over the Enchanter's head.
+  function placeEnchOv() {
+    const el = $('enchov'), ar = $('arena'); if (!el || el.hidden || !ar) return;
+    ar.classList.toggle('short', ar.clientHeight < 250);
+    const aw = ar.clientWidth, bw = el.offsetWidth, ex = aw * SHOP.ex, left = Math.max(6, Math.min(aw - bw - 6, ex - bw / 2));
+    el.style.left = left + 'px'; SHOP.top = (el.offsetTop + el.offsetHeight + 6) * 240 / Math.max(1, aw); const t = el.querySelector('.evtail'); if (t) t.style.left = Math.max(14, Math.min(bw - 14, ex - left)) + 'px';
+  }
+  window.addEventListener('resize', () => placeEnchOv());
   // ---------- merge: two copies of the same item become one at +1, or both are lost ----------
   function mergePicker(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
@@ -4496,7 +4642,7 @@
         'Fine items have 1 socket, rare 2, epic 3 and set pieces 2. Items from floor 30 and floor 80 on get one more each, up to 4. Common items get sockets from floor 30.',
         'Enchants: <b>Might</b> (damage), <b>Vigor</b> (health), <b>Keen</b> (crits), <b>Fortune</b> (gold), <b>Finder</b> (gear drops), <b>Mending</b> (healing), <b>Warding</b> (less damage taken) and <b>Wick</b> (lantern time) help the whole party. Tiers run I to IX, higher from deeper floors.',
         'Four enchants help <b>only the hero wearing the item</b>: <b>Flow</b> (mana or stamina regen, up to +100%), <b>Leech</b> (life steal, up to 8%), <b>Bulwark</b> (block chance, up to 25%) and <b>Plating</b> (defense, up to 30% less damage). Rings and trinkets roll Flow and Leech more often, armor and shields roll Bulwark and Plating more often, and weapons roll Leech.',
-        'Enchanting happens in <b>the Enchanter’s shop</b>. Press <b>Enchanter</b> on the battle screen, or Enchant on an item, and your party leaves the Deep for the shop. Pick Enchant, Disenchant or Scrap above the counter and choose an item from the counter below. <b>Leave shop</b> takes you back to the same floor.',
+        'Enchanting happens in <b>the Enchanter’s shop</b>. Press <b>Enchanter</b> on the battle screen, or Enchant on an item, and your party leaves the Deep for the shop. Pick Enchant an item, Disenchant or Scrap for Dust in the Enchanter’s speech bubble, then answer one question at a time in the counter below the scene: the item, the enchant, then confirm. <b>Leave shop</b> at the top takes you back to the same floor.',
         '<b>Disenchant</b> destroys an item and moves one of its enchants into a socket on another item of any class. A full socket can be overwritten. At the Enchanter you can enchant worn gear too.',
         'Moving an enchant costs <b>Dust</b>: 5 for tier I, 20 for II, 45 for III and so on (5 &times; tier&sup2;).',
         'Merging two items keeps the best enchants of both, as many as the result has sockets.']],
@@ -4658,6 +4804,13 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 99, date: 'November 24, 2026', title: 'The Enchanter’s shop, rebuilt', items: [
+      'The Enchanter has been redrawn: an old, hooded enchanter with half-moon spectacles and a glowing crystal, standing behind his counter in front of a turning rune circle. Your hero walks in at full size.',
+      'The top of the screen now says you are in the Enchanter’s Shop, with a Leave shop button, instead of showing the dungeon floor.',
+      'His question hangs in a speech bubble above him: Enchant an item, Disenchant or Scrap for Dust.',
+      'Enchanting is now done one plain question at a time in the counter under the scene, with no pop-ups: pick the item, pick the enchant, then confirm. A short summary says exactly what moves, what is used up and what it costs, and the items you pick appear on the counter.',
+      'Scrapping for Dust happens right at the counter too.',
+    ] },
     { v: 98, date: 'November 24, 2026', title: 'The Enchanter’s shop', items: [
       'Visiting the Enchanter now takes your party out of the Deep and into the Enchanter’s shop. Your hero walks in through the door to the counter, and the Enchanter waits behind it among shelves of glowing bottles.',
       'The shop’s buttons hang above the Enchanter, where monsters usually stand: Enchant, Disenchant, Scrap for Dust and Leave shop. The counter below the scene lists your items; pick one to work on it.',

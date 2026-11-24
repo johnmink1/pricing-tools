@@ -1,4 +1,4 @@
-/* lh-build 202611241310 */
+/* lh-build 202611241316 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2079,3 +2079,28 @@ body.atench .hint,body.atench .taptip{display:none}
 .enchvisit .merchhead svg{width:46px;height:60px;flex:none}
 .evbal{display:flex;flex-wrap:wrap;gap:6px 14px;margin:12px 0 8px;font-size:13px;color:var(--muted)}.evbal b{color:var(--text)}.evbal span{display:inline-flex;align-items:center;gap:4px}.evbal svg{width:14px;height:14px;flex:none}
 .evtabs{margin:4px 0 8px}
+/* v97: profile account tiles and the Sigil shop */
+.pfacct{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 14px}
+.pft{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--panel);color:var(--text);text-align:left;cursor:pointer;font:inherit}
+.pft:hover{border-color:var(--gold)}
+.pft small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pft b{display:flex;align-items:center;gap:4px;font-size:15px;color:var(--gold);white-space:nowrap}.pft b .sigil{width:16px;height:16px}
+.pft em{font-style:normal;font-size:12px;font-weight:700;color:var(--text);opacity:.8}
+.pflook{margin:2px 0 8px;font-size:15px}
+.pfseg{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr))}
+@media (max-width:560px){.pfacct{grid-template-columns:repeat(2,1fr)}}
+.shopbal{display:inline-flex;align-items:center;gap:6px;margin:4px 0 12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line2);background:var(--panel);color:var(--muted)}.shopbal b{color:var(--gold)}.shopbal .sigil{width:18px;height:18px}
+.shopuses{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:6px 0 14px}
+.shopuse{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--panel);color:var(--text);text-align:left;cursor:pointer;font:inherit;min-width:0}
+.shopuse:hover{border-color:var(--gold)}
+.shopuse .su-ic{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:10px;background:var(--bg2);color:var(--gold)}.shopuse .su-ic svg{width:18px;height:18px}
+.shopuse .su-t{display:flex;flex-direction:column;min-width:0;flex:1}.shopuse .su-t small{color:var(--muted);font-size:12px}
+.shopuse em{font-style:normal;font-size:12px;font-weight:700;color:var(--gold);flex:none}
+@media (max-width:560px){.shopuses{grid-template-columns:1fr}}
+.passfx.tight li{padding:8px 12px}
+.lhways{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.lhway{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:12px;border:1px solid var(--line2);background:var(--bg2)}
+.lhway small{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.lhway b{display:flex;align-items:center;gap:4px;font-size:20px;color:var(--gold)}.lhway b i{font-style:normal;font-size:13px;color:var(--muted);font-weight:600}.lhway b .sigil{width:20px;height:20px}
+.lhway span{color:var(--muted);font-size:13px;flex:1}.lhway .btn{margin-top:6px;width:100%;justify-content:center}
+@media (max-width:420px){.lhways{grid-template-columns:1fr}}

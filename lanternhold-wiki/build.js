@@ -298,7 +298,7 @@ ref({
       '<p class="note">Power grows 3% per item level and 20% per upgrade. Items from floor 30 and floor 80 get one more socket each, up to ' + 4 + '.</p>' +
       '<h2 id="upgrades">Upgrades and merging</h2><p>Upgrade a piece with gold up to +' + L.UP_MAX + ', or merge two copies of the same item into one at one level higher. A failed merge destroys both pieces. Luck and Intelligence cut the risk, up to half.</p>' +
       table(['Merge to', 'Base risk', 'With 40 Luck and 25 Intelligence'], ups.map(u => { const r = L.mergeRisk({ attr: { lck: 40, int: 25 } }, { up: u - 1 }, { up: 0 }); return ['+' + u, pct(r.base), pct(r.risk)]; }), 'small') +
-      '<h2 id="pack">Your pack</h2>' + kv([['Starting space', L.GEAR_CAP + ' items'], ['Kindling', '+' + L.BAG_STEP + ' slots, up to ' + L.BAG_UPS_MAX + ' times'], ['Lantern Pass', '+' + L.PASS_BAG + ' slots'], ['Bag of Holding', 'Endless, ' + num(L.BOH_COST) + ' Sigils once']]) +
+      '<h2 id="pack">Your pack</h2>' + kv([['Starting space', L.GEAR_CAP + ' items'], ['Kindling', '+' + L.BAG_STEP + ' slots, up to ' + L.BAG_UPS_MAX + ' times'], ['Lanternholder', '+' + L.PASS_BAG + ' slots'], ['Bag of Holding', 'Endless, ' + num(L.BOH_COST) + ' Sigils once']]) +
       related(['sets', 'enchantments', 'gear-and-loot']);
   },
   index: () => { addSearch('gear', 'Gear slots', 'slots', 'Main hand, offhand, helmet, trinket, chest, robe, legs, feet, rings', 'Gear'); addSearch('gear', 'Rarity', 'rarity', L.RARITY.map(r => r.name).join(', '), 'Gear'); addSearch('gear', 'Upgrades and merging', 'upgrades', 'Merge risk table, upgrade to +' + L.UP_MAX, 'Gear'); addSearch('gear', 'Pack space', 'pack', 'Bag of Holding, Kindling bag slots', 'Gear');
@@ -399,12 +399,12 @@ ref({
 // ---- Store items ----
 ref({
   slug: 'store-items', title: 'Camp store and tonics', nav: 'Store and tonics', icon: 'bag',
-  desc: 'Lanternhold camp store: Campfire Draught, Lantern Oil and every tonic, what it does and how long it lasts. Plus Sigils, the Lantern Pass and Lantern Surge.',
+  desc: 'Lanternhold camp store: Campfire Draught, Lantern Oil and every tonic, what it does and how long it lasts. Plus Sigils, Lanternholder and Lantern Surge.',
   lede: 'The camp store sells consumables for gold, priced from what your party earns. Tonics stack time up to an hour.',
   body: () => '<div class="grid3">' + L.SHOP.map(s => card('item-' + s.id, esc(s.name), { pic: '<div class="gicon">' + icon(s.icon) + '</div>', body: '<p>' + esc(s.desc) + '</p>' })).join('') + '</div>' +
-    '<h2 id="sigils">Sigils</h2><p>Sigils are the premium token. They drop very rarely in game (chests, guardians and daily quests) and can be bought in packs. They buy convenience and perks such as the Lantern Pass (' + L.PASS_COST + ' Sigils for ' + L.PASS_DAYS + ' days: +' + L.PASS_BAG + ' pack slots and 4 more offline hours), a stat respec (' + L.RESPEC_COST + ') and the Bag of Holding (' + num(L.BOH_COST) + '). Enchants, Ember Ring gear and auras can never be bought.</p>' +
+    '<h2 id="sigils">Sigils</h2><p>Sigils are the premium token. They drop very rarely in game (chests, guardians and daily quests) and can be bought in packs. They buy convenience and perks such as Lanternholder premium (' + L.PASS_COST + ' Sigils for ' + L.PASS_DAYS + ' days, or a $4.99 monthly membership: Auto-train, +' + L.PASS_BAG + ' pack slots and 4 more offline hours), a stat respec (' + L.RESPEC_COST + ') and the Bag of Holding (' + num(L.BOH_COST) + '). Enchants, Ember Ring gear and auras can never be bought.</p>' +
     '<h2 id="surge">Lantern Surge</h2><p>Whenever any player buys a Sigil pack, every hero in the game gets ' + pct(L.SURGE_FX.gold, 1) + ' gold and ' + pct(L.SURGE_FX.xp, 1) + ' XP for a while.</p>' + related(['sigils-and-perks', 'camp-and-jobs']),
-  index: () => { for (const s of L.SHOP) addSearch('store-items', s.name, 'item-' + s.id, s.desc, 'Item'); addSearch('store-items', 'Sigils', 'sigils', 'Premium token, Lantern Pass, Bag of Holding', 'Sigils'); addSearch('store-items', 'Lantern Surge', 'surge', 'Server-wide gold and XP boost', 'Sigils'); },
+  index: () => { for (const s of L.SHOP) addSearch('store-items', s.name, 'item-' + s.id, s.desc, 'Item'); addSearch('store-items', 'Sigils', 'sigils', 'Premium token, Lanternholder, Bag of Holding', 'Sigils'); addSearch('store-items', 'Lantern Surge', 'surge', 'Server-wide gold and XP boost', 'Sigils'); },
 });
 
 // ---- Ember Ring ----

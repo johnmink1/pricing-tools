@@ -14,8 +14,8 @@ const SITE = path.resolve(process.argv[3] || path.join(__dirname, 'out'));
 const BASE = (process.argv[4] || 'https://lanternhold.born2gamellc.com').replace(/\/$/, '');
 const OUT = path.join(SITE, 'wiki');
 const DISCORD = 'https://discord.gg/6G7E7rhGFu';
-const PRESS = 'https://tools.born2develop.com/press/lanternhold/';
-const OG_IMG = 'https://tools.born2develop.com/press/lanternhold/img/og-1200x630.png';
+const PRESS = 'https://lanternhold.born2gamellc.com/press/';
+const OG_IMG = 'https://lanternhold.born2gamellc.com/press/img/og-1200x630.png';
 const HERE = __dirname;
 
 // ---------- load the game ----------
@@ -501,6 +501,6 @@ fs.writeFileSync(path.join(OUT, 'icons.svg'), '<svg xmlns="http://www.w3.org/200
 fs.copyFileSync(path.join(HERE, 'wiki.css'), path.join(OUT, 'wiki.css'));
 fs.copyFileSync(path.join(HERE, 'wiki.js'), path.join(OUT, 'wiki.js'));
 const today = new Date().toISOString().slice(0, 10);
-const urls = [BASE + '/', BASE + '/wiki/'].concat(pages.map(p => BASE + '/wiki/' + p.slug + '/'));
+const urls = [BASE + '/', BASE + '/wiki/', BASE + '/press/'].concat(pages.map(p => BASE + '/wiki/' + p.slug + '/'));
 fs.writeFileSync(path.join(SITE, 'sitemap.xml'), '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls.map(u => '<url><loc>' + u + '</loc><lastmod>' + today + '</lastmod></url>').join('\n') + '\n</urlset>\n');
 console.log('wiki: ' + (pages.length + 1) + ' pages, ' + search.length + ' search entries, ' + written.size + ' images -> ' + OUT);

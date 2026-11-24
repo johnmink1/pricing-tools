@@ -1,0 +1,53 @@
+---
+layout: null
+permalink: /lanternhold/
+---
+{% raw %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lanternhold: A Grand War Front</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="Lanternhold is a free idle dungeon crawler set on a hidden front of the Grand War. Play it at lanternhold.born2gamellc.com.">
+<link rel="canonical" href="https://lanternhold.born2gamellc.com/">
+<meta property="og:title" content="Lanternhold: A Grand War Front">
+<meta property="og:site_name" content="Born 2 Game">
+<meta property="og:description" content="A free idle dungeon crawler on a hidden front of the Grand War. Party of five, story chapters, class gear and sets.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lanternhold.born2gamellc.com/">
+<meta property="og:image" content="https://lanternhold.born2gamellc.com/press/img/og-1200x630.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://lanternhold.born2gamellc.com/press/img/og-1200x630.png">
+<meta name="theme-color" content="#04070d">
+<noscript><meta http-equiv="refresh" content="0; url=https://lanternhold.born2gamellc.com/"></noscript>
+<script>
+/* Lanternhold lives at lanternhold.born2gamellc.com. Players who once played at this old address keep their
+   progress: it rides along in the URL hash and the game restores it before it starts. Sign-in tokens never travel. */
+(function () {
+  var NEW = 'https://lanternhold.born2gamellc.com/';
+  var KEYS = ['lanternhold.save.v1', 'lanternhold.epoch', 'lanternhold.muted', 'lanternhold.wiped', 'lh_ref'];
+  var o = {};
+  try { KEYS.forEach(function (k) { var v = localStorage.getItem(k); if (v != null) o[k] = v; }); } catch (e) {}
+  var hash = Object.keys(o).length ? '#lhmove=' + encodeURIComponent(JSON.stringify(o)) : '';
+  location.replace(NEW + location.search + hash);
+})();
+</script>
+<style>
+html,body{margin:0;min-height:100%;background:#04070d;color:#e8eef8;font:16px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:520px;margin:18vh auto 0;padding:0 16px;text-align:center}
+h1{font-size:26px;margin:0 0 8px;letter-spacing:.02em}
+p{color:#9fb0c8;margin:0 0 20px}
+a{display:inline-block;padding:12px 20px;border-radius:10px;background:#f5c242;color:#1a1204;font-weight:700;text-decoration:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>Lanternhold has its own home</h1>
+  <p>Taking you to lanternhold.born2gamellc.com. Your progress comes with you.</p>
+  <a href="https://lanternhold.born2gamellc.com/">Play Lanternhold</a>
+</main>
+</body>
+</html>{% endraw %}

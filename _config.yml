@@ -1,0 +1,10 @@
+# tools.born2develop.com is the calculators site only.
+# Lanternhold's source lives in this repo but is published at https://lanternhold.born2gamellc.com
+# by johnmink1/lanternhold, so none of it is served here. The two pages in moved/ answer the old
+# Lanternhold addresses and send players (and link previews) to the game's own domain.
+exclude:
+  - lanternhold
+  - lanternhold-music
+  - lanternhold-wiki
+  - infra
+  - README.md

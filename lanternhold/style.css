@@ -1,4 +1,4 @@
-/* lh-build 202611241325 */
+/* lh-build 202611241343 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2067,21 +2067,76 @@ body.resting .taptip{display:none}
 .klant[hidden]{display:none}.klant svg{width:18px;height:18px}
 @keyframes kglow{50%{box-shadow:0 0 20px rgba(255,200,100,.85)}}
 @media (prefers-reduced-motion:reduce){.klant{animation:none}}
-/* The Enchanter's shop (v98): buttons hang above the Enchanter inside the scene */
-.enchov{position:absolute;left:62%;transform:translateX(-50%);top:8px;width:max-content;z-index:7;display:flex;flex-direction:column;align-items:center;gap:6px;max-width:74%;pointer-events:auto}
-.enchov[hidden]{display:none}
-.evsign{padding:3px 12px;border-radius:6px;border:1px solid #8b5cf6;background:linear-gradient(180deg,#3b1d6e,#1f1038);color:#f3e8ff;font:700 12px/1.3 var(--display,Inter),sans-serif;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 0 12px rgba(167,139,250,.45)}
-.enchov .evrow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-.evb{padding:6px 12px;border-radius:999px;border:1px solid #8b5cf6;background:rgba(20,12,40,.85);color:#ede9fe;font:700 12px/1.2 Inter,sans-serif;cursor:pointer}.evb.main{background:linear-gradient(180deg,#8b5cf6,#6d28d9);border-color:#c4b5fd;color:#fff}.evb.leave{border-color:#a8822e;color:#ffe7b0}.evb:hover{filter:brightness(1.15)}
+/* The Enchanter's shop (v99): the stage header names the shop, the Enchanter's question bubble hangs above him,
+   and the counter panel walks you through one question at a time. */
+body.atench .stagehead>:not(#shophead){display:none!important}
 body.atench .foe>:not(#enchpanel){display:none!important}
+body.atench .hint,body.atench .taptip,body.atench #abilities,body.atench #tonicbar,body.atench #keeperbar{display:none!important}
+body.atench .arena{cursor:default}
+body.atench #ghostlamp,body.atench #merchant,body.atench #spwarn,body.atench .float{display:none!important}
+.shophead{display:flex;align-items:center;gap:10px;padding:8px 12px}
+.shophead[hidden]{display:none}
+.shophead img{width:30px;height:40px;object-fit:contain;transform:scaleX(-1);flex:none}
+.shophead>div{flex:1;min-width:0}.shophead b{display:block;font-family:var(--display,inherit);font-size:17px;letter-spacing:.02em;color:#e9d5ff}
+.shophead small{display:block;color:var(--muted);font-size:12.5px}
+.shophead .leave{flex:none;display:inline-flex;align-items:center;gap:6px;border-color:#a8822e;color:#ffe7b0}.shophead .leave svg{width:14px;height:14px}
+.enchov{position:absolute;top:8px;left:50%;z-index:7;width:max-content;max-width:calc(100% - 12px);padding:8px 10px 9px;border-radius:14px;border:1px solid #8b5cf6;background:rgba(22,12,42,.92);box-shadow:0 8px 24px rgba(0,0,0,.45);pointer-events:auto;cursor:default}
+.enchov[hidden]{display:none}
+.enchov p{margin:0 0 6px;font-size:12.5px;font-style:italic;color:#e9d5ff;text-align:center}
+.enchov .evrow{display:flex;gap:6px;justify-content:center}
+.evtail{position:absolute;bottom:-7px;width:12px;height:12px;margin-left:-6px;background:rgba(22,12,42,.92);border-right:1px solid #8b5cf6;border-bottom:1px solid #8b5cf6;transform:rotate(45deg)}
+.evb{padding:6px 11px;border-radius:999px;border:1px solid #8b5cf6;background:#1e1238;color:#ede9fe;font:700 12.5px/1.2 Inter,sans-serif;cursor:pointer;white-space:nowrap}
+.evb.main{background:linear-gradient(180deg,#8b5cf6,#6d28d9);border-color:#c4b5fd;color:#fff}.evb:hover{filter:brightness(1.15)}
+@media (max-width:420px){.enchov{padding:6px 7px 7px}.enchov p{font-size:11.5px;margin-bottom:4px}.evb{padding:5px 8px;font-size:11.5px}.enchov .evrow{gap:4px}}
+.arena.short .enchov p{display:none}
+@media (max-width:900px){body.atench .arena{aspect-ratio:1/1;max-height:70vh}}
 .enchpanel[hidden]{display:none}
-.ephead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}.ephead b{display:block;font-size:16px}.ephead small{color:var(--muted);font-size:13px}
+.ephead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.ephead>b{font-size:16px}
 .epdust{display:inline-flex;align-items:center;gap:4px;flex:none;padding:4px 10px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);font-size:13px}.epdust b{color:var(--gold);font-size:14px}.epdust svg{width:14px;height:14px}
-.eplist{max-height:260px;overflow:auto}
-body.atench .hint,body.atench .taptip{display:none}
-.enchvisit .merchhead svg{width:46px;height:60px;flex:none}
-.evbal{display:flex;flex-wrap:wrap;gap:6px 14px;margin:12px 0 8px;font-size:13px;color:var(--muted)}.evbal b{color:var(--text)}.evbal span{display:inline-flex;align-items:center;gap:4px}.evbal svg{width:14px;height:14px;flex:none}
-.evtabs{margin:4px 0 8px}
+.ewtabs{display:flex;gap:4px;padding:3px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);margin-bottom:10px}
+.ewtabs button{flex:1;padding:7px 6px;border-radius:9px;border:0;background:none;color:var(--muted);font:600 13px/1.2 Inter,sans-serif;cursor:pointer}
+.ewtabs button.on{background:linear-gradient(180deg,#7c4dea,#5b2bc4);color:#fff}
+.ewsteps{display:flex;gap:6px;list-style:none;margin:0 0 10px;padding:0;font-size:12.5px;color:var(--dim,#6b7891)}
+.ewsteps li{display:flex;align-items:center;gap:5px;flex:1;min-width:0;white-space:nowrap}
+.ewsteps li+li::before{content:'';flex:0 0 10px;height:1px;background:var(--line2);margin-right:2px}
+.ewsteps i{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--line2);font-style:normal;font-size:11px;flex:none}
+.ewsteps li.cur{color:var(--text);font-weight:700}.ewsteps li.cur i{background:#7c4dea;border-color:#c4b5fd;color:#fff}
+.ewsteps li.done{color:#b9a7f5}.ewsteps li.done i{background:#2a1f4a;border-color:#7c4dea;color:#c4b5fd}
+.ewpicked{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.ewpick{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;background:#1a1430;border:1px solid #4c3a8a}
+.ewpick .tile{width:38px;height:38px;flex:none}
+.ewt{flex:1;min-width:0;display:flex;flex-direction:column;text-align:left}
+.ewt>b{font-size:14px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ewt>b small{color:var(--muted);font-weight:400;font-size:12px;margin-left:4px}
+.ewt>small{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ewpick .ewt>small{text-transform:uppercase;letter-spacing:.06em;font-size:10.5px;color:#b9a7f5}
+.ewq{margin:2px 0 2px;font-size:15px}
+.ewhint{margin:0 0 8px;color:var(--muted);font-size:12.5px}
+.ewlist{display:flex;flex-direction:column;gap:6px;max-height:min(34vh,300px);overflow:auto;padding-right:2px}
+.ewrow{display:flex;align-items:center;gap:10px;width:100%;padding:6px 8px;border-radius:10px;background:#0e121a;border:1px solid var(--line);color:inherit;font:inherit;cursor:pointer;text-align:left}
+.ewrow:hover,.ewrow:focus-visible{border-color:#8b5cf6;background:#151027}
+.ewrow .tile{width:40px;height:40px;flex:none}
+.ewen{color:#d8c8ff;font-weight:600}
+.ewdots{display:inline-flex;gap:3px;flex:none;vertical-align:middle}.ewdots i{width:8px;height:8px;border-radius:50%;border:1px solid #6b7aa8}.ewdots i.on{background:#b79cff;border-color:#b79cff;box-shadow:0 0 5px #8b5cf6}
+.ewcost{display:inline-flex;align-items:center;gap:3px;flex:none;font-size:12.5px;font-weight:700;color:var(--gold)}.ewcost svg{width:12px;height:12px}.ewcost.short{color:#f87171}
+.ewchips,.ewrar{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.ewchip{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:7px 10px;border-radius:10px;border:1px solid var(--line2);background:#0e121a;color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.ewchip b{font-size:13.5px}.ewchip small{font-size:11.5px;color:var(--muted)}.ewchip:hover{border-color:#8b5cf6}.ewchip.sel{border-color:#c4b5fd;background:#2a1f4a}
+.ewrar .ewchip{opacity:.65}.ewrar .ewchip.sel{opacity:1}
+.ewsum{margin-top:8px;padding:10px 12px;border-radius:12px;border:1px solid #4c3a8a;background:linear-gradient(180deg,#1c1434,#120d22)}
+.ewsum p{margin:0 0 6px;font-size:13.5px}.ewsum p.warn{color:#fca5a5}.ewsum svg{width:13px;height:13px;vertical-align:-2px;margin-right:2px}
+.ewsum .btn{width:100%;margin-top:4px}
+.ewempty{color:var(--muted);font-size:13px;padding:8px 0}
+.ewdone{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:10px;border-radius:10px;border:1px solid #2f7a4f;background:#0f2a1c;color:#bff5d4;font-size:13px}.ewdone svg{width:16px;height:16px;flex:none;color:#7ee0a5}
+.ewsum p b,.ewsum p svg{display:inline}.ewsum p svg{display:inline-block}
+@media (min-width:901px) and (min-height:620px){
+  body.atench .stagehead{flex:none}
+  body.atench .stage .arena{min-height:min(290px,40vh)}
+  body.atench .stage .foe{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  body.atench #enchpanel{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:auto}
+  body.atench #enchpanel>*{flex:none}
+  body.atench #enchpanel .ewlist{flex:1 1 auto;min-height:90px;max-height:none}
+}
+.enchvisit .merchhead img{width:46px;height:62px;object-fit:contain;flex:none}
 /* v97: profile account tiles and the Sigil shop */
 .pfacct{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 14px}
 .pft{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--panel);color:var(--text);text-align:left;cursor:pointer;font:inherit}

@@ -1,4 +1,4 @@
-/* lh-build 202611240229 */
+/* lh-build 202611240243 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -4144,6 +4144,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 79, date: 'November 24, 2026', title: 'A tidier battle header', items: [
+      'Floor, Map of the Deep, your chapter goal and the world boss now sit in one framed panel on top of the battle, instead of floating above it.',
+      'The header is shorter, so the battle scene gets more room (about 70 px more on a laptop).'
+    ] },
     { v: 78, date: 'November 24, 2026', title: 'One tab at a time', items: [
       'If Lanternhold is open in two tabs, the older one now stops and says so. Before, both kept saving over each other, so quest claims, auto-scrap and tonics could come undone after a refresh.',
       'Tap Play here instead on a stopped tab to pick it back up.'] },

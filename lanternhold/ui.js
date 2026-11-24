@@ -1,4 +1,4 @@
-/* lh-build 202611241612 */
+/* lh-build 202611241658 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -606,7 +606,7 @@
   const shopIcons = {};
   function shopIcon(it) {
     const k = it.cls + '|' + it.slot + '|' + it.rar;
-    if (!shopIcons[k]) { const im = new Image(); im.src = SP.itemIcon(it.cls, it.slot, it.rar); shopIcons[k] = im; }
+    if (!shopIcons[k]) { const im = new Image(); im.src = itemIco(it); shopIcons[k] = im; }
     return shopIcons[k];
   }
   // A shower of sparks on the counter when something is made.
@@ -693,15 +693,18 @@
   // ---------- Mercy Corps encounters (John, 2026-11-24) ----------
   // A wounded companion sits propped against a rock, a lantern-green glow rising as the healers mend them.
   function drawWounded(foe, fxC, floorY) {
-    const spr = sprite('healer', 0, false), sw = spr.lw * 2, sh = spr.lh * 2, k = foe.hp / foe.max;
-    ctx.fillStyle = '#3a3440'; ctx.beginPath(); ctx.ellipse(fxC + sw * 0.35, floorY + 1, sw * 0.32, sh * 0.2, 0, Math.PI, 0); ctx.fill();
-    const gl = ctx.createRadialGradient(fxC, floorY - sh * 0.3, 2, fxC, floorY - sh * 0.3, sw * 0.9); gl.addColorStop(0, 'rgba(126,224,165,' + (0.15 + 0.35 * k) + ')'); gl.addColorStop(1, 'rgba(126,224,165,0)');
-    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gl; ctx.fillRect(fxC - sw, floorY - sh * 1.2, sw * 2, sh * 1.4); ctx.globalCompositeOperation = 'source-over';
-    // sitting: lean back and sink a little, facing the party
-    ctx.save(); ctx.translate(fxC + sw * 0.2, floorY + 3); ctx.rotate(0.18 - 0.12 * k); ctx.scale(-1, 1); ctx.drawImage(spr, -sw * 0.5, -sh * (0.78 + 0.2 * k), sw, sh); ctx.restore();
-    // a bandage that turns from red to white as they heal
-    ctx.fillStyle = k < 0.5 ? '#e5484d' : '#f5f5f5'; ctx.fillRect(fxC - sw * 0.05, floorY - sh * (0.62 + 0.2 * k), sw * 0.22, 1.6);
-    if (Math.random() < 0.15 + 0.3 * k) particles.push({ x: fxC + (Math.random() - 0.5) * sw * 0.6, y: floorY - sh * 0.4, vx: (Math.random() - 0.5) * 6, vy: -14 - Math.random() * 10, life: 0.9, age: 0, c: Math.random() < 0.5 ? '#7ee0a5' : '#d1fae5', s: 1, float: true });
+    // v117: a dedicated scene (vector ART.wounded) instead of a copy of the party healer
+    const spr = sprite('wounded', 0, false), sc = 2.7, sw = spr.lw * sc, sh = spr.lh * sc, k = foe.hp / foe.max;
+    const gl = ctx.createRadialGradient(fxC, floorY - sh * 0.4, 2, fxC, floorY - sh * 0.4, sw * 0.75); gl.addColorStop(0, 'rgba(126,224,165,' + (0.12 + 0.38 * k) + ')'); gl.addColorStop(1, 'rgba(126,224,165,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gl; ctx.fillRect(fxC - sw, floorY - sh * 1.4, sw * 2, sh * 1.6); ctx.globalCompositeOperation = 'source-over';
+    // they sit up a touch as they heal; a slow breath keeps them alive on screen
+    const lift = k * 1.5 + Math.sin(tAnim * 1.6) * 0.35;
+    ctx.drawImage(spr, Math.round(fxC - sw / 2), Math.round(floorY + 5 - sh - lift), sw, sh);
+    // a pulsing Mercy Corps heart over them, brighter as they mend
+    const hy = floorY - sh - 8 + Math.sin(tAnim * 2.2) * 1.5, hx = fxC + sw * 0.12, hs = 3.2 + 0.5 * Math.sin(tAnim * 4);
+    ctx.save(); ctx.globalAlpha = 0.55 + 0.45 * k; ctx.fillStyle = '#22c55e'; ctx.strokeStyle = '#0b3d1e'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(hx, hy + hs); ctx.bezierCurveTo(hx - hs * 2.2, hy - hs * 0.6, hx - hs, hy - hs * 2.4, hx, hy - hs * 1.1); ctx.bezierCurveTo(hx + hs, hy - hs * 2.4, hx + hs * 2.2, hy - hs * 0.6, hx, hy + hs); ctx.fill(); ctx.stroke(); ctx.restore();
+    if (Math.random() < 0.15 + 0.3 * k) particles.push({ x: fxC + (Math.random() - 0.3) * sw * 0.5, y: floorY - sh * 0.5, vx: (Math.random() - 0.5) * 6, vy: -14 - Math.random() * 10, life: 0.9, age: 0, c: Math.random() < 0.5 ? '#7ee0a5' : '#d1fae5', s: 1, float: true });
   }
   // A Mercy Corps companion held captive behind the monster, hands bound.
   function drawCaptive(x, floorY) {
@@ -1766,6 +1769,34 @@
     toast('map', 'Farming floor ' + f, 'Descend automatically is off, so the party stays on floor ' + f + ' and fights it again and again. Turn it back on to keep going down.', '');
     document.querySelectorAll('[data-farm]').forEach(x => { x.textContent = +x.dataset.farm === f ? 'Farming here' : 'Farm floor ' + x.dataset.farm; });
   });
+  // ---------- inventory filters (v117) ----------
+  const INV_KINDS = [['all', 'All'], ['weapon', 'Weapons'], ['off', 'Off-hands'], ['armor', 'Armour'], ['jewel', 'Jewellery']];
+  const INV_SORTS = [['best', 'Best first'], ['level', 'Level'], ['rarity', 'Rarity'], ['type', 'Type'], ['new', 'Newest']];
+  const INV = { kind: 'all', rar: 'all', who: 'all', sort: 'best' };
+  try { Object.assign(INV, JSON.parse(localStorage.getItem('lh_inv') || '{}')); } catch (e) {}
+  const invSave = () => { try { localStorage.setItem('lh_inv', JSON.stringify(INV)); } catch (e) {} };
+  const invKind = it => it.slot === 'main' ? 'weapon' : it.slot === 'off' ? 'off' : it.slot === 'ring' || it.slot === 'neck' ? 'jewel' : 'armor';
+  const RAR_RANK = it => L.RARITY.findIndex(r => r.id === it.rar);
+  function invList(pack, m) {
+    let l = pack.filter(it => (INV.kind === 'all' || invKind(it) === INV.kind) && (INV.rar === 'all' || it.rar === INV.rar) &&
+      (INV.who === 'all' || L.usable(INV.who === 'me' ? m.cls : INV.who, it)));
+    const by = { best: (a, b) => L.gearPct(b) - L.gearPct(a), level: (a, b) => L.reqLevel(b) - L.reqLevel(a) || L.gearPct(b) - L.gearPct(a), rarity: (a, b) => RAR_RANK(b) - RAR_RANK(a) || L.gearPct(b) - L.gearPct(a),
+      type: (a, b) => (INV_KINDS.findIndex(k => k[0] === invKind(a)) - INV_KINDS.findIndex(k => k[0] === invKind(b))) || String(L.tyOf(a)).localeCompare(String(L.tyOf(b))) || L.gearPct(b) - L.gearPct(a), new: (a, b) => String(b.uid).localeCompare(String(a.uid)) };
+    return l.sort(by[INV.sort] || by.best);
+  }
+  $('bag').addEventListener('click', e => { const k = e.target.closest('[data-invk]'); if (k) { e.stopPropagation(); INV.kind = k.dataset.invk; invSave(); updateGear(true); } });
+  $('bag').addEventListener('change', e => { const c = e.target.closest('[data-invs]'); if (c) { INV[c.dataset.invs] = c.value; invSave(); updateGear(true); } });
+  // Item type and who can use it, shown on every item (v117).
+  const CLS_SHORT = { tank: 'Tank', healer: 'Healer', rogue: 'Rogue', mage: 'Mage', necro: 'Necro' };
+  function usersText(it) { const u = L.usersOf(it); return u ? u.map(c => CLS_SHORT[c]).join(', ') : 'Any class'; }
+  function typeLine(it) { const t = L.ITYPES[L.tyOf(it)], kind = it.slot === 'main' || it.slot === 'off' ? t.name : it.slot === 'ring' || it.slot === 'neck' ? L.SLOT_NAME[it.slot] : t.name + ' ' + L.SLOT_NAME[it.slot].toLowerCase(); return kind + ' · ' + usersText(it); }
+  const clsDots = it => { const u = L.usersOf(it); return '<i class="clsd" title="' + esc(usersText(it)) + '">' + (u ? u.map(c => '<b style="background:' + L.CLASSES[c].color + '"></b>').join('') : '<b class="any"></b>') + '</i>'; };
+  const itemIco = it => SP.itemIcon(it.cls, it.slot, it.rar, 0, L.tyOf(it));
+  function typeBlock(it, m) {
+    const uu = L.usersOf(it), ok = !m || L.usable(m.cls, it);
+    return '<div class="iusers"><small>Used by</small>' + (uu ? uu.map(c => '<span class="uchip' + (m && c === m.cls ? ' me' : '') + '">' + L.CLASSES[c].name + '</span>').join('') : '<span class="uchip any">Any class</span>') + (!ok ? '<em>' + esc(m.name) + ' can’t use this</em>' : '') + '</div>';
+  }
+  function typeFx(it) { const t = L.ITYPES[L.tyOf(it)]; return t && t.txt ? '<p class="ityfx">' + icon('star') + '<span><b>' + t.name + ':</b> ' + t.txt + (it.slot !== 'main' && it.slot !== 'off' ? ' per piece worn' : '') + '</span></p>' : ''; }
   const bound = it => it.rset != null || it.rar === 'goblin' || it.wb != null;
   function itemEffect(it) {
     const st = L.itemStats(it);
@@ -1773,7 +1804,7 @@
   }
   function itemChip(it, extra, cls) {
     const w = L.wearer(S, it.uid);
-    return '<div class="item r-' + it.rar + (cls ? ' ' + cls : '') + '" data-item="' + it.uid + '" role="button" tabindex="0"><img class="iimg sm" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt=""><span><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.SLOT_NAME[it.slot] + ' &middot; ' + itemEffect(it) + (w ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(w).name) + '</i>' : '') + '</small></span>' + (extra || '') + '</div>';
+    return '<div class="item r-' + it.rar + (cls ? ' ' + cls : '') + '" data-item="' + it.uid + '" role="button" tabindex="0"><img class="iimg sm" src="' + itemIco(it) + '" alt=""><span><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.SLOT_NAME[it.slot] + ' &middot; ' + itemEffect(it) + (w ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(w).name) + '</i>' : '') + '</small></span>' + (extra || '') + '</div>';
   }
   // How an item compares to what this member wears in that slot, in gear percent.
   function compareTag(it, id) {
@@ -1814,7 +1845,7 @@
       const it = g[sl] && L.itemOf(S, g[sl]);
       const up = better[sl] ? '<i class="upb" title="Better one in your pack">&#9650;</i>' : '';
       if (!it) return '<div class="dslot ds-' + sl + ' empty" title="Choose a ' + name.toLowerCase() + '"><div class="tile ghost" data-pos="' + sl + '" role="button" tabindex="0"><img class="iimg" src="' + SP.itemIcon(m.cls, type, 'common') + '" alt="">' + up + '</div><span>' + name + '</span></div>';
-      return '<div class="dslot ds-' + sl + '"><div class="tile r-' + it.rar + (it.lk ? ' held' : '') + '" data-pos="' + sl + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (it.lk ? '<i class="lkb" title="Locked in this slot">' + icon('lock') + '</i>' : up) + '</div><span>' + name + '</span></div>';
+      return '<div class="dslot ds-' + sl + '"><div class="tile r-' + it.rar + (it.lk ? ' held' : '') + '" data-pos="' + sl + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + '"><img class="iimg" src="' + itemIco(it) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (it.lk ? '<i class="lkb" title="Locked in this slot">' + icon('lock') + '</i>' : up) + '</div><span>' + name + '</span></div>';
     };
     // totals from worn gear
     const dmg = L.gearPctOf(S, gearWho, 'dps'), hp = L.gearPctOf(S, gearWho, 'hp');
@@ -1828,34 +1859,27 @@
       '<div class="drings">' + ['ring1', 'ring2', 'ring3', 'ring4', 'ring5'].map(slotTile).join('') + '</div></div>' +
       '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small>' + setWhere('class') + '</div>' +
       Object.entries(L.rsetCounts(S, gearWho)).map(([i, n]) => '<div class="setinfo rset' + (n >= 2 ? ' on' : '') + '"><b>' + L.REGION_SETS[i].name + '</b> <span class="pips">' + [0, 1, 2, 3].map(k => '<i class="' + (k < n ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + rsetTwoText(+i) + '. 4 pieces: ' + rsetFourText(+i) + '.</small>' + setWhere('rset', +i) + '</div>').join('') +
-      '<div class="dollbar"><small>' + cname + ' gear only. Tap a slot to change it. Worn gear stays on the character, not in the pack.' + (L.lockedSlots(S, gearWho) ? ' Locked slots keep their piece when you use Equip best.' : '') + '</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
+      '<div class="dollbar"><small>Tap a slot to change it. Each item says which classes can use it. Worn gear stays on the character, not in the pack.' + (L.lockedSlots(S, gearWho) ? ' Locked slots keep their piece when you use Equip best.' : '') + '</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
     { const pn = $('packn'); if (pn) pn.textContent = L.packCount(S); }
     paintPackCap();
     const tile = (it, dim) => {
-      const w = L.wearer(S, it.uid), fit = it.cls === m.cls;
+      const w = L.wearer(S, it.uid), fit = L.usable(m.cls, it);
       const d = fit && !w ? Math.round((L.itemScore(it) - L.replaces(S, gearWho, it).reduce((a, x) => a + L.itemScore(x), 0)) * 100) : 0;
-      return '<div class="tile r-' + it.rar + (dim ? ' dim' : '') + (w ? ' worn' : '') + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + ' (' + itemEffect(it) + ')' + (w ? ', worn by ' + esc(L.memberById(w).name) : '') + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' +
-        '<i class="lvb' + (fit && !L.canWear(S, gearWho, it) ? ' no' : '') + '" title="Needs power level ' + L.reqLevel(it) + '">Lv ' + L.reqLevel(it) + '</i>' + (it.aff || it.jset ? '<i class="affb" title="Helps a camp job"></i>' : '') + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (d > 0 && L.canWear(S, gearWho, it) ? '<i class="upb">&#9650;</i>' : '') + (w ? '<i class="wb" title="Worn">' + esc(L.memberById(w).name.charAt(0)) + '</i>' : '') + (it.lk ? '<i class="lkb" title="Locked">' + icon('lock') + '</i>' : '') + '</div>';
+      return '<div class="tile r-' + it.rar + (dim ? ' dim' : '') + (w ? ' worn' : '') + '" data-item="' + it.uid + '" role="button" tabindex="0" title="' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + ' (' + typeLine(it) + '. ' + itemEffect(it) + ')' + (w ? ', worn by ' + esc(L.memberById(w).name) : '') + '"><img class="iimg" src="' + itemIco(it) + '" alt="">' +
+        '<i class="lvb' + (fit && !L.canWear(S, gearWho, it) ? ' no' : '') + '" title="Needs power level ' + L.reqLevel(it) + '">Lv ' + L.reqLevel(it) + '</i>' + clsDots(it) + (it.aff || it.jset ? '<i class="affb" title="Helps a camp job"></i>' : '') + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + (d > 0 && L.canWear(S, gearWho, it) ? '<i class="upb">&#9650;</i>' : '') + (w ? '<i class="wb" title="Worn">' + esc(L.memberById(w).name.charAt(0)) + '</i>' : '') + (it.lk ? '<i class="lkb" title="Locked">' + icon('lock') + '</i>' : '') + '</div>';
     };
+    // v117 one inventory (John: "make it one inventory... sort and filter"): every spare piece in one grid, filtered by
+    // kind, rarity and who can use it, sorted by power, level, rarity, type or newest. Pieces this character can't use are dimmed.
     const pack = S.bag.filter(it => !L.wearer(S, it.uid));
-    const fits = pack.filter(it => it.cls === m.cls).sort((a, b) => L.gearPct(b) - L.gearPct(a));
-    const others = pack.filter(it => it.cls !== m.cls);
-    let bh = '<h4 class="packh">Fits ' + esc(m.name) + ' <em>' + fits.length + '</em></h4>';
-    bh += fits.length ? '<div class="grid">' + fits.map(it => tile(it)).join('') + '</div>' : '<p class="note">No ' + cname.toLowerCase() + ' gear in your pack yet.</p>';
-    if (others.length) {
-      bh += '<details class="others"><summary>Other classes <em>' + others.length + '</em></summary>';
-      for (const c of L.CLASS_ORDER) {
-        const list = others.filter(it => it.cls === c); if (!list.length) continue;
-        const owners = who.filter(id => L.memberById(id).cls === c).map(id => esc(L.memberById(id).name));
-        bh += '<div class="ogroup"><span class="slab">' + L.CLASSES[c].name + (owners.length ? ' &middot; ' + owners.join(', ') : ' &middot; ' + (camp() ? 'nobody can wear this yet' : 'nobody in your party')) + '</span><div class="grid">' + list.sort((a, b) => L.gearPct(b) - L.gearPct(a)).map(it => tile(it, true)).join('') + '</div></div>';
-      }
-      bh += '</details>';
-    }
+    const list = invList(pack, m);
+    let bh = '<div class="invbar"><div class="invkinds" role="tablist">' + INV_KINDS.map(([k, n]) => { const c = k === 'all' ? pack.length : pack.filter(it => invKind(it) === k).length; return '<button class="' + (INV.kind === k ? 'on' : '') + '" data-invk="' + k + '">' + n + ' <em>' + c + '</em></button>'; }).join('') + '</div>' +
+      '<div class="invsel"><label><span>Sort</span><select data-invs="sort">' + INV_SORTS.map(([k, n]) => '<option value="' + k + '"' + (INV.sort === k ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></label>' +
+      '<label><span>Rarity</span><select data-invs="rar"><option value="all">Any</option>' + L.RARITY.filter(r => pack.some(it => it.rar === r.id)).map(r => '<option value="' + r.id + '"' + (INV.rar === r.id ? ' selected' : '') + '>' + r.name + '</option>').join('') + '</select></label>' +
+      '<label><span>Who</span><select data-invs="who"><option value="all">Anyone</option><option value="me"' + (INV.who === 'me' ? ' selected' : '') + '>' + esc(m.name) + ' can use</option>' + L.CLASS_ORDER.map(c => '<option value="' + c + '"' + (INV.who === c ? ' selected' : '') + '>' + L.CLASSES[c].name + '</option>').join('') + '</select></label></div></div>';
+    bh += list.length ? '<div class="grid">' + list.map(it => tile(it, !L.usable(m.cls, it))).join('') + '</div>' : '<p class="note">Nothing in your pack matches. Try another filter.</p>';
     if (!pack.length) bh = '<p class="note">Your pack is empty. Gear your party wears shows on each character above. New gear drops from foes, chests and guardians.</p>';
-    const open = $('bag').querySelector('details.others[open]');
     $('bag').innerHTML = bh;
-    if (open) { const d = $('bag').querySelector('details.others'); if (d) d.open = true; }
   }
   $('tab-gear').addEventListener('click', e => {
     const w = e.target.closest('[data-who]'); if (w) { gearWho = w.dataset.who; updateGear(true); return; }
@@ -1873,9 +1897,9 @@
   function itemModal(uid) {
     const it = L.itemOf(S, uid); if (!it) return;
     let m = L.memberById(gearWho), w = L.wearer(S, uid);
-    if (m.cls !== it.cls) { const o = gearOwners().find(id => L.memberById(id).cls === it.cls); if (o) { gearWho = o; m = L.memberById(o); } }
+    if (!L.usable(m.cls, it)) { const o = gearOwners().find(id => L.usable(L.memberById(id).cls, it)); if (o) { gearWho = o; m = L.memberById(o); } }
     const set = it.set && L.SETS.find(x => x.id === it.set), rs = it.rset != null && L.REGION_SETS[it.rset];
-    const fits = m.cls === it.cls, rar = L.RARITY.find(r => r.id === it.rar);
+    const fits = L.usable(m.cls, it), rar = L.RARITY.find(r => r.id === it.rar);
     const leg = it.wb != null && L.WB_SETS[it.wb], shHave = leg ? L.shardsOf(S)[it.wb] || 0 : 0;
     const cost = leg ? L.wbUpCost(it) : L.upgradeCost(it), maxed = it.up >= L.UP_MAX;
     const reps = fits && !w ? L.replaces(S, gearWho, it) : [], ci = reps[0];
@@ -1891,9 +1915,9 @@
     const tool = (id, ic, label, extra) => '<button class="itool' + (extra ? ' ' + extra : '') + '" id="' + id + '">' + icon(ic) + '<span>' + label + '</span></button>';
     modal('<div class="icard r-' + it.rar + '">' +
       '<button class="iconbtn icx" id="i-close" aria-label="Close">&times;</button>' +
-      '<div class="ihero"><div class="tile big r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
-      '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + esc(L.gearName(it)) + '</h2>' + pips + '<small>Requires power level <b class="' + (fits && !w && !L.canWear(S, gearWho, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
-      '<div class="istats">' + stats + '</div>' +
+      '<div class="ihero"><div class="tile big r-' + it.rar + '"><img class="iimg" src="' + itemIco(it) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
+      '<div class="ititle"><span class="irar">' + rar.name + ' ' + esc(typeLine(it).split(' · ')[0].toLowerCase()) + ' &middot; ' + L.SLOT_NAME[it.slot] + '</span><h2>' + esc(L.gearName(it)) + '</h2>' + pips + '<small>Requires power level <b class="' + (fits && !w && !L.canWear(S, gearWho, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
+      typeBlock(it, m) + '<div class="istats">' + stats + '</div>' + typeFx(it) +
       (fits && !w ? '<p class="icmp">' + (ci ? 'Compared with ' + esc(m.name) + '’s ' + reps.map(r => esc(L.gearName(r)) + (r.up ? ' +' + r.up : '')).join(' and ') + '.' : esc(m.name) + ' has an open ' + L.SLOT_NAME[it.slot].toLowerCase() + ' slot.') + (it.slot === 'robe' ? ' A robe covers the chest and legs.' : '') + '</p>' : '') +
       enchBlock(it) +
       (it.aff ? '<div class="iaff">' + icon('flame') + '<span><b>' + affText(it) + '</b><small>Counts while the wearer works the ' + jobName(it.aff.j) + ' job at the campfire.</small></span></div>' : '') +
@@ -2084,7 +2108,7 @@
     return head + (AW.mode === 'merge' ? perk : '') + stepper + (picked ? '<div class="ewpicked">' + picked + '</div>' : '') + body;
   }
   // pieces of the panel
-  const ewTile = x => '<div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>';
+  const ewTile = x => '<div class="tile r-' + x.rar + '"><img class="iimg" src="' + itemIco(x) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>';
   const ewName = x => esc(L.gearName(x)) + (x.up ? ' +' + x.up : '');
   const ewDots = x => { const n = L.sockets(x), l = L.enchList(x); let h = '<span class="ewdots" title="' + l.length + ' of ' + n + ' sockets used">'; for (let i = 0; i < n; i++) h += '<i' + (l[i] ? ' class="on"' : '') + '></i>'; return h + '</span>'; };
   const ewWorn = x => { const w = L.wearer(S, x.uid); return w ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(w).name) + '</i>' : ''; };
@@ -2284,7 +2308,7 @@
       const b = L.itemOf(S, pick), r = L.mergeRisk(S, it, b), wa = L.wearer(S, it.uid), wb = L.wearer(S, b.uid);
       const blocked = it.lk || b.lk;
       const row = x => { const wn = L.wearer(S, x.uid);
-        return '<div class="pkrow r-' + x.rar + (x.uid === pick ? ' sel' : '') + '" data-mp="' + x.uid + '" role="button" tabindex="0"><div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>' +
+        return '<div class="pkrow r-' + x.rar + (x.uid === pick ? ' sel' : '') + '" data-mp="' + x.uid + '" role="button" tabindex="0"><div class="tile r-' + x.rar + '"><img class="iimg" src="' + itemIco(x) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div>' +
           '<span class="pkt"><b>' + esc(L.gearName(x)) + (x.up ? ' +' + x.up : '') + '</b><small>Floor ' + x.ilvl + (x.aff ? ' &middot; ' + affText(x) : '') + (wn ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(wn).name) + '</i>' : '') + '</small></span>' +
           (x.lk ? '<span class="cmp down">' + icon('lock') + 'Locked</span>' : '<span class="cmp eq">' + pct(L.mergeRisk(S, it, x).risk) + ' risk</span>') + '</div>'; };
       modal('<div class="mergebox picker"><h2>' + icon('relic') + 'Merge ' + esc(L.gearName(it)) + '</h2>' +
@@ -2317,7 +2341,7 @@
     const type = L.posType(pos), name = L.SLOT_NAME[pos];
     const robeNow = pos === 'legs' && L.robeOn(S, id) ? L.itemOf(S, g.chest) : null;
     const curScore = cur ? L.itemScore(cur) : robeNow ? L.itemScore(robeNow) : 0;
-    const list = S.bag.filter(it => it.cls === m.cls && L.fitsPos(it.slot, pos) && it.uid !== (cur && cur.uid))
+    const list = S.bag.filter(it => L.usable(m.cls, it) && L.fitsPos(it.slot, pos) && it.uid !== (cur && cur.uid))
       .map(it => ({ it, d: Math.round((L.itemScore(it) - (it.slot === 'robe' ? L.replaces(S, id, it).reduce((a, x) => a + L.itemScore(x), 0) : curScore)) * 100), ok: L.canWear(S, id, it), w: L.wearer(S, it.uid) }))
       .sort((a, b) => (b.ok - a.ok) || (b.d - a.d));
     const held = !!(cur && cur.lk) || (pos === 'legs' && robeNow && robeNow.lk);
@@ -2325,11 +2349,11 @@
       const it = x.it, wn = x.w ? L.memberById(x.w).name : '';
       if (x.ok && (held || (it.lk && x.w && x.w !== id) || (it.slot === 'robe' && L.slotLocked(S, id, 'legs')))) x.ok = false, x.lockd = true;
       const tag = x.lockd ? '<span class="cmp down">' + icon('lock') + 'Locked</span>' : !x.ok ? '<span class="cmp down">Needs power level ' + L.reqLevel(it) + '</span>' : x.d > 0 ? '<span class="cmp up">&#9650; ' + x.d + '%</span>' : x.d < 0 ? '<span class="cmp down">&#9660; ' + (-x.d) + '%</span>' : '<span class="cmp eq">Same</span>';
-      return '<div class="pkrow r-' + it.rar + (x.ok ? '' : ' no') + '"><div class="tile r-' + it.rar + '" data-info="' + it.uid + '" role="button" tabindex="0" title="Details"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
+      return '<div class="pkrow r-' + it.rar + (x.ok ? '' : ' no') + '"><div class="tile r-' + it.rar + '" data-info="' + it.uid + '" role="button" tabindex="0" title="Details"><img class="iimg" src="' + itemIco(it) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>' +
         '<span class="pkt"><b>' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b><small>' + L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it) + (wn ? ' &middot; <i class="worn">worn by ' + esc(wn) + '</i>' : '') + '</small></span>' + tag +
         '<button class="btn small" data-pick="' + it.uid + '"' + (x.ok ? '' : ' disabled') + '>Equip</button></div>';
     };
-    const head = cur ? '<div class="pkcur"><small>Wearing now</small><div class="pkrow r-' + cur.rar + '"><div class="tile r-' + cur.rar + '" data-info="' + cur.uid + '" role="button" tabindex="0"><img class="iimg" src="' + SP.itemIcon(cur.cls, cur.slot, cur.rar) + '" alt="">' + (cur.up ? '<i class="upn">+' + cur.up + '</i>' : '') + '</div><span class="pkt"><b>' + esc(L.gearName(cur)) + (cur.up ? ' +' + cur.up : '') + '</b><small>' + itemEffect(cur) + '</small></span><button class="btn small ghost' + (cur.lk ? ' on' : '') + '" id="pk-lk" title="' + (cur.lk ? 'Unlock this slot' : 'Lock it in this slot') + '">' + icon('lock') + (cur.lk ? 'Unlock' : 'Lock') + '</button><button class="btn small ghost" id="pk-info">Details</button><button class="btn small ghost" id="pk-off"' + (cur.lk ? ' disabled' : '') + '>Take off</button></div>' + (cur.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked in this slot. Equip best leaves it alone, and it is safe from scrap and the Loot Goblin. Unlock it to swap it out.</p>' : '') + '</div>'
+    const head = cur ? '<div class="pkcur"><small>Wearing now</small><div class="pkrow r-' + cur.rar + '"><div class="tile r-' + cur.rar + '" data-info="' + cur.uid + '" role="button" tabindex="0"><img class="iimg" src="' + itemIco(cur) + '" alt="">' + (cur.up ? '<i class="upn">+' + cur.up + '</i>' : '') + '</div><span class="pkt"><b>' + esc(L.gearName(cur)) + (cur.up ? ' +' + cur.up : '') + '</b><small>' + itemEffect(cur) + '</small></span><button class="btn small ghost' + (cur.lk ? ' on' : '') + '" id="pk-lk" title="' + (cur.lk ? 'Unlock this slot' : 'Lock it in this slot') + '">' + icon('lock') + (cur.lk ? 'Unlock' : 'Lock') + '</button><button class="btn small ghost" id="pk-info">Details</button><button class="btn small ghost" id="pk-off"' + (cur.lk ? ' disabled' : '') + '>Take off</button></div>' + (cur.lk ? '<p class="note ilocked">' + icon('lock') + 'Locked in this slot. Equip best leaves it alone, and it is safe from scrap and the Loot Goblin. Unlock it to swap it out.</p>' : '') + '</div>'
       : robeNow ? '<p class="note">' + esc(L.gearName(robeNow)) + ' covers the legs. Leggings here will take the robe off.</p>' : '';
     modal('<div class="picker"><div class="maphead"><div><h2>' + esc(m.name) + '’s ' + name.toLowerCase() + '</h2><small>' + (camp() ? 'Pick a piece to wear here.' : 'You can look now. Changing gear happens at camp.') + '</small></div><button class="iconbtn" id="pk-x" aria-label="Close">&times;</button></div>' + head +
       (list.length ? '<div class="pklist">' + list.map(row).join('') + '</div>' : '<p class="note">No ' + L.CLASSES[m.cls].name.toLowerCase() + ' ' + (type === 'chest' ? 'chest pieces or robes' : name.toLowerCase().replace(/ \d$/, '') + 's') + ' in your pack' + (cur ? ' to swap in' : '') + ' yet. They drop from monsters, chests and guardians, and you can buy them on the Market.</p>') + '</div>', md => {
@@ -3799,10 +3823,24 @@
       ? '<b>Victor’s Banner</b><span>+' + fx + '% damage, health, healing and gold. Fallen allies rise in <b>' + L.WARWIN_REVIVE + 's</b></span>' + tipI(d.name + ' won Grand War Season ' + w.season + ' and holds the Nexus. Every hero under its banner gets this until the next season is crowned.')
       : '<b>' + esc(d.name) + ' holds the Nexus</b><span>Victor’s Banner for its heroes</span>' + tipI(d.name + ' won Grand War Season ' + w.season + '. Heroes under its banner get +' + fx + '% damage, health, healing and gold, and fallen allies rise in ' + L.WARWIN_REVIVE + ' seconds, until the next season is crowned. Your play here counts for your banner in the Grand War too.'));
   }
+  // The banner lantern: shows your banner's live Grand War territories and the buff they give (v117).
+  function paintBanner() {
+    const el = $('bannerlamp'); if (!el) return;
+    const n = S.hero ? L.terrHeld(S) : 0, d = S.hero && L.SIDES[L.sideOf ? L.sideOf(S) : S.hero.side];
+    el.hidden = !n || !d; if (el.hidden) return;
+    const pct = Math.round(L.terrBonus(S) * 100), tot = S.warLive.total;
+    el.style.setProperty('--side', d.color);
+    el.innerHTML = icon('lantern') + '<b>' + n + '</b>';
+    el.dataset.tip = d.name + ' holds ' + n + (tot ? ' of ' + tot : '') + ' Grand War territories' + (S.warLive.week ? ' this week (week ' + S.warLive.week + ')' : '') + '. Every hero under its banner gets +' + pct + '% damage, health, healing and gold here. +' + Math.round(L.TERR_PER * 100) + '% per territory, up to +' + Math.round(L.TERR_MAX * 100) + '%. Win more territories in the store’s Grand War to raise it.';
+    el.setAttribute('aria-label', el.dataset.tip);
+  }
+  setInterval(paintBanner, 15000);
   async function loadWarWin() {
     try {
       const r = await fetch(WAR_SITE + '/api/nexus.json'); if (!r.ok) return;
       const m = await r.json(), side = m && L.WAR_KEY[m.nexus];
+      if (m && m.live && m.live.held) { const held = {}; for (const k in m.live.held) if (L.WAR_KEY[k]) held[L.WAR_KEY[k]] = +m.live.held[k] || 0; S.warLive = { held, total: +m.live.total || 0, week: m.live.week }; } else S.warLive = null;
+      paintBanner();
       const next = side ? { side, season: m.season } : null, was = S.warWin;
       S.warWin = next;
       if (next && (!was || was.season !== next.season) && L.warWinOn(S)) toast('crown', 'Victor’s Banner', L.SIDES[side].name + ' won Grand War Season ' + next.season + '. Your heroes get +' + Math.round(L.WARWIN_FX.dps * 100) + '% damage, health, healing and gold until the next season.', 'feat');
@@ -4099,8 +4137,17 @@
   function pingMentions(k, add) {
     const hits = add.filter(mentionsMe); if (!hits.length) return;
     const m = hits[hits.length - 1], ch = CH_NAME[k.split(':')[0]] || 'chat';
-    if (!viewing(k)) { chat.ment[k] = (chat.ment[k] || 0) + hits.length; toast('chat', m.name + ' mentioned you in ' + ch, String(m.text).replace(ITEM_TOKEN, '[item]').slice(0, 90), 'feat'); try { sfx.coin(); } catch (e) {} }
+    // v117 (John: "the @ didnt let you know about it"): a ping always toasts (so it lands in the bell) and chimes,
+    // even with that channel open; the line flashes; the chat button and the browser tab show it while you are away.
+    if (!viewing(k)) chat.ment[k] = (chat.ment[k] || 0) + hits.length;
+    toast('chat', '@ ' + m.name + ' mentioned you in ' + ch, String(m.text).replace(ITEM_TOKEN, '[item]').slice(0, 90), 'feat');
+    try { sfx.relic(); } catch (e) {}
+    chat.flash = new Set(hits.map(x => x.id)); setTimeout(() => { chat.flash = null; }, 2500);
+    if (document.hidden) { chat.away = (chat.away || 0) + hits.length; document.title = '(' + chat.away + ') @ ' + BASE_TITLE; }
+    paintUnread();
   }
+  const BASE_TITLE = document.title;
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && chat.away) { chat.away = 0; document.title = BASE_TITLE; } });
   try { JSON.parse(localStorage.getItem('lanternhold.muted') || '[]').forEach(x => chat.muted.add(x)); } catch (e) {}
   const roomKey = () => chat.ch + (chat.ch === 'party' ? ':' + (chat.leader || 'mine') : '');
   async function chatCall(method, path, body) {
@@ -4163,7 +4210,7 @@
   function previewItem(tok) {
     ITEM_TOKEN.lastIndex = 0; const m = ITEM_TOKEN.exec(tok), it = m && itemFromToken(m); if (!it) return;
     const set = it.set && L.SETS.find(x => x.id === it.set), rar = L.RARITY.find(r => r.id === it.rar);
-    modal('<div class="itemhead r-' + it.rar + '"><div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt=""></div><div><h2>' + esc(itemLabel(it)) + '</h2><small>' + rar.name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + L.CLASSES[it.cls].name + ' only &middot; found on floor ' + it.ilvl + '</small></div></div>' +
+    modal('<div class="itemhead r-' + it.rar + '"><div class="tile r-' + it.rar + '"><img class="iimg" src="' + itemIco(it) + '" alt=""></div><div><h2>' + esc(itemLabel(it)) + '</h2><small>' + rar.name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + L.CLASSES[it.cls].name + ' only &middot; found on floor ' + it.ilvl + '</small></div></div>' +
       '<p class="effect">' + itemEffect(it) + '</p>' +
       (set ? '<div class="setinfo on"><b>' + set.name + '</b><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
       '<p class="note">A preview of an item linked in chat. Viewing it does not add it to your pack.</p><div class="row"><button class="btn ghost" id="lp-x">Close</button></div>', md => { md.querySelector('#lp-x').onclick = closeModal; });
@@ -4183,7 +4230,7 @@
     const dm = chat.ch === 'dm';
     if (dm) return paintWhispers(log, list, atBottom);
     $('dmto').hidden = true;
-    log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + (mentionsMe(m) ? ' ment' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
+    log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + (mentionsMe(m) ? ' ment' + (chat.flash && chat.flash.has(m.id) ? ' flash' : '') : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
       : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'help' ? 'Help chat. Stuck on something? Ask here and other delvers and the Lantern Keepers can answer. The wiki at lanternhold.born2gamellc.com/wiki has guides too.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : chat.ch === 'dm' ? 'No whispers yet. Tap a player’s name in any channel and choose Whisper to message them privately.' : 'Quiet down here. Say hello.') + '</p></div>';
     if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
   }
@@ -4200,16 +4247,20 @@
     chat.seen[k] = l[l.length - 1].id; if (k === 'dm') try { localStorage.setItem('lh_seen_dm', chat.seen.dm); } catch (e) {}
   }
   const unread = k => (chat.msgs[k] || []).filter(m => m.id > (chat.seen[k] || '') && m.from !== chat.me && m.from !== 'sys' && !chat.muted.has(m.from)).length;
+  let dockPaint = () => {};
   function paintUnread() {
     const n = WATCH.reduce((a, k) => a + unread(k), 0) + Object.keys(chat.ment || {}).filter(k => !WATCH.includes(k)).reduce((a, k) => a + chat.ment[k], 0), d = $('chatdot');
     d.hidden = !n || chat.open; d.textContent = n > 9 ? '9+' : n || '';
     $('btn-chat').setAttribute('aria-label', n ? 'Open chat, ' + n + ' unread' : 'Open chat');
+    const mn = Object.keys(chat.ment || {}).reduce((a, k) => a + chat.ment[k], 0); $('btn-chat').classList.toggle('ment', !!mn && !chat.open); d.classList.toggle('ment', !!mn);
+    dockPaint();
     document.querySelectorAll('#chatch [data-ch]').forEach(b => { const k = b.dataset.ch; b.classList.toggle('unread', WATCH.includes(k) && k !== roomKey() && unread(k) > 0); b.classList.toggle('ment', k !== roomKey() && !!(chat.ment && chat.ment[k])); });
   }
   // While chat is closed (or on another channel), check Whispers and Global now and then for the unread bubble.
   async function bgPoll() {
     clearTimeout(chat.bg);
-    if (CL && signedIn() && S.hero && !document.hidden) {
+    if (CL && signedIn() && S.hero && (!document.hidden || Date.now() - (chat.bgAt || 0) > 55000)) {
+      chat.bgAt = Date.now();
       for (const k of BG_ROOMS) {
         if (viewing(k)) continue;
         try {
@@ -4331,6 +4382,33 @@
       }
       if (e.target.closest('#dm-new')) { newWhisper(); return; } const c = e.target.closest('[data-dmpick]'); if (c) { chat.dmTo = { pid: c.dataset.dmpick, name: c.dataset.dmname }; paintChat(); $('chatin').focus(); } });
     setTimeout(bgPoll, 4000);
+    // ---------- chat dock (v117, player ask: "make the chat bar more like Torn's") ----------
+    // On wide screens a bar along the bottom holds a tab per channel and one per recent whisper, each with its own
+    // unread or @ count, so every conversation is one click away. Tapping a tab opens chat right there.
+    const dock = document.createElement('div'); dock.id = 'chatdock'; dock.className = 'chatdock'; dock.hidden = true; document.body.appendChild(dock);
+    const DOCK_CH = ['global', 'banner', 'trade', 'help', 'party'];
+    function paintDock() {
+      const on = CL && signedIn() && S.hero && !chat.open && matchMedia('(min-width:721px)').matches;
+      dock.hidden = !on; document.body.classList.toggle('hasdock', !!on); if (!on) return;
+      const ment = k => (chat.ment && chat.ment[k]) || 0;
+      const badge = (n, m) => m ? '<i class="dk ment">@' + (m > 1 ? m : '') + '</i>' : n ? '<i class="dk">' + (n > 99 ? '99+' : n) + '</i>' : '';
+      const dl = chat.msgs.dm || [], people = dmPartners(dl).filter(p => !(chat.dmHidden[p.pid] && p.last <= chat.dmHidden[p.pid])).slice(0, 6);
+      const h = DOCK_CH.map(k => '<button class="dtab' + (ment(k) ? ' hot' : '') + '" data-dock="' + k + '">' + CH_NAME[k] + badge(WATCH.includes(k) ? unread(k) : 0, ment(k)) + '</button>').join('') +
+        (people.length ? '<span class="dsep"></span>' : '') +
+        people.map(p => { const n = dl.filter(m => m.from === p.pid && m.id > (chat.dmSeen[p.pid] || chat.seen.dm || '')).length;
+          return '<button class="dtab dm' + (n ? ' hot' : '') + '" data-dockdm="' + esc(p.pid) + '" data-dname="' + esc(p.name) + '"><b class="dav">' + esc(p.name.charAt(0).toUpperCase()) + '</b>' + esc(p.name) + badge(n, 0) + '<span class="dx" data-dockx="' + esc(p.pid) + '" title="Close" aria-label="Close chat with ' + esc(p.name) + '">&times;</span></button>'; }).join('') +
+        '<button class="dtab dnew" data-docknew="1" title="New whisper" aria-label="New whisper">+</button>';
+      if (dock.dataset.h !== h) { dock.innerHTML = h; dock.dataset.h = h; }
+    }
+    dock.addEventListener('click', e => {
+      const x = e.target.closest('[data-dockx]');
+      if (x) { e.stopPropagation(); const pid = x.dataset.dockx, l = (chat.msgs.dm || []).filter(m => dmOther(m).pid === pid);
+        chat.dmHidden[pid] = l.length ? l[l.length - 1].id : '0'; try { localStorage.setItem('lh_dm_hidden', JSON.stringify(chat.dmHidden)); } catch (e2) {} if (chat.dmTo && chat.dmTo.pid === pid) chat.dmTo = null; paintDock(); return; }
+      const c = e.target.closest('[data-dock]'); if (c) { openChat(true); setChannel(c.dataset.dock); return; }
+      const d = e.target.closest('[data-dockdm]'); if (d) { whisperTo(d.dataset.dockdm, d.dataset.dname); return; }
+      if (e.target.closest('[data-docknew]')) { openChat(true); setChannel('dm'); newWhisper(); }
+    });
+    addEventListener('resize', () => paintDock()); dockPaint = paintDock;
     // @ autocomplete: type @ and a few letters, then tap a name (or press Tab / Enter) to fill it in.
     const atBox = document.createElement('div'); atBox.className = 'atbox'; atBox.id = 'atbox'; atBox.hidden = true; $('chatform').appendChild(atBox);
     let atSel = 0, atList = [];
@@ -5207,6 +5285,16 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 117, date: 'November 24, 2026', title: 'Real weapons, one inventory and the banner lantern', items: [
+      'Weapons now have types with their own jobs. Sword (Tank, Rogue): +2% life steal. Dagger (Rogue): +5% critical hits. Mace (Tank, Healer): +8% damage to bosses. Morningstar (Tank): +15% damage. Staff (Healer, Mage) and Scepter (Necro, Healer): +10% healing or spell power. Wand (Mage, Necro): +10% mana regen and +3% critical hits.',
+      'Off-hands too: Shield (Tank) +4% block, Parrying dagger (Rogue) +3% dodge, Tome (Healer, Necro) +8% healing and life drain, Orb (Mage) +4% critical hits.',
+      'Armour goes by weight: plate for Tanks, leather for Rogues, cloth for Healers, Mages and Necromancers. Rings and trinkets fit any class. Your old gear keeps its stats and gets a type.',
+      'New, detailed item art, so you can tell a sword from a staff at a glance.',
+      'One inventory: every spare piece in one list. Filter by weapons, off-hands, armour or jewellery, by rarity and by who can use it, and sort by best, level, rarity, type or newest. Each item shows which classes can use it.',
+      'The banner lantern: the more Grand War territories your banner holds right now, the stronger you are here. +1% damage, health, healing and gold per territory, up to +15%. Hover the lantern at the top right to see it.',
+      '@ mentions are loud now: a toast, a chime, a flashing @you line, a glowing chat button and a count on the browser tab.',
+      'A chat bar along the bottom on wider screens, with a tab for each channel and each whisper, each with its own unread count.',
+      'Mercy Corps wounded companions have their own art: a bandaged medic on a bedroll.'] },
     { v: 116, date: 'November 24, 2026', title: 'Specialist shops and a Help channel', items: [
       'The Armorer’s forge: every merge at the Armorer carries 25% less risk than merging in the field. The Armorer now has a Mass merge tab too.',
       'The Enchanter’s touch: enchants moved at the Enchanter keep their tier and have a 15% chance to come out one tier stronger.',
@@ -5739,14 +5827,14 @@
   // Items and gold live in each player's save, so the client moves them; the server keeps
   // listings, offers and letters so both sides see the same thing.
   const trade = { view: 'market', cls: null, mine: false, list: null, mail: null, msg: '', busy: false, slot: 'all', rar: 'all', sort: 'cheap' };
-  const tradeItem = it => L.normItem({ cls: it.cls, slot: it.slot, rar: it.rar, set: it.set || undefined, jset: it.jset || undefined, aff: it.aff || undefined, en: typeof it.en === 'string' ? it.en : '', ilvl: it.ilvl, up: it.up || 0 });
+  const tradeItem = it => L.normItem({ cls: it.cls, slot: it.slot, rar: it.rar, set: it.set || undefined, jset: it.jset || undefined, aff: it.aff || undefined, en: typeof it.en === 'string' ? it.en : '', ty: it.ty || undefined, ilvl: it.ilvl, up: it.up || 0 });
   const fromServer = it => Object.assign(tradeItem(it), { uid: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) });
   // Letters and listings from before the gold rescale are shown and paid in today's gold.
   const nowGold = (g, at) => at && at < L.ECON_AT ? Math.max(1, Math.round(L.regold(g, L.lvl(S, 'you')))) : g;
   const bagFull = () => L.packCount(S) >= L.bagCap(S);
   const shTile = k => '<div class="tile shtile sh' + k + '">' + icon('relic') + '</div>';
   const shName = (k, n) => n + ' ' + (L.WB_SETS[k] ? L.WB_SETS[k].word : 'boss') + ' shard' + (n === 1 ? '' : 's');
-  const tradeTile = it => it.shard != null ? shTile(it.shard) : it.sig ? '<div class="tile sigtile">' + sigil + '</div>' : (L.normItem(it), '<div class="tile r-' + it.rar + '"><img class="iimg" src="' + SP.itemIcon(it.cls, it.slot, it.rar) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>');
+  const tradeTile = it => it.shard != null ? shTile(it.shard) : it.sig ? '<div class="tile sigtile">' + sigil + '</div>' : (L.normItem(it), '<div class="tile r-' + it.rar + '"><img class="iimg" src="' + itemIco(it) + '" alt="">' + (it.up ? '<i class="upn">+' + it.up + '</i>' : '') + '</div>');
   const tradeName = it => it.shard != null ? shName(it.shard, it.n) : it.sig ? it.sig.toLocaleString() + ' ' + TOKEN : esc(L.gearName(it)) + (it.up ? ' +' + it.up : '');
   const tradeSub = it => (L.normItem(it), 0) || L.RARITY.find(r => r.id === it.rar).name + ' ' + L.CLASSES[it.cls].name.toLowerCase() + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' &middot; ' + itemEffect(it);
   const tradeErr = (e, what) => {
@@ -5852,7 +5940,7 @@
     return list.slice().sort(by[trade.sort] || by.cheap);
   }
   // How a listed item compares with what your best-fitting character of that class wears now.
-  function marketOwner(it) { const ids = S.unlocked.filter(id => { const m = L.memberById(id); return m && !m.guest && m.cls === it.cls; }); return ids.includes('you') ? 'you' : ids[0] || null; }
+  function marketOwner(it) { const ids = S.unlocked.filter(id => { const m = L.memberById(id); return m && !m.guest && L.usable(m.cls, it); }); return ids.includes('you') ? 'you' : ids[0] || null; }
   function marketCmp(it) {
     const id = marketOwner(it); if (!id) return '';
     const d = Math.round((L.itemScore(it) - L.replaces(S, id, it).reduce((a, x) => a + L.itemScore(x), 0)) * 100);
@@ -5915,8 +6003,8 @@
     const om = owner && L.memberById(owner);
     const set = it.set && L.SETS.find(x => x.id === it.set), js = it.jset && L.JOB_SETS[it.jset];
     modal('<div class="icard r-' + it.rar + '"><button class="iconbtn icx" id="l-x" aria-label="Close">&times;</button>' +
-      '<div class="ihero">' + tradeTile(it).replace('class="tile', 'class="tile big') + '<div class="ititle"><span class="irar">' + rar.name + ' ' + L.CLASSES[it.cls].name + ' ' + L.SLOT_NAME[it.slot] + '</span><h2>' + tradeName(it) + '</h2><small>Requires power level <b class="' + (om && !L.canWear(S, owner, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
-      '<div class="istats">' + stats + '</div>' +
+      '<div class="ihero">' + tradeTile(it).replace('class="tile', 'class="tile big') + '<div class="ititle"><span class="irar">' + rar.name + ' ' + esc(typeLine(it).split(' · ')[0].toLowerCase()) + ' &middot; ' + L.SLOT_NAME[it.slot] + '</span><h2>' + tradeName(it) + '</h2><small>Requires power level <b class="' + (om && !L.canWear(S, owner, it) ? 'bad' : '') + '">' + L.reqLevel(it) + '</b> &middot; found on floor ' + it.ilvl + '</small></div></div>' +
+      typeBlock(it, om) + '<div class="istats">' + stats + '</div>' + typeFx(it) +
       (om ? '<p class="icmp">' + (reps.length ? 'Compared with ' + esc(om.name) + '’s ' + reps.map(r => esc(L.gearName(r))).join(' and ') + '.' : esc(om.name) + ' has an open ' + L.SLOT_NAME[it.slot].toLowerCase() + ' slot.') + '</p>' : '<p class="icmp">You have no ' + L.CLASSES[it.cls].name.toLowerCase() + ' yet to wear this.</p>') +
       (it.aff ? '<div class="iaff">' + icon('flame') + '<span><b>+' + Math.round(it.aff.v * (1 + 0.1 * it.up) * 100) + '% ' + (L.JOBS.find(j => j.id === it.aff.j) || {}).name + ' job</b><small>Counts while the wearer works that job at the campfire.</small></span></div>' : '') +
       (js ? '<div class="iset"><b>' + js.name + '</b><small><em>2 pieces</em> +' + Math.round(L.JOB_SET_TWO * 100) + '% job output</small><small><em>3 pieces</em> +' + Math.round(L.JOB_SET_THREE * 100) + '% job output</small></div>' : '') +

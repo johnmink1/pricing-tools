@@ -1,4 +1,4 @@
-/* lh-build 202611241612 */
+/* lh-build 202611241658 */
 /* Lanternhold illustrated sprites. Each sprite is drawn as layered SVG (outline, shading, rim light, detail),
    tinted per companion or biome, rendered once to an image and then drawn on the arena canvas. */
 (function (root) {
@@ -324,6 +324,50 @@
       P('M55 51 Q60 55 65 51', 'none', ' stroke-width="1.3"'),
       E(51, 50, 2.6, 1.5, '#ff8a7a', ' opacity=".35"'), E(69, 50, 2.6, 1.5, '#ff8a7a', ' opacity=".35"'),
       L_('M49 38 Q53 36 57 38 M63 38 Q67 36 71 38', '#a3a8b6', 1.1),
+    ].join('');
+  } };
+  // Mercy Corps wounded (v117, John: "needs better art"): a field medic slumped against a boulder on a bedroll,
+  // head bandaged, arm in a sling, the Corps' green heart on tabard and satchel, a dimmed lantern at their side.
+  // Faces left, toward the party. 200x130 so it reads as a scene, not another party healer.
+  ART.wounded = { w: 200, h: 130, draw(c) {
+    const rock = c.lg(['#6b6475', '#4a4452', '#2c2832'], 0, 0, 1, 1), moss = c.lg(['#4f8a46', '#2f5a2a']);
+    const roll = c.mat('#3f7a5a'), rollD = c.t('#1f4a34'), tab = c.lg(['#fbf8f0', '#e4dccb', '#bfb39a'], 0, 0, 1, 1), tabD = c.t('#8a7f68');
+    const pants = c.mat('#5b4a3a'), boot = c.lg(['#4a3424', '#22160e']), skin = c.lg([SK.light, SK.mid], 0, 0, 1, 1), hair = c.lg(['#7a4a26', '#4a2a14']);
+    const bag = c.lg(['#a87a46', '#6e4a26'], 0, 0, 1, 1), white = c.lg(['#ffffff', '#e8e8ea']), heart = '#22c55e', heartD = '#15803d';
+    const hrt = (x, y, k) => P('M' + x + ' ' + (y + 3 * k) + ' C' + (x - 7 * k) + ' ' + (y - 3 * k) + ' ' + (x - 3 * k) + ' ' + (y - 8 * k) + ' ' + x + ' ' + (y - 4 * k) + ' C' + (x + 3 * k) + ' ' + (y - 8 * k) + ' ' + (x + 7 * k) + ' ' + (y - 3 * k) + ' ' + x + ' ' + (y + 3 * k) + 'Z', heart, ' stroke="' + heartD + '" stroke-width="1"');
+    return [
+      E(104, 122, 92, 7, '#000000', ' opacity=".35"'),
+      // boulder and moss
+      P('M118 122 Q112 70 134 46 Q160 26 184 44 Q198 66 194 122Z', rock), Pn('M160 34 Q190 46 194 80 Q194 104 190 122 L176 122 Q184 80 160 34Z', '#1e1b24', ' opacity=".35"'),
+      Pn('M132 50 Q150 36 170 38 Q150 44 140 56Z', '#8a8496', ' opacity=".6"'), P('M120 120 Q126 108 140 112 Q150 104 164 112 Q176 108 192 120Z', moss, ' stroke-width="1.6"'),
+      // bedroll
+      P('M30 112 Q30 102 44 102 H150 Q162 104 160 114 Q158 122 146 122 H42 Q30 122 30 112Z', roll), Pn('M44 114 H150 Q158 116 156 120 H42Z', rollD, ' opacity=".5"'),
+      L_('M60 103 V121 M120 103 V121', '#e6c08a', 1.6),
+      // legs stretched toward the party, boots up
+      P('M110 98 Q80 96 54 100 L54 110 Q82 110 112 110Z', pants), P('M108 88 Q84 90 62 92 L62 101 Q86 101 112 100Z', pants),
+      P('M44 92 Q40 92 40 100 L40 112 Q46 116 56 112 L56 98 Q52 92 44 92Z', boot), P('M52 82 Q48 82 48 90 L48 101 Q54 104 64 101 L64 88 Q60 82 52 82Z', boot),
+      // torso leaning back on the boulder: Mercy Corps tabard over a dark undershirt
+      P('M104 106 Q98 80 110 58 Q122 46 138 54 Q146 72 140 106Z', c.mat('#3a4a5a')),
+      P('M108 104 Q104 82 114 62 Q124 54 134 60 Q140 78 136 104Z', tab), Pn('M126 58 Q136 62 136 104 L128 104 Q132 80 126 58Z', tabD, ' opacity=".35"'),
+      hrt(122, 80, 1.3), L_('M108 104 H136', '#bfb39a', 1.4),
+      // right arm in a white sling across the chest
+      P('M110 66 Q100 76 104 88 Q112 92 126 86 L124 80 Q114 82 112 78Z', c.mat('#3a4a5a')), P('M102 84 Q112 94 130 84 L132 90 Q114 100 100 90Z', white, ' stroke-width="1.6"'),
+      L_('M114 62 L132 88', '#d4d4d8', 2.4), Eo(102, 87, 4.6, 4.2, skin),
+      // left arm down to the ground, resting by a dim lantern
+      P('M136 64 Q146 80 140 104 L132 104 Q136 86 130 72Z', c.mat('#3a4a5a')), Eo(136, 107, 4.6, 4.2, skin),
+      // head tipped back against the rock, eyes closed, bandage with a red mark
+      P('M116 40 Q114 22 130 20 Q146 22 146 38 Q146 54 132 56 Q116 54 116 40Z', skin),
+      P('M115 36 Q114 16 132 16 Q150 18 147 38 Q142 26 132 26 Q120 26 115 36Z', hair),
+      P('M114 30 Q130 24 148 30 L148 37 Q130 31 114 37Z', white, ' stroke-width="1.6"'), E(122, 33, 3, 2, '#e5484d', ' opacity=".85"'), L_('M146 33 L154 38 M146 35 L152 42', '#e8e8ea', 1.8),
+      L_('M121 42 Q124 44 127 42 M133 42 Q136 44 139 42', '#2a2030', 1.3), L_('M127 49 Q130 47 133 49', '#a0604a', 1.2),
+      E(122, 47, 2.4, 1.4, '#ff8a7a', ' opacity=".3"'), Pn('M140 44 Q144 46 142 50', 'none', ' stroke="#9ad7ff" stroke-width="1"'),
+      // satchel with the green heart, bandage roll spilling out
+      G(P('M60 74 Q58 66 66 64 H90 Q98 66 96 74 L98 94 Q78 100 58 94Z', bag) + L_('M64 66 Q78 50 92 66', '#5a3a1a', 2.2) +
+        P('M60 72 Q78 64 96 72 L94 84 Q78 90 62 84Z', c.t('#7a5430')) + C(78, 85, 2, '#f5c242') + hrt(78, 78, 1) +
+        P('M94 92 Q104 92 110 98 L102 102 Q96 98 92 98Z', white, ' stroke-width="1.4"') + Eo(94, 96, 4, 4, white, ' stroke-width="1.4"'), 'translate(-44 34) scale(.82)'),
+      // dimmed lantern beside the hand
+      P('M150 112 H164 V96 Q164 90 157 90 Q150 90 150 96Z', c.lg(['#ffe9a8', '#f5c242', '#a8742e'], 0, 0, 1, 1), ' stroke-width="1.8" opacity=".9"'),
+      L_('M150 98 H164 M157 90 V86 M152 86 Q157 80 162 86', '#3a2a1a', 1.6), C(157, 104, 9, c.rg([['#fff3c0', 0.5], ['#f5c242', 0.15], ['#f5c242', 0]]), ''),
     ].join('');
   } };
   ART.necro = { w: 120, h: 160, draw(c) {
@@ -918,5 +962,108 @@
     return c.toDataURL();
   }
   for (const n in ART) load(n, 0);
-  root.LHSprites = Object.assign({}, PX, { render, spriteURL, svgOf, OUTFITS, LANTERNS, vector: true, ready: () => waiting === 0 });
+
+  // ---------- Item icons v2 (v117, John: "make the art a little better... hard to tell what items are") ----------
+  // Detailed outlined vector icons per item type. The type comes from the item (it.ty, see core ITYPES); older callers
+  // that pass no type get the class default. The rarity colour tints the gem and glow.
+  const ICON2 = (function () {
+  const K = '#120d0a';
+  const P = (d, f, w) => `<path d="${d}" fill="${f}" stroke="${K}" stroke-width="${w || 2.2}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const Pn = (d, f, x) => `<path d="${d}" fill="${f}"${x || ''}/>`;
+  const L = (d, c, w, x) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w || 1.2}" stroke-linecap="round"${x || ''}/>`;
+  const C = (x, y, r, f, w) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${f}"${w === 0 ? '' : ` stroke="${K}" stroke-width="${w || 2}"`}/>`;
+  let gid = 0;
+  function defs(r) {
+    const id = 'g' + (++gid);
+    return { id, d: `<defs>
+      <linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f7fa"/><stop offset=".45" stop-color="#b9c4cf"/><stop offset="1" stop-color="#5d6b7a"/></linearGradient>
+      <linearGradient id="${id}w" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b07a44"/><stop offset=".5" stop-color="#8a5a2e"/><stop offset="1" stop-color="#4e3018"/></linearGradient>
+      <linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0b8"/><stop offset=".5" stop-color="#f5c242"/><stop offset="1" stop-color="#a87418"/></linearGradient>
+      <radialGradient id="${id}r" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="${r}"/><stop offset="1" stop-color="${shade(r)}"/></radialGradient>
+      <radialGradient id="${id}h"><stop offset="0" stop-color="${r}" stop-opacity=".55"/><stop offset="1" stop-color="${r}" stop-opacity="0"/></radialGradient>
+      <linearGradient id="${id}l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9824e"/><stop offset="1" stop-color="#5a3a1e"/></linearGradient>
+      <linearGradient id="${id}c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="CLOTHL"/><stop offset="1" stop-color="CLOTHD"/></linearGradient>
+    </defs>` };
+  }
+  function shade(h) { const n = parseInt(h.slice(1), 16), f = v => Math.max(0, Math.round(v * 0.45)); return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); }
+  const steel = g => `url(#${g}s)`, wood = g => `url(#${g}w)`, gold = g => `url(#${g}g)`, gem = g => `url(#${g}r)`, halo = g => `url(#${g}h)`, leather = g => `url(#${g}l)`, cloth = g => `url(#${g}c)`;
+  const diag = s => `<g transform="rotate(45 32 32)">${s}</g>`;
+  const ART = {
+    sword: g => diag(P('M32 3 L36.5 10 V40 H27.5 V10Z', steel(g)) + L('M32 9 V38', '#ffffff', 1.1, ' opacity=".8"') + L('M33.6 11 V38', '#5d6b7a', .8) +
+      P('M20 40 H44 Q45 44 41 44 H23 Q19 44 20 40Z', gold(g)) + P('M29.5 44 H34.5 V55 H29.5Z', leather(g)) + L('M29.5 47 L34.5 49 M29.5 50 L34.5 52', '#2a1a0c', 1) + C(32, 58, 3.6, gem(g))),
+    dagger: g => diag(P('M32 12 Q37 18 36 26 L36 40 H28 L28 26 Q27 18 32 12Z', steel(g)) + L('M31 17 Q30 28 31 38', '#ffffff', 1.1, ' opacity=".8"') +
+      P('M22 40 Q32 36 42 40 Q42 44 38 44 H26 Q22 44 22 40Z', gold(g)) + P('M29.5 44 H34.5 V53 H29.5Z', leather(g)) + C(32, 56, 3.2, gem(g))),
+    mace: g => diag(P('M30 26 H34 V58 H30Z', wood(g)) + L('M30 50 L34 52 M30 54 L34 56', '#2a1a0c', 1) +
+      P('M32 4 L39 12 L39 22 L32 28 L25 22 L25 12Z', steel(g)) + P('M32 4 L36 13 L32 28 L28 13Z', '#dfe6ec', 1.2) + P('M24 14 L18 17 L24 20Z', steel(g), 1.6) + P('M40 14 L46 17 L40 20Z', steel(g), 1.6) +
+      P('M27 26 H37 V30 H27Z', gold(g), 1.6) + C(32, 16, 2.6, gem(g), 1.4)),
+    morningstar: g => diag(P('M30 28 H34 V58 H30Z', wood(g)) + P('M28 28 H36 V32 H28Z', gold(g), 1.6) +
+      [0, 45, 90, 135, 180, 225, 270, 315].map(a => `<g transform="rotate(${a} 32 15)">${P('M30 6 L32 -1 L34 6Z', steel(g), 1.4)}</g>`).join('') +
+      C(32, 15, 10, steel(g)) + Pn('M25 11 Q29 7 34 7', 'none', ' stroke="#ffffff" stroke-width="1.6" opacity=".8" stroke-linecap="round"') + C(32, 15, 2.6, gem(g), 1.4)),
+    staff: g => P('M33 60 Q30 40 33 22 Q34 16 31 12', 'none', 3) + L('M33 60 Q30 40 33 22 Q34 16 31 12', '#8a5a2e', 3.6) + L('M32 58 Q29.6 40 32.4 24', '#c79a62', 1) +
+      C(31, 12, 12, halo(g), 0) + P('M24 14 Q22 4 31 3 Q40 3 39 12 Q38 18 33 18', 'none') + L('M24 14 Q22 4 31 3 Q40 3 39 12 Q38 18 33 18', '#8a5a2e', 3) +
+      P('M31 6 L35 11 L31 17 L27 11Z', gem(g), 1.6) + P('M27 30 H37 V34 H27Z', gold(g), 1.4),
+    wand: g => diag(P('M30.5 22 L33.5 22 L35 58 H29Z', wood(g), 1.8) + P('M29 50 H35 V54 H29Z', gold(g), 1.4) + C(32, 14, 11, halo(g), 0) +
+      P('M32 4 L34.5 11 L42 11 L36 15.5 L38.5 23 L32 18.5 L25.5 23 L28 15.5 L22 11 L29.5 11Z', gem(g), 1.6) + C(32, 13.5, 1.8, '#ffffff', 0)),
+    scepter: g => diag(P('M30 24 H34 V58 H30Z', gold(g), 1.8) + L('M30 34 H34 M30 44 H34', '#8a6420', 1.2) + P('M23 20 Q32 26 41 20 L39 26 Q32 30 25 26Z', gold(g), 1.8) +
+      P('M24 20 L25 8 L29 13 L32 5 L35 13 L39 8 L40 20Z', gold(g)) + C(32, 16, 3.6, gem(g), 1.6) + C(32, 60, 2.6, gem(g), 1.4)),
+    shield: g => P('M32 4 L54 11 Q55 38 32 60 Q9 38 10 11Z', steel(g)) + P('M32 9 L49 14 Q49 36 32 54 Q15 36 15 14Z', `url(#${g}c)`, 1.4) +
+      L('M32 9 V54 M17 26 H47', '#120d0a', 1.4, ' opacity=".35"') + C(32, 28, 6, gold(g)) + C(32, 28, 2.6, gem(g), 1.2) + L('M14 13 Q32 6 50 13', '#ffffff', 1.2, ' opacity=".6"'),
+    parry: g => diag(P('M32 8 L35.5 14 V40 H28.5 V14Z', steel(g)) + L('M32 13 V38', '#ffffff', 1, ' opacity=".8"') +
+      P('M18 38 Q24 42 32 40 Q40 42 46 38 L44 45 Q32 42 20 45Z', gold(g), 1.8) + P('M29.5 44 H34.5 V54 H29.5Z', leather(g)) + C(32, 57, 3, gem(g))),
+    tome: g => P('M12 12 Q12 8 16 8 H50 V54 H16 Q12 54 12 50Z', `url(#${g}c)`) + P('M16 50 H50 V56 H16 Q12 56 12 52 Q12 50 16 50Z', '#efe6cf', 1.8) +
+      P('M18 8 H22 V50 H18Z', gold(g), 1.4) + C(36, 28, 10, halo(g), 0) + P('M36 18 L42 28 L36 38 L30 28Z', gem(g), 1.6) + P('M48 24 H54 V34 H48Z', gold(g), 1.6),
+    orb: g => C(32, 25, 17, halo(g), 0) + P('M20 52 Q32 44 44 52 L46 58 H18Z', gold(g)) + L('M22 46 Q18 36 24 30 M42 46 Q46 36 40 30 M32 44 V40', '#a87418', 2.4) +
+      C(32, 26, 13, gem(g)) + Pn('M24 20 Q28 14 35 15', 'none', ' stroke="#ffffff" stroke-width="2.4" opacity=".85" stroke-linecap="round"') + C(30, 30, 2, '#ffffff', 0),
+    // armour by weight
+    helm: g => P('M14 30 Q14 8 32 8 Q50 8 50 30 V50 Q50 54 46 54 H18 Q14 54 14 50Z', steel(g)) + P('M20 30 H44 V35 H20Z', '#1a2030', 1.6) + L('M32 36 V52 M26 40 V48 M38 40 V48', '#2a3440', 1.4) +
+      L('M32 8 V28', '#ffffff', 1.4, ' opacity=".55"') + P('M29 2 Q32 -1 35 2 L34 9 H30Z', gem(g), 1.4),
+    hood: g => P('M10 54 Q10 18 32 8 Q54 18 54 54 Q44 48 32 48 Q20 48 10 54Z', leather(g)) + P('M20 50 Q20 26 32 20 Q44 26 44 50 Q38 44 32 44 Q26 44 20 50Z', '#120d0a', 1.2) +
+      C(27, 36, 1.6, '#ffd36a', 0) + C(37, 36, 1.6, '#ffd36a', 0) + L('M16 48 Q14 30 26 16', '#d9a46a', 1.2, ' opacity=".6"') + C(32, 52, 3, gem(g), 1.4),
+    circlet: g => P('M10 38 Q32 26 54 38 L52 44 Q32 34 12 44Z', gold(g)) + P('M27 32 L32 18 L37 32Z', gold(g), 1.8) + C(32, 26, 4.4, gem(g), 1.6) + C(18, 37, 2.2, gem(g), 1.2) + C(46, 37, 2.2, gem(g), 1.2),
+    chest: g => P('M16 10 L26 8 Q32 14 38 8 L48 10 L54 20 L48 26 V54 Q32 60 16 54 V26 L10 20Z', steel(g)) + L('M32 16 V54', '#5d6b7a', 1.4) + L('M20 30 Q32 36 44 30 M20 42 Q32 48 44 42', '#5d6b7a', 1.3) +
+      P('M10 20 L16 10 L22 14 L16 26Z', steel(g), 1.8) + P('M54 20 L48 10 L42 14 L48 26Z', steel(g), 1.8) + C(32, 22, 3.2, gem(g), 1.4),
+    jerkin: g => P('M18 10 L27 8 Q32 13 37 8 L46 10 L52 22 L46 26 V54 Q32 58 18 54 V26 L12 22Z', leather(g)) + L('M32 14 V54', '#2a1a0c', 1.4) +
+      L('M28 18 L36 22 M28 24 L36 28 M28 30 L36 34', '#e8c48a', 1.2) + P('M18 44 H46 V49 H18Z', '#3a2414', 1.4) + P('M29 43 H35 V50 H29Z', gold(g), 1.2) + C(41, 18, 2.2, gem(g), 1.2),
+    robe: g => P('M20 8 L28 6 Q32 11 36 6 L44 8 L48 22 L44 24 L50 58 H14 L20 24 L16 22Z', `url(#${g}c)`) + P('M28 6 Q32 11 36 6 L34 58 H30Z', '#efe6cf', 1.4) +
+      L('M14 58 H50', gold(g), 3) + L('M24 26 L20 56 M40 26 L44 56', '#120d0a', 1, ' opacity=".3"') + C(32, 18, 2.8, gem(g), 1.3),
+    greaves: g => P('M18 8 H46 V20 L42 56 H34 L32 28 L30 56 H22 L18 20Z', steel(g)) + P('M18 8 H46 V14 H18Z', gold(g), 1.6) + P('M21 32 Q26 28 30 32 Q26 38 21 32Z M34 32 Q38 28 43 32 Q38 38 34 32Z', '#dfe6ec', 1.4),
+    boots: g => P('M14 10 H30 V40 L46 44 Q54 46 54 54 V56 H14Z', leather(g)) + P('M14 10 H30 V16 H14Z', '#3a2414', 1.4) + P('M14 52 H54 V58 H14Z', '#2a1a0c', 1.6) + L('M18 24 H28 M18 30 H28', '#e8c48a', 1.2) + C(22, 13, 2, gem(g), 1),
+    ring: g => C(32, 22, 18, halo(g), 0) + `<ellipse cx="32" cy="38" rx="17" ry="16" fill="none" stroke="${K}" stroke-width="9"/><ellipse cx="32" cy="38" rx="17" ry="16" fill="none" stroke="${gold(g)}" stroke-width="5.4"/>` +
+      Pn('M18 32 Q22 26 28 24', 'none', ' stroke="#fff6cf" stroke-width="1.6" stroke-linecap="round"') + P('M24 22 L28 14 H36 L40 22 L32 30Z', gold(g), 1.8) + P('M26 21 L29 15 H35 L38 21 L32 27Z', gem(g), 1.4),
+    trinket: g => L('M14 4 Q32 26 50 4', '#a87418', 2.4) + C(32, 38, 20, halo(g), 0) + P('M32 18 Q44 22 46 36 Q44 52 32 58 Q20 52 18 36 Q20 22 32 18Z', gold(g)) +
+      P('M32 25 Q40 28 40 37 Q39 47 32 51 Q25 47 24 37 Q24 28 32 25Z', gem(g), 1.6) + C(29, 32, 2.2, '#ffffff', 0) + C(32, 16, 3, gold(g), 1.6),
+    sabaton: g => P('M16 8 H32 V36 L48 40 Q56 42 56 52 V56 H14 V40Z', steel(g)) + P('M16 8 H32 V14 H16Z', gold(g), 1.6) + L('M16 22 H32 M16 30 H32', '#5d6b7a', 1.3) + L('M34 40 Q44 44 50 50', '#ffffff', 1.2, ' opacity=".6"') + C(24, 11, 2, gem(g), 1),
+    breeches: g => P('M18 8 H46 V18 L43 56 H34 L32 26 L30 56 H21 L18 18Z', leather(g)) + P('M18 8 H46 V13 H18Z', '#3a2414', 1.4) + P('M29 7 H35 V14 H29Z', gold(g), 1.2) + L('M23 30 L26 50 M41 30 L38 50', '#e8c48a', 1.1, ' stroke-dasharray="2 2.5"'),
+    leggings: g => P('M19 8 H45 V18 L42 56 H34 L32 24 L30 56 H22 L19 18Z', cloth(g)) + P('M19 8 H45 V13 H19Z', gold(g), 1.4) + L('M22 50 H30 M34 50 H42', gold(g), 2) + C(32, 10.5, 1.8, gem(g), 1),
+    slippers: g => P('M10 40 Q10 30 22 30 H34 Q40 30 46 36 Q56 40 56 48 Q56 54 48 54 H16 Q10 54 10 48Z', cloth(g)) + P('M10 48 H56 V54 Q56 56 52 56 H14 Q10 56 10 52Z', '#2a1a0c', 1.4) + L('M24 32 Q30 40 40 34', gold(g), 1.8) + C(52, 40, 3, gem(g), 1.3),
+  };
+  const CLOTHS = { plate: ['#3a5fa8', '#22396b'], leather: ['#6b4a2a', '#3a2414'], cloth: ['#5aa04e', '#2e5a2c'], arcane: ['#c2552a', '#6a2414'], grave: ['#6c4aa8', '#2e1e52'] };
+  function icon(type, rar, cl, size) {
+    const g = defs(rar); const cc = CLOTHS[cl] || CLOTHS.plate;
+    const inner = g.d.replace('CLOTHL', cc[0]).replace('CLOTHD', cc[1]) + ART[type](g.id);
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 68 68" width="${size || 64}" height="${size || 64}">${inner}</svg>`;
+  }
+
+  const RAR2 = { common: '#9aa4ae', fine: '#4ade80', rare: '#60a5fa', epic: '#c084fc', set: '#34d399', goblin: '#f5c242', legend: '#f97316' };
+  const CL2 = { tank: 'plate', rogue: 'leather', healer: 'cloth', mage: 'arcane', necro: 'grave' };
+  const MAIN0 = { tank: 'mace', healer: 'staff', rogue: 'dagger', mage: 'wand', necro: 'scepter' }, OFF0 = { tank: 'shield', healer: 'tome', rogue: 'parry', mage: 'orb', necro: 'tome' };
+  const WEIGHT0 = { tank: 'plate', rogue: 'leather' };
+  const ARMOR = { plate: { head: 'helm', chest: 'chest', robe: 'chest', legs: 'greaves', feet: 'sabaton' }, leather: { head: 'hood', chest: 'jerkin', robe: 'jerkin', legs: 'breeches', feet: 'boots' }, cloth: { head: 'circlet', chest: 'robe', robe: 'robe', legs: 'leggings', feet: 'slippers' } };
+  function artOf(cls, slot, ty) {
+    if (slot === 'ring') return 'ring'; if (slot === 'neck') return 'trinket';
+    if (slot === 'main') return ART[ty] && ty !== 'shield' ? ty : MAIN0[cls] || 'sword';
+    if (slot === 'off') return ART[ty] ? ty : OFF0[cls] || 'shield';
+    const w = ty === 'plate' || ty === 'leather' || ty === 'cloth' ? ty : WEIGHT0[cls] || 'cloth';
+    return (ARMOR[w] || ARMOR.cloth)[slot] || 'chest';
+  }
+  const cache = {};
+  function itemIcon(cls, slot, rar, scale, ty) {
+    const k = cls + slot + rar + (ty || ''); if (cache[k]) return cache[k];
+    const r = RAR2[rar] || RAR2.common, g = defs(r), cc = CLOTHS[CL2[cls]] || CLOTHS.plate;
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 68 68" width="128" height="128">' + g.d.replace('CLOTHL', cc[0]).replace('CLOTHD', cc[1]) + ART[artOf(cls, slot, ty)](g.id) + '</svg>';
+    return (cache[k] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+  }
+  return { itemIcon, artOf };
+  })();
+  root.LHSprites = Object.assign({}, PX, { render, spriteURL, svgOf, OUTFITS, LANTERNS, vector: true, itemIcon: ICON2.itemIcon, itemArt: ICON2.artOf, ready: () => waiting === 0 });
 })(this);

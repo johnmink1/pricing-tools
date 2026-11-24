@@ -1,6 +1,10 @@
 # Lanternhold handoff (24 Nov 2026)
 
-This handoff stands on its own for the new Lanternhold project. It is current as of **v116**, live at https://lanternhold.born2gamellc.com.
+This handoff stands on its own for the new Lanternhold project. It is current as of **v117**, live at https://lanternhold.born2gamellc.com.
+
+## Release rule (John, 24 Nov 2026)
+
+Do not ship changes one at a time. Collect everything John asks for into one numbered release, build and test it all together, then ship it once with a single summary of what changed. Only an urgent fix to something broken goes out on its own.
 
 ## Where the code lives
 
@@ -9,7 +13,7 @@ This handoff stands on its own for the new Lanternhold project. It is current as
 | Path | What it is |
 |---|---|
 | `lanternhold/core.js` | All game rules: classes, foes, loot, crafting, events, the `api` export list. Any new function must be added to that big export list at the bottom. |
-| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v117**. |
+| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v118**. |
 | `lanternhold/style.css`, `index.html` | Styles and markup. |
 | `lanternhold/vector.js` | Illustrated SVG sprites (`ART.enchanter`, `ART.armorer`, classes, foes). |
 | `lanternhold/sprites.js` | Pixel fallback sprites and `itemIcon`. |
@@ -109,6 +113,15 @@ There is no working AWS CLI. The cloud container's keys are invalid, and VENGEAN
   - v113 pacing v3 (John, 24 Nov 2026: leveling too slow, too long to reach the other parts of the game): `XP_A` 330→160, `XP_POW` 2.27→1.9; unlocks gear 2, camp 3, map/buy 5, jobs 6, guild 8, ring 10, sell 12, rekindle 15, boss/jset 18 (were 3/5/8/8/10/12/15/18/20/25/25); `JOB_SLOT_LV` [6,10,15,20,25,30]. Estimated steady play: level 10 in ~2 h (was 8), 20 in ~11 h (was 59). Level is derived from total `hxp`, so existing heroes jump up (old 12 → new 18). No server-side level gates exist.
   - v114 @mentions (John, 24 Nov 2026), client only: `knownChatters()` feeds the `#atbox` autocomplete (Tab/Enter/arrows); `mentionsMe(m)` matches `@HeroName`; `pingMentions` toasts (so it lands in the bell), plays a sound, and sets `chat.ment[room]` for the chat-button count and the gold tab underline. bgPoll now also polls banner and trade (`BG_ROOMS`) to catch pings. Party pings only arrive while that party room is polled. v115: the @ list also includes the Players Guild board (`boardList`, fetched once on the first @). Deploy gotcha: a CDN edge can cache an old ui.js under the new ?v= stamp for up to 10 min; a fresh stamp fixes it. Shop scenes are fixed at 16:10 in shop mode (`body.atench .stage .arena{flex:0 1 auto;aspect-ratio:16/10}`), so tall screens no longer stretch them.
   - v116 specialist shops (John, 24 Nov 2026: field crafting should be worse than at the shop that specialises in it). Core `SHOP_FX={mergeCut:.25,enchUp:.15}`, `FIELD_FX={tierDown:1,dust:1.5}`, `atShop(s,k)`. `mergeRisk` returns `shop` and `field` (risk at the Armorer = field x 0.75). `disenchant` now works outside the Enchanter: field = tier -1 (min I) and `enchCostAt` = ceil(1.5x Dust); at the Enchanter a 15% roll adds +1 tier (max IX). UI: Armorer has a Mass merge tab (`AW.mode 'mass'`, `data-awcap`), field merge/mass merge show the Armorer odds with a jump button, `atEnchanter` offers "Do it here" which opens the counter steps in a modal (`#fieldench`, same `shopClick` handler, field actions need camp). Help chat channel: client tab `help` (in BG_ROOMS for pings); server `infra/chat/index.js` room() allows `help`, which needs a chat Lambda deploy through CloudShell. Until then the Help tab says it opens soon.
+  - v117 bundle (first release under the ship-together rule):
+    - Item types: core `ITYPES` (weapons, off-hands, plate/leather/cloth, jewel) and `tyOf(it)` (old items get a type from class and slot in `normItem`). `usersOf`/`usable(cls, it)` replace every `m.cls === it.cls` check. Class sets, Legendary sets and the Goblin sack stay tied to `it.cls`, and region sets fit anyone. Type `fx` go through `wearTotals` (crit/power/boss raise `memberDps`, heal raises `healPerSec`, dodge works for any class in `soak`). `mergeKey` includes the type.
+    - Item art: `vector.js` ICON2 (`SP.itemIcon(cls, slot, rar, scale, ty)` returns an SVG data URL), and UI `itemIco(it)`.
+    - Inventory: one grid with `INV` filters (kind, rarity, who) and sorts, saved in localStorage `lh_inv`. Class dots on tiles; `typeBlock`/`typeFx` on item cards.
+    - Banner lantern: the war site `/api/nexus.json` now has `live.held` per alliance (bot #218/#219). `S.warLive` and core `terrBonus` give +1% per territory, capped at 15%, folded into `sidePerk`. The `#bannerlamp` tooltip shows it.
+    - @mentions: always toast and chime, flash the line with an `@you` tag, glow the chat button, show a "(n) @" tab title while hidden, and poll every 55 s while hidden.
+    - Chat dock `#chatdock` (≥721 px): channel tabs plus up to 6 whisper tabs with counts and close buttons. It replaces the chat button on wide screens.
+    - Wounded art: vector `ART.wounded`, drawn by `drawWounded`.
+    - Server bits waiting on CloudShell: `infra/chat` (help room) and the `market`/`mail` item whitelist (`ty`, plus enchants i–l, which were being stripped before). Until they're deployed, Help says it opens soon and a traded item falls back to its class's default type.
 
 ## Open asks and things to watch
 

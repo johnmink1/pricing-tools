@@ -1,4 +1,4 @@
-/* lh-build 202611241612 */
+/* lh-build 202611241658 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -645,7 +645,7 @@ button.scene:hover{border-color:var(--accent)}
 .acts{display:flex;flex-direction:column;gap:5px;align-items:stretch}
 .rest{font:inherit;font-size:12px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--line2);border-radius:8px;padding:4px 8px;cursor:pointer;white-space:nowrap}
 .rest:hover{color:var(--text);border-color:var(--ember);background:color-mix(in srgb,var(--ember) 10%,transparent)}
-.iimg{image-rendering:pixelated;width:40px;height:40px;display:block}
+.iimg{image-rendering:auto;width:40px;height:40px;display:block}
 .iimg.sm{width:28px;height:28px;flex:none}
 .tile{position:relative;width:60px;height:60px;display:grid;place-items:center;border-radius:10px;cursor:pointer;
   background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--rc,#2e3c55) 22%,#11161e),#0b0d12 75%);
@@ -2236,3 +2236,54 @@ body{overflow-x:clip}
 .shopnote{font-size:12.5px;color:var(--muted);margin:4px 0}
 .fieldench{max-height:min(78vh,680px);overflow:auto}
 .fieldench .ewlist{max-height:44vh}
+/* v117 louder @mentions */
+.msg.ment{background:color-mix(in srgb,#f5c242 18%,transparent);border-left:4px solid #f5c242;padding-left:6px}
+.msg.ment::after{content:'@you';margin-left:6px;padding:1px 6px;border-radius:999px;background:#f5c242;color:#1a1306;font:800 10px/1.5 var(--body);vertical-align:1px}
+.msg.ment.flash{animation:mentflash .6s ease-in-out 3}
+@keyframes mentflash{50%{background:color-mix(in srgb,#f5c242 45%,transparent)}}
+.chatfab.ment{box-shadow:0 0 0 2px #f5c242,0 0 18px rgba(245,194,66,.6);animation:mentpulse 1.6s ease-in-out infinite}
+.chatfab #chatdot.ment{background:#f5c242;color:#1a1306}
+@keyframes mentpulse{50%{box-shadow:0 0 0 3px #f5c242,0 0 26px rgba(245,194,66,.85)}}
+@media (prefers-reduced-motion:reduce){.msg.ment.flash,.chatfab.ment{animation:none}}
+#chatch{overflow-x:auto;scrollbar-width:none}#chatch::-webkit-scrollbar{display:none}#chatch button{padding-left:6px;padding-right:6px;font-size:12.5px;flex:1 0 auto}
+/* v117 banner lantern: live Grand War territories */
+.klant.blant{top:50px;border-color:var(--side,#a8822e);color:var(--side,#ffd27a);background:radial-gradient(circle,color-mix(in srgb,var(--side,#a8822e) 30%,#120d06) ,#120d06dd);box-shadow:0 0 12px color-mix(in srgb,var(--side,#ffbe5a) 60%,transparent)}
+.klant.blant b{position:absolute;right:-6px;bottom:-6px;min-width:17px;padding:0 4px;border-radius:999px;background:var(--side,#a8822e);color:#0d0a06;font:800 10.5px/17px var(--body);text-align:center;font-style:normal}
+#keeperbar[hidden]+.blant{top:10px}
+body.atench #bannerlamp{display:none!important}
+/* v117 one inventory: filters, class dots, type line */
+.invbar{display:flex;flex-direction:column;gap:8px;margin:4px 0 10px}
+.invkinds{display:flex;gap:4px;flex-wrap:wrap}
+.invkinds button{all:unset;cursor:pointer;padding:5px 10px;border-radius:999px;border:1px solid var(--line2);font:600 12.5px/1.2 var(--body);color:var(--muted)}
+.invkinds button em{font-style:normal;opacity:.7;margin-left:2px}
+.invkinds button.on{background:color-mix(in srgb,#f5c242 18%,transparent);border-color:#f5c242;color:#ffe7a3}
+.invsel{display:flex;gap:8px;flex-wrap:wrap}
+.invsel label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+.invsel select{background:var(--bg2);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:4px 6px;font:500 12.5px var(--body)}
+.tile .clsd{position:absolute;left:3px;top:3px;display:flex;gap:2px;pointer-events:auto}
+.tile .clsd b{width:6px;height:6px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.7)}
+.tile .clsd b.any{background:linear-gradient(90deg,#9fb6c8,#8fcf6a,#e2c36a,#ff8a5a,#b58cff)}
+.tile.dim{opacity:.55}
+.iusers{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin:8px 0 2px;font-size:12px}
+.iusers small{color:var(--muted);margin-right:2px}
+.uchip{padding:1px 8px;border-radius:999px;border:1px solid var(--line2);font-weight:600}
+.uchip.me{border-color:#f5c242;color:#ffe7a3}
+.iusers em{font-style:normal;color:#ff8a7a;margin-left:4px}
+.ityfx{display:flex;gap:7px;align-items:flex-start;margin:8px 0;padding:7px 10px;border-radius:8px;background:rgba(245,194,66,.1);border:1px solid rgba(245,194,66,.35);font-size:13px}
+.ityfx>svg{flex:none;width:16px;height:16px;color:#f5c242;margin-top:1px}
+/* v117 chat dock: a tab per channel and per whisper along the bottom (wide screens) */
+.chatdock{position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:39;display:flex;align-items:stretch;gap:4px;max-width:calc(100vw - 32px);overflow-x:auto;scrollbar-width:none;padding:6px 8px;border:1px solid var(--line2);border-bottom:0;border-radius:12px 12px 0 0;background:linear-gradient(180deg,#121b2c,#0b1220);box-shadow:0 -6px 24px rgba(0,0,0,.45)}
+.chatdock[hidden]{display:none}.chatdock::-webkit-scrollbar{display:none}
+.chatdock .dtab{all:unset;cursor:pointer;position:relative;display:flex;align-items:center;gap:6px;flex:none;padding:6px 11px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid var(--line2);font:600 13px/1.2 var(--body);color:var(--text);white-space:nowrap}
+.chatdock .dtab:hover{background:rgba(255,255,255,.09)}
+.chatdock .dtab.hot{border-color:#f5c242;box-shadow:0 0 10px rgba(245,194,66,.35)}
+.chatdock .dav{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#2a3550;color:#cfe0ff;font:800 11px var(--body)}
+.chatdock .dx{margin-left:2px;padding:0 3px;border-radius:4px;color:var(--muted);font-size:15px;line-height:1}
+.chatdock .dx:hover{background:rgba(255,255,255,.12);color:var(--text)}
+.chatdock .dk{min-width:18px;padding:1px 5px;border-radius:999px;background:#e5484d;color:#fff;font:800 10.5px/1.4 var(--body);text-align:center;font-style:normal}
+.chatdock .dk.ment{background:#f5c242;color:#1a1306}
+.chatdock .dsep{width:1px;margin:3px 4px;background:var(--line2);flex:none}
+.chatdock .dnew{padding:6px 10px;color:var(--muted)}
+body.hasdock .chatfab{display:none!important}
+@media (max-width:720px){.chatdock{display:none!important}}
+body.hasdock{padding-bottom:52px}

@@ -16,7 +16,7 @@ function item(i) {
   if (set ? SET[set] !== i.cls || i.rar !== 'set' : js ? !JOB.includes(js) || i.rar !== 'set' : i.rar === 'set') return null;
   const ilvl = Math.floor(+i.ilvl), up = Math.floor(+i.up || 0);
   if (!(ilvl >= 1 && ilvl <= 1e6 && up >= 0 && up <= 10)) return null;
-  return { cls: i.cls, slot: i.slot, rar: i.rar, set: set || undefined, jset: js || undefined, aff: JOB.includes(a.j) && a.v > 0 && a.v <= 0.5 ? { j: a.j, v: +a.v } : undefined, en: /^([a-h][1-9]){0,4}$/.test(i.en) ? i.en : undefined, ilvl, up };
+  return { cls: i.cls, slot: i.slot, rar: i.rar, set: set || undefined, jset: js || undefined, aff: JOB.includes(a.j) && a.v > 0 && a.v <= 0.5 ? { j: a.j, v: +a.v } : undefined, en: /^([a-l][1-9]){0,4}$/.test(i.en) ? i.en : undefined, ty: /^\w{3,11}$/.test(i.ty) ? i.ty : undefined, ilvl, up };
 }
 const hero = p => db.send(new GetItemCommand({ TableName: H, Key: { pid: S(p) } })).then(r => r.Item && r.Item.name && r.Item.name.S);
 const newId = () => Date.now().toString(36).padStart(9, '0') + crypto.randomBytes(3).toString('hex');

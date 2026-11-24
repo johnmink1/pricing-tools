@@ -1082,6 +1082,9 @@
       } else if (e.type === 'aided') {
         sfx.relic(); floatText('Healed!', 'skill', FOE_X, 0.2);
         toast('cross', esc(e.who) + ' is back on their feet', 'Mercy’s Thanks: +' + L.AID_FX.pdps * 100 + '% damage and +' + L.AID_FX.pheal * 100 + '% healing for ' + L.MERCY_MIN + ' minutes.', 'feat');
+      } else if (e.type === 'npcleft') {
+        toast('user', esc(e.name || 'A hire') + (e.why === 'short' ? '’s contract is over' : ' walked off unpaid'), (e.why === 'short' ? 'Their short contract ended and they went back to the Guild Hall.' : 'Your gold ran out and their wages went unpaid. They wait on the Guild Hall bench for 3 days; hire them back for half price.') + ' Their gear is back in your bag.', e.why === 'short' ? '' : 'warn');
+        updateSeats(true); updateAbilities(true); paintBoard();
       } else if (e.type === 'mercyleft') {
         floatText('Carried to safety', 'auto', FOE_X, 0.2);
         toast('cross', 'Other medics carried ' + esc(e.who) + ' to safety', 'They will be fine. Next time, more healing (or a Lantern Hymn and some taps) gets them up in time.', '');
@@ -1480,7 +1483,7 @@
       } else btn = '<button class="btn ghost small" data-dismiss="' + id + '">Dismiss</button>';
       const mv = '<div class="mv"><button class="mini up" data-move="' + i + ':-1"' + (i === 0 ? ' disabled' : '') + ' title="Move forward" aria-label="Move ' + esc(m.name) + ' forward">&#9650;</button><button class="mini dn" data-move="' + i + ':1"' + (i === L.PARTY_SIZE - 1 ? ' disabled' : '') + ' title="Move back" aria-label="Move ' + esc(m.name) + ' back">&#9660;</button></div>';
       html += '<div class="seat' + (down ? ' down' : '') + (m.player ? ' mine' : '') + '"><span class="pos">' + (i + 1) + '<small>' + L.POS_NAME[i] + '</small></span>' + mv + portrait(id) +
-        '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
+        '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + rarTag(id) + (id === 'you' ? '<span class="you">You</span>' : guest ? '<span class="you guest">Player</span>' : '') + '</div>' +
         '<div class="lv">' + (down ? 'Fallen. Back up in ' + Math.ceil((down - now) / 1000) + 's' : memberStatsLine(id, now)) + '</div>' +
         traitChips(id, 'seat') +
         '<div class="hpbar"><i data-hp="' + id + '"></i></div>' + (L.resKind(id) ? '<div class="resbar r-' + L.resKind(id) + '" title="' + (L.resKind(id) === 'mana' ? 'Mana' : 'Stamina') + '"><i data-res="' + id + '"></i></div>' : '') + '</div><div class="acts">' + btn + '</div></div>';
@@ -1495,7 +1498,7 @@
     const bench = S.unlocked.filter(x => !S.party.includes(x));
     const nComp = L.companions(S).length, cap = L.rosterCap(S), slots = L.jobSlots(S), usedJobs = Object.keys(S.jobs || {}).filter(k => L.jobFree(S, S.jobs[k])).length;
     const nextSlot = L.JOB_SLOT_LV.find(x => x > L.heroLv(S));
-    const rosterBar = '<div class="rosterbar"><span>' + icon('flame') + 'Companions <b>' + nComp + ' / ' + cap + '</b></span><small>' + L.PARTY_SEATS + ' party seats plus ' + L.fireCap(S) + ' at the fire. ' + (L.ROSTER_LV.find(x => x > L.heroLv(S)) ? 'One more spot at hero level ' + L.ROSTER_LV.find(x => x > L.heroLv(S)) + '.' : 'Every free spot earned.') + ' When it is full, a new companion means dismissing someone for good.</small>' +
+    const rosterBar = '<div class="rosterbar"><span>' + icon('flame') + 'Companions <b>' + nComp + ' / ' + cap + '</b></span><small>' + L.PARTY_SEATS + ' party seats plus ' + L.fireCap(S) + ' at the fire. ' + (L.ROSTER_LV.find(x => x > L.heroLv(S)) ? 'One more spot at hero level ' + L.ROSTER_LV.find(x => x > L.heroLv(S)) + '.' : 'Every free spot earned.') + ' Hires from the Guild Hall take spots too; short contracts don\u2019t.</small>' +
       ((S.rosterUps || 0) < L.ROSTER_BUY_MAX && CL ? '<button class="btn small ghost" data-rosterbuy>' + sigil + ' +1 spot · ' + fmt(L.ROSTER_COST) + ' ' + TOKEN + '</button>' : '') + '</div>';
     const jobsHead = L.canUse(S, 'jobs') ? '<div class="jobhead"><b>Camp jobs</b><small>' + usedJobs + ' of ' + slots + ' slots in use' + (nextSlot ? ' &middot; next slot at hero level ' + nextSlot : '') + '</small></div>'
       : '<div class="lockrow">' + icon('lock') + '<div><b>Camp jobs open at hero level ' + L.unlockOf('jobs').lv + '</b><small>Resting companions will work jobs that help the whole party.</small></div></div>';
@@ -1507,10 +1510,10 @@
     let benchHtml = jobsHtml + bench.map(id => {
       const m = L.memberById(id), job = L.jobOf(S, id);
       const n = buyN() === 'max' ? Math.max(1, L.maxAffordable(S, id)) : buyN(), cost = L.trainCost(S, id, n);
-      return '<div class="seat bench">' + portrait(id) + '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + '</div><div class="lv">Power level ' + L.lvl(S, id) + ' &middot; ' + esc(m.title) + '</div>' +
+      return '<div class="seat bench">' + portrait(id) + '<div class="info"><div class="nm"><a class="pname" data-prof="' + id + '">' + esc(m.name) + '</a> ' + classTag(m.cls) + rarTag(id) + '</div><div class="lv">Power level ' + L.lvl(S, id) + ' &middot; ' + esc(m.title) + '</div>' +
         '<div class="jobline' + (job ? ' on' : '') + '">' + (job ? icon(job.icon) + '<b>' + job.name + '</b> ' + L.jobText(job, L.jobValue(S, job, id)) : 'No camp job yet') + '</div>' + traitChips(id, true) + '</div>' +
         '<div class="acts"><button class="buy" data-train="' + id + '"' + (cost > S.gold ? ' disabled' : '') + '><b>Train +' + n + '</b><span>' + coin + '<em>' + fmt(cost) + '</em></span></button><div class="minis">' + '<button class="autot' + ((S.autoTrain || {})[id] && L.passOn(S) ? ' on' : '') + (L.passOn(S) ? '' : ' locked') + '" data-autot="' + id + '" title="Auto-train: spend gold on this character automatically" aria-pressed="' + !!(S.autoTrain || {})[id] + '">' + icon('refresh') + 'Auto</button>' +
-        '<button class="rest" data-jobfor="' + id + '" data-tip="' + (job ? 'Change their camp job' : 'Give them a camp job that helps the party') + '">Job</button><button class="rest" data-seat="' + id + '" data-tip="Bring them into your party">Bring</button></div></div></div>';
+        '<button class="rest" data-jobfor="' + id + '" data-tip="' + (job ? 'Change their camp job' : 'Give them a camp job that helps the party') + '">Job</button><button class="rest" data-seat="' + id + '" data-tip="Bring them into your party">Bring</button>' + ((S.hires || {})[id] ? '<button class="rest" data-release="' + id + '" data-tip="Send them back to the Guild Hall. Their gear goes back to your bag.">Let go</button>' : '') + '</div></div></div>';
     }).join('');
     if (!bench.length) benchHtml = jobsHtml + '<p class="note">No one is at the fire. Companions who rest here can take a job that helps the whole party.</p>';
     if ($('bench').dataset.h !== benchHtml) { $('bench').innerHTML = benchHtml; $('bench').dataset.h = benchHtml; }
@@ -1519,6 +1522,7 @@
     const pf = e.target.closest('[data-prof]'); if (pf) { profileModal(pf.dataset.prof); return; }
     const gp = e.target.closest('[data-gprof]'); if (gp) { const g = (boardList || []).find(x => x.id === gp.dataset.gprof); if (g) boardProfile(g); return; }
     const t = e.target.closest('button'); if (!t) return;
+    if (npcClick(t)) return;
     if (t.dataset.move) { const [i, d] = t.dataset.move.split(':').map(Number); if (L.moveMember(S, i, i + d)) { sfx.buy(); updateSeats(true); updateAbilities(true); } return; }
     if (t.dataset.autot && !L.passOn(S)) { openPass(); return; }
     if (t.dataset.autot) { const id = t.dataset.autot; S.autoTrain = S.autoTrain || {}; S.autoTrain[id] = !S.autoTrain[id]; if (!S.autoTrain[id]) delete S.autoTrain[id]; sfx.buy(); updateSeats(true); if (S.autoTrain[id]) toast('refresh', 'Auto-train on', L.memberById(id).name + ' will train whenever you have the gold' + (S.party.includes(id) ? '.' : ' and you are at camp.'), ''); return; }
@@ -1588,18 +1592,79 @@
       });
   }
 
+  // ---------- NPC Guild (John, 2026-11-24): hire companions for gold or Dust, pay them by the hour ----------
+  function rarTag(id) {
+    const r = L.npcRarOf(S, id); if (!r) return '';
+    const R = L.npcRar(r), h = (S.hires || {})[id], w = h ? L.wagePerHour(S, id) : 0;
+    const tip = R.name + ' hire. ' + (h && h.kind === 'short' ? 'Short contract: ' + fmtTime(Math.max(0, (h.until - Date.now()) / 1000)) + ' left, already paid.' : 'Wage ' + fmt(w) + ' gold an hour, offline too.');
+    return '<span class="rartag" style="--rc:' + R.color + '" data-tip="' + esc(tip) + '" tabindex="0">' + R.name + (h && h.kind === 'short' ? ' · ' + fmtTime(Math.max(0, (h.until - Date.now()) / 1000)) : '') + '</span>';
+  }
+  function npcCard(o, bench) {
+    const R = L.npcRar(o.rar), m = o.legend || L.LEGENDS.includes(o.id) ? L.memberById(o.id) : { name: o.name, cls: o.cls, side: o.side, hue: o.hue, title: '' };
+    const why = bench ? null : L.npcReq(S, o), full = L.companions(S).length >= L.rosterCap(S);
+    const nShort = Object.keys(S.hires || {}).filter(id => L.shortHire(S, id)).length;
+    const c = L.npcCost(S, o.rar, bench ? 'bench' : 'sign'), cs = L.npcCost(S, o.rar, 'short');
+    const wage = R.wage * L.npcIncomeMin(S) * 60;
+    const price = x => coin + fmt(x.gold) + (x.dust ? ' + ' + fmt(x.dust) + ' Dust' : '');
+    const can = x => S.gold >= x.gold && (S.dust || 0) >= (x.dust || 0);
+    const side = L.SIDES[m.side];
+    let acts = '';
+    if (why) acts = '<span class="npclock">' + icon('lock') + esc(why) + '</span>';
+    else if (bench) acts = '<button class="btn small" data-hire="b:' + o.id + '|' + (o.kind || 'sign') + '|gold"' + (can(c) && (o.kind === 'short' || !full) ? '' : ' disabled') + '>Hire back · ' + price(c) + '</button>';
+    else acts = '<button class="btn small" data-hire="' + o.id + '|sign|gold"' + (can(c) && !full ? '' : ' disabled') + ' data-tip="Takes a companion spot. Paid ' + fmt(wage) + ' gold an hour.">Sign on · ' + price(c) + '</button>' +
+      (c.dustAlt ? '<button class="btn small ghost" data-hire="' + o.id + '|sign|dust"' + ((S.dust || 0) >= c.dustAlt && !full ? '' : ' disabled') + '>Sign on · ' + fmt(c.dustAlt) + ' Dust</button>' : '') +
+      '<button class="btn small ghost" data-hire="' + o.id + '|short|gold"' + (can(cs) && nShort < L.NPC_SHORT_MAX ? '' : ' disabled') + ' data-tip="Two hours, paid up front, no wage. Needs no free spot.">2 h · ' + price(cs) + '</button>';
+    return '<div class="seat bench npcard" style="--rc:' + R.color + '"><div class="ic c-' + m.cls + '"><img src="' + SP.spriteURL(m.cls, 2, lookHue(m)) + '" alt=""></div><div class="info"><div class="nm">' + esc(m.name) + ' ' + classTag(m.cls) + ' <span class="rartag" style="--rc:' + R.color + '">' + R.name + '</span></div>' +
+      '<div class="lv">' + (m.title ? esc(m.title) : (side ? side.name + (o.need === 'banner' ? ' only' : '') : '')) + ' &middot; wage ' + fmt(wage) + ' gold/h' + (bench ? ' &middot; power level ' + o.lv + ' &middot; leaves in ' + fmtTime(Math.max(0, (o.until - Date.now()) / 1000)) : '') + '</div>' +
+      '<div class="npcacts">' + acts + '</div></div></div>';
+  }
+  function npcGuildHtml() {
+    if (S.mode !== 'multi') return '';
+    const h = L.hallState(S), now = Date.now(), wph = L.wagesPerHour(S), inc = L.npcIncomeMin(S) * 60;
+    const next = Math.max(0, (h.at + L.NPC_ROTATE - now) / 1000), rr = L.npcRerollCost(S), full = L.companions(S).length >= L.rosterCap(S);
+    let x = '<h3 class="sub" id="npcg">NPC Guild</h3><div class="growcard npcg">' +
+      '<p>Hire companions for gold or Dust. Rarer ones fight harder and work camp jobs better, but cost more and draw a bigger wage every hour, even while you are away. Legendaries are the lore companions of the story. If your gold runs dry, unpaid hires walk off to the bench here, and their gear stays in your bag.</p>' +
+      '<div class="npcstat"><span>Wages <b>' + fmt(wph) + ' gold/h</b></span><span>Income about <b>' + fmt(inc) + ' gold/h</b></span>' + ((S.owed || 0) >= 1 ? '<span class="warn">Owed <b>' + fmt(S.owed) + '</b></span>' : '') + '<span>New faces in <b>' + fmtTime(next) + '</b></span>' +
+      '<button class="btn small ghost" data-npcreroll' + ((S.dust || 0) >= rr ? '' : ' disabled') + '>New faces now · ' + fmt(rr) + ' Dust</button></div>' +
+      (full ? '<p class="note">Every companion spot is taken. Let someone go from the Campfire, or take a 2 hour contract.</p>' : '') +
+      '<div class="board npcoffers">' + h.offers.map(o => npcCard(o, false)).join('') + '</div>';
+    if (h.bench.length) x += '<h4 class="npcbh">On the bench</h4><p class="note">Hires who left in the last 3 days. They come back at the level they left, for half the price.</p><div class="board">' + h.bench.map(o => npcCard(o, true)).join('') + '</div>';
+    return x + '</div>';
+  }
+  function npcClick(t) {
+    if (t.dataset.npcreroll != null) { if (L.npcReroll(S)) { sfx.buy(); save(); paintBoard(); } return true; }
+    if (t.dataset.hire) {
+      if (!campGate(true)) return true;
+      const [src, kind, pay] = t.dataset.hire.split('|'), r = L.npcHire(S, src, kind, pay);
+      if (!r.ok) { toast('lock', 'Could not hire', r.why + '.', 'warn'); return true; }
+      const m = L.memberById(r.id), h = S.hires[r.id];
+      sfx.relic(); save();
+      toast('crown', m.name + ' joins you', (h.kind === 'short' ? 'A two hour contract, already paid.' : 'Their wage is ' + fmt(L.wagePerHour(S, r.id)) + ' gold an hour.') + (S.party.includes(r.id) ? ' They took an open seat.' : ' They wait at the Campfire.'), 'feat');
+      updateSeats(true); updateAbilities(true); paintBoard(); return true;
+    }
+    if (t.dataset.release) {
+      if (!campGate(true)) return true;
+      const id = t.dataset.release, m = L.memberById(id), sh = L.shortHire(S, id);
+      modal('<h2>Let ' + esc(m.name) + ' go?</h2><p>' + (sh ? 'Their contract ends now, with no refund.' : 'They go back to the Guild Hall and wait on the bench for 3 days. You can hire them back at the same level for half the price.') + ' Their gear goes back to your bag.</p><div class="row"><button class="btn ghost" id="m-no">Keep them</button><button class="btn" id="m-yes">Let them go</button></div>', md => {
+        md.querySelector('#m-no').onclick = closeModal;
+        md.querySelector('#m-yes').onclick = () => { const i = S.party.indexOf(id); L.npcRelease(S, id, sh ? 'short' : 'sent'); closeModal(); if (i >= 0) sendOff(i, id, m.name + ' went back to the Guild Hall', 'Their gear is back in your bag.'); save(); updateSeats(true); updateAbilities(true); paintBoard(); };
+      });
+      return true;
+    }
+    return false;
+  }
   // ---------- growing the party: story companions + recruiting players ----------
   let boardList = null, boardMsg = '';
   function nextCompanion() {
-    for (const b of L.STORY) if (b.join && !S.unlocked.includes(b.join)) return L.memberById(b.join);
+    for (const b of L.STORY) if (b.join && !L.LEGENDS.includes(b.join) && !S.unlocked.includes(b.join)) return L.memberById(b.join);
     return null;
   }
   function paintBoard() {
     const w = $('boardwrap');
     const open = S.party.filter(x => !x).length;
     const nc = nextCompanion();
-    $('campnext').innerHTML = nc ? '<p class="next">Next to join the fire: <b>' + esc(nc.name) + '</b> ' + classTag(nc.cls) + '<br><small>They will find you as the story goes on. Your goal: ' + esc(L.currentGoal(S)) + '.</small></p>' : '<p class="next">Every story companion has found the fire.</p>';
-    let h = '<h3 class="sub" id="grow">Players Guild</h3><div class="growcard">' +
+    $('campnext').innerHTML = nc ? '<p class="next">Next to join the fire: <b>' + esc(nc.name) + '</b> ' + classTag(nc.cls) + '<br><small>They will find you as the story goes on. Your goal: ' + esc(L.currentGoal(S)) + '.</small></p>' : '<p class="next">Every story companion has found the fire. More can be hired at the Guild Hall.</p>';
+    let h = npcGuildHtml() + '<h3 class="sub" id="grow">Players Guild</h3><div class="growcard">' +
       '<p>Heroes made by other players. They are stronger than story companions and fight at the level their owner trained them to. Your own hero is listed here too, and you earn gold whenever someone recruits it.</p>';
     if (!CL) {
       h += '<p>The Players Guild is not available right now. Try again later.</p>';
@@ -2419,7 +2484,8 @@
     if (wv('leech')) stats.push(['Life steal', (wv('leech') * 100).toFixed(1) + '% of damage']);
     if (wv('block')) stats.push(['Gear block', (wv('block') * 100).toFixed(1) + '% chance']);
     if (wv('def')) stats.push(['Defense', (wv('def') * 100).toFixed(1) + '% less damage']);
-    stats.push(['Power', m.player ? 'Full (player hero)' : Math.round(L.NPC_POWER * 100) + '% (story companion)']);
+    stats.push(['Power', m.player ? 'Full (player hero)' : m.rar ? Math.round(m.pow * 100) + '% (' + L.npcRar(m.rar).name + ' hire)' : L.LEGENDS.includes(id) ? 'Legendary (lore companion, ' + Math.round(L.NPC_POWER * 100) + '% of a much stronger build)' : Math.round(L.NPC_POWER * 100) + '% (story companion)']);
+    if ((S.hires || {})[id]) stats.push(['Contract', L.shortHire(S, id) ? fmtTime(Math.max(0, (S.hires[id].until - Date.now()) / 1000)) + ' left, already paid' : fmt(L.wagePerHour(S, id)) + ' gold an hour']);
     const gear = S.gear[id] || {};
     const gearList = L.openPos(S, id).filter(sl => !(sl === 'legs' && L.robeOn(S, id))).map(sl => { const it = gear[sl] && L.itemOf(S, gear[sl]); return '<li><span>' + L.SLOT_NAME[sl] + '</span>' + (it ? '<b class="r-' + it.rar + '">' + esc(L.gearName(it)) + (it.up ? ' +' + it.up : '') + '</b>' : '<i>Empty</i>') + '</li>'; }).join('');
     const bio = id === 'you' ? 'That is you. You took the lantern from Old Thessaly and carried it down the stair' + (sd ? ', under the banner of the ' + sd.name : '') + '.'
@@ -2969,7 +3035,8 @@
       modal('<div class="scene-head"><span>Chapter ' + b.ch + '</span><h2>' + esc(b.title) + '</h2></div>' +
         '<div class="line-box"><div class="spk k-' + kind + '">' + icon(SPEAKER_ICON[kind] || 'user') + '</div><div><b>' + esc(who) + '</b><p>' + esc(text) + '</p></div></div>' +
         (waits ? '<div class="joined">' + icon('flame') + '<span><b>' + esc(waits.name) + '</b> the ' + L.CLASSES[waits.cls].name + ' wants to join, but your campfire is full. You choose next.</span></div>' : '') +
-        (joined ? '<div class="joined">' + icon(CLASS_ICON[joined.cls]) + '<span><b>' + esc(joined.name) + '</b> the ' + L.CLASSES[joined.cls].name + ' joins you.' + (S.party.includes(joined.id) ? '' : ' They wait at camp until you make room.') + '</span></div>' : '') +
+        (last && !replay && b.join && L.LEGENDS.includes(b.join) && !S.unlocked.includes(b.join) ? '<div class="joined">' + icon('crown') + '<span><b>' + esc(L.memberById(b.join).name) + '</b> waits at the Guild Hall. They are a Legendary hire: costly, and very strong.</span></div>' : '') +
+        (joined && !L.LEGENDS.includes(joined.id) ? '<div class="joined">' + icon(CLASS_ICON[joined.cls]) + '<span><b>' + esc(joined.name) + '</b> the ' + L.CLASSES[joined.cls].name + ' joins you.' + (S.party.includes(joined.id) ? '' : ' They wait at camp until you make room.') + '</span></div>' : '') +
         '<div class="row" style="justify-content:space-between;align-items:center"><small class="muted">' + (i + 1) + ' / ' + b.lines.length + '</small><button class="btn" id="s-next">' + (last ? (replay ? 'Close' : 'Onward') : 'Continue') + '</button></div>', md => {
           const go = () => { if (last) { delete $('modal').dataset.lock; closeModal(); sceneOpen = false; if (!replay) { save(); updateSeats(true); updateAbilities(true); updateJournal(); } } else { i++; show(); } };
           md.querySelector('#s-next').onclick = go; md.querySelector('#s-next').focus();
@@ -3098,8 +3165,12 @@
     sec = Math.min(win, sec);
     const g = L.offlineEarnPerSec(S) * sec;
     if (g > 0) { S.gold += g; S.stats.goldEarned += g; }
+    const wagesBefore = S.wagesPaid || 0, wev = [];
+    L.payWages(S, sec, Date.now(), wev);
+    const wpaid = (S.wagesPaid || 0) - wagesBefore;
+    if (wev.length) setTimeout(() => { for (const e of wev) toast('user', esc(e.name || 'A hire') + (e.why === 'short' ? '’s contract ended' : ' walked off unpaid'), 'While you were away. Their gear is back in your bag.' + (e.why === 'short' ? '' : ' They wait on the Guild Hall bench for 3 days.'), 'warn'); updateSeats(true); paintBoard(); }, 1500);
     if (fromLoad && sec >= 60 && g > 0) {
-      modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Welcome back</h2><p>Your party kept delving for ' + fmtTime(sec) + ' while you were away and brought home</p><div class="big">' + fmt(g) + ' gold</div><p class="muted">Away from the game your party earns a quarter of its usual gold.' + (away > win ? ' They stopped after ' + fmtTime(win) + ' and waited for you at the stair.' + (win < L.OFFLINE_MAX ? ' Night Watch in the Skills tab keeps them going longer, up to 3 days.' : '') : '') + '</p><div class="row" style="justify-content:center"><button class="btn" id="m-ok">Collect</button></div></div>', m => { m.querySelector('#m-ok').onclick = () => { sfx.coin(); closeModal(); }; });
+      modal('<div class="center"><svg class="lantern-hero" viewBox="0 0 32 32"><use href="#i-lantern"/></svg><h2>Welcome back</h2><p>Your party kept delving for ' + fmtTime(sec) + ' while you were away and brought home</p><div class="big">' + fmt(g) + ' gold</div><p class="muted">Away from the game your party earns a quarter of its usual gold.' + (wpaid >= 1 ? ' Your hires were paid ' + fmt(wpaid) + ' gold in wages.' : '') + (away > win ? ' They stopped after ' + fmtTime(win) + ' and waited for you at the stair.' + (win < L.OFFLINE_MAX ? ' Night Watch in the Skills tab keeps them going longer, up to 3 days.' : '') : '') + '</p><div class="row" style="justify-content:center"><button class="btn" id="m-ok">Collect</button></div></div>', m => { m.querySelector('#m-ok').onclick = () => { sfx.coin(); closeModal(); }; });
     }
   }
 
@@ -5126,6 +5197,12 @@
         '<b>Bring along</b> seats one. <b>To campfire</b> sends one back.',
         'Seat changes happen at <b>camp</b>.',
         'Companions are a little weaker than other players’ heroes.']],
+      ['NPC Guild', 'i:crown', 'Hire more companions at the Guild Hall for gold or Dust, and pay them by the hour.', [
+        'Open the <b>Guild</b> tab. Six hires are on offer, and new faces arrive every <b>4 hours</b>. <b>New faces now</b> rerolls them for Dust.',
+        'Rarity: <b>Common, Uncommon, Rare, Epic, Legendary</b>. Rarer hires fight harder, work camp jobs better, cost more and draw a bigger wage. Legendaries are the lore companions of the story.',
+        'Some need a hero level, a floor reached or your banner. Costs follow your gold income, so they stay fair at any depth.',
+        '<b>Sign on</b> takes a companion spot and pays a wage every hour, even while you are away. <b>2 h</b> is a short contract: paid up front, no wage, no free spot needed (up to 2 at once).',
+        'If your gold runs dry for an hour of wages, the priciest hire walks off to the bench. <b>Let go</b> at the Campfire sends one back. Either way their gear returns to your bag, and they wait on the bench 3 days to be hired back for half price.']],
       ['Players Guild', 'i:users', 'Fill seats with other players’ heroes. They are stronger than companions.', [
         'Sign in, open the <b>Guild</b> tab, press <b>Invite</b>.',
         'They <b>accept or decline</b>. Accepted heroes join at camp.',
@@ -5420,6 +5497,14 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 118, date: 'November 24, 2026', title: 'The NPC Guild', items: [
+      'The Guild Hall now has an NPC Guild next to the Players Guild. Hire companions for gold or Dust: Common, Uncommon, Rare, Epic or Legendary. Rarer hires fight harder and work camp jobs better, but cost more.',
+      'Hires draw an hourly wage, even while you are away. Sign one on to take a companion spot, or take a 2 hour contract when you have no room: paid up front, no wage.',
+      'New faces arrive every 4 hours; New faces now rerolls them for Dust. Some hires need a hero level, a floor reached or your banner.',
+      'The lore companions (Sir Ashe, the Pale Oracle, Varga, Brann and the Hollow King) are now Legendary hires. When the story reaches them, they wait at the Guild Hall. If you already have them, they stay with you, on a Legendary wage.',
+      'If your gold can’t cover an hour of wages, the priciest hire walks off. Let go sends one back by choice. Their gear always returns to your bag, and they wait on the bench 3 days to be hired back for half price.',
+      'The world boss and Loot Goblin bars moved into the battle scene as small chips in the top-left corner, so they no longer squash the picture.',
+    ] },
     { v: 117, date: 'November 24, 2026', title: 'Real weapons, one inventory and the banner lantern', items: [
       'Weapons now have types with their own jobs. Sword (Tank, Rogue): +2% life steal. Dagger (Rogue): +5% critical hits. Mace (Tank, Healer): +8% damage to bosses. Morningstar (Tank): +15% damage. Staff (Healer, Mage) and Scepter (Necro, Healer): +10% healing or spell power. Wand (Mage, Necro): +10% mana regen and +3% critical hits.',
       'Off-hands too: Shield (Tank) +4% block, Parrying dagger (Rogue) +3% dodge, Tome (Healer, Necro) +8% healing and life drain, Orb (Mage) +4% critical hits.',

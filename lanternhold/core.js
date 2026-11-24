@@ -85,6 +85,7 @@
   const dyn = {};
   function registerHero(s) {
     if (s.hero) dyn.you = { id: 'you', name: s.hero.name, title: (SIDES[s.hero.side] ? SIDES[s.hero.side].name + ' ' : '') + 'Lantern-bearer', cls: s.hero.cls, tier: 0, hue: 0, player: true, line: 'That\u2019s you.' };
+    for (const id in s.hires || {}) { const h = s.hires[id]; if (h.m) dyn[id] = npcMember(h.m); }
     for (const g of s.guests || []) dyn[g.id] = { id: g.id, name: g.name, title: 'Recruited player', cls: g.cls, side: g.side || null, tier: 0, hue: 0, player: true, guest: true, line: 'Another delver, lending you their strength.' };
   }
   const memberById = id => dyn[id] || MEMBERS.find(m => m.id === id);
@@ -458,7 +459,7 @@
   function featCount(s) { return Object.keys(s.feats).length; }
   function emberMult(s) { return 1 + EMBER_PER * s.embers; }
   function abilityActive(s, id, now) { const a = s.abil[id]; return !!(a && a.until > now); }
-  const scale = (s, id) => { const m = memberById(id), L = lvl(s, id); return Math.pow(L * milestoneMult(L) * TIER[m.tier].stat * (m.player ? 1 : NPC_POWER), POW); };
+  const scale = (s, id) => { const m = memberById(id), L = lvl(s, id); return Math.pow(L * milestoneMult(L) * TIER[m.tier].stat * (m.player ? 1 : (m.pow || NPC_POWER)), POW); };
 
   function maxHpOf(s, id) {
     const m = memberById(id);
@@ -678,7 +679,7 @@
   // 0 when floor f is open; otherwise the number (1-based) of the region whose trial still has to be finished.
   // Floors you have already reached stay open.
   function regionNeed(s, f) { if (f <= (s.maxFloorEver || 1)) return 0; const r = regionNo(f); if (r < 1 || f > REGIONS * 10) return 0; return trialOf(s, r - 1).done ? 0 : r; }
-  const companions = s => s.unlocked.filter(id => id !== 'you');
+  const companions = s => s.unlocked.filter(id => id !== 'you' && !shortHire(s, id));
   // Spots at the fire (resting companions). The four party seats beside your hero never count against it
   // (John, 2026-11-24), so the companions you can keep = party seats + fire spots.
   const PARTY_SEATS = PARTY_SIZE - 1;
@@ -701,6 +702,172 @@
     s.pendingJoin = null; return recruit(s, id);
   }
   function declineRecruit(s) { const id = s.pendingJoin; if (!id) return false; s.gone = s.gone || {}; s.gone[id] = Date.now(); s.pendingJoin = null; return true; }
+  // ---------- NPC Guild (John, 2026-11-24) ----------
+  // Companions beyond the five who find you on the stair are hired at the Guild Hall. Each has a rarity: rarer ones
+  // fight harder and work camp jobs better, cost more to hire and draw a bigger hourly wage. Hire costs follow your
+  // gold income (minutes of it), so they stay meaningful at any depth. Legendaries are the lore companions.
+  // Wages come out of gold every second, offline too; when the gold runs out the priciest hire walks off to the
+  // Hall bench (gear stays in your bag) and can be hired back for half price within 3 days.
+  const NPC_RAR = [
+    { id: 'common',    name: 'Common',    pow: 0.5, job: 0,    hireMin: 10,  wage: 0.02, dust: 0,   dustAlt: 0,   lvF: 0.6,  w: 40, color: '#d8cfb8' },
+    { id: 'uncommon',  name: 'Uncommon',  pow: 0.7, job: 0.1,  hireMin: 30,  wage: 0.04, dust: 0,   dustAlt: 0,   lvF: 0.75, w: 30, color: '#8fcf6a' },
+    { id: 'rare',      name: 'Rare',      pow: 1.0, job: 0.25, hireMin: 90,  wage: 0.07, dust: 0,   dustAlt: 120, lvF: 0.9,  w: 18, color: '#6cc4e8' },
+    { id: 'epic',      name: 'Epic',      pow: 1.5, job: 0.5,  hireMin: 240, wage: 0.11, dust: 150, dustAlt: 0,   lvF: 1,    w: 9,  color: '#c78bff' },
+    { id: 'legendary', name: 'Legendary', pow: 0,   job: 0,    hireMin: 720, wage: 0.18, dust: 600, dustAlt: 0,   lvF: 1,    w: 3,  color: '#ff8a3d' },
+  ];
+  const npcRar = id => NPC_RAR.find(r => r.id === id) || NPC_RAR[0];
+  const LEGENDS = ['ashe', 'oracle', 'varga', 'brann', 'hollow'];
+  const NPC_ROTATE = 4 * 3600e3, NPC_OFFERS = 6, NPC_SHORT_MS = 2 * 3600e3, NPC_SHORT_MAX = 2, NPC_BENCH_MS = 3 * 86400e3, NPC_SHORT_PART = 0.25, NPC_REHIRE = 0.5;
+  const NPC_NAMES = ['Tamsin', 'Odile', 'Corwin', 'Ysolde', 'Garrick', 'Petra', 'Jory', 'Mirela', 'Halden', 'Sable', 'Fenna', 'Rook', 'Isolt', 'Dacey', 'Orrin', 'Liesl', 'Tobin', 'Maren', 'Cass', 'Ulric', 'Nell', 'Aldous', 'Briar', 'Quill', 'Hesper', 'Joss', 'Wynn', 'Edda', 'Lorcan', 'Merrit', 'Saoirse', 'Dunstan', 'Ilse', 'Torvald', 'Junia', 'Cael'];
+  const NPC_JOB = { tank: 'Shieldhand', healer: 'Field Medic', rogue: 'Sellsword', mage: 'Hedge Mage', necro: 'Bonecaller' };
+  const NPC_SIDE = { covenant: 'Covenant', radiant: 'Ascendancy', tide: 'Tide', mercy: 'Mercy Corps', unsworn: 'Unsworn' };
+  function npcMember(m) {
+    const r = npcRar(m.rar);
+    return { id: m.id, name: m.name, title: NPC_SIDE[m.side] + ' ' + NPC_JOB[m.cls], side: m.side, cls: m.cls, tier: 0, hue: m.hue || 0, npc: true, rar: m.rar, pow: r.pow, job: r.job,
+      bio: 'A ' + r.name.toLowerCase() + ' hire from the Guild Hall, paid by the hour.', line: 'Hired at the Guild Hall. Works for wages.' };
+  }
+  const shortHire = (s, id) => !!(s.hires && s.hires[id] && s.hires[id].kind === 'short');
+  const npcRarOf = (s, id) => (s.hires && s.hires[id] && s.hires[id].rar) || (LEGENDS.includes(id) ? 'legendary' : null);
+  // Gold income per minute, the yardstick for hire costs and wages (cached for a couple of seconds).
+  let incAt = 0, incVal = 0;
+  function npcIncomeMin(s, now) { now = now || Date.now(); if (now - incAt > 2000 || now < incAt) { incAt = now; incVal = Math.max(5, offlineGoldPerSec(s) * 60); } return incVal; }
+  const npcDust = (s, base) => base ? Math.round(base * (1 + (s.maxFloorEver || 1) / 25)) : 0;
+  function npcCost(s, rar, kind) {
+    const r = npcRar(rar), inc = npcIncomeMin(s), gold = Math.round(inc * r.hireMin);
+    if (kind === 'short') return { gold: Math.round(gold * NPC_SHORT_PART), dust: 0, dustAlt: 0 };
+    if (kind === 'bench') return { gold: Math.round(gold * NPC_REHIRE), dust: 0, dustAlt: 0 };
+    return { gold, dust: npcDust(s, r.dust), dustAlt: npcDust(s, r.dustAlt) };
+  }
+  const wagePerHour = (s, id) => { const h = s.hires && s.hires[id]; if (!h || h.kind === 'short') return 0; return npcRar(h.rar).wage * npcIncomeMin(s) * 60; };
+  const wagesPerHour = s => Object.keys(s.hires || {}).reduce((a, id) => a + wagePerHour(s, id), 0);
+  const legendBeat = id => STORY.find(b => b.join === id);
+  function npcReq(s, o) {
+    if (o.rar === 'legendary') { const b = legendBeat(o.id); return b && !s.story.seen[b.id] ? 'Their part of the story has not reached you yet' : null; }
+    if (o.rar === 'uncommon' && heroLv(s) < 10) return 'Hero level 10';
+    if (o.rar === 'rare' && (s.maxFloorEver || 1) < 30) return 'Reach floor 30';
+    if (o.rar === 'epic' && (heroLv(s) < 18 || (s.maxFloorEver || 1) < 60)) return 'Hero level 18 and floor 60';
+    if (o.side && o.need === 'banner' && sideOf(s) !== o.side) return 'Marches only under the ' + NPC_SIDE[o.side] + ' banner';
+    return null;
+  }
+  function rollNpc(s, r, rar) {
+    const taken = new Set(Object.keys(s.hires || {}).map(id => (s.hires[id].m || {}).name).filter(Boolean));
+    const pool = NPC_NAMES.filter(n => !taken.has(n));
+    const cls = CLASS_ORDER[Math.floor(r() * CLASS_ORDER.length)], side = SIDE_ORDER[Math.floor(r() * SIDE_ORDER.length)];
+    return { id: 'n' + Math.floor(r() * 36 ** 6).toString(36), name: pool[Math.floor(r() * pool.length)] || 'Hireling', cls, side, rar, hue: Math.round(r() * 300 - 60), need: rar !== 'common' && r() < 0.3 ? 'banner' : null };
+  }
+  function rollOffers(s, r) {
+    r = r || Math.random;
+    const out = [], free = LEGENDS.filter(id => !s.unlocked.includes(id) && !(s.hall.bench || []).some(b => b.id === id));
+    const tot = NPC_RAR.reduce((a, x) => a + x.w, 0);
+    for (let i = 0; i < NPC_OFFERS; i++) {
+      let x = r() * tot, rar = NPC_RAR[0];
+      for (const q of NPC_RAR) { if (x < q.w) { rar = q; break; } x -= q.w; }
+      if (rar.id === 'legendary') {
+        const left = free.filter(id => !out.some(o => o.id === id));
+        if (!left.length) { rar = npcRar('epic'); } else { out.push({ id: left[Math.floor(r() * left.length)], rar: 'legendary', legend: 1 }); continue; }
+      }
+      out.push(rollNpc(s, r, rar.id));
+    }
+    return out;
+  }
+  function hallState(s, now) {
+    now = now || Date.now();
+    s.hall = s.hall || { at: 0, offers: [], bench: [], rr: 0 };
+    s.hall.bench = (s.hall.bench || []).filter(b => b.until > now);
+    const win = Math.floor(now / NPC_ROTATE) * NPC_ROTATE;
+    if (s.hall.at !== win || (s.hall.keep || []).length) {
+      const kept = (s.hall.offers || []).filter(o => o.keep).concat(s.hall.keep || []).filter((o, i, a) => !s.unlocked.includes(o.id) && a.findIndex(x => x.id === o.id) === i);
+      if (s.hall.at !== win) { s.hall.at = win; s.hall.rr = 0; s.hall.offers = rollOffers(s).filter(o => !kept.some(k => k.id === o.id)).concat(kept); }
+      else s.hall.offers = s.hall.offers.filter(o => !kept.some(k => k.id === o.id)).concat(kept);
+      s.hall.keep = [];
+    }
+    return s.hall;
+  }
+  const npcRerollCost = s => npcDust(s, 25) * (1 + ((s.hall && s.hall.rr) || 0));
+  function npcReroll(s) {
+    const h = hallState(s), c = npcRerollCost(s); if ((s.dust || 0) < c) return false;
+    s.dust -= c; h.rr = (h.rr || 0) + 1; h.offers = rollOffers(s).concat((h.offers || []).filter(o => o.keep)); return true;
+  }
+  // A lore companion's story beat: they wait at the Guild Hall as a Legendary hire, kept on offer until hired.
+  function npcLegendArrives(s, id) {
+    const h = hallState(s);
+    if (s.unlocked.includes(id) || h.offers.some(o => o.id === id)) return;
+    h.offers.push({ id, rar: 'legendary', legend: 1, keep: 1 });
+  }
+  // kind: 'sign' (takes a roster spot, hourly wage) or 'short' (2 hours, paid up front, no spot needed).
+  // pay: 'gold' or 'dust' (Rare only). src: an offer's id, or 'b:<id>' to hire back from the bench.
+  function npcHire(s, src, kind, pay, now) {
+    now = now || Date.now();
+    const h = hallState(s, now);
+    let o, bench = null;
+    if (typeof src === 'string' && src.startsWith('b:')) { bench = h.bench.find(b => b.id === src.slice(2)); o = bench; }
+    else o = h.offers.find(x => x.id === src);
+    if (!o || s.unlocked.includes(o.id)) return { ok: false, why: 'Gone' };
+    const why = !bench && npcReq(s, o); if (why) return { ok: false, why };
+    if (kind === 'short') { if (Object.keys(s.hires || {}).filter(id => shortHire(s, id)).length >= NPC_SHORT_MAX) return { ok: false, why: 'You already have ' + NPC_SHORT_MAX + ' on short contracts' }; }
+    else if (companions(s).length >= rosterCap(s)) return { ok: false, why: 'No free spot. Send someone back to the Hall, or take a short contract' };
+    const c = npcCost(s, o.rar, bench ? 'bench' : kind);
+    if (pay === 'dust') { if (!c.dustAlt || (s.dust || 0) < c.dustAlt) return { ok: false, why: 'Not enough Dust' }; s.dust -= c.dustAlt; }
+    else { if (s.gold < c.gold || (s.dust || 0) < c.dust) return { ok: false, why: s.gold < c.gold ? 'Not enough gold' : 'Not enough Dust' }; s.gold -= c.gold; s.dust = (s.dust || 0) - c.dust; }
+    s.hires = s.hires || {};
+    const legend = LEGENDS.includes(o.id);
+    s.hires[o.id] = { rar: o.rar, kind: bench ? (bench.kind || 'sign') : kind, at: now, until: (bench ? bench.kind : kind) === 'short' ? now + NPC_SHORT_MS : 0, m: legend ? null : { id: o.id, name: o.name, cls: o.cls, side: o.side, rar: o.rar, hue: o.hue } };
+    if (bench && bench.kind === 'short') s.hires[o.id].until = now + NPC_SHORT_MS;
+    if (!legend) dyn[o.id] = npcMember(s.hires[o.id].m);
+    let lv = bench ? bench.lv : 1;
+    if (!bench && !legend) { const best = Math.max(1, ...s.unlocked.filter(x => x !== 'you' && !LEGENDS.includes(x)).map(x => lvl(s, x))); lv = Math.max(1, Math.round(best * npcRar(o.rar).lvF)); }
+    if (!bench && legend && s.levels[o.id]) lv = s.levels[o.id];
+    s.levels[o.id] = lv;
+    if (bench && bench.traits) { s.traits = s.traits || {}; s.traits[o.id] = bench.traits; }
+    if (s.gone) delete s.gone[o.id];
+    recruit(s, o.id);
+    if (bench) h.bench = h.bench.filter(b => b !== bench); else h.offers = h.offers.filter(x => x !== o);
+    return { ok: true, id: o.id };
+  }
+  // A hire leaves (sent back, contract over, or unpaid). Their gear stays in your bag; they wait on the bench 3 days.
+  function npcRelease(s, id, why, now) {
+    now = now || Date.now();
+    const hr = s.hires && s.hires[id]; if (!hr) return false;
+    const h = hallState(s, now);
+    h.bench = h.bench.filter(b => b.id !== id);
+    if (why !== 'short') h.bench.push(Object.assign({ id, rar: hr.rar, kind: 'sign', lv: lvl(s, id), traits: s.traits && s.traits[id], until: now + NPC_BENCH_MS, why }, hr.m ? { name: hr.m.name, cls: hr.m.cls, side: hr.m.side, hue: hr.m.hue } : {}));
+    s.unlocked = s.unlocked.filter(x => x !== id);
+    s.party = s.party.map(x => x === id ? null : x);
+    if (s.jobs) for (const k in s.jobs) if (s.jobs[k] === id) delete s.jobs[k];
+    if (s.autoTrain) delete s.autoTrain[id];
+    delete s.gear[id]; delete s.hp[id]; delete s.down[id]; if (s.traits) delete s.traits[id];
+    if (!LEGENDS.includes(id)) delete s.levels[id];
+    delete s.hires[id];
+    return true;
+  }
+  // Wages every second, offline too (dt in seconds). Short contracts end on time.
+  function payWages(s, dt, now, events) {
+    if (!s.hires) return;
+    for (const id of Object.keys(s.hires)) if (s.hires[id].kind === 'short' && s.hires[id].until <= now) { const nm = (memberById(id) || {}).name; npcRelease(s, id, 'short', now); events && events.push({ type: 'npcleft', id, name: nm, why: 'short' }); }
+    // Unpaid wages run up as a debt; past one hour's worth, the priciest hire walks off and takes their share of it.
+    const per = wagesPerHour(s);
+    if (per <= 0) { s.owed = 0; return; }
+    s.owed = (s.owed || 0) + per * dt / 3600;
+    const pay = Math.min(s.owed, Math.max(0, s.gold)); s.gold -= pay; s.owed -= pay; s.wagesPaid = (s.wagesPaid || 0) + pay;
+    while (s.owed > wagesPerHour(s) && Object.keys(s.hires).some(id => s.hires[id].kind !== 'short')) {
+      const id = Object.keys(s.hires).filter(x => s.hires[x].kind !== 'short').sort((a, b) => wagePerHour(s, b) - wagePerHour(s, a))[0];
+      const nm = (memberById(id) || {}).name, w = wagePerHour(s, id), tot = wagesPerHour(s);
+      s.owed = Math.max(0, s.owed * (1 - w / tot));
+      npcRelease(s, id, 'unpaid', now); events && events.push({ type: 'npcleft', id, name: nm, why: 'unpaid' });
+    }
+    if (!Object.keys(s.hires).length) s.owed = 0;
+  }
+  // v118: lore companions you already have stay, on a Legendary wage (no hire fee). New ones are hired at the Hall.
+  function npcMigrate(s) {
+    s.hires = s.hires || {}; s.hall = s.hall || { at: 0, offers: [], bench: [], rr: 0 };
+    if (!s.npcV) {
+      for (const id of LEGENDS) if (s.unlocked.includes(id) && !s.hires[id]) s.hires[id] = { rar: 'legendary', kind: 'sign', at: Date.now(), until: 0, m: null, kept: 1 };
+      // a lore companion still waiting at a full campfire goes to the Hall instead
+      if (s.pendingJoin && LEGENDS.includes(s.pendingJoin)) { s.hall.keep = (s.hall.keep || []).concat([{ id: s.pendingJoin, rar: 'legendary', legend: 1, keep: 1 }]); s.pendingJoin = null; }
+      for (const id of LEGENDS) { const b = legendBeat(id); if (b && s.story.seen[b.id] && !s.unlocked.includes(id)) s.hall.keep = (s.hall.keep || []).concat([{ id, rar: 'legendary', legend: 1, keep: 1 }]); }
+      s.npcV = 1;
+    }
+  }
   // Region mastery: three goals in every region, each a small permanent bonus.
   const MASTERY_ELITES = 20, MASTERY_PER = 0.01;
   const MASTERY = [
@@ -1786,7 +1953,7 @@
   function jobValue(s, job, id) {
     const m = memberById(id); if (!m) return 0;
     const tr = s.traits && s.traits[id] && s.traits[id].camp.k === 'job' ? s.traits[id].camp.v : 0;
-    return job.base * Math.sqrt(Math.max(1, lvl(s, id))) * (m.cls === job.aff ? 1.5 : 1) * (1 + (m.tier || 0)) * (1 + jobGear(s, id, job.id)) * (1 + tr);
+    return job.base * Math.sqrt(Math.max(1, lvl(s, id))) * (m.cls === job.aff ? 1.5 : 1) * (1 + (m.tier || 0)) * (1 + (m.job || 0)) * (1 + jobGear(s, id, job.id)) * (1 + tr);
   }
   const jobFree = (s, id) => id && id !== 'you' && s.unlocked.includes(id) && !s.party.includes(id) && !isGuest(s, id);
   function campBonus(s, stat) {
@@ -2551,6 +2718,7 @@
   function tick(s, dt, now, rng, events) {
     s.stats.playTime += dt; s.clock = now;
     nxTick(s, dt, now, events);
+    payWages(s, dt, now, events);
     if (s.wb && (now >= s.wb.until || resting(s, now))) endAssault(s, events);
     if (s.unlocked.length && !(s.traits && s.unlocked.every(id => s.traits[id]))) for (const id of s.unlocked) traitsOf(s, id);
     if (visiting(s)) return;
@@ -2718,7 +2886,8 @@
       if (s.story.seen[b.id]) continue;
       if (!b.when(s)) return null; // beats play in order
       s.story.seen[b.id] = Date.now();
-      if (b.join && !s.unlocked.includes(b.join) && !(s.gone && s.gone[b.join])) { if (companions(s).length >= rosterCap(s)) s.pendingJoin = b.join; else recruit(s, b.join); }
+      if (b.join && LEGENDS.includes(b.join)) npcLegendArrives(s, b.join);
+      else if (b.join && !s.unlocked.includes(b.join) && !(s.gone && s.gone[b.join])) { if (companions(s).length >= rosterCap(s)) s.pendingJoin = b.join; else recruit(s, b.join); }
       for (const id of STORY_LORE[b.id] || []) if (!s.lore[id]) s.lore[id] = Date.now();
       if (b.id === 'end') s.lore.g7 = Date.now();
       return b;
@@ -2797,11 +2966,13 @@
     registerHero(s);
     s.pace = o.pace || 0; s.grand = o.grand || {}; s.mast = o.mast || {}; s.mastE = o.mastE || {}; s.gone = o.gone || {}; s.rosterUps = o.rosterUps || 0;
     paceMigrate(s); trialMigrate(s);
+    npcMigrate(s); registerHero(s);
     for (const id of s.party) if (id && (s.hp[id] == null || s.hp[id] <= 0)) s.hp[id] = maxHpOf(s, id);
     return s;
   }
 
   const api = {
+    NPC_RAR, NPC_ROTATE, NPC_SHORT_MS, NPC_SHORT_MAX, NPC_BENCH_MS, LEGENDS, npcRar, npcRarOf, shortHire, hallState, npcCost, npcReq, npcHire, npcRelease, npcReroll, npcRerollCost, wagePerHour, wagesPerHour, npcIncomeMin, payWages,
     UNLOCKS, JOB_SLOT_LV, REGIONS, TRIAL_ELITES, trialOf, ROSTER_BASE, ROSTER_LV, ROSTER_BUY_MAX, ROSTER_COST, ROSTER_ITEMS, MASTERY, MASTERY_ELITES, MASTERY_PER, MASTERY_XP, MASTERY_FULL_XP, masteryXp, heroLv, unlockOf, canUse, nextUnlock, newUnlocks, jobSlots, regionNo, regionNeed, companions, rosterCap, fireCap, PARTY_SEATS, dismissCompanion, acceptRecruit, declineRecruit, masteryStars, masteryVal, paceMigrate,
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, atMainCamp, regionTop, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, TRAIT_FX, CAMP_TRAITS, traitsOf, traitState, traitVal, traitText, campTrait, tonicById, tonicLeft, tonicVal, drinkTonic,

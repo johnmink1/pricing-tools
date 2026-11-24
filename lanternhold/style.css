@@ -1,4 +1,4 @@
-/* lh-build 202611240256 */
+/* lh-build 202611240302 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1996,3 +1996,19 @@ body.resting .taptip{display:none}
 .foemods .mod.m-sp{background:#2a0e10;border-color:#a8382e;color:#ffd0c8}
 .foemods .mod.m-sp.m-burn{background:#2e1408;border-color:#c8602a;color:#ffd2b0}
 .foemods .mod.m-sp.m-poison{background:#122410;border-color:#4a8a2a;color:#d4f0c0}
+/* where a set drops, with a Farm button */
+.setwhere{display:flex;align-items:center;gap:8px;margin-top:7px;padding-top:7px;border-top:1px solid var(--line);clear:both}
+.setwhere svg{width:15px;height:15px;flex:none;color:var(--accent)}
+.setwhere small{flex:1;margin:0!important;font-size:12.5px;color:var(--muted)}
+.setwhere small b{color:var(--text)}
+.setwhere small em{font-style:normal;color:var(--dim)}
+.setwhere .btn{flex:none;white-space:nowrap}
+@media (max-width:480px){.setwhere{flex-wrap:wrap}.setwhere .btn{margin-left:23px}}
+/* the purse never shrinks out of sight (gold was clipped under the online pill on narrower desktops) */
+.top .purse{flex-shrink:0;justify-content:flex-start}
+.top .brand{flex-shrink:1;min-width:0}
+.top .brand b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (min-width:901px) and (max-width:1600px){.top{gap:8px;padding-left:16px;padding-right:16px}.top .purse .stat{padding:0 10px;gap:5px}.brand small{display:none}.onlinect small{display:none}}
+@media (min-width:901px) and (max-width:1280px){.top .brand b{display:none}.top .hudchip.quests span{max-width:5.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.top .hudchip span{white-space:nowrap}
+@media (min-width:901px) and (max-width:1180px){.top .hudchip.mercy span,.top .hudchip.surge span{display:none}.top .purse .stat{padding:0 8px}}

@@ -1,4 +1,4 @@
-/* lh-build 202611240256 */
+/* lh-build 202611240302 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1434,6 +1434,29 @@
   const rsetTwoText = i => '+' + pct100(L.rsetTwo(i)) + ' ' + RSET_KIND[L.REGION_SETS[i].k];
   const rsetFourText = i => '+' + pct100(L.rsetFour(i)) + ' damage and health' + (L.REGION_SETS[i].k === 'heal' ? ' (and healing for healers)' : '');
   const regionName = i => L.BIOMES[i].name;
+  // Where a set drops (John, 2026-11-24), with a button that takes the party there to farm it.
+  function setWhere(kind, i) {
+    const top = S.maxFloor, bossAt = f => Math.floor(f / L.BOSS_EVERY) * L.BOSS_EVERY;
+    let txt, go = 0;
+    if (kind === 'rset') {
+      const a = i * 10 + 1, z = i * 10 + 10;
+      txt = 'Drops in <b>' + esc(regionName(i)) + '</b> (floors ' + a + '\u2013' + z + '). Best from its guardian, ' + esc(L.BIOMES[i].boss) + ', on floor ' + z + '. Chests and soldiers there drop it too.';
+      go = top >= z ? z : top >= a ? (bossAt(top) >= a ? bossAt(top) : top) : 0;
+      if (!go) txt += ' <em>Reach floor ' + a + ' to farm it.</em>';
+    } else {
+      txt = 'Drops from <b>guardians</b> (every ' + L.BOSS_EVERY + 'th floor) from floor 15, for the classes in your party. Any guardian works; the deepest one you can beat is fastest.';
+      go = top >= 15 ? bossAt(top) : 0;
+      if (!go) txt += ' <em>Reach floor 15 to farm it.</em>';
+    }
+    return '<div class="setwhere">' + icon('map') + '<small>' + txt + '</small>' + (go ? '<button class="btn small" data-farm="' + go + '">' + (S.floor === go ? 'Farming here' : 'Farm floor ' + go) + '</button>' : '') + '</div>';
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-farm]'); if (!b) return;
+    const f = +b.dataset.farm; if (!(f > 0) || f > S.maxFloor) return;
+    L.gotoFloor(S, f); S.autoAdvance = false; S.campReturn = 0; $('auto').checked = false; updateStage();
+    toast('map', 'Farming floor ' + f, 'Descend automatically is off, so the party stays on floor ' + f + ' and fights it again and again. Turn it back on to keep going down.', '');
+    document.querySelectorAll('[data-farm]').forEach(x => { x.textContent = +x.dataset.farm === f ? 'Farming here' : 'Farm floor ' + x.dataset.farm; });
+  });
   const bound = it => it.rset != null || it.rar === 'goblin';
   function itemEffect(it) {
     const st = L.itemStats(it);
@@ -1494,8 +1517,8 @@
       '<div class="dstats">' + totals + '</div></div>' +
       '<div class="dcol">' + ['main', 'off', 'neck2', 'feet'].map(slotTile).join('') + '</div>' +
       '<div class="drings">' + ['ring1', 'ring2', 'ring3', 'ring4', 'ring5'].map(slotTile).join('') + '</div></div>' +
-      '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small></div>' +
-      Object.entries(L.rsetCounts(S, gearWho)).map(([i, n]) => '<div class="setinfo rset' + (n >= 2 ? ' on' : '') + '"><b>' + L.REGION_SETS[i].name + '</b> <span class="pips">' + [0, 1, 2, 3].map(k => '<i class="' + (k < n ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + rsetTwoText(+i) + '. 4 pieces: ' + rsetFourText(+i) + '.</small></div>').join('') +
+      '<div class="setinfo' + (sc ? ' on' : '') + '"><b>' + set.name + '</b> <span class="pips">' + [0, 1, 2].map(i => '<i class="' + (i < sc ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + set.two + '. 3 pieces: ' + set.three + '.</small>' + setWhere('class') + '</div>' +
+      Object.entries(L.rsetCounts(S, gearWho)).map(([i, n]) => '<div class="setinfo rset' + (n >= 2 ? ' on' : '') + '"><b>' + L.REGION_SETS[i].name + '</b> <span class="pips">' + [0, 1, 2, 3].map(k => '<i class="' + (k < n ? 'on' : '') + '"></i>').join('') + '</span><small>2 pieces: ' + rsetTwoText(+i) + '. 4 pieces: ' + rsetFourText(+i) + '.</small>' + setWhere('rset', +i) + '</div>').join('') +
       '<div class="dollbar"><small>' + cname + ' gear only. Tap a slot to change it. Worn gear stays on the character, not in the pack.' + (L.lockedSlots(S, gearWho) ? ' Locked slots keep their piece when you use Equip best.' : '') + '</small><button class="btn small" id="g-best"' + (nb ? '' : ' disabled') + '>' + (nb ? 'Equip best (' + nb + ')' : 'Best gear on') + '</button></div>';
     $('gearslots').innerHTML = h;
     { const pn = $('packn'); if (pn) pn.textContent = L.packCount(S); }
@@ -1565,8 +1588,8 @@
       enchBlock(it) +
       (it.aff ? '<div class="iaff">' + icon('flame') + '<span><b>' + affText(it) + '</b><small>Counts while the wearer works the ' + jobName(it.aff.j) + ' job at the campfire.</small></span></div>' : '') +
       (it.jset ? (() => { const js = L.JOB_SETS[it.jset], n = wearer ? L.jobSetCount(S, w, it.jset) : 0; return '<div class="iset"><b>' + js.name + (wearer ? ' <em>' + n + '/3 worn</em>' : '') + '</b><small>A job set for the ' + jobName(it.jset) + '. It helps whoever wears it while they work that job at camp.</small><small><em>2 pieces</em> +' + Math.round(L.JOB_SET_TWO * 100) + '% ' + jobName(it.jset) + ' output</small><small><em>3 pieces</em> +' + Math.round(L.JOB_SET_THREE * 100) + '% ' + jobName(it.jset) + ' output</small></div>'; })() : '') +
-      (set ? '<div class="iset"><b>' + set.name + '</b><small><em>2 pieces</em> ' + set.two + '</small><small><em>3 pieces</em> ' + set.three + '</small><small class="lore">' + esc(set.lore) + '</small></div>' : '') +
-      (rs ? (() => { const n = wearer ? (L.rsetCounts(S, w)[it.rset] || 0) : 0; return '<div class="iset rset"><b>' + rs.name + (wearer ? ' <em>' + n + '/4 worn</em>' : '') + '</b><small>A region set from ' + esc(regionName(it.rset)) + '. Head, chest, legs and feet, for any class. The bonuses multiply all of the wearer’s gear.</small><small><em>2 pieces</em> ' + rsetTwoText(it.rset) + '</small><small><em>4 pieces</em> ' + rsetFourText(it.rset) + '</small><small class="lore">' + esc(rs.lore) + '</small></div>'; })() : '') +
+      (set ? '<div class="iset"><b>' + set.name + '</b><small><em>2 pieces</em> ' + set.two + '</small><small><em>3 pieces</em> ' + set.three + '</small><small class="lore">' + esc(set.lore) + '</small>' + setWhere('class') + '</div>' : '') +
+      (rs ? (() => { const n = wearer ? (L.rsetCounts(S, w)[it.rset] || 0) : 0; return '<div class="iset rset"><b>' + rs.name + (wearer ? ' <em>' + n + '/4 worn</em>' : '') + '</b><small>A region set from ' + esc(regionName(it.rset)) + '. Head, chest, legs and feet, for any class. The bonuses multiply all of the wearer’s gear.</small><small><em>2 pieces</em> ' + rsetTwoText(it.rset) + '</small><small><em>4 pieces</em> ' + rsetFourText(it.rset) + '</small><small class="lore">' + esc(rs.lore) + '</small>' + setWhere('rset', it.rset) + '</div>'; })() : '') +
       (it.rar === 'goblin' ? '<div class="iset gobset"><b>The Loot Goblin’s Sack</b><small>+' + pct100(L.GOBLIN_SACK_GOLD) + ' gold for the whole party while worn. Roughly one Loot Goblin in ' + Math.round(1 / L.GOBLIN_SACK_CHANCE).toLocaleString('en-US') + ' drops it.</small><small class="lore">Still lumpy with whatever he stole last. Nobody has been brave enough to empty it.</small></div>' : '') +
       (wearer ? '<div class="iworn"><img src="' + SP.spriteURL(wearer.cls, 2, lookHue(wearer)) + '" alt="">Worn by <b>' + esc(wearer.name) + '</b></div>' : '') +
       '<div class="iacts">' +
@@ -4189,6 +4212,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 81, date: 'November 24, 2026', title: 'Where sets drop, and your gold is back', items: [
+      'Every set card in the Gear tab, and every set piece you open, now says where it drops, with a Farm floor button that takes your party there and keeps it on that floor.',
+      'Region sets drop in their own region, best from its guardian. Class sets drop from any guardian from floor 15.',
+      'Fixed: on some laptop-sized screens your gold was hidden under the online count in the top bar.'
+    ] },
     { v: 80, date: 'November 24, 2026', title: 'Special attacks', items: [
       'Every guardian now has a special attack it winds up every 10 seconds or so. Each region guardian has its own signature move, like Furnace-Heart\u2019s Magma Wave or the Root Mother\u2019s Grasping Roots.',
       'Some monsters past floor 8 have one too: acid that splashes the heroes beside the target, bats that dive at the back of the line, spores that poison everyone.',

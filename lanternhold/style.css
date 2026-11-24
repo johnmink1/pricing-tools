@@ -1,4 +1,4 @@
-/* lh-build 202611241538 */
+/* lh-build 202611241542 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2215,4 +2215,5 @@ body.atench #ghostlamp,body.atench #merchant,body.atench #spwarn,body.atench .fl
 .shchip svg{width:13px;height:13px;color:var(--sc)}.shchip b{color:var(--sc)}
 /* v110: full screen button always shows; fit5 tightens the icon buttons when the bar is very full */
 .top.fit5{gap:5px}.top.fit5 .iconbtn{width:34px;min-width:34px}
-body.isfull #app{max-width:min(1840px,100vw)}
+body.isfull #app{max-width:min(1840px,100%)}
+body{overflow-x:clip}

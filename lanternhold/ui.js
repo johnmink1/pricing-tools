@@ -1,4 +1,4 @@
-/* lh-build 202611241538 */
+/* lh-build 202611241542 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -5089,8 +5089,18 @@
     const b = $('btn-full'); if (!b) return; b.hidden = !fsOk();
     const on = !!fsEl(); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Leave full screen' : 'Full screen');
     b.dataset.tip = on ? 'Leave full screen (or press Esc)' : 'Full screen: hide the browser and fill your screen (Esc to leave)';
-    $('fullpath').setAttribute('d', on ? FS_OUT : FS_IN); document.body.classList.toggle('isfull', on); fitTop();
+    $('fullpath').setAttribute('d', on ? FS_OUT : FS_IN); paintWide();
   }
+  // The wide layout follows what the window really is, not what the browser says: it is on whenever the page fills
+  // the whole screen (the button, F11 or a maximised borderless window) and off as soon as it doesn't. Browsers that
+  // grant full screen but keep the window size never get it, so nothing ends up wider than the window.
+  function paintWide() {
+    const real = innerWidth >= 1500 && innerHeight >= screen.height * 0.95 && innerWidth >= screen.width * 0.95;
+    if (document.body.classList.contains('isfull') !== real) { document.body.classList.toggle('isfull', real); requestAnimationFrame(() => { resize(); requestAnimationFrame(resize); }); }
+    if (scrollX) scrollTo(0, scrollY);
+    fitTop();
+  }
+  addEventListener('resize', () => { clearTimeout(paintWide.t); paintWide.t = setTimeout(paintWide, 120); });
   $('btn-full') && $('btn-full').addEventListener('click', toggleFull);
   document.addEventListener('fullscreenchange', paintFull); document.addEventListener('webkitfullscreenchange', paintFull); paintFull();
   $('btn-notes').addEventListener('click', openBell); paintNoteDot();
@@ -5098,6 +5108,8 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 112, date: 'November 24, 2026', title: 'Smoother full screen', items: [
+      'Going in and out of full screen (the button or F11) no longer leaves the page wider than your window. The wider layout now turns on whenever the game really fills your screen, F11 included, and turns off the moment it doesn’t.'] },
     { v: 111, date: 'November 24, 2026', title: 'Full screen help', items: [
       'If your browser keeps the game inside its window when you press full screen, the game now tells you to press F11 instead, which always works on a computer.'] },
     { v: 110, date: 'November 24, 2026', title: 'Full screen button stays put', items: [
@@ -6596,6 +6608,9 @@
   checkEpoch(); wipedNotice(); paintAdminTab(); if (signedIn()) idToken().then(paintAdminTab);
   resize();
   window.addEventListener('resize', resize);
+  // The arena can change size without the window changing (full screen layout, panels opening), so watch it directly.
+  // Only a real size change re-renders, so this can never loop.
+  if (window.ResizeObserver) { let aw = 0, ah = 0; new ResizeObserver(es => { const r = es[0].contentRect, w = Math.round(r.width), h = Math.round(r.height); if (w && h && (w !== aw || h !== ah)) { aw = w; ah = h; resize(); } }).observe(arena); }
   syncBuySeg();
   if (!S.hero) setup(S.migratedFromV1 ? 'Lanternhold has grown. You now lead a party of five, the story has begun, and monsters fight back. Your Embers and relics carried over.' : '');
   else grantOffline((Date.now() - (S.lastSeen || Date.now())) / 1000, true);

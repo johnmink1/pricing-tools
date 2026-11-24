@@ -1,4 +1,4 @@
-/* lh-build 202611241253 */
+/* lh-build 202611241259 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -119,7 +119,7 @@
   });
   document.addEventListener('pointerout', e => { if (tipFor && !tipFor.contains(e.relatedTarget)) { clearTimeout(tipHide); tipHide = setTimeout(hideTip, 60); } });
   document.addEventListener('click', e => {
-    const i = e.target.closest('.tipi,.klant') || (!fine.matches && e.target.closest('.trait[data-tip],.cxp[data-tip]'));
+    const i = e.target.closest('.tipi,.klant') || (!fine.matches && e.target.closest('.trait[data-tip],.cxp[data-tip],#foetag[data-tip]'));
     if (i) { e.preventDefault(); e.stopPropagation(); if (tipFor === i) hideTip(); else { showTip(i); clearTimeout(tipHide); tipHide = setTimeout(hideTip, 5000); } return; }
     if (!fine.matches) hideTip();
   }, true);
@@ -882,7 +882,7 @@
         toast('bag', e.item ? 'You got it back' : 'Loot Goblin slain', e.item ? L.gearName(e.item) + ' is back in your pack, and the goblin dropped a fat purse of gold.' : 'It dropped a fat purse of gold. Your pack is safe.', 'feat');
       } else if (e.type === 'pack') {
         floatText('Ambush!', 'crit', 0.5, 0.3);
-        if (!(S.stats.packs > 0)) toast('sword', 'Ambush!', e.n + ' monsters have teamed up to jump your party. They hit harder and strike the back first, but they pay ' + (e.n * L.PACK_GOLD) + ' times the gold and often drop gear.', 'feat');
+        if (!(S.stats.packs > 0)) toast('sword', 'Ambush!', e.n + ' monsters have teamed up to jump your party. They hit harder and strike the back first, but they pay ' + (e.n * L.PACK_GOLD) + ' times the gold, ' + (e.n * L.PACK_XP) + ' times the hero XP and often drop gear.', 'feat');
       } else if (e.type === 'herolevel') {
         sfx.relic(); floatText('Hero level ' + e.lv + '!', 'crit', 0.5, 0.25);
         toast('star', L.memberById('you').name + ' reached hero level ' + e.lv, (e.pts === 1 ? 'A new stat point' : e.pts + ' new stat points') + ' to spend on the character sheet in the Skills tab.', 'feat');
@@ -2224,7 +2224,7 @@
     if (f) {
       $('foename').textContent = f.pack ? f.name + ' and ' + (f.pack - 1) + ' more' : f.name;
       if (f.goblin && !f.seen) { f.seen = 1; goblinArrives(f); }
-      const tag = $('foetag'); tag.textContent = f.world ? 'World boss' : f.goblin ? 'Thief' : f.pack ? 'Ambush ×' + f.pack : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; tag.className = 'tag' + (f.world ? ' world' : '') + (f.goblin ? ' thief' : '') + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
+      const tag = $('foetag'); tag.textContent = f.world ? 'World boss' : f.goblin ? 'Thief' : f.pack ? 'Ambush ×' + f.pack + ' · XP ×' + f.pack * L.PACK_XP : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; if (f.pack) tag.dataset.tip = f.pack + ' foes at once: ' + f.pack * L.PACK_XP + '× hero XP and ' + f.pack * L.PACK_GOLD + '× gold.'; else delete tag.dataset.tip; tag.className = 'tag' + (f.world ? ' world' : '') + (f.goblin ? ' thief' : '') + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
       { const sp = f.sp && L.SPECIALS[f.sp], mk = (f.mods || []).join(',') + '|' + (f.sp || ''); if (mk !== lastModKey) { lastModKey = mk; $('foemods').innerHTML = (sp ? '<span class="mod m-sp' + (sp.dot ? ' m-' + sp.dot : '') + '" title="' + esc(sp.desc + (sp.dot ? '. ' + (sp.dot === 'burn' ? 'Burns' : 'Poison') + ' last ' + L.DOT_FIGHTS + ' fights.' : '.')) + '">' + esc(sp.name) + '</span>' : '') + (f.mods || []).map(m => '<span class="mod m-' + m + '" title="' + esc(L.MODS[m].desc) + '">' + esc(L.MODS[m].name) + '</span>').join(''); } }
       if (f.world && S.wb) {
         const ph = L.wbPhase(wbState().total + S.wb.score), pct = ph.into / ph.need * 100;
@@ -4481,6 +4481,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 94, date: 'November 24, 2026', title: 'More ambushes', items: [
+      'Ambushes (groups of 2 to 4 monsters) now come twice as often: 6% of fights from floor 3, up from 3%.',
+      'The ambush tag now shows its XP bonus. Each monster in the group adds 2× hero XP, so an ambush of 3 gives XP ×6 (and 6× gold). Hover the tag (or tap it) for the details.',
+    ] },
     { v: 93, date: 'November 24, 2026', title: 'A quieter Lantern Keeper', items: [
       'The Lantern Keeper banner above the fight is now a small glowing lantern in the corner of the battle scene. Hover it (or tap it on a phone) to see who is online and the +25% bonus.',
     ] },

@@ -1,4 +1,4 @@
-/* lh-build 202611240323 */
+/* lh-build 202611240332 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2178,7 +2178,14 @@
         $('lanternbar').style.width = (left / lt * 100) + '%';
         $('lanterntext').textContent = 'Lantern oil ' + left.toFixed(1) + 's';
       }
-    } else if (!L.alive(S).length) { $('foename').textContent = 'Your party is resting'; }
+    } else {
+      // No foe up (between foes, or resting): clear the panel so it never shows a foe from another floor (John, 2026-11-24).
+      $('foename').textContent = !L.alive(S).length ? 'Your party is resting' : L.isBossFloor(S.floor) ? 'The guardian steps up\u2026' : 'The next foe steps up\u2026';
+      $('foetag').textContent = ''; $('foetag').className = 'tag';
+      if (lastModKey !== '') { lastModKey = ''; $('foemods').innerHTML = ''; }
+      $('hpbar').style.width = '0%'; $('wardbar').style.width = '0%'; $('hptext').textContent = '';
+      $('lanternwrap').hidden = true; $('b-oil').hidden = true;
+    }
     paintNexus();
     if ($('auto').checked !== S.autoAdvance) $('auto').checked = S.autoAdvance;
     if ($('autocast').checked !== S.autoCast) $('autocast').checked = S.autoCast;
@@ -4243,6 +4250,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 85, date: 'November 24, 2026', title: 'Fight panel fix', items: [
+      'Fixed: after changing floors, the fight panel could keep showing the last guardian (with its lantern timer) while your party was really fighting something else. Between foes it now says the next foe is on the way.'
+    ] },
     { v: 84, date: 'November 24, 2026', title: 'Notification tabs', items: [
       'The bell now sorts notifications into tabs: Loot, Fights, Progress, Players and Other. Tap one to read just that log. Each tab shows how many it holds and a dot for new ones.',
       'The bell keeps the last 120 notifications instead of 50.'

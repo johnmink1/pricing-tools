@@ -1,4 +1,4 @@
-/* lh-build 202611241453 */
+/* lh-build 202611241509 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -465,11 +465,12 @@
   // live in the counter panel under the scene (one set of controls).
   let shopBg = null, shopKey = '', SG = { k: 1, vw: 240, vh: 100, ex: 176, fy: 88 };
   // v105 (John: "seems squished... autoscale those based on window size"): the shop is drawn in a virtual room scaled so
-  // the party, the shopkeeper, the counter and the sign (a 198 x 100 focus box) fill the arena at any window shape. The
-  // room grows sideways or upward around them, so nothing is squashed or left tiny in a corner.
+  // the party, the shopkeeper and the counter (a 198 x 74 focus box) fill the arena at any window shape. The room grows
+  // sideways or upward around them, so nothing is squashed or left tiny in a corner. v106: in short, wide panels the sign
+  // and lanterns tuck in under the ceiling instead of shrinking the party (a player still saw tiny sprites there).
   function shopGeo() {
-    const k = Math.min(W / 198, H / 100), vw = W / k, vh = H / k;
-    return (SG = { k, vw, vh, ex: Math.round(vw / 2 + 48), fy: Math.round(88 + (vh - 100) * 0.8) });
+    const k = Math.min(W / 198, H / 74), vw = W / k, vh = H / k;
+    return (SG = { k, vw, vh, ex: Math.round(vw / 2 + 48), fy: Math.round(64 + (vh - 74) * 0.8) });
   }
   const shopKind = () => S.shopK === 'arm' ? 'arm' : 'ench';
   function shopGlow(g, cx, cy, r, rgb, a) { const q = g.createRadialGradient(cx, cy, 0, cx, cy, r); q.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); q.addColorStop(1, 'rgba(' + rgb + ',0)'); g.globalCompositeOperation = 'lighter'; g.fillStyle = q; g.fillRect(cx - r, cy - r, r * 2, r * 2); g.globalCompositeOperation = 'source-over'; }
@@ -508,7 +509,7 @@
       g.fillStyle = '#7a8494'; g.beginPath(); g.arc(ex - 4, fy - 52, 7, 0, Math.PI * 2); g.fill(); g.fillStyle = '#a8742e'; g.beginPath(); g.arc(ex - 4, fy - 52, 2.2, 0, Math.PI * 2); g.fill();
     }
     // the sign over the shop
-    const text = ench ? 'THE ENCHANTER' : 'THE ARMORER'; g.font = '700 7px Inter, system-ui, sans-serif'; const sw = g.measureText(text).width + 12, sy = fy - 80;
+    const text = ench ? 'THE ENCHANTER' : 'THE ARMORER'; g.font = '700 7px Inter, system-ui, sans-serif'; const sw = g.measureText(text).width + 12, sy = Math.max(3, fy - 80);
     g.strokeStyle = '#2a1a0e'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(ex - sw / 2 + 4, 6); g.lineTo(ex - sw / 2 + 4, sy); g.moveTo(ex + sw / 2 - 4, 6); g.lineTo(ex + sw / 2 - 4, sy); g.stroke();
     g.fillStyle = '#5a3a22'; g.fillRect(ex - sw / 2, sy, sw, 11); g.strokeStyle = '#a8742e'; g.strokeRect(ex - sw / 2 + 0.5, sy + 0.5, sw - 1, 10);
     g.fillStyle = ench ? '#e9d5ff' : '#ffd9a8'; g.textAlign = 'center'; g.fillText(text, ex, sy + 8); g.textAlign = 'left';
@@ -539,7 +540,7 @@
   function drawShopRoom(W, fy, ex, ench) {
     // hanging lanterns and the room light
     for (const lx of [ex - 120, ex - 72]) {
-      const ly = fy - 70, s = Math.sin(tAnim * 1.1 + lx) * 0.6;
+      const ly = Math.max(13, fy - 70), s = Math.sin(tAnim * 1.1 + lx) * 0.6;
       ctx.strokeStyle = '#2a1a0e'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(lx, 6); ctx.lineTo(lx + s, ly - 4); ctx.stroke();
       shopGlow(ctx, lx + s, ly, 26, '255,200,110', 0.3);
       ctx.fillStyle = '#3a2618'; ctx.fillRect(lx + s - 3, ly - 4.5, 6, 1.5); ctx.fillRect(lx + s - 3, ly + 3.5, 6, 1.5);
@@ -4982,6 +4983,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 106, date: 'November 24, 2026', title: 'Bigger shop scenes', items: [
+      'The Enchanter and the Armorer no longer shrink the party and the shopkeeper in short, wide windows. The sign and lanterns tuck in under the ceiling instead.',
+    ] },
     { v: 105, date: 'November 24, 2026', title: 'Legendary world boss loot', items: [
       'World bosses now drop Legendary loot. When an event ends, a draw picks who wins the boss’s Legendary (if one drops) and who gets each of its boss shards.',
       'Every whole point of boss score is one ticket, and anyone who hit the boss gets at least one. The more phases the server breaks, the better the odds of a Legendary and the more shards drop.',

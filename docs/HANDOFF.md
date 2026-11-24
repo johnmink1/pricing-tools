@@ -1,6 +1,6 @@
 # Lanternhold handoff (24 Nov 2026)
 
-This handoff stands on its own for the new Lanternhold project. It is current as of **v105, build 202611241453**, live at https://lanternhold.born2gamellc.com.
+This handoff stands on its own for the new Lanternhold project. It is current as of **v106**, live at https://lanternhold.born2gamellc.com.
 
 ## Where the code lives
 
@@ -9,7 +9,7 @@ This handoff stands on its own for the new Lanternhold project. It is current as
 | Path | What it is |
 |---|---|
 | `lanternhold/core.js` | All game rules: classes, foes, loot, crafting, events, the `api` export list. Any new function must be added to that big export list at the bottom. |
-| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v106**. |
+| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v107**. |
 | `lanternhold/style.css`, `index.html` | Styles and markup. |
 | `lanternhold/vector.js` | Illustrated SVG sprites (`ART.enchanter`, `ART.armorer`, classes, foes). |
 | `lanternhold/sprites.js` | Pixel fallback sprites and `itemIcon`. |
@@ -102,7 +102,7 @@ There is no working AWS CLI. The cloud container's keys are invalid, and VENGEAN
   - Core: rarity `legend`, `WB_SETS` (Colossus = hp, Sovereign = dps, Nyxmaw = heal, Leviathan = gold), 4 pieces each (main, chest/robe, ring, neck), 2-piece +15% (gold +25%), 4-piece +30% damage and health. Legendaries are bound, can't be merged, and upgrade with that boss's shards (`s.shards[boss]`, cost = next level) instead of gold. `makeLegend` caps item level so the winner can wear it.
   - UI: `lootBoss(id)` runs after the Sigil claim; Market > Boss shards view; set block in the item window. `LHDebug.lootBoss` exists for tests.
   - **The stack update for this Lambda must be deployed through CloudShell.** Until it is, the game says "The shard stall opens soon." and loot claims retry later.
-  - Also in v105: the Enchanter and Armorer scenes scale to the arena (`shopGeo()`: a 198 × 100 focus box fills the arena, the room grows around it).
+  - Also in v105: the Enchanter and Armorer scenes scale to the arena (`shopGeo()`: a 198 × 74 focus box fills the arena, the room grows around it; v106 shrank it from 100 so short, wide panels keep big sprites).
 
 ## Open asks and things to watch
 

@@ -1,4 +1,4 @@
-/* lh-build 202611240302 */
+/* lh-build 202611240315 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -1870,20 +1870,21 @@
     }
     // The next region opens at a hero level (pacing v2). Until then the party keeps working this one.
     const need = regionNeed(s, s.floor + 1);
-    if (need && (s.autoAdvance || boss)) {
+    // With Descend automatically off the party stays put to farm this floor, guardians included (John, 2026-11-24).
+    if (need && s.autoAdvance) {
       s.lantern = 0; s.foeIdx = 0; healParty(s, 0.3, true);
       events && events.push({ type: 'regionlock', need, floor: s.floor + 1 });
       if (boss) s.floor = Math.max(1, s.floor - 1);
       return;
     }
-    if (s.floor >= s.maxFloor) {
+    if (!need && s.floor >= s.maxFloor) {
       s.maxFloor = s.floor + 1;
       if (s.maxFloor > s.maxFloorEver) { s.maxFloorEver = s.maxFloor; events && events.push({ type: 'newfloor', floor: s.maxFloor }); }
       unlockLore(s, 'biome' + (Math.floor((s.maxFloor - 1) / 10) % BIOMES.length), events);
     }
     s.lantern = 0; s.foeIdx = 0;
     healParty(s, 0.3, true); // a breather between floors
-    if (s.autoAdvance || boss) s.floor++;
+    if (s.autoAdvance) s.floor++;
   }
 
   function gotoFloor(s, f) {

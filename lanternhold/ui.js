@@ -1,4 +1,4 @@
-/* lh-build 202611240302 */
+/* lh-build 202611240315 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -4207,11 +4207,24 @@
       });
   }
   $('btn-guide').addEventListener('click', () => openGuide());
+  // Top bar fit: step up .fit1..fit4 until nothing overflows (works at any zoom, whatever chips are showing).
+  function fitTop() {
+    const top = document.querySelector('.top'); if (!top) return;
+    if (innerWidth <= 900) { top.classList.remove('fit1', 'fit2', 'fit3', 'fit4'); return; }
+    let n = 0; top.classList.remove('fit1', 'fit2', 'fit3', 'fit4');
+    while (n < 4 && top.scrollWidth > top.clientWidth + 1) top.classList.add('fit' + (++n));
+  }
+  addEventListener('resize', fitTop); setInterval(fitTop, 1500); setTimeout(fitTop, 50);
   $('btn-notes').addEventListener('click', openBell); paintNoteDot();
 
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 82, date: 'November 24, 2026', title: 'Farming guardians, and a cleaner top bar', items: [
+      'With Descend automatically off, beating a guardian now keeps you on its floor so you can farm it again. Before, a guardian kill always pushed you down a floor.',
+      'The top bar fits itself to your screen and zoom: it drops labels and then the title before anything can overlap. The online count no longer sits on the Lanternhold title.',
+      'The floor dots in the battle header no longer touch the region name.'
+    ] },
     { v: 81, date: 'November 24, 2026', title: 'Where sets drop, and your gold is back', items: [
       'Every set card in the Gear tab, and every set piece you open, now says where it drops, with a Farm floor button that takes your party there and keeps it on that floor.',
       'Region sets drop in their own region, best from its guardian. Class sets drop from any guardian from floor 15.',

@@ -1,4 +1,4 @@
-/* lh-build 202611241244 */
+/* lh-build 202611241253 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -119,7 +119,7 @@
   });
   document.addEventListener('pointerout', e => { if (tipFor && !tipFor.contains(e.relatedTarget)) { clearTimeout(tipHide); tipHide = setTimeout(hideTip, 60); } });
   document.addEventListener('click', e => {
-    const i = e.target.closest('.tipi') || (!fine.matches && e.target.closest('.trait[data-tip],.cxp[data-tip]'));
+    const i = e.target.closest('.tipi,.klant') || (!fine.matches && e.target.closest('.trait[data-tip],.cxp[data-tip]'));
     if (i) { e.preventDefault(); e.stopPropagation(); if (tipFor === i) hideTip(); else { showTip(i); clearTimeout(tipHide); tipHide = setTimeout(hideTip, 5000); } return; }
     if (!fine.matches) hideTip();
   }, true);
@@ -2483,7 +2483,7 @@
   $('online').addEventListener('click', () => switchTab('guild'));
   function paintKeeper() {
     const el = $('keeperbar'); if (!el) return; const on = L.keeperOn(S);
-    el.hidden = !on; if (on) el.innerHTML = icon('lantern') + '<span><b>The Lantern Keeper is here.</b> ' + esc(S.keeper.name) + ' is online: <b>+' + Math.round(L.KEEPER * 100) + '%</b> damage, healing, gold, hero XP and gear finds for every hero.</span>';
+    el.hidden = !on; if (on) { el.innerHTML = icon('lantern'); el.dataset.tip = 'The Lantern Keeper is here. ' + S.keeper.name + ' is online: +' + Math.round(L.KEEPER * 100) + '% damage, healing, gold, hero XP and gear finds for every hero.'; }
   }
   setInterval(paintKeeper, 15000);
   setTimeout(loadOnline, 2000); setInterval(loadOnline, 60000);
@@ -4481,6 +4481,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 93, date: 'November 24, 2026', title: 'A quieter Lantern Keeper', items: [
+      'The Lantern Keeper banner above the fight is now a small glowing lantern in the corner of the battle scene. Hover it (or tap it on a phone) to see who is online and the +25% bonus.',
+    ] },
     { v: 92, date: 'November 24, 2026', title: 'See your XP bonuses', items: [
       'The XP bar on your character sheet now shows your total hero XP rate, like XP ×1.18. Hover the bar (or tap it on a phone) to see every bonus that adds to it: class skills, war aura, Scholar’s Ink, Lantern Surge, companion traits, enchants and region mastery, plus the Lantern Keeper when he is online.',
     ] },

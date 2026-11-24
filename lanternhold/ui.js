@@ -3031,7 +3031,7 @@
   function paintGoblinHunt() {
     const g = S.goblin, el = $('gobhunt'), k = g ? g.floor + '|' + g.item.uid + '|' + (S.maxFloor >= g.floor) : '';
     if (k === gobKey) return; gobKey = k; el.hidden = !g; if (!g) return;
-    el.innerHTML = icon('bag') + '<span>The Loot Goblin is hiding on <b>floor ' + g.floor + '</b> with your <b class="r-' + g.item.rar + '">' + esc(L.gearName(g.item)) + '</b></span>' + (S.maxFloor >= g.floor && S.floor !== g.floor ? '<em>Go there</em>' : '');
+    el.innerHTML = icon('bag') + '<i class="cb">F' + g.floor + '</i><span>The Loot Goblin is hiding on <b>floor ' + g.floor + '</b> with your <b class="r-' + g.item.rar + '">' + esc(L.gearName(g.item)) + '</b></span>' + (S.maxFloor >= g.floor && S.floor !== g.floor ? '<em>Go there</em>' : '');
   }
   $('gobhunt').addEventListener('click', () => {
     const g = S.goblin; if (!g) return;
@@ -6370,7 +6370,7 @@
     else if (x.claim) h = icon('crown') + '<span><b>The world boss has fallen back.</b> Your reward is waiting.</span><em>Claim</em>';
     else if (x.live) {
       const ph = L.wbPhase(x.total);
-      h = icon('skull') + '<span><b>World boss: ' + esc(x.name) + '</b> · phase ' + (ph.broken + 1) + ' · ' + Math.floor(ph.into / ph.need * 100) + '% · ends in ' + wbDur(x.w.end - x.now) + '</span>' +
+      h = icon('skull') + '<i class="cb">' + Math.floor(ph.into / ph.need * 100) + '%</i><span><b>World boss: ' + esc(x.name) + '</b> · phase ' + (ph.broken + 1) + ' · ' + Math.floor(ph.into / ph.need * 100) + '% · ends in ' + wbDur(x.w.end - x.now) + '</span>' +
         (!CL || !signedIn() ? '<em>Sign in to fight</em>' : x.ready > 0 ? '<em class="wait">Next assault ' + wbDur(x.ready) + '</em>' : '<em>Join the assault</em>');
     } else if (x.next - x.now < 2 * 864e5) h = icon('skull') + '<span><b>' + esc(L.wbName(L.wbWindow(x.next).id)) + '</b> attacks the Hold in ' + wbDur(x.next - x.now) + '</span><em class="wait">Details</em>';
     if (h !== wb.key) { wb.key = h; el.innerHTML = h; el.hidden = !h; el.classList.toggle('on', !!inA); }

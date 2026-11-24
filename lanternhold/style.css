@@ -2323,3 +2323,19 @@ body.hasdock{padding-bottom:calc(var(--dockh) + 6px)}
   body.atench .stage .arena{max-height:none}
 }
 body.hasdock #toasts{bottom:calc(var(--dockh) + 16px)}
+/* v118 (John: the world boss and Loot Goblin bars were squeezing the fight scene): they are now small round chips in the
+   scene's top-left corner, like the lanterns on the right. Hover or focus opens the full line; a click does what the bar did. */
+.achips{position:absolute;left:10px;top:10px;z-index:6;display:flex;flex-direction:column;align-items:flex-start;gap:8px;pointer-events:none}
+.achips .achip{pointer-events:auto;position:relative;margin:0;width:auto;min-width:34px;height:34px;padding:0 8px;gap:8px;white-space:nowrap;border-radius:999px;font-size:12.5px;cursor:pointer;justify-content:center}
+.achips .achip[hidden]{display:none}
+.achips .achip>svg{width:17px;height:17px;flex:none}
+.achips .achip span,.achips .achip em{display:none}
+.achips .achip:hover,.achips .achip:focus-visible{max-width:calc(100vw - 60px);padding-right:6px;z-index:7}
+.achips .achip:hover span,.achips .achip:hover em,.achips .achip:focus-visible span,.achips .achip:focus-visible em{display:inline;overflow:hidden;text-overflow:ellipsis}
+.achips .achip .cb{position:absolute;left:22px;bottom:-6px;min-width:16px;padding:0 4px;border-radius:999px;font:800 9.5px/15px var(--body);font-style:normal;text-align:center;pointer-events:none}
+.achips .achip:hover .cb,.achips .achip:focus-visible .cb{display:none}
+.achips .gobhunt .cb{background:#7ee0a5;color:#0b1a10}
+.achips .wbbar .cb{background:#c58bff;color:#1a0d2e}
+.achips .gobhunt{display:flex;align-items:center;border:1px solid #3f6b3a;background:linear-gradient(90deg,#10200f,#18301a);color:#d6f5c8;box-shadow:0 0 10px rgba(126,224,165,.35)}
+.achips .wbbar{box-shadow:0 0 10px rgba(155,77,255,.45)}
+body.atench .achips{display:none}

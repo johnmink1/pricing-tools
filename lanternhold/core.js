@@ -1,4 +1,4 @@
-/* lh-build 202611241302 */
+/* lh-build 202611241310 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -1325,7 +1325,7 @@
   // Move enchant number `idx` of `src` into socket `slot` of `dst` (an empty socket, or one to overwrite). src is destroyed.
   function disenchant(s, srcUid, idx, dstUid, slot) {
     const a = itemOf(s, srcUid), b = itemOf(s, dstUid);
-    if (!a || !b || a === b || a.lk || wornAt(s, a.uid)) return null;
+    if (!visiting(s) || !a || !b || a === b || a.lk || wornAt(s, a.uid)) return null;
     const la = enchList(a), lb = enchList(b), x = la[idx]; if (!x || (s.dust || 0) < enchCost(x)) return null;
     const n = sockets(b); if (!(slot >= 0 && slot < n && slot <= lb.length)) return null;
     const old = lb[slot] || null; lb[slot] = { id: x.id, t: x.t }; b.en = enchStr(lb);
@@ -1997,7 +1997,7 @@
   function merchantTick(s, now, active, rng, events) {
     rng = rng || Math.random;
     if (s.merchant && now >= s.merchant.until) { s.merchant = null; s.merchNext = now + MERCH_COOL * 1000; events && events.push({ type: 'merchgone' }); return; }
-    if (s.merchant || !active || (s.maxFloorEver || 0) < MERCH_FLOOR || resting(s, now)) return;
+    if (s.merchant || !active || (s.maxFloorEver || 0) < MERCH_FLOOR || resting(s, now) || visiting(s)) return;
     if (now < (s.merchNext || 0) || rng() >= 1 / (MERCH_EVERY * 2)) return;
     s.merchant = { at: now, until: now + MERCH_LIFE * 1000, offer: merchOffer(s, rng) };
     events && events.push({ type: 'merchant' });
@@ -2265,6 +2265,11 @@
 
   // Resting at camp: after Return to camp (floor 1) or under a Campfire Draught. Nobody fights; everyone heals up.
   const resting = (s, now) => !!((s.campReturn && s.floor <= CAMP_FLOOR) || s.campUntil > now);
+  // The Enchanter (John, 2026-11-24): enchanting and disenchanting happen on a visit. The dive stops while you are there:
+  // nobody fights, heals or advances, and nothing new turns up. A visit is never saved; reloading the game ends it.
+  const visiting = s => !!(s && s.enchAt);
+  function visitEnchanter(s, now) { if (!s.hero || s.enchAt) return false; s.enchAt = now || Date.now(); return true; }
+  function leaveEnchanter(s) { if (!s.enchAt) return false; s.enchAt = 0; return true; }
   // Ghost Lantern (John, 2026-11-24): now and then, only while the player is actively playing, a ghost lantern drifts
   // into the fight and slowly saps party damage or healing, never more than GHOST_MAX. Tap it to shatter it for a small
   // reward. Left alone it fades after GHOST_LIFE seconds and the stat comes straight back: nothing lasting is lost.
@@ -2279,7 +2284,7 @@
   function ghostTick(s, now, active, rng, events) {
     rng = rng || Math.random;
     if (s.ghost && now >= s.ghost.until) { const k = s.ghost.k; s.ghost = null; s.ghostNext = now + GHOST_COOL * 1000; events && events.push({ type: 'ghostgone', k }); return; }
-    if (s.ghost || !active || s.maxFloorEver < GHOST_FLOOR || resting(s, now) || !s.foe || nexusOn(s)) return;
+    if (s.ghost || !active || s.maxFloorEver < GHOST_FLOOR || resting(s, now) || visiting(s) || !s.foe || nexusOn(s)) return;
     if (now < (s.ghostNext || 0) || rng() >= 1 / GHOST_EVERY) return;
     const hasHealer = s.party.some(id => id && healPerSec(s, id) > 0);
     const k = hasHealer && rng() < 0.35 ? 'heal' : 'dps';
@@ -2302,6 +2307,7 @@
     nxTick(s, dt, now, events);
     if (s.wb && (now >= s.wb.until || resting(s, now))) endAssault(s, events);
     if (s.unlocked.length && !(s.traits && s.unlocked.every(id => s.traits[id]))) for (const id of s.unlocked) traitsOf(s, id);
+    if (visiting(s)) return;
     if (resting(s, now)) {
       for (const id of s.party) if (id) { delete s.down[id]; const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + mx * 0.25 * (1 + campTrait(s, 'rest')) * dt); }
       s.minions = []; s.lantern = 0; s.dots = {}; s.res = {}; s.oom = {}; s.cc = {};
@@ -2416,6 +2422,7 @@
   }
 
   function strike(s, now, rng, events, auto) {
+    if (visiting(s)) return 0;
     if (!auto) nxClick(s, now || Date.now());
     if (resting(s, now)) return 0;
     if ((s.foeGap || 0) > (now || Date.now())) return 0;
@@ -2543,7 +2550,7 @@
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, xpBonus, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, xpBonus, visiting, visitEnchanter, leaveEnchanter, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

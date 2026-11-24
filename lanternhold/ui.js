@@ -1,4 +1,4 @@
-/* lh-build 202611241509 */
+/* lh-build 202611241515 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -472,7 +472,7 @@
     const k = Math.min(W / 198, H / 74), vw = W / k, vh = H / k;
     return (SG = { k, vw, vh, ex: Math.round(vw / 2 + 48), fy: Math.round(64 + (vh - 74) * 0.8) });
   }
-  const shopKind = () => S.shopK === 'arm' ? 'arm' : 'ench';
+  const shopKind = () => S.shopK === 'arm' || S.shopK === 'store' ? S.shopK : 'ench';
   function shopGlow(g, cx, cy, r, rgb, a) { const q = g.createRadialGradient(cx, cy, 0, cx, cy, r); q.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); q.addColorStop(1, 'rgba(' + rgb + ',0)'); g.globalCompositeOperation = 'lighter'; g.fillStyle = q; g.fillRect(cx - r, cy - r, r * 2, r * 2); g.globalCompositeOperation = 'source-over'; }
   function shopShelf(g, sx, y, w, seed) {
     let s = seed; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -485,20 +485,28 @@
   function buildShop(kind) {
     const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
     const g = c.getContext('2d'); g.scale(R * SG.k, R * SG.k);
-    const W = SG.vw, H = SG.vh, fy = SG.fy, ench = kind === 'ench', ex = SG.ex;
+    const W = SG.vw, H = SG.vh, fy = SG.fy, ench = kind === 'ench', store = kind === 'store', warm = !!(ench || store), ex = SG.ex;
     let lg = g.createLinearGradient(0, 0, 0, fy);
-    if (ench) { lg.addColorStop(0, '#1a1128'); lg.addColorStop(1, '#352350'); } else { lg.addColorStop(0, '#17130f'); lg.addColorStop(1, '#3a2a20'); }
+    if (ench) { lg.addColorStop(0, '#1a1128'); lg.addColorStop(1, '#352350'); } else if (store) { lg.addColorStop(0, '#1d140c'); lg.addColorStop(1, '#43301d'); } else { lg.addColorStop(0, '#17130f'); lg.addColorStop(1, '#3a2a20'); }
     g.fillStyle = lg; g.fillRect(0, 0, W, fy);
     if (ench) { g.fillStyle = 'rgba(255,220,160,.05)'; for (let y = 8; y < fy - 14; y += 12) for (let x = (y / 12 % 2) * 8; x < W; x += 16) { g.beginPath(); g.moveTo(x, y - 2.5); g.lineTo(x + 2, y); g.lineTo(x, y + 2.5); g.lineTo(x - 2, y); g.fill(); } }
+    else if (store) { g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 0.6; for (let x = 4; x < W; x += 9) { g.beginPath(); g.moveTo(x, 6); g.lineTo(x, fy); g.stroke(); } g.fillStyle = 'rgba(255,220,160,.04)'; for (let x = 0; x < W; x += 18) g.fillRect(x, 6, 4, fy - 6); }
     else { g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = 6, k = 0; y < fy; y += 9, k++) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); for (let x = (k % 2) * 10; x < W; x += 20) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 9); g.stroke(); } } }
-    const wy = fy - 16; lg = g.createLinearGradient(0, wy, 0, fy); lg.addColorStop(0, ench ? '#4a2f1c' : '#2a2420'); lg.addColorStop(1, ench ? '#2a190e' : '#16120e'); g.fillStyle = lg; g.fillRect(0, wy, W, fy - wy);
-    g.fillStyle = ench ? '#6a4426' : '#4a3e34'; g.fillRect(0, wy - 1.5, W, 2);
+    const wy = fy - 16; lg = g.createLinearGradient(0, wy, 0, fy); lg.addColorStop(0, warm ? '#4a2f1c' : '#2a2420'); lg.addColorStop(1, warm ? '#2a190e' : '#16120e'); g.fillStyle = lg; g.fillRect(0, wy, W, fy - wy);
+    g.fillStyle = warm ? '#6a4426' : '#4a3e34'; g.fillRect(0, wy - 1.5, W, 2);
     for (let px = (ex - 53) % 110 - 110; px < W + 110; px += 110) { const pg = g.createLinearGradient(px - 3, 0, px + 3, 0); pg.addColorStop(0, '#2a1a0e'); pg.addColorStop(0.5, '#5a3a22'); pg.addColorStop(1, '#2a1a0e'); g.fillStyle = pg; g.fillRect(px - 3, 0, 6, fy); }
     g.fillStyle = '#3a2618'; g.fillRect(0, 0, W, 6);
-    lg = g.createLinearGradient(0, fy, 0, H); lg.addColorStop(0, ench ? '#5a3a22' : '#3a322c'); lg.addColorStop(1, '#1a120a'); g.fillStyle = lg; g.fillRect(0, fy, W, H - fy);
+    lg = g.createLinearGradient(0, fy, 0, H); lg.addColorStop(0, warm ? '#5a3a22' : '#3a322c'); lg.addColorStop(1, '#1a120a'); g.fillStyle = lg; g.fillRect(0, fy, W, H - fy);
     g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = fy + 4, k = 0; y < H; y += 4 + k * 1.6, k++) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
     if (ench) {
       shopShelf(g, ex - 46, fy - 60, 30, 7); shopShelf(g, ex - 46, fy - 42, 30, 19); shopShelf(g, ex + 18, fy - 60, 30, 23); shopShelf(g, ex + 18, fy - 42, 30, 31);
+    } else if (store) {
+      // tonic shelves behind the Quartermaster, crates and a barrel of lantern oil beside her, herbs drying overhead
+      shopShelf(g, ex - 48, fy - 58, 34, 11); shopShelf(g, ex - 48, fy - 40, 34, 29); shopShelf(g, ex + 16, fy - 58, 30, 41);
+      const crate = (x, y, w) => { g.fillStyle = '#7a5530'; g.fillRect(x, y, w, w); g.strokeStyle = '#3a2614'; g.lineWidth = 0.8; g.strokeRect(x + 0.4, y + 0.4, w - 0.8, w - 0.8); g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y + w); g.moveTo(x + w, y); g.lineTo(x, y + w); g.stroke(); };
+      crate(ex + 30, fy - 30, 14); crate(ex + 44, fy - 30, 14); crate(ex + 37, fy - 44, 14);
+      g.fillStyle = '#6a4426'; g.beginPath(); g.ellipse(ex + 24, fy - 10, 7, 9, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#3a2614'; g.fillRect(ex + 17, fy - 14, 14, 1.2); g.fillRect(ex + 17, fy - 7, 14, 1.2);
+      for (let i = 0; i < 7; i++) { const hx = ex - 110 + i * 14 + (i % 2) * 4; g.strokeStyle = '#2a1a0e'; g.lineWidth = 0.5; g.beginPath(); g.moveTo(hx, 6); g.lineTo(hx, 12); g.stroke(); g.fillStyle = ['#4d7c3a', '#6b8f3a', '#8a6a2a'][i % 3]; g.beginPath(); g.moveTo(hx - 3, 12); g.lineTo(hx + 3, 12); g.lineTo(hx, 20); g.fill(); }
     } else {
       // forge hearth behind the smith, a weapon rack and a shield on the wall
       const hx = ex + 30; g.fillStyle = '#2a2420'; g.fillRect(hx - 6, 6, 12, fy - 56);
@@ -509,20 +517,25 @@
       g.fillStyle = '#7a8494'; g.beginPath(); g.arc(ex - 4, fy - 52, 7, 0, Math.PI * 2); g.fill(); g.fillStyle = '#a8742e'; g.beginPath(); g.arc(ex - 4, fy - 52, 2.2, 0, Math.PI * 2); g.fill();
     }
     // the sign over the shop
-    const text = ench ? 'THE ENCHANTER' : 'THE ARMORER'; g.font = '700 7px Inter, system-ui, sans-serif'; const sw = g.measureText(text).width + 12, sy = Math.max(3, fy - 80);
+    const text = ench ? 'THE ENCHANTER' : store ? 'THE STORE' : 'THE ARMORER'; g.font = '700 7px Inter, system-ui, sans-serif'; const sw = g.measureText(text).width + 12, sy = Math.max(3, fy - 80);
     g.strokeStyle = '#2a1a0e'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(ex - sw / 2 + 4, 6); g.lineTo(ex - sw / 2 + 4, sy); g.moveTo(ex + sw / 2 - 4, 6); g.lineTo(ex + sw / 2 - 4, sy); g.stroke();
     g.fillStyle = '#5a3a22'; g.fillRect(ex - sw / 2, sy, sw, 11); g.strokeStyle = '#a8742e'; g.strokeRect(ex - sw / 2 + 0.5, sy + 0.5, sw - 1, 10);
-    g.fillStyle = ench ? '#e9d5ff' : '#ffd9a8'; g.textAlign = 'center'; g.fillText(text, ex, sy + 8); g.textAlign = 'left';
+    g.fillStyle = ench ? '#e9d5ff' : store ? '#c8f7d4' : '#ffd9a8'; g.textAlign = 'center'; g.fillText(text, ex, sy + 8); g.textAlign = 'left';
     return c;
   }
-  function drawShopCounter(ex, fy, ench) {
-    const cw = 54, top = fy - 13;
+  function drawShopCounter(ex, fy, kind) {
+    const cw = 54, top = fy - 13, ench = kind !== 'arm';
     let lg = ctx.createLinearGradient(0, top, 0, fy); lg.addColorStop(0, ench ? '#6a4024' : '#3a3a42'); lg.addColorStop(1, ench ? '#2e1a0c' : '#1e1e24'); ctx.fillStyle = lg; ctx.fillRect(ex - cw / 2, top + 2, cw, fy - top);
     ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.6; for (let i = 0; i < 3; i++) ctx.strokeRect(ex - cw / 2 + 3 + i * 16, top + 5, 15, fy - top - 7);
     ctx.fillStyle = ench ? '#b07a46' : '#6a6a76'; ctx.fillRect(ex - cw / 2 - 2, top - 1, cw + 4, 3.5);
     if (ench) {
       ctx.fillStyle = '#efe2bf'; ctx.fillRect(ex - 24, top - 5, 2, 4); flame(ctx, ex - 23, top - 5, 3.5 + Math.sin(tAnim * 8) * 0.5, Math.sin(tAnim * 5));
-      ctx.fillStyle = '#1e3a8a'; ctx.fillRect(ex + 14, top - 2.5, 9, 2); ctx.fillStyle = '#7c2d12'; ctx.fillRect(ex + 15, top - 4.5, 7, 2);
+      if (kind === 'store') {
+        // the Quartermaster's scales and a stack of coins
+        ctx.fillStyle = '#a8742e'; ctx.fillRect(ex + 18, top - 9, 1.2, 8); ctx.fillRect(ex + 12, top - 9, 13, 1);
+        ctx.beginPath(); ctx.ellipse(ex + 13, top - 6, 3, 1, 0, 0, Math.PI * 2); ctx.ellipse(ex + 24, top - 6.5 + Math.sin(tAnim * 1.3) * 0.4, 3, 1, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#f5c242'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(ex - 12, top - 1.5 - i * 1.3, 2.6, 0.9, 0, 0, Math.PI * 2); ctx.fill(); }
+      } else { ctx.fillStyle = '#1e3a8a'; ctx.fillRect(ex + 14, top - 2.5, 9, 2); ctx.fillStyle = '#7c2d12'; ctx.fillRect(ex + 15, top - 4.5, 7, 2); }
     } else {
       ctx.fillStyle = '#4a505c'; ctx.beginPath(); ctx.moveTo(ex + 16, top - 1); ctx.lineTo(ex + 28, top - 1); ctx.lineTo(ex + 28, top - 4); ctx.lineTo(ex + 32, top - 6); ctx.lineTo(ex + 13, top - 6); ctx.lineTo(ex + 17, top - 4); ctx.fill();
       ctx.fillStyle = '#8a92a0'; ctx.fillRect(ex + 13, top - 6.5, 19, 1);
@@ -534,10 +547,11 @@
     if (shopKey !== key) { shopGeo(); shopBg = buildShop(kind); shopKey = key; }
     ctx.drawImage(shopBg, 0, 0, W, H);
     ctx.save(); ctx.scale(SG.k, SG.k);
-    drawShopRoom(SG.vw, SG.fy, SG.ex, ench);
+    drawShopRoom(SG.vw, SG.fy, SG.ex, kind);
     ctx.restore();
   }
-  function drawShopRoom(W, fy, ex, ench) {
+  function drawShopRoom(W, fy, ex, kind) {
+    const ench = kind === 'ench';
     // hanging lanterns and the room light
     for (const lx of [ex - 120, ex - 72]) {
       const ly = Math.max(13, fy - 70), s = Math.sin(tAnim * 1.1 + lx) * 0.6;
@@ -553,6 +567,9 @@
       ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.stroke();
       ctx.rotate(tAnim * 0.15); ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 - Math.PI / 2, b = a + Math.PI * 2 / 3; ctx.moveTo(Math.cos(a) * 17, Math.sin(a) * 17); ctx.lineTo(Math.cos(b) * 17, Math.sin(b) * 17); } ctx.stroke();
       ctx.restore(); ctx.globalAlpha = 1; shopGlow(ctx, ex, fy - 44, 30, '167,139,250', 0.28);
+    } else if (kind === 'store') {
+      // a warm glow on the tonic shelves
+      shopGlow(ctx, ex - 31, fy - 50, 30, '134,239,172', 0.14 + 0.04 * Math.sin(tAnim * 2));
     } else {
       // the forge fire
       const hx = ex + 30, fg = ctx.createLinearGradient(0, fy - 40, 0, fy - 16); fg.addColorStop(0, '#3a1a08'); fg.addColorStop(1, '#ff7a1a'); ctx.fillStyle = fg; ctx.fillRect(hx - 11, fy - 36, 22, 20);
@@ -561,11 +578,11 @@
       if (Math.random() < 0.15) particles.push({ x: hx + (Math.random() - 0.5) * 14, y: fy - 22, vx: (Math.random() - 0.5) * 6, vy: -10 - Math.random() * 12, life: 1 + Math.random(), age: 0, c: Math.random() < 0.5 ? '#ffb347' : '#ff6a1f', s: 1 });
     }
     // the shopkeeper at monster size behind the counter, facing the party
-    const k = sprite(ench ? 'enchanter' : 'armorer', 0, false), kw = k.lw * 3, kh = k.lh * 3, br = Math.sin(tAnim * 1.4) * 0.5;
+    const k = sprite(ench ? 'enchanter' : kind === 'store' ? 'quartermaster' : 'armorer', 0, false), kw = k.lw * 3, kh = k.lh * 3, br = Math.sin(tAnim * 1.4) * 0.5;
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, fy - 11); ctx.clip(); ctx.translate(ex, 0); ctx.scale(-1, 1); ctx.drawImage(k, -kw / 2, fy - 4 - kh + br, kw, kh); ctx.restore();
-    const top = drawShopCounter(ex, fy, ench);
+    const top = drawShopCounter(ex, fy, kind);
     // what you picked sits on the counter
-    const picks = (ench ? [EW.dst, EW.src] : [AW.a, AW.b]).map(u => u && L.itemOf(S, u));
+    const picks = (ench ? [EW.dst, EW.src] : kind === 'arm' ? [AW.a, AW.b] : []).map(u => u && L.itemOf(S, u));
     picks.forEach((it, i) => {
       if (!it) return; const im = shopIcon(it), sz = 10, px = ex + (i ? 6 : -14), py = top - sz - 1 + Math.sin(tAnim * 2 + i) * 0.5;
       shopGlow(ctx, px + sz / 2, py + sz / 2, sz, '255,230,160', 0.25);
@@ -594,7 +611,7 @@
   }
   // A shower of sparks on the counter when something is made.
   function shopBurst() {
-    const ex = SG.ex, y = SG.fy - 18, cols = shopKind() === 'ench' ? ['#f5c242', '#c4b5fd', '#f0abfc', '#ffffff'] : ['#ffb347', '#ff6a1f', '#fff3c0', '#ffffff'];
+    const ex = SG.ex, y = SG.fy - 18, cols = shopKind() === 'ench' ? ['#f5c242', '#c4b5fd', '#f0abfc', '#ffffff'] : shopKind() === 'store' ? ['#f5c242', '#86efac', '#fff3c0', '#ffffff'] : ['#ffb347', '#ff6a1f', '#fff3c0', '#ffffff'];
     for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, v = 10 + Math.random() * 30; particles.push({ x: ex - 8, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 15, g: 30, life: 0.8 + Math.random() * 0.6, age: 0, c: cols[i % 4], s: 2 }); }
   }
 
@@ -1333,16 +1350,21 @@
 
   // ---------- store: supplies and tonics, for gold or Sigils ----------
   let qmBusy = false;
-  function openStore() {
-    const now = Date.now();
-    const row = it => {
+  // v107 (John: "make the store the same setup as the armorer and enchanter"): the Store is a shop you visit. Old Thessaly
+  // stands behind the counter and her wares are listed in the counter panel under tabs. The old window remains only for
+  // a player without a hero yet.
+  function openStore() { if (S.hero && visitEnch('store')) { paintEnchPanel(true); return; } openStoreModal(); }
+  const refreshStore = () => { if (L.visiting(S) && shopKind() === 'store') paintEnchPanel(true); else if (!$('modal').hidden && $('modalbody').querySelector('#st-x')) openStoreModal(); };
+  function storeRow(it, now) {
       const p = L.shopPrice(S, it.id), have = (S.items && S.items[it.id]) || 0, sg = L.ITEM_SIGILS[it.id], t = L.tonicById(it.id), left = t ? L.tonicLeft(S, it.id, now) : 0;
       const full = t && left + t.min * 60 > L.TONIC_CAP + 1;
       return '<div class="trow"><div class="tile r-' + (t ? 'fine' : it.id === 'draught' ? 'epic' : 'rare') + '">' + icon(it.icon) + '</div><div class="tinfo"><b>' + it.name + '</b><small>' + it.desc + '</small><small>You have ' + have + '.' + (left ? ' <span class="tleft">Active, ' + fmtTime(left) + ' left</span>' : '') + '</small></div>' +
         '<div class="tact">' + (t && have ? '<button class="btn small" data-drink="' + it.id + '"' + (full ? ' disabled title="Already at the 60 minute limit"' : '') + '>Drink</button>' : '') +
         '<button class="btn small ghost" data-buy="' + it.id + '"' + (p > S.gold ? ' disabled' : '') + '>' + icon('coin') + fmt(p) + '</button>' +
         (sg && CL && signedIn() ? '<button class="btn small ghost sigbuy" data-sbuy="' + it.id + '"' + (typeof prof !== 'undefined' && prof && prof.bal < sg ? ' disabled' : '') + '>' + sigil + sg + '</button>' : '') + '</div></div>';
-    };
+  }
+  function openStoreModal() {
+    const now = Date.now(), row = it => storeRow(it, now);
     const sup = L.SHOP.filter(x => !L.tonicById(x.id)), ton = L.TONICS;
     const bal = typeof prof !== 'undefined' && prof ? '<span class="stbal">' + sigil + fmt(prof.bal) + ' ' + TOKEN + '</span>' : '';
     modal('<div class="maphead"><div><h2>The Quartermaster</h2><small>Old Thessaly keeps a stall by the campfire. Everything costs gold. Speed-ups can also be bought with ' + TOKEN + '.</small></div>' + bal + '<button class="iconbtn" id="st-x" aria-label="Close">&times;</button></div>' +
@@ -1353,23 +1375,23 @@
       '<p class="note small">Gold prices follow how much gold you earn. Use a Campfire Draught from the camp bar in the Party or Gear tab. Lantern Oil appears under the lantern during guardian fights.</p>', md => {
         md.className = 'sheet wide';
         md.querySelector('#st-x').onclick = closeModal; const sw = md.querySelector('#st-ward'); if (sw) sw.onclick = () => openWardrobe('k');
-        md.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (L.buyShop(S, b.dataset.buy, 1)) { sfx.coin(); save(); openStore(); paintCamp(); paintTonics(); } });
-        md.querySelectorAll('[data-drink]').forEach(b => b.onclick = () => drink(b.dataset.drink, true));
+        md.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (L.buyShop(S, b.dataset.buy, 1)) { sfx.coin(); save(); openStoreModal(); paintCamp(); paintTonics(); } });
+        md.querySelectorAll('[data-drink]').forEach(b => b.onclick = () => drink(b.dataset.drink));
         md.querySelectorAll('[data-sbuy]').forEach(b => b.onclick = async () => {
           if (qmBusy) return; qmBusy = true; b.disabled = true;
           const id = b.dataset.sbuy;
-          try { const r = await papi('POST', '/store/pass', { what: 'item', id, n: 1 }); prof.bal = r.bal; S.items[id] = (S.items[id] || 0) + 1; save(); try { pushCloud(true); } catch (e) {} sfx.buy(); openStore(); paintCamp(); paintTonics(); }
+          try { const r = await papi('POST', '/store/pass', { what: 'item', id, n: 1 }); prof.bal = r.bal; S.items[id] = (S.items[id] || 0) + 1; save(); try { pushCloud(true); } catch (e) {} sfx.buy(); openStoreModal(); paintCamp(); paintTonics(); }
           catch (e) { b.disabled = false; toast('lock', 'That did not go through', e.code === 'funds' ? 'Not enough ' + TOKEN + '.' : 'Try again in a moment.', 'warn'); }
           qmBusy = false;
         });
       });
-    if (CL && signedIn() && typeof prof !== 'undefined' && !prof) loadProfile().then(() => { if (!$('modal').hidden && $('modalbody').querySelector('#st-x')) openStore(); });
+    if (CL && signedIn() && typeof prof !== 'undefined' && !prof) loadProfile().then(() => { if (!$('modal').hidden && $('modalbody').querySelector('#st-x')) openStoreModal(); });
   }
   function drink(id, fromStore) {
     const t = L.tonicById(id);
     if (!L.drinkTonic(S, id, Date.now())) { if ((S.items[id] || 0) > 0 && L.tonicLeft(S, id) > 0) toast(t.icon, t.name + ' is nearly full', 'A tonic can stack up to 60 minutes. Drink another when it runs lower.', 'warn'); return; }
     sfx.relic(); save(); toast(t.icon, t.name, t.desc.replace(/ for .*$/, '') + ' for ' + fmtTime(L.tonicLeft(S, id)) + '.', 'feat');
-    if (fromStore) openStore(); paintTonics();
+    refreshStore(); paintTonics();
   }
   // Active tonics show as small timers above the ability bar; tap one you carry to drink it again.
   let tonicKey = '';
@@ -1943,7 +1965,7 @@
       });
   }
   function visitEnch(kind) {
-    kind = kind === 'arm' ? 'arm' : 'ench';
+    kind = kind === 'arm' || kind === 'store' ? kind : 'ench';
     if (L.visiting(S)) S.shopK = kind; else if (!L.visitEnchanter(S, Date.now(), kind)) return false;
     closeModal(); sfx.relic(); particles.length = 0; paintEnchOv(); updatePanel(true);
     const a = document.querySelector('.stagehead') || $('arena'); if (a && a.scrollIntoView && innerWidth < 900) a.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -1963,6 +1985,35 @@
   const riskTxt = v => Math.round(v * 1000) / 10 + '%';
   const upCostTag = x => { if (x.wb != null) { const c = L.wbUpCost(x), h = L.shardsOf(S)[x.wb] || 0; return '<span class="ewcost legc' + (h < c ? ' short' : '') + '">' + icon('relic') + c + ' shard' + (c === 1 ? '' : 's') + '</span>'; }
     const c = L.upgradeCost(x); return '<span class="ewcost gold' + (S.gold < c ? ' short' : '') + '">' + icon('coin') + fmt(c) + '</span>'; };
+  const SW = { mode: 'ton' };
+  let stBusy = false;
+  function storePanelHtml() {
+    const now = Date.now(), gold = '<span class="epdust">' + icon('coin') + '<b>' + fmt(S.gold) + '</b> gold</span>';
+    const tabs = '<div class="ewtabs shop" role="tablist">' + [['ton', 'Tonics'], ['sup', 'Supplies']].map(([k, n]) => '<button role="tab" class="' + (SW.mode === k ? 'on' : '') + '" data-swmode="' + k + '">' + n + '</button>').join('') + '</div>';
+    const bal = typeof prof !== 'undefined' && prof ? '<span class="stbal">' + sigil + fmt(prof.bal) + ' ' + TOKEN + '</span>' : '';
+    const head = '<div class="ephead"><b>Old Thessaly’s counter</b>' + bal + gold + '</div>' + tabs;
+    const list = SW.mode === 'sup' ? L.SHOP.filter(x => !L.tonicById(x.id)) : L.TONICS;
+    const hint = SW.mode === 'sup' ? 'Supplies for the road. Use a Campfire Draught from the camp bar. Lantern Oil appears under the lantern during guardian fights.' : 'Each tonic is a small boost for a short time. Different tonics stack, and drinking the same one again adds time, up to 60 minutes.';
+    return head + '<h3 class="ewq">' + (SW.mode === 'sup' ? 'What supplies do you need?' : 'Which tonic would you like?') + '</h3><p class="ewhint">' + hint + '</p>' +
+      '<div class="tlist store">' + list.map(it => storeRow(it, now)).join('') + '</div>' +
+      (wardOn() ? '<button class="btn ghost small stward" data-swward="1">' + icon('star') + 'Open the Wardrobe</button>' : '') +
+      '<p class="note small">Gold prices follow how much gold you earn. Speed-ups can also be bought with ' + TOKEN + '.</p>';
+  }
+  $('enchpanel') && $('enchpanel').addEventListener('click', async e => {
+    if (shopKind() !== 'store') return;
+    const t = e.target.closest('[data-swmode],[data-buy],[data-drink],[data-sbuy],[data-swward]'); if (!t) return;
+    const d = t.dataset;
+    if (d.swmode) { SW.mode = d.swmode; return paintEnchPanel(true); }
+    if (d.swward) return openWardrobe('k');
+    if (d.buy) { if (L.buyShop(S, d.buy, 1)) { sfx.coin(); save(); shopBurst(); paintEnchPanel(true); paintCamp(); paintTonics(); } return; }
+    if (d.drink) return drink(d.drink);
+    if (d.sbuy) {
+      if (stBusy) return; stBusy = true; t.disabled = true;
+      try { const r = await papi('POST', '/store/pass', { what: 'item', id: d.sbuy, n: 1 }); prof.bal = r.bal; S.items[d.sbuy] = (S.items[d.sbuy] || 0) + 1; save(); try { pushCloud(true); } catch (x) {} sfx.buy(); shopBurst(); paintEnchPanel(true); paintCamp(); paintTonics(); }
+      catch (x) { t.disabled = false; toast('lock', 'That did not go through', x.code === 'funds' ? 'Not enough ' + TOKEN + '.' : 'Try again in a moment.', 'warn'); }
+      stBusy = false;
+    }
+  });
   function armPanelHtml() {
     const gold = '<span class="epdust">' + icon('coin') + '<b>' + fmt(S.gold) + '</b> gold</span>';
     const tabs = '<div class="ewtabs forge" role="tablist">' + [['up', 'Upgrade'], ['merge', 'Merge'], ['smelt', 'Scrap for gold']].map(([k, n]) => '<button role="tab" class="' + (AW.mode === k ? 'on' : '') + '" data-awmode="' + k + '">' + n + '</button>').join('') + '</div>';
@@ -2103,8 +2154,8 @@
   function paintEnchPanel(force) {
     const el = $('enchpanel'); if (!el) return; const on = L.visiting(S);
     el.hidden = !on; if (!on) { el.dataset.h = ''; return; }
-    const arm = shopKind() === 'arm', h = arm ? armPanelHtml() : enchPanelHtml(); if (!force && el.dataset.h === h) return;
-    const step = arm ? 'a' + AW.mode + !!AW.a + !!AW.b : EW.mode + !!EW.dst + !!EW.src + EW.idx;
+    const kind = shopKind(), arm = kind === 'arm', h = kind === 'store' ? storePanelHtml() : arm ? armPanelHtml() : enchPanelHtml(); if (!force && el.dataset.h === h) return;
+    const step = kind === 'store' ? 's' + SW.mode : arm ? 'a' + AW.mode + !!AW.a + !!AW.b : EW.mode + !!EW.dst + !!EW.src + EW.idx;
     const sc = el.querySelector('.ewlist'), top = sc ? sc.scrollTop : 0, same = el.dataset.step === step;
     el.innerHTML = h; el.dataset.h = h; el.dataset.step = step;
     if (!same) el.scrollTop = 0;
@@ -2165,18 +2216,20 @@
   $('enchpanel') && $('enchpanel').addEventListener('change', e => { const c = e.target.closest('[data-ewopt]'); if (c) { scrapOpts[c.dataset.ewopt] = c.checked; paintEnchPanel(true); } });
   // In the shop the stage header names the shop and holds the way out. Everything else is in the counter panel.
   function paintEnchOv() {
-    const on = L.visiting(S), arm = on && shopKind() === 'arm';
+    const on = L.visiting(S), kind = shopKind(), arm = on && kind === 'arm';
+    const SHOPS = { ench: ['enchanter', 'The Enchanter', 'Enchanter'], arm: ['armorer', 'The Armorer', 'Armorer'], store: ['quartermaster', 'The Store', 'Store'] };
     document.body.classList.toggle('atench', on);
     let hd = $('shophead');
     if (!hd && on) {
       hd = document.createElement('div'); hd.id = 'shophead'; hd.className = 'shophead';
-      hd.addEventListener('click', e => { if (e.target.closest('[data-ev="leave"]')) leaveEnch(); const sw = e.target.closest('[data-ev="swap"]'); if (sw) { if (sw.dataset.k === 'arm') awReset(); else ewReset(); visitEnch(sw.dataset.k); } });
+      hd.addEventListener('click', e => { if (e.target.closest('[data-ev="leave"]')) leaveEnch(); const sw = e.target.closest('[data-ev="swap"]'); if (sw) { if (sw.dataset.k === 'arm') awReset(); else if (sw.dataset.k === 'store') SW.mode = 'ton'; else ewReset(); visitEnch(sw.dataset.k); } });
       const sh = document.querySelector('.stagehead'); sh && sh.insertBefore(hd, sh.firstChild);
     }
     if (hd) {
       hd.hidden = !on;
-      const h = '<img src="' + SP.spriteURL(arm ? 'armorer' : 'enchanter', 2, 0) + '" alt=""><div><b>' + (arm ? 'The Armorer' : 'The Enchanter') + '</b><small>Your dive is paused on floor ' + S.floor + '</small></div>' +
-        '<button class="btn ghost small" data-ev="swap" data-k="' + (arm ? 'ench' : 'arm') + '">' + (arm ? 'Enchanter' : 'Armorer') + '</button><button class="btn small leave" data-ev="leave">Leave</button>';
+      const me = SHOPS[kind] || SHOPS.ench;
+      const h = '<img src="' + SP.spriteURL(me[0], 2, 0) + '" alt=""><div><b>' + me[1] + '</b><small>Your dive is paused on floor ' + S.floor + '</small></div><span class="shopbtns">' +
+        Object.keys(SHOPS).filter(k => k !== kind).map(k => '<button class="btn ghost small" data-ev="swap" data-k="' + k + '">' + SHOPS[k][2] + '</button>').join('') + '<button class="btn small leave" data-ev="leave">Leave</button></span>';
       if (on && hd.dataset.h !== h) { hd.innerHTML = h; hd.dataset.h = h; }
     }
     const old = $('enchov'); if (old) old.remove();
@@ -4983,6 +5036,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 107, date: 'November 24, 2026', title: 'Visit the Store', items: [
+      'The Store is now a shop you walk into, like the Enchanter and the Armorer. Old Thessaly runs the counter, with shelves of glowing tonics behind her.',
+      'Tonics and Supplies sit in tabs under the scene. Buy and drink without leaving the shop.',
+      'Every shop header has buttons to hop straight to the other two shops.'] },
     { v: 106, date: 'November 24, 2026', title: 'Bigger shop scenes', items: [
       'The Enchanter and the Armorer no longer shrink the party and the shopkeeper in short, wide windows. The sign and lanterns tuck in under the ceiling instead.',
     ] },

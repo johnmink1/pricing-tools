@@ -1,4 +1,4 @@
-/* lh-build 202611241509 */
+/* lh-build 202611241515 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -2362,8 +2362,8 @@
   // The Enchanter (John, 2026-11-24): enchanting and disenchanting happen on a visit. The dive stops while you are there:
   // nobody fights, heals or advances, and nothing new turns up. A visit is never saved; reloading the game ends it.
   const visiting = s => !!(s && s.enchAt);
-  // The Hold's shops (v102): kind 'ench' (the Enchanter) or 'arm' (the Armorer). s.enchAt and s.shopK are never saved.
-  function visitEnchanter(s, now, kind) { if (!s.hero || s.enchAt) return false; s.enchAt = now || Date.now(); s.shopK = kind === 'arm' ? 'arm' : 'ench'; return true; }
+  // The Hold's shops (v102): kind 'ench' (the Enchanter), 'arm' (the Armorer) or 'store' (the Quartermaster's Store, v107). s.enchAt and s.shopK are never saved.
+  function visitEnchanter(s, now, kind) { if (!s.hero || s.enchAt) return false; s.enchAt = now || Date.now(); s.shopK = kind === 'arm' || kind === 'store' ? kind : 'ench'; return true; }
   function leaveEnchanter(s) { if (!s.enchAt) return false; s.enchAt = 0; s.shopK = null; return true; }
   // The Armorer's forge melts spare gear for SMELT_MULT x the scrap gold, but gives no Dust.
   const SMELT_MULT = 2;

@@ -1,4 +1,4 @@
-/* lh-build 202611241509 */
+/* lh-build 202611241515 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2091,6 +2091,9 @@ body.atench #ghostlamp,body.atench #merchant,body.atench #spwarn,body.atench .fl
 .shophead img{width:30px;height:40px;object-fit:contain;transform:scaleX(-1);flex:none}
 .shophead>div{flex:1;min-width:0}.shophead b{display:block;font-family:var(--display,inherit);font-size:17px;letter-spacing:.02em;color:#e9d5ff}
 .shophead small{display:block;color:var(--muted);font-size:12.5px}
+.shophead{flex-wrap:wrap}.shophead>div{flex:1 1 150px}.shopbtns{display:flex;gap:8px;flex:none;margin-left:auto}
+.ewtabs.shop button.on{background:linear-gradient(180deg,#2f9e5b,#1d6b3c);color:#fff}
+.stward{display:inline-flex;align-items:center;gap:6px;margin:10px 0 2px}.stward svg{width:14px;height:14px;flex:none}
 .shophead .leave{flex:none;display:inline-flex;align-items:center;gap:6px;border-color:#a8822e;color:#ffe7b0}.shophead .leave svg{width:14px;height:14px}
 .enchov{position:absolute;top:8px;left:50%;z-index:7;width:max-content;max-width:calc(100% - 12px);padding:8px 10px 9px;border-radius:14px;border:1px solid #8b5cf6;background:rgba(22,12,42,.92);box-shadow:0 8px 24px rgba(0,0,0,.45);pointer-events:auto;cursor:default}
 .enchov[hidden]{display:none}

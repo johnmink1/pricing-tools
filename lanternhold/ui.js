@@ -1,4 +1,4 @@
-/* lh-build 202611232327 */
+/* lh-build 202611240148 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -709,7 +709,10 @@
       } else if (e.type === 'ward') {
         floatText('Ward', 'skill', FOE_X, 0.3); burst(foeAnim.cx, foeAnim.cy, 18, ['#bfe6ff', '#ffffff', '#7fb8e8'], 35);
       } else if (e.type === 'regionlock') {
-        if (lockToast !== e.floor) { lockToast = e.floor; toast('lock', 'The way down is barred', 'Floors ' + e.floor + ' and deeper need a stronger hero: level ' + e.need + '. Your party keeps working this region for XP, gold and its mastery goals.', 'feat'); }
+        { const t = L.trialOf(S, e.need - 1), key = e.floor + ':' + t.elites; if (lockToast !== key) { lockToast = key; toast('lock', 'Region trial: ' + trialName(e.need - 1), 'To go past floor ' + (e.floor - 1) + ', defeat ' + L.TRIAL_ELITES + ' alliance elites in this region (' + t.elites + '/' + L.TRIAL_ELITES + ' so far) and beat its guardian. Elites are the bannered warband foes.', 'feat'); } }
+      } else if (e.type === 'trial') {
+        if (e.elites >= L.TRIAL_ELITES) { sfx.relic(); toast('map', 'Region trial complete', e.guardian ? 'Beat ' + trialName(e.region) + '\u2019s guardian once more and the way down opens.' : 'Now beat ' + trialName(e.region) + '\u2019s guardian to open the way down.', 'feat'); }
+        else floatText('Trial ' + e.elites + '/' + L.TRIAL_ELITES, 'skill', FOE_X, 0.22);
       } else if (e.type === 'mastery') {
         sfx.relic(); toast('star', 'Region mastery: ' + e.goal.name, (L.BIOMES[e.region] || { name: 'Region' }).name + ': +' + Math.round(L.MASTERY_PER * 100) + '% ' + e.goal.fx + ' for good.', 'feat');
       } else if (e.type === 'sealed') {
@@ -762,7 +765,6 @@
         toast('star', L.memberById('you').name + ' reached hero level ' + e.lv, (e.pts === 1 ? 'A new stat point' : e.pts + ' new stat points') + ' to spend on the character sheet in the Skills tab.', 'feat');
         if (tab === 'rekindle') updateSkills(); else { const hp = L.heroPoints(S); if (!S.kindling && hp) $('kindcount').textContent = '+' + hp; }
         for (const u of L.newUnlocks(S, e.from || e.lv - 1, e.lv)) toast(u.icon, 'Unlocked: ' + u.name, u.desc, 'feat');
-        { const r = L.REGION_LV.findIndex((need, i) => need > (e.from || e.lv - 1) && need <= e.lv && i * 10 + 1 > S.maxFloorEver); if (r > 0) toast('map', 'The way down opens', 'Floors ' + (r * 10 + 1) + ' to ' + (r * 10 + 10) + ' are open to you now.', 'feat'); }
         if (L.ROSTER_LV.includes(e.lv)) toast('flame', 'A bigger campfire', 'Room for ' + L.rosterCap(S) + ' companions now.', 'feat');
         if (L.JOB_SLOT_LV.includes(e.lv) && e.lv > L.JOB_SLOT_LV[0]) toast('hammer', 'A new camp job slot', L.jobSlots(S) + ' camp jobs can be worked at once now.', 'feat');
         paintTabLocks(); if (TAB_FEATURE[tab]) switchTab(tab);
@@ -830,19 +832,21 @@
   // The road ahead: every level-gated feature, the next region and the campfire, in one card.
   function roadHtml(focus) {
     const hl = L.heroLevel(S), lv = hl.lv, pct = Math.floor(hl.xp / hl.need * 100);
-    const nextR = L.REGION_LV.findIndex((need, r) => need > lv && r * 10 + 1 > S.maxFloorEver);
+    const curR = L.regionNo(S.maxFloorEver), tr = curR < L.REGIONS - 1 && L.regionNeed(S, (curR + 1) * 10 + 1) ? L.trialOf(S, curR) : null;
     const fu = focus && L.unlockOf(focus);
     let h = '<div class="road">' + (fu ? '<div class="roadlock">' + icon('lock') + '<div><b>' + esc(fu.name) + ' opens at hero level ' + fu.lv + '</b><small>' + esc(fu.desc) + ' Your hero earns XP from every fight, and more from deeper floors and guardians.</small></div></div>' : '') +
       '<div class="roadhead"><div><h3>The road ahead</h3><small>' + esc(heroName()) + ' is hero level <b>' + lv + '</b> &middot; ' + pct + '% to level ' + (lv + 1) + '</small></div></div>' +
       '<div class="bar roadxp"><i style="width:' + pct + '%"></i></div><ul class="roadlist">' +
       L.UNLOCKS.map(u => { const on = L.canUse(S, u.id); return '<li class="' + (on ? 'open' : '') + (u.id === focus ? ' focus' : '') + '"><span class="ric">' + icon(on ? u.icon : 'lock') + '</span><div><b>' + esc(u.name) + '</b><small>' + esc(u.desc) + '</small></div><em>' + (on ? 'Open' : 'Hero level ' + u.lv) + '</em></li>'; }).join('') +
-      '</ul><p class="note small">' + (nextR >= 0 ? 'Floors ' + (nextR * 10 + 1) + ' to ' + (nextR * 10 + 10) + ' open at hero level ' + L.REGION_LV[nextR] + '. ' : '') +
+      '</ul>' + (tr ? '<div class="roadlock">' + icon('map') + '<div><b>Region trial: ' + esc(trialName(curR)) + '</b><small>To reach floors ' + ((curR + 1) * 10 + 1) + ' and deeper: defeat ' + L.TRIAL_ELITES + ' alliance elites here (' + tr.elites + '/' + L.TRIAL_ELITES + ') and beat the guardian on floor ' + ((curR + 1) * 10) + (tr.guardian ? ' (done)' : '') + '.</small></div></div>' : '') +
+      '<p class="note small">' +
       'Your campfire holds ' + L.rosterCap(S) + ' companions now; it grows at hero levels ' + L.ROSTER_LV.join(', ') + '. Camp job slots open at levels ' + L.JOB_SLOT_LV.join(', ') + '.</p></div>';
     return h;
   }
+  const trialName = r => (L.BIOMES[r] || { name: 'Region ' + (r + 1) }).name;
   // Region mastery: three goals in each region you have reached.
   function masteryHtml() {
-    const top = Math.min(L.REGION_LV.length, Math.max(1, Math.ceil(S.maxFloorEver / 10)));
+    const top = Math.min(L.REGIONS, Math.max(1, Math.ceil(S.maxFloorEver / 10)));
     let h = '<div class="mastery"><h3 class="sub">Region mastery</h3><p class="note small">Each region has three goals. Every one you finish gives +' + Math.round(L.MASTERY_PER * 100) + '% to its stat for good: ' + L.MASTERY.map(g => g.name.toLowerCase() + ' to ' + g.fx).join(', ') + '.</p><div class="mlist">';
     for (let r = 0; r < top; r++) {
       const v = (S.mast || {})[r] || 0, el = Math.min(L.MASTERY_ELITES, (S.mastE || {})[r] || 0), b = L.BIOMES[r] || { name: 'Region ' + (r + 1) };
@@ -3775,13 +3779,15 @@
         'Every <b>25 power levels</b> a character gets a big power jump.']],
       ['Power level and hero level', 'i:star', 'Two different levels. Power level is how strong each fighter is; hero level is how far your own hero has come.', [
         '<b>Power level</b>: every character in your party has one, your hero included. Raise it with gold (<b>Train</b> on the Party tab). It sets damage and health, and gear needs a power level to wear. Rekindling resets it.',
-        '<b>Hero level</b>: your own hero\'s experience level, from fighting. It gives stat points, opens new parts of the game and lets you into deeper regions. It is never reset.',
+        '<b>Hero level</b>: your own hero\'s experience level, from fighting. It gives stat points and opens new parts of the game. It is never reset.',
         'So a hero can be hero level 11 and power level 142 at the same time. Your Party card shows power level; the Skills tab and Codex show hero level.']],
       ['Hero level and unlocks', 'i:star', 'New parts of the game open as your hero levels up. Codex, Progress shows the whole road.', [
         'Level <b>3</b>: Gear. <b>5</b>: the Campfire. <b>8</b>: map travel and buying on the Market. <b>10</b>: camp jobs.',
         '<b>12</b>: the Players Guild. <b>15</b>: the Ember Ring. <b>18</b>: selling and the Sigil exchange. <b>20</b>: rekindling. <b>25</b>: world boss and job sets.',
-        'Each region past the first needs a hero level to enter: floors 11+ at 3, 21+ at 6, 31+ at 9, then 12, 15, 18, 20, 22, 25 and up.',
-        'Until then your party keeps working the region it is in. Hero XP grows with depth, and guardians give the most.']],
+        'Hero XP grows with depth, and guardians give the most.']],
+      ['Region trials', 'i:map', 'Each region has a trial that opens the way to the next one.', [
+        'Defeat <b>' + L.TRIAL_ELITES + ' alliance elites</b> in the region (the bannered warband foes) and beat its <b>guardian</b>.',
+        'Until then your party keeps working the region it is in. Codex, Progress shows how far along you are.']],
       ['Region mastery', 'i:map', 'Every region has three goals. Each one finished is +1% for good.', [
         '<b>Guardian</b>: beat the region\'s last guardian (+1% damage).',
         '<b>Warbands</b>: defeat 20 alliance elites in the region (+1% health).',
@@ -4037,6 +4043,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 74, date: 'November 24, 2026', title: 'Region trials', items: [
+      'The hero level gates between regions are gone. Instead each region has a trial: defeat ' + L.TRIAL_ELITES + ' alliance elites there (the bannered warband foes) and beat its guardian, and the way to the next region opens.',
+      'Progress shows on screen as you fight, and in Codex, Progress. Hero level still opens new parts of the game, like camp jobs, the Ember Ring and rekindling.',
+      'If you were held at a gate, you are through: the trial counts as done for the region you are in. Beat its guardian again and keep going.'] },
     { v: 73, date: 'November 23, 2026', title: 'Power level and hero level', items: [
       'The level shown on each Party card is now called power level. It is what training with gold raises, and what gear needs.',
       'Your hero level (from XP, which opens new parts of the game) is now always called hero level, so the two never get mixed up. A hero can be hero level 11 with a power level of 142.',

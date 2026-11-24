@@ -1,4 +1,4 @@
-/* lh-build 202611240206 */
+/* lh-build 202611240222 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -580,7 +580,11 @@
   // Floors you have already reached stay open.
   function regionNeed(s, f) { if (f <= (s.maxFloorEver || 1)) return 0; const r = regionNo(f); if (r < 1 || f > REGIONS * 10) return 0; return trialOf(s, r - 1).done ? 0 : r; }
   const companions = s => s.unlocked.filter(id => id !== 'you');
-  function rosterCap(s) { const lv = heroLv(s); return ROSTER_BASE + ROSTER_LV.filter(x => lv >= x).length + Math.min(ROSTER_BUY_MAX, s.rosterUps || 0); }
+  // Spots at the fire (resting companions). The four party seats beside your hero never count against it
+  // (John, 2026-11-24), so the companions you can keep = party seats + fire spots.
+  const PARTY_SEATS = PARTY_SIZE - 1;
+  function fireCap(s) { const lv = heroLv(s); return ROSTER_BASE + ROSTER_LV.filter(x => lv >= x).length + Math.min(ROSTER_BUY_MAX, s.rosterUps || 0); }
+  const rosterCap = s => PARTY_SEATS + fireCap(s);
   // Story recruits wait here when the campfire is full: keep them by dismissing someone for good, or turn them away.
   function dismissCompanion(s, id) {
     if (!id || id === 'you' || !s.unlocked.includes(id)) return false;
@@ -2182,7 +2186,7 @@
   }
 
   const api = {
-    UNLOCKS, JOB_SLOT_LV, REGIONS, TRIAL_ELITES, trialOf, ROSTER_BASE, ROSTER_LV, ROSTER_BUY_MAX, ROSTER_COST, ROSTER_ITEMS, MASTERY, MASTERY_ELITES, MASTERY_PER, heroLv, unlockOf, canUse, nextUnlock, newUnlocks, jobSlots, regionNo, regionNeed, companions, rosterCap, dismissCompanion, acceptRecruit, declineRecruit, masteryStars, masteryVal, paceMigrate,
+    UNLOCKS, JOB_SLOT_LV, REGIONS, TRIAL_ELITES, trialOf, ROSTER_BASE, ROSTER_LV, ROSTER_BUY_MAX, ROSTER_COST, ROSTER_ITEMS, MASTERY, MASTERY_ELITES, MASTERY_PER, heroLv, unlockOf, canUse, nextUnlock, newUnlocks, jobSlots, regionNo, regionNeed, companions, rosterCap, fireCap, PARTY_SEATS, dismissCompanion, acceptRecruit, declineRecruit, masteryStars, masteryVal, paceMigrate,
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, atMainCamp, regionTop, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, TRAIT_FX, CAMP_TRAITS, traitsOf, traitState, traitVal, traitText, campTrait, tonicById, tonicLeft, tonicVal, drinkTonic,
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,

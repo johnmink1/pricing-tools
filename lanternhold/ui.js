@@ -1,4 +1,4 @@
-/* lh-build 202611240206 */
+/* lh-build 202611240222 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -765,7 +765,7 @@
         toast('star', L.memberById('you').name + ' reached hero level ' + e.lv, (e.pts === 1 ? 'A new stat point' : e.pts + ' new stat points') + ' to spend on the character sheet in the Skills tab.', 'feat');
         if (tab === 'rekindle') updateSkills(); else { const hp = L.heroPoints(S); if (!S.kindling && hp) $('kindcount').textContent = '+' + hp; }
         for (const u of L.newUnlocks(S, e.from || e.lv - 1, e.lv)) toast(u.icon, 'Unlocked: ' + u.name, u.desc, 'feat');
-        if (L.ROSTER_LV.includes(e.lv)) toast('flame', 'A bigger campfire', 'Room for ' + L.rosterCap(S) + ' companions now.', 'feat');
+        if (L.ROSTER_LV.includes(e.lv)) toast('flame', 'A bigger campfire', 'Room for ' + L.fireCap(S) + ' at the fire now, plus your party.', 'feat');
         if (L.JOB_SLOT_LV.includes(e.lv) && e.lv > L.JOB_SLOT_LV[0]) toast('hammer', 'A new camp job slot', L.jobSlots(S) + ' camp jobs can be worked at once now.', 'feat');
         paintTabLocks(); if (TAB_FEATURE[tab]) switchTab(tab);
       } else if (e.type === 'relic') {
@@ -870,7 +870,7 @@
       L.UNLOCKS.map(u => { const on = L.canUse(S, u.id); return '<li class="' + (on ? 'open' : '') + (u.id === focus ? ' focus' : '') + '"><span class="ric">' + icon(on ? u.icon : 'lock') + '</span><div><b>' + esc(u.name) + '</b><small>' + esc(u.desc) + '</small></div><em>' + (on ? 'Open' : 'Hero level ' + u.lv) + '</em></li>'; }).join('') +
       '</ul>' + (tr ? '<div class="roadlock">' + icon('map') + '<div><b>Region trial: ' + esc(trialName(curR)) + '</b><small>To reach floors ' + ((curR + 1) * 10 + 1) + ' and deeper: defeat ' + L.TRIAL_ELITES + ' alliance elites here (' + tr.elites + '/' + L.TRIAL_ELITES + ') and beat the guardian on floor ' + ((curR + 1) * 10) + (tr.guardian ? ' (done)' : '') + '.</small></div></div>' : '') +
       '<p class="note small">' +
-      'Your campfire holds ' + L.rosterCap(S) + ' companions now; it grows at hero levels ' + L.ROSTER_LV.join(', ') + '. Camp job slots open at levels ' + L.JOB_SLOT_LV.join(', ') + '.</p></div>';
+      'Your campfire holds ' + L.fireCap(S) + ' companions now, not counting your party; it grows at hero levels ' + L.ROSTER_LV.join(', ') + '. Camp job slots open at levels ' + L.JOB_SLOT_LV.join(', ') + '.</p></div>';
     return h;
   }
   const trialName = r => (L.BIOMES[r] || { name: 'Region ' + (r + 1) }).name;
@@ -901,7 +901,7 @@
         });
       return;
     }
-    modal('<div class="maphead"><div><h2>' + esc(nm.name) + ' wants to join</h2><small>' + esc(nm.title) + ' &middot; ' + L.CLASSES[nm.cls].name + '. Your campfire is full: ' + list.length + ' of ' + L.rosterCap(S) + ' companions.</small></div></div>' +
+    modal('<div class="maphead"><div><h2>' + esc(nm.name) + ' wants to join</h2><small>' + esc(nm.title) + ' &middot; ' + L.CLASSES[nm.cls].name + '. You have ' + list.length + ' of ' + L.rosterCap(S) + ' companions: ' + L.PARTY_SEATS + ' party seats plus ' + L.fireCap(S) + ' at the fire.</small></div></div>' +
       '<p>' + esc(nm.line || nm.bio || '') + '</p><p class="note">To keep ' + esc(nm.name) + ', dismiss someone for good, or add a spot at the fire. If you turn ' + esc(nm.name) + ' away, they will not ask again.</p>' +
       '<div class="choice">' + list.map(c => { const m = L.memberById(c); return '<button class="pick jpick rdis" data-rdis="' + c + '"><img src="' + SP.spriteURL(m.cls, 2, lookHue(m)) + '" alt=""><b>' + esc(m.name) + '</b><small>Power level ' + L.lvl(S, c) + ' ' + L.CLASSES[m.cls].name + (S.party.includes(c) ? ' &middot; in your party' : '') + '</small><em>Dismiss</em></button>'; }).join('') + '</div>' +
       '<div class="row">' + (canBuy ? '<button class="btn" id="rc-buy">' + sigil + ' Add a spot: ' + fmt(L.ROSTER_COST) + ' ' + TOKEN + '</button>' : '') + '<button class="btn ghost" id="rc-no">Turn ' + esc(nm.name) + ' away</button></div>', md => {
@@ -1124,7 +1124,7 @@
     const bench = S.unlocked.filter(x => !S.party.includes(x));
     const nComp = L.companions(S).length, cap = L.rosterCap(S), slots = L.jobSlots(S), usedJobs = Object.keys(S.jobs || {}).filter(k => L.jobFree(S, S.jobs[k])).length;
     const nextSlot = L.JOB_SLOT_LV.find(x => x > L.heroLv(S));
-    const rosterBar = '<div class="rosterbar"><span>' + icon('flame') + 'Companions <b>' + nComp + ' / ' + cap + '</b></span><small>' + (L.ROSTER_LV.find(x => x > L.heroLv(S)) ? 'One more spot at hero level ' + L.ROSTER_LV.find(x => x > L.heroLv(S)) + '.' : 'Every free spot earned.') + ' When it is full, a new companion means dismissing someone for good.</small>' +
+    const rosterBar = '<div class="rosterbar"><span>' + icon('flame') + 'Companions <b>' + nComp + ' / ' + cap + '</b></span><small>' + L.PARTY_SEATS + ' party seats plus ' + L.fireCap(S) + ' at the fire. ' + (L.ROSTER_LV.find(x => x > L.heroLv(S)) ? 'One more spot at hero level ' + L.ROSTER_LV.find(x => x > L.heroLv(S)) + '.' : 'Every free spot earned.') + ' When it is full, a new companion means dismissing someone for good.</small>' +
       ((S.rosterUps || 0) < L.ROSTER_BUY_MAX && CL ? '<button class="btn small ghost" data-rosterbuy>' + sigil + ' +1 spot · ' + fmt(L.ROSTER_COST) + ' ' + TOKEN + '</button>' : '') + '</div>';
     const jobsHead = L.canUse(S, 'jobs') ? '<div class="jobhead"><b>Camp jobs</b><small>' + usedJobs + ' of ' + slots + ' slots in use' + (nextSlot ? ' &middot; next slot at hero level ' + nextSlot : '') + '</small></div>'
       : '<div class="lockrow">' + icon('lock') + '<div><b>Camp jobs open at hero level ' + L.unlockOf('jobs').lv + '</b><small>Resting companions will work jobs that help the whole party.</small></div></div>';
@@ -1152,7 +1152,7 @@
     if (t.dataset.autot && !L.passOn(S)) { openPass(); return; }
     if (t.dataset.autot) { const id = t.dataset.autot; S.autoTrain = S.autoTrain || {}; S.autoTrain[id] = !S.autoTrain[id]; if (!S.autoTrain[id]) delete S.autoTrain[id]; sfx.buy(); updateSeats(true); if (S.autoTrain[id]) toast('refresh', 'Auto-train on', L.memberById(id).name + ' will train whenever you have the gold' + (S.party.includes(id) ? '.' : ' and you are at camp.'), ''); return; }
     if (t.id === 'f-auto') { L.autoFormation(S); S.formationManual = false; sfx.buy(); updateSeats(true); updateAbilities(true); toast('shield', 'Party arranged', 'Tank in front, rogue behind it, healers in the middle where they reach everyone, casters at the back.', ''); return; }
-    if (t.dataset.rosterbuy != null) { buyRosterSpot().then(ok => { if (ok) { sfx.relic(); toast('flame', 'A new spot by the fire', 'Your campfire holds ' + L.rosterCap(S) + ' companions now.', 'feat'); } }); return; }
+    if (t.dataset.rosterbuy != null) { buyRosterSpot().then(ok => { if (ok) { sfx.relic(); toast('flame', 'A new spot by the fire', 'Your campfire holds ' + L.fireCap(S) + ' companions now, plus your party.', 'feat'); } }); return; }
     if ((t.dataset.unseat || t.dataset.seat) && !gateUse('camp')) return;
     if ((t.dataset.job || t.dataset.jobfor) && !gateUse('jobs')) return;
     if ((t.dataset.train && !S.party.includes(t.dataset.train)) || t.dataset.unseat || t.dataset.seat || t.dataset.dismiss || t.dataset.job || t.dataset.jobfor) { if (!campGate(true)) return; }
@@ -3314,6 +3314,9 @@
   // Their messages sit on the left, yours on the right.
   const dmOther = m => m.from === chat.me ? { pid: m.to, name: m.toName || 'them' } : { pid: m.from, name: m.name };
   chat.dmSeen = {};
+  // Closed whisper tabs: hidden until that player sends something newer. Kept on this device.
+  chat.dmHidden = {};
+  try { chat.dmHidden = JSON.parse(localStorage.getItem('lh_dm_hidden') || '{}') || {}; } catch (e) {}
   function dmPartners(list) {
     const by = new Map();
     for (const m of list) { const o = dmOther(m); if (!o.pid) continue; const p = by.get(o.pid) || { pid: o.pid, name: o.name, last: '' }; if (m.from !== chat.me) p.name = m.name; p.last = m.id; by.set(o.pid, p); }
@@ -3323,11 +3326,11 @@
   }
   const dmUnread = (list, pid) => list.some(m => m.from === pid && m.id > (chat.dmSeen[pid] || chat.seen.dm || ''));
   function paintWhispers(log, list, atBottom) {
-    const people = dmPartners(list), bar = $('dmto');
+    const people = dmPartners(list).filter(p => !(chat.dmHidden[p.pid] && p.last <= chat.dmHidden[p.pid])), bar = $('dmto');
     if (!chat.dmTo && people.length) chat.dmTo = { pid: people[0].pid, name: people[0].name };
     $('chatin').placeholder = chat.dmTo ? 'Whisper to ' + chat.dmTo.name : 'Pick someone to whisper';
     bar.hidden = false;
-    bar.innerHTML = people.length ? people.map(p => '<button type="button" class="dmchip' + (chat.dmTo && p.pid === chat.dmTo.pid ? ' on' : '') + (dmUnread(list, p.pid) && !(chat.dmTo && p.pid === chat.dmTo.pid) ? ' unread' : '') + '" data-dmpick="' + esc(p.pid) + '" data-dmname="' + esc(p.name) + '">' + esc(p.name) + '</button>').join('') + '<button type="button" class="dmchip dmnew" id="dm-new" aria-label="New whisper" title="New whisper">+</button>'
+    bar.innerHTML = people.length ? people.map(p => '<button type="button" class="dmchip' + (chat.dmTo && p.pid === chat.dmTo.pid ? ' on' : '') + (dmUnread(list, p.pid) && !(chat.dmTo && p.pid === chat.dmTo.pid) ? ' unread' : '') + '" data-dmpick="' + esc(p.pid) + '" data-dmname="' + esc(p.name) + '">' + esc(p.name) + '<span class="dmx" data-dmclose="' + esc(p.pid) + '" role="button" aria-label="Close chat with ' + esc(p.name) + '" title="Close">&times;</span></button>').join('') + '<button type="button" class="dmchip dmnew" id="dm-new" aria-label="New whisper" title="New whisper">+</button>'
       : '<span>No conversations yet.</span><button type="button" class="dmchip dmnew wide" id="dm-new">+ New whisper</button>';
     const conv = chat.dmTo ? list.filter(m => dmOther(m).pid === chat.dmTo.pid) : [];
     if (chat.dmTo && conv.length && viewing('dm')) chat.dmSeen[chat.dmTo.pid] = conv[conv.length - 1].id;
@@ -3341,6 +3344,7 @@
   }
   function whisperTo(pid, name) {
     if (!pid || pid === chat.me) return;
+    if (chat.dmHidden[pid]) { delete chat.dmHidden[pid]; try { localStorage.setItem('lh_dm_hidden', JSON.stringify(chat.dmHidden)); } catch (e) {} }
     chat.dmTo = { pid, name }; if (!chat.open) openChat(true);
     setChannel('dm'); setTimeout(() => $('chatin').focus(), 50);
   }
@@ -3392,7 +3396,15 @@
         md.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { closeModal(); whisperTo(b.dataset.pick, b.dataset.pname); });
       });
     }
-    $('dmto').addEventListener('click', e => { if (e.target.closest('#dm-new')) { newWhisper(); return; } const c = e.target.closest('[data-dmpick]'); if (c) { chat.dmTo = { pid: c.dataset.dmpick, name: c.dataset.dmname }; paintChat(); $('chatin').focus(); } });
+    $('dmto').addEventListener('click', e => {
+      const x = e.target.closest('[data-dmclose]');
+      if (x) {
+        const pid = x.dataset.dmclose, l = (chat.msgs.dm || []).filter(m => dmOther(m).pid === pid);
+        chat.dmHidden[pid] = l.length ? l[l.length - 1].id : '0'; try { localStorage.setItem('lh_dm_hidden', JSON.stringify(chat.dmHidden)); } catch (e2) {}
+        if (chat.dmTo && chat.dmTo.pid === pid) chat.dmTo = null;
+        paintChat(); return;
+      }
+      if (e.target.closest('#dm-new')) { newWhisper(); return; } const c = e.target.closest('[data-dmpick]'); if (c) { chat.dmTo = { pid: c.dataset.dmpick, name: c.dataset.dmname }; paintChat(); $('chatin').focus(); } });
     setTimeout(bgPoll, 4000);
     $('chatform').addEventListener('submit', async e => {
       e.preventDefault();
@@ -4003,7 +4015,7 @@
         '<b>Main camp</b> (floor 1): swap companions, recruit, train camp companions and change gear. <b>Descend</b> restarts you at the top of the region you left, so floor 99 becomes 91.',
         '<b>Campfire Draught</b>: a field camp for 60 seconds. Change your party\'s gear and keep your floor. No companion swaps.',
         'The party rests and heals at either. Training party members works anywhere.']],
-      ['The campfire roster', 'i:users', 'Your campfire holds 4 companions, plus one more at hero levels 10, 20 and 30.', [
+      ['The campfire roster', 'i:users', 'Your party’s 4 companion seats never count. On top of them, the campfire holds 4 resting companions, plus one more at hero levels 10, 20 and 30.', [
         'When a new companion arrives and the fire is full, dismiss someone for good to keep them, or turn them away.',
         'Up to 3 more spots can be added for ' + L.ROSTER_COST + ' Sigils each. They are yours for good.']],
       ['Camp jobs', 'i:hammer', 'Opens at hero level 10 with one job slot; one more slot at levels 15, 20, 25, 30 and 35.', [
@@ -4110,6 +4122,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 76, date: 'November 24, 2026', title: 'Room at the fire, and closing whispers', items: [
+      'Companions in your party no longer count against the campfire. You can keep your 4 party companions plus 4 more resting at the fire, and the fire still grows at hero levels 10, 20 and 30.',
+      'Whisper tabs have a small &times; to close a conversation. It comes back if that player whispers you again.'] },
     { v: 75, date: 'November 24, 2026', title: 'Whispers and the notification bell', items: [
       'Each whisper conversation now has its own tab along the top of the Whispers channel, and the latest one opens on its own.',
       'Their messages sit on the left and yours on the right, like a messenger app.',

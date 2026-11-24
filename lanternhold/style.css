@@ -1,4 +1,4 @@
-/* lh-build 202611241658 */
+/* lh-build 202611241721 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2272,18 +2272,54 @@ body.atench #bannerlamp{display:none!important}
 .ityfx{display:flex;gap:7px;align-items:flex-start;margin:8px 0;padding:7px 10px;border-radius:8px;background:rgba(245,194,66,.1);border:1px solid rgba(245,194,66,.35);font-size:13px}
 .ityfx>svg{flex:none;width:16px;height:16px;color:#f5c242;margin-top:1px}
 /* v117 chat dock: a tab per channel and per whisper along the bottom (wide screens) */
-.chatdock{position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:39;display:flex;align-items:stretch;gap:4px;max-width:calc(100vw - 32px);overflow-x:auto;scrollbar-width:none;padding:6px 8px;border:1px solid var(--line2);border-bottom:0;border-radius:12px 12px 0 0;background:linear-gradient(180deg,#121b2c,#0b1220);box-shadow:0 -6px 24px rgba(0,0,0,.45)}
+/* v117 chat dock + chat windows: a bar pinned bottom-right (icon per channel, tab per whisper) and small chat windows above it.
+   The page keeps a strip for the bar (padding, and the fixed desktop layout is shortened) so the bar never covers the game. */
+:root{--dockh:44px}
+.chatdock{position:fixed;right:12px;bottom:0;z-index:39;display:flex;align-items:flex-end;gap:4px;max-width:calc(100vw - 24px);height:var(--dockh);overflow-x:auto;scrollbar-width:none;padding:0 6px;border:1px solid var(--line2);border-bottom:0;border-radius:12px 12px 0 0;background:linear-gradient(180deg,#121b2c,#0b1220);box-shadow:0 -6px 24px rgba(0,0,0,.45)}
 .chatdock[hidden]{display:none}.chatdock::-webkit-scrollbar{display:none}
-.chatdock .dtab{all:unset;cursor:pointer;position:relative;display:flex;align-items:center;gap:6px;flex:none;padding:6px 11px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid var(--line2);font:600 13px/1.2 var(--body);color:var(--text);white-space:nowrap}
-.chatdock .dtab:hover{background:rgba(255,255,255,.09)}
-.chatdock .dtab.hot{border-color:#f5c242;box-shadow:0 0 10px rgba(245,194,66,.35)}
-.chatdock .dav{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#2a3550;color:#cfe0ff;font:800 11px var(--body)}
-.chatdock .dx{margin-left:2px;padding:0 3px;border-radius:4px;color:var(--muted);font-size:15px;line-height:1}
+.chatdock .dtab,.chatdock .dico{all:unset;box-sizing:border-box;cursor:pointer;position:relative;display:flex;align-items:center;gap:6px;flex:none;height:36px;margin-bottom:0;border:1px solid var(--line2);border-bottom:0;border-radius:8px 8px 0 0;background:rgba(255,255,255,.04);font:600 13px/1.2 var(--body);color:var(--text);white-space:nowrap}
+.chatdock .dtab{padding:0 8px 0 6px;max-width:170px}
+.chatdock .dtab .dn{overflow:hidden;text-overflow:ellipsis}
+.chatdock .dico{width:40px;justify-content:center;background:linear-gradient(180deg,#1d2a44,#142036)}
+.chatdock .dico svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;color:#c9d6ee}
+.chatdock .dico.dnew b{position:absolute;right:5px;bottom:4px;font:800 12px/1 var(--body);color:var(--accent)}
+.chatdock .dtab:hover,.chatdock .dico:hover{background:rgba(255,255,255,.1)}
+.chatdock .on{background:linear-gradient(180deg,#2a3c62,#1a2744)!important;border-color:var(--accent)}
+.chatdock .hot{border-color:#f5c242;box-shadow:0 0 10px rgba(245,194,66,.35)}
+.chatdock .dav,.cpop .dav{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#2a3550;color:#cfe0ff;font:800 11px var(--body);flex:none}
+.chatdock .dx{margin-left:2px;padding:0 4px;border-radius:4px;color:var(--muted);font-size:16px;line-height:1}
 .chatdock .dx:hover{background:rgba(255,255,255,.12);color:var(--text)}
-.chatdock .dk{min-width:18px;padding:1px 5px;border-radius:999px;background:#e5484d;color:#fff;font:800 10.5px/1.4 var(--body);text-align:center;font-style:normal}
+.chatdock .dk{position:absolute;top:-9px;right:-4px;min-width:18px;padding:1px 5px;border-radius:999px;background:#e5484d;color:#fff;font:800 10.5px/1.4 var(--body);text-align:center;font-style:normal;box-shadow:0 0 0 2px #0b1220}
+.chatdock .dtab .dk{position:static;box-shadow:none}
 .chatdock .dk.ment{background:#f5c242;color:#1a1306}
-.chatdock .dsep{width:1px;margin:3px 4px;background:var(--line2);flex:none}
-.chatdock .dnew{padding:6px 10px;color:var(--muted)}
+.chatpops{position:fixed;right:12px;bottom:calc(var(--dockh) + 6px);z-index:39;display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;gap:8px;max-width:calc(100vw - 24px);pointer-events:none}
+.chatpops[hidden]{display:none}
+.cpop{pointer-events:auto;width:300px;height:380px;max-height:calc(100vh - var(--dockh) - 80px);display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.55);overflow:hidden}
+.cpop.min{height:auto;width:200px}
+.cpop.min .cplog,.cpop.min .cpform,.cpop.min .cpnote{display:none!important}
+.cpop header{display:flex;align-items:center;gap:7px;padding:7px 6px 7px 10px;background:linear-gradient(180deg,#1d2a44,#142036);border-bottom:1px solid var(--line2);cursor:pointer;user-select:none}
+.cpop header>svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;color:#c9d6ee;flex:none}
+.cpop .ptit{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.cpop .pk:empty{display:none}.cpop .pk{min-width:18px;padding:1px 5px;border-radius:999px;background:#e5484d;color:#fff;font:800 10.5px/1.4 var(--body);text-align:center;font-style:normal}
+.cpop .pbtn{all:unset;cursor:pointer;width:26px;height:24px;display:grid;place-items:center;border-radius:6px;color:var(--muted);font-size:17px;line-height:1}
+.cpop .pbtn:hover{background:rgba(255,255,255,.12);color:var(--text)}
+.cplog{flex:1;min-height:0;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.cpform{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line2)}
+.cpform input{flex:1;min-width:0;padding:7px 9px;border-radius:8px;border:1px solid var(--line2);background:var(--bg2);color:var(--text);font:inherit;font-size:13px}
+.cpnote{margin:0;padding:0 10px 8px;font-size:12px;color:#fca5a5}
 body.hasdock .chatfab{display:none!important}
-@media (max-width:720px){.chatdock{display:none!important}}
-body.hasdock{padding-bottom:52px}
+@media (max-width:720px){.chatdock,.chatpops{display:none!important}}
+body.hasdock{padding-bottom:calc(var(--dockh) + 6px)}
+@media (min-width:901px) and (min-height:620px){body.hasdock #app{height:calc(100vh - var(--dockh) - 6px);height:calc(100dvh - var(--dockh) - 6px)}body.hasdock{padding-bottom:0}}
+/* v117: big, tall monitors (2560x1440, 3440x1440 ultrawide). The app used to stop at 1360px wide, so the battle scene became a
+   narrow, very tall box: small party at the bottom under a huge wall. Let the app grow with the screen height so the scene is
+   wider (the party scales with width) and never let the battle scene get taller than a 3:2 box. */
+@media (min-width:1700px) and (min-height:1100px){
+  #app,body.isfull #app{max-width:min(100%,190vh,2600px)}
+  .stage{container-type:inline-size}
+}
+@media (min-width:901px) and (min-height:620px){
+  .stage .arena{max-height:66cqw}
+  body.atench .stage .arena{max-height:none}
+}
+body.hasdock #toasts{bottom:calc(var(--dockh) + 16px)}

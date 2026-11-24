@@ -1,4 +1,4 @@
-/* lh-build 202611241658 */
+/* lh-build 202611241721 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1784,6 +1784,27 @@
       type: (a, b) => (INV_KINDS.findIndex(k => k[0] === invKind(a)) - INV_KINDS.findIndex(k => k[0] === invKind(b))) || String(L.tyOf(a)).localeCompare(String(L.tyOf(b))) || L.gearPct(b) - L.gearPct(a), new: (a, b) => String(b.uid).localeCompare(String(a.uid)) };
     return l.sort(by[INV.sort] || by.best);
   }
+  // v117: the same filters on the Armorer's and Enchanter's lists (John: "roll that same filtering into the armorer and
+  // enchanter"). They keep their own saved choice so the pack and the counters don't fight. "Suggested" keeps each list's own order.
+  const SF = { kind: 'all', rar: 'all', who: 'all', sort: 'best' };
+  try { Object.assign(SF, JSON.parse(localStorage.getItem('lh_shopf') || '{}')); } catch (e) {}
+  const sfSave = () => { try { localStorage.setItem('lh_shopf', JSON.stringify(SF)); } catch (e) {} };
+  const sfPass = it => (SF.kind === 'all' || invKind(it) === SF.kind) && (SF.rar === 'all' || it.rar === SF.rar) && (SF.who === 'all' || L.usable(SF.who, it));
+  const SF_SORT = { level: (a, b) => L.reqLevel(b) - L.reqLevel(a), rarity: (a, b) => RAR_RANK(b) - RAR_RANK(a), type: (a, b) => (INV_KINDS.findIndex(k => k[0] === invKind(a)) - INV_KINDS.findIndex(k => k[0] === invKind(b))) || String(L.tyOf(a)).localeCompare(String(L.tyOf(b))), new: (a, b) => String(b.uid).localeCompare(String(a.uid)) };
+  function sfApply(list, get, noSort) {
+    get = get || (x => x); const l = list.filter(r => sfPass(get(r))), by = !noSort && SF_SORT[SF.sort];
+    return by ? l.map((r, i) => [r, i]).sort((p, q) => by(get(p[0]), get(q[0])) || p[1] - q[1]).map(p => p[0]) : l;
+  }
+  function sfBar(items, o) {
+    o = o || {}; const opt = (k, v, n) => '<option value="' + v + '"' + (SF[k] === v ? ' selected' : '') + '>' + n + '</option>';
+    return '<div class="invbar sfbar"><div class="invkinds" role="tablist">' + INV_KINDS.map(([k, n]) => '<button class="' + (SF.kind === k ? 'on' : '') + '" data-sfk="' + k + '">' + n + ' <em>' + (k === 'all' ? items.length : items.filter(it => invKind(it) === k).length) + '</em></button>').join('') + '</div><div class="invsel">' +
+      (o.noSort ? '' : '<label><span>Sort</span><select data-sfs="sort">' + [['best', 'Suggested']].concat(INV_SORTS.slice(1)).map(([k, n]) => opt('sort', k, n)).join('') + '</select></label>') +
+      (o.noRar ? '' : '<label><span>Rarity</span><select data-sfs="rar">' + opt('rar', 'all', 'Any') + L.RARITY.filter(r => items.some(it => it.rar === r.id) || SF.rar === r.id).map(r => opt('rar', r.id, r.name)).join('') + '</select></label>') +
+      '<label><span>Who</span><select data-sfs="who">' + opt('who', 'all', 'Anyone') + L.CLASS_ORDER.map(c => opt('who', c, L.CLASSES[c].name)).join('') + '</select></label></div></div>';
+  }
+  const sfList = (items, rows, empty, o) => sfBar(items, o) + ewList(rows, items.length && !rows.length ? 'Nothing here matches these filters. Try All or Anyone.' : empty);
+  document.addEventListener('click', e => { const k = e.target.closest('[data-sfk]'); if (k) { e.stopPropagation(); SF.kind = k.dataset.sfk; sfSave(); paintEnchPanel(true); } }, true);
+  document.addEventListener('change', e => { const c = e.target.closest('[data-sfs]'); if (c) { SF[c.dataset.sfs] = c.value; sfSave(); paintEnchPanel(true); } });
   $('bag').addEventListener('click', e => { const k = e.target.closest('[data-invk]'); if (k) { e.stopPropagation(); INV.kind = k.dataset.invk; invSave(); updateGear(true); } });
   $('bag').addEventListener('change', e => { const c = e.target.closest('[data-invs]'); if (c) { INV[c.dataset.invs] = c.value; invSave(); updateGear(true); } });
   // Item type and who can use it, shown on every item (v117).
@@ -2057,29 +2078,29 @@
     if (AW.a && !A) AW.a = null; if (AW.b && !B) AW.b = null;
     const byWorn = (a, b) => (!!L.wearer(S, b.uid) - !!L.wearer(S, a.uid)) || (L.itemScore(b) - L.itemScore(a));
     if (AW.mode === 'smelt') {
-      const list = scrapList(), g = list.reduce((a, it) => a + L.smeltValue(it), 0);
-      return head + '<h3 class="ewq">Which gear should the Armorer melt down for gold?</h3><p class="ewhint">The forge pays ' + L.SMELT_MULT + '× the gold of a normal scrap, but gives no Dust. Worn and locked items are never melted.</p>' +
+      const list = shopScrap(), g = list.reduce((a, it) => a + L.smeltValue(it), 0);
+      return head + '<h3 class="ewq">Which gear should the Armorer melt down for gold?</h3><p class="ewhint">The forge pays ' + L.SMELT_MULT + '× the gold of a normal scrap, but gives no Dust. Worn and locked items are never melted.</p>' + sfBar(scrapList(), { noSort: 1, noRar: 1 }) +
         '<div class="ewrar">' + L.RARITY.map(r => '<button class="ewchip r-' + r.id + (scrapOpts[r.id] ? ' sel' : '') + '" data-ewrar="' + r.id + '"><b style="color:var(--rc)">' + r.name + '</b><small>' + S.bag.filter(x => x.rar === r.id && enchSpare(x)).length + ' spare</small></button>').join('') + '</div>' +
         '<label class="chk"><input type="checkbox" data-ewopt="keepBest"' + (scrapOpts.keepBest ? ' checked' : '') + '><span><b>Keep the best spare of each kind</b></span></label>' +
         '<label class="chk"><input type="checkbox" data-ewopt="keepUp"' + (scrapOpts.keepUp ? ' checked' : '') + '><span><b>Keep upgraded pieces</b></span></label>' +
-        '<div class="ewsum">' + (list.length ? '<p><b>' + list.length + '</b> ' + (list.length === 1 ? 'piece becomes' : 'pieces become') + ' <b>' + fmt(g) + ' gold</b>.</p>' : '<p>Nothing matches. Tick more rarities above.</p>') +
+        '<div class="ewsum">' + (list.length ? '<p><b>' + list.length + '</b> ' + (list.length === 1 ? 'piece becomes' : 'pieces become') + ' <b>' + fmt(g) + ' gold</b>.</p>' : (scrapList().length ? '<p>Nothing matches these filters. Try All or Anyone.</p>' : '<p>Nothing matches. Tick more rarities above.</p>')) +
         '<button class="btn danger" data-awgo="smelt"' + (list.length ? '' : ' disabled') + '>Melt ' + list.length + '</button></div>';
     }
     if (AW.mode === 'mass') {
-      const plan = L.massMergePlan(S, mmCap), exp = plan.reduce((a, p) => a + p.risk, 0), fexp = plan.reduce((a, p) => a + L.mergeRisk(S, p.a, p.b).field, 0);
+      const all = L.massMergePlan(S, mmCap), plan = all.filter(p => sfPass(p.a)), exp = plan.reduce((a, p) => a + p.risk, 0), fexp = plan.reduce((a, p) => a + L.mergeRisk(S, p.a, p.b).field, 0);
       return head + perk + '<h3 class="ewq">Merge all your spare pairs at once?</h3><p class="ewhint">Copies of the same item merge in pairs, best with next best. Worn and locked items are left alone. Each pair rolls on its own; a loss destroys both pieces.</p>' +
-        '<div class="ewchips">' + [1, 2, 3, 5, 10].map(n => '<button class="ewchip' + (n === mmCap ? ' sel' : '') + '" data-awcap="' + n + '"><b>Up to +' + n + '</b></button>').join('') + '</div>' +
+        '<div class="ewchips">' + [1, 2, 3, 5, 10].map(n => '<button class="ewchip' + (n === mmCap ? ' sel' : '') + '" data-awcap="' + n + '"><b>Up to +' + n + '</b></button>').join('') + '</div>' + (all.length ? sfBar(all.map(p => p.a), { noSort: 1 }) : '') +
         (plan.length ? ewList(plan.map(p => ewItemRow(p.a, 'data-noop="1"', '+' + p.a.up + ' &amp; +' + p.b.up + ' &rarr; +' + p.to, '<span class="ewcost">' + riskTxt(p.risk) + ' risk</span>')), '') +
           '<div class="ewsum"><div class="mgodds"><div><small>Merges</small><b>' + plan.length + '</b></div><div class="ok"><small>Expected wins</small><b>' + (Math.round((plan.length - exp) * 10) / 10) + '</b></div><div class="bad"><small>Expected losses</small><b>' + (Math.round(exp * 10) / 10) + '</b></div></div>' +
           '<p class="shopnote">In the field the same merges would expect ' + (Math.round(fexp * 10) / 10) + ' losses.</p><button class="btn danger" data-awgo="mass">Merge ' + plan.length + '</button></div>'
-          : '<p class="ewempty">No spare pairs to merge up to +' + mmCap + '. Worn and locked items are skipped.</p>');
+          : '<p class="ewempty">' + (all.length ? 'No pairs match these filters. Try All or Anyone.' : 'No spare pairs to merge up to +' + mmCap + '. Worn and locked items are skipped.') + '</p>');
     }
     let steps, cur = 0, body = '', picked = '';
     if (AW.mode === 'up') {
       steps = ['Item', 'Upgrade'];
       if (!A) {
         body = '<h3 class="ewq">Which item do you want to upgrade?</h3><p class="ewhint">Each upgrade raises an item one level for gold. Worn gear works too.</p>' +
-          ewList(S.bag.filter(x => x.up < L.UP_MAX).sort(byWorn).slice(0, 60).map(x => ewItemRow(x, 'data-awa="' + x.uid + '"', 'Upgrade to +' + (x.up + 1) + ewWorn(x), upCostTag(x))), 'Nothing left to upgrade.');
+          (l => sfList(l, sfApply(l).slice(0, 60).map(x => ewItemRow(x, 'data-awa="' + x.uid + '"', 'Upgrade to +' + (x.up + 1) + ewWorn(x), upCostTag(x))), 'Nothing left to upgrade.'))(S.bag.filter(x => x.up < L.UP_MAX).sort(byWorn));
       } else {
         cur = 1; picked = ewPicked('Upgrading', A, ewName(A), 'a');
         const lg = A.wb != null && L.WB_SETS[A.wb], c = lg ? L.wbUpCost(A) : L.upgradeCost(A), have = lg ? L.shardsOf(S)[A.wb] || 0 : S.gold, unit = lg ? lg.word + ' shard' + (c === 1 ? '' : 's') : 'gold', max = A.up >= L.UP_MAX;
@@ -2092,11 +2113,11 @@
       if (B) picked += ewPicked('With', B, ewName(B), 'b');
       if (!A) {
         body = '<h3 class="ewq">Which item do you want to merge?</h3><p class="ewhint">Two copies of the same item become one, a level higher. If it fails, both are lost.</p>' +
-          ewList(S.bag.filter(x => !x.lk && x.up < L.UP_MAX && S.bag.some(y => y !== x && !y.lk && L.mergeable(x, y))).sort(byWorn).slice(0, 60).map(x => ewItemRow(x, 'data-awa="' + x.uid + '"', S.bag.filter(y => y !== x && !y.lk && L.mergeable(x, y)).length + ' matching ' + (S.bag.filter(y => y !== x && !y.lk && L.mergeable(x, y)).length === 1 ? 'copy' : 'copies') + ewWorn(x), '')), 'No item has a matching copy yet. Copies of the same item can be merged.');
+          (l => sfList(l, sfApply(l).slice(0, 60).map(x => ewItemRow(x, 'data-awa="' + x.uid + '"', S.bag.filter(y => y !== x && !y.lk && L.mergeable(x, y)).length + ' matching ' + (S.bag.filter(y => y !== x && !y.lk && L.mergeable(x, y)).length === 1 ? 'copy' : 'copies') + ewWorn(x), '')), 'No item has a matching copy yet. Copies of the same item can be merged.'))(S.bag.filter(x => !x.lk && x.up < L.UP_MAX && S.bag.some(y => y !== x && !y.lk && L.mergeable(x, y))).sort(byWorn));
       } else if (!B) {
         cur = 1;
         body = '<h3 class="ewq">Which copy should go into it?</h3><p class="ewhint">The copy is used up. The lower the result, the lower the risk.</p>' +
-          ewList(S.bag.filter(y => y !== A && !y.lk && L.mergeable(A, y)).sort((p, q) => q.up - p.up).map(x => ewItemRow(x, 'data-awb="' + x.uid + '"', 'Result +' + L.mergeRisk(S, A, x).to + ewWorn(x), '<span class="ewcost">' + riskTxt(L.mergeRisk(S, A, x).risk) + ' risk</span>')), 'No matching copy left.');
+          (l => sfList(l, sfApply(l).map(x => ewItemRow(x, 'data-awb="' + x.uid + '"', 'Result +' + L.mergeRisk(S, A, x).to + ewWorn(x), '<span class="ewcost">' + riskTxt(L.mergeRisk(S, A, x).risk) + ' risk</span>')), 'No matching copy left.'))(S.bag.filter(y => y !== A && !y.lk && L.mergeable(A, y)).sort((p, q) => q.up - p.up));
       } else {
         cur = 2; const r = L.mergeRisk(S, A, B), worn = L.wearer(S, A.uid) || L.wearer(S, B.uid);
         body = '<div class="ewsum"><div class="mgodds"><div><small>Result</small><b>+' + r.to + '</b></div><div class="ok"><small>Success</small><b>' + riskTxt(1 - r.risk) + '</b></div><div class="bad"><small>Both destroyed</small><b>' + riskTxt(r.risk) + '</b></div></div>' +
@@ -2137,12 +2158,12 @@
     let body = '', steps = [], cur = 0;
     const done = EW.done ? '<div class="ewdone">' + icon('star') + '<span>' + EW.done + '</span></div>' : '';
     if (EW.mode === 'scrap') {
-      const list = scrapList(), gold = list.reduce((a, it) => a + L.salvageValue(it), 0), dd = list.reduce((a, it) => a + L.dustValue(it), 0);
-      body = '<h3 class="ewq">Which gear should the Enchanter break down for Dust?</h3><p class="ewhint">Worn and locked items are never scrapped. You also get gold.</p>' +
+      const list = shopScrap(), gold = list.reduce((a, it) => a + L.salvageValue(it), 0), dd = list.reduce((a, it) => a + L.dustValue(it), 0);
+      body = '<h3 class="ewq">Which gear should the Enchanter break down for Dust?</h3><p class="ewhint">Worn and locked items are never scrapped. You also get gold.</p>' + sfBar(scrapList(), { noSort: 1, noRar: 1 }) +
         '<div class="ewrar">' + L.RARITY.map(r => '<button class="ewchip r-' + r.id + (scrapOpts[r.id] ? ' sel' : '') + '" data-ewrar="' + r.id + '"><b style="color:var(--rc)">' + r.name + '</b><small>' + S.bag.filter(x => x.rar === r.id && enchSpare(x)).length + ' spare</small></button>').join('') + '</div>' +
         '<label class="chk"><input type="checkbox" data-ewopt="keepBest"' + (scrapOpts.keepBest ? ' checked' : '') + '><span><b>Keep the best spare of each kind</b></span></label>' +
         '<label class="chk"><input type="checkbox" data-ewopt="keepUp"' + (scrapOpts.keepUp ? ' checked' : '') + '><span><b>Keep upgraded pieces</b></span></label>' +
-        '<div class="ewsum">' + (list.length ? '<p><b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' become <b>' + fmt(dd) + ' Dust</b> and <b>' + fmt(gold) + ' gold</b>.</p>' : '<p>Nothing matches. Tick more rarities above.</p>') +
+        '<div class="ewsum">' + (list.length ? '<p><b>' + list.length + '</b> ' + (list.length === 1 ? 'piece' : 'pieces') + ' become <b>' + fmt(dd) + ' Dust</b> and <b>' + fmt(gold) + ' gold</b>.</p>' : (scrapList().length ? '<p>Nothing matches these filters. Try All or Anyone.</p>' : '<p>Nothing matches. Tick more rarities above.</p>')) +
         '<button class="btn danger" data-ewgo="scrap"' + (list.length ? '' : ' disabled') + '>Scrap ' + list.length + '</button></div>';
       return '<div class="ephead"><b>' + title + '</b>' + dust + '</div>' + tabs + done + body;
     }
@@ -2161,12 +2182,12 @@
       if (!B) {
         cur = 0;
         body = '<h3 class="ewq">Which item do you want to enchant?</h3><p class="ewhint">Gear your party is wearing works too. The dots show its sockets.</p>' +
-          ewList(ewTargets().slice(0, 60).map(x => ewItemRow(x, 'data-ewdst="' + x.uid + '"', (L.enchList(x).map(enchName).join(', ') || 'No enchants yet') + ewWorn(x), ewDots(x))), 'None of your items has an enchant socket yet. Rarer gear and gear from deeper floors has more.');
+          (l => sfList(l, sfApply(l).slice(0, 60).map(x => ewItemRow(x, 'data-ewdst="' + x.uid + '"', (L.enchList(x).map(enchName).join(', ') || 'No enchants yet') + ewWorn(x), ewDots(x))), 'None of your items has an enchant socket yet. Rarer gear and gear from deeper floors has more.'))(ewTargets());
       } else if (!mv) {
         cur = 1;
         const src = ewSources(B.uid);
         body = '<h3 class="ewq">Which enchant should go on it?</h3><p class="ewhint">These come from your spare gear. The spare item is used up.</p>' +
-          ewList(src.slice(0, 80).map(r => ewItemRow(r.x, 'data-ewsrc="' + r.x.uid + '" data-ewi="' + r.i + '"', '<span class="ewen">' + enchName(r.e) + '</span> ' + L.enchText(r.e) + ' &middot; from ' + ewName(r.x), ewCost(r.e))), 'No spare enchants. Enchants come on found gear; keep a spare piece that has one and it will show up here.');
+          sfList(src.map(r => r.x).filter((x, i, a) => a.indexOf(x) === i), sfApply(src, r => r.x).slice(0, 80).map(r => ewItemRow(r.x, 'data-ewsrc="' + r.x.uid + '" data-ewi="' + r.i + '"', '<span class="ewen">' + enchName(r.e) + '</span> ' + L.enchText(r.e) + ' &middot; from ' + ewName(r.x), ewCost(r.e))), 'No spare enchants. Enchants come on found gear; keep a spare piece that has one and it will show up here.');
       }
     } else {
       steps = ['Spare item', 'Where it goes', 'Confirm'];
@@ -2175,14 +2196,14 @@
       if (!A) {
         cur = 0;
         body = '<h3 class="ewq">Which spare item do you want to break down?</h3><p class="ewhint">You keep one of its enchants and move it to another item. The spare item is used up.</p>' +
-          ewList(S.bag.filter(x => enchSpare(x) && L.enchList(x).length).slice(0, 60).map(x => ewItemRow(x, 'data-ewsrcitem="' + x.uid + '"', L.enchList(x).map(e => '<span class="ewen">' + enchName(e) + '</span>').join(', '), '')), 'Nothing to disenchant. Spare items with enchants show up here. Worn and locked items do not.');
+          (l => sfList(l, sfApply(l).slice(0, 60).map(x => ewItemRow(x, 'data-ewsrcitem="' + x.uid + '"', L.enchList(x).map(e => '<span class="ewen">' + enchName(e) + '</span>').join(', '), '')), 'Nothing to disenchant. Spare items with enchants show up here. Worn and locked items do not.'))(S.bag.filter(x => enchSpare(x) && L.enchList(x).length));
       } else if (!mv) {
         cur = 0;
         body = '<h3 class="ewq">Which enchant do you want to keep?</h3><div class="ewchips">' + la.map((e, i) => '<button class="ewchip" data-ewidx="' + i + '"><b>' + enchName(e) + '</b><small>' + L.enchText(e) + '</small>' + ewCost(e) + '</button>').join('') + '</div>';
       } else if (!B) {
         cur = 1;
         body = '<h3 class="ewq">Which item should get ' + enchName(mv) + '?</h3><p class="ewhint">Gear your party is wearing works too. The dots show its sockets.</p>' +
-          ewList(ewTargets(A.uid).slice(0, 60).map(x => ewItemRow(x, 'data-ewdst="' + x.uid + '"', (L.enchList(x).map(enchName).join(', ') || 'No enchants yet') + ewWorn(x), ewDots(x))), 'No other item has an enchant socket yet.');
+          (l => sfList(l, sfApply(l).slice(0, 60).map(x => ewItemRow(x, 'data-ewdst="' + x.uid + '"', (L.enchList(x).map(enchName).join(', ') || 'No enchants yet') + ewWorn(x), ewDots(x))), 'No other item has an enchant socket yet.'))(ewTargets(A.uid));
       }
     }
     if (A && B && mv) {
@@ -2221,7 +2242,7 @@
     if (d.awcap) { mmCap = +d.awcap; AW.done = null; return paintEnchPanel(true); }
     if (d.awgo === 'mass') {
       let ok = 0, bad = 0, mxp = 0;
-      for (const p of L.massMergePlan(S, mmCap)) { const r = L.mergeItems(S, p.a.uid, p.b.uid, null, events); if (!r) continue; mxp += r.xp || 0; if (r.ok) ok++; else bad++; }
+      for (const p of shopMass()) { const r = L.mergeItems(S, p.a.uid, p.b.uid, null, events); if (!r) continue; mxp += r.xp || 0; if (r.ok) ok++; else bad++; }
       if (!ok && !bad) return;
       save(); updateGear(true); updateSeats(true); ok ? (sfx.relic(), shopBurst()) : sfx.coin();
       AW.done = ok + ' merged' + (bad ? ', ' + bad + ' failed (' + bad * 2 + ' items lost)' : '') + '. +' + fmt(mxp) + ' hero XP.'; return paintEnchPanel(true);
@@ -2243,7 +2264,7 @@
       return paintEnchPanel(true);
     }
     if (d.awgo === 'smelt') {
-      const l = scrapList(); if (!l.length) return; let g = 0; for (const it of l) g += L.smelt(S, it.uid);
+      const l = shopScrap(); if (!l.length) return; let g = 0; for (const it of l) g += L.smelt(S, it.uid);
       sfx.coin(); updateGear(true); save(); shopBurst();
       AW.done = 'Melted ' + l.length + (l.length === 1 ? ' piece' : ' pieces') + ' for ' + fmt(g) + ' gold.'; return paintEnchPanel(true);
     }
@@ -2262,7 +2283,7 @@
     }
     if (d.ewrar) { scrapOpts[d.ewrar] = !scrapOpts[d.ewrar]; return paintEnchPanel(true); }
     if (d.ewgo === 'scrap') {
-      const l = scrapList(); if (!l.length) return; let g = 0, dd = 0; for (const it of l) { dd += L.dustValue(it); g += L.salvage(S, it.uid); }
+      const l = shopScrap(); if (!l.length) return; let g = 0, dd = 0; for (const it of l) { dd += L.dustValue(it); g += L.salvage(S, it.uid); }
       sfx.coin(); updateGear(true); save(); shopBurst();
       EW.done = 'Scrapped ' + l.length + (l.length === 1 ? ' piece' : ' pieces') + ' for ' + fmt(dd) + ' Dust and ' + fmt(g) + ' gold.';
       return paintEnchPanel(true);
@@ -2471,6 +2492,8 @@
     return S.bag.filter(it => o[it.rar] && !it.lk && !L.wearer(S, it.uid) && !best.has(it.uid) && !(o.keepUp && it.up > 0));
   }
   const scrapList = () => bulkList(scrapOpts);
+  const shopScrap = () => scrapList().filter(sfPass);
+  const shopMass = () => L.massMergePlan(S, mmCap).filter(p => sfPass(p.a));
   function openScrap() {
     const draw = () => {
       const list = scrapList(), gold = list.reduce((a, it) => a + L.salvageValue(it), 0);
@@ -4184,8 +4207,10 @@
     if (chat.links.length >= 3) { toast('lock', 'Three links at most', 'Send this message first, then link more.', 'warn'); return true; }
     const label = '[' + itemLabel(it) + ']';
     chat.links.push({ label, token: tokenOf(it) });
-    if (!chat.open) openChat(true);
-    const inp = $('chatin'), at = inp.selectionStart != null ? inp.selectionStart : inp.value.length;
+    let inp = $('chatin');
+    if (dockMode() && !chat.open) { const p = lastPop || POPS.find(q => !q.min) || openPop('global'); if (p.min) { p.min = false; paintPops(); } inp = popEl(p).querySelector('input'); }
+    else if (!chat.open) openChat(true);
+    const at = inp.selectionStart != null ? inp.selectionStart : inp.value.length;
     inp.value = inp.value.slice(0, at) + (at && inp.value[at - 1] !== ' ' ? ' ' : '') + label + ' ' + inp.value.slice(at);
     inp.focus(); return true;
   }
@@ -4221,6 +4246,7 @@
     const bn = lk && lk.b && BANNERS[lk.b] ? lk.b : '';
     return (bn ? bannerSVG(bn, 'chatban') : '') + (c ? '<span class="nc-' + esc(c) + '">' + esc(m.name) + '</span>' : esc(m.name)) + (t ? '<small class="ctitle">' + esc(t) + '</small>' : '');
   }
+  const msgLine = m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + (mentionsMe(m) ? ' ment' + (chat.flash && chat.flash.has(m.id) ? ' flash' : '') : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>';
   function paintChat() {
     const log = $('chatlog'), k = roomKey(), list = (chat.msgs[k] || []).filter(m => !chat.muted.has(m.from));
     if (!signedIn()) { log.innerHTML = '<div class="chatempty"><p>Sign in to chat with other delvers.</p><button class="btn small" id="chat-in">Sign in</button></div>'; $('chatform').hidden = true; return; }
@@ -4230,7 +4256,7 @@
     const dm = chat.ch === 'dm';
     if (dm) return paintWhispers(log, list, atBottom);
     $('dmto').hidden = true;
-    log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + (mentionsMe(m) ? ' ment' + (chat.flash && chat.flash.has(m.id) ? ' flash' : '') : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
+    log.innerHTML = list.length ? list.map(msgLine).join('')
       : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'help' ? 'Help chat. Stuck on something? Ask here and other delvers and the Lantern Keepers can answer. The wiki at lanternhold.born2gamellc.com/wiki has guides too.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : chat.ch === 'dm' ? 'No whispers yet. Tap a player’s name in any channel and choose Whisper to message them privately.' : 'Quiet down here. Say hello.') + '</p></div>';
     if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
   }
@@ -4240,7 +4266,13 @@
     if (r.msgs.length) { chat.msgs[k] = cur.concat(add).slice(-120); chat.since[k] = chat.msgs[k][chat.msgs[k].length - 1].id; } else chat.msgs[k] = cur;
     return add;
   }
-  const viewing = k => chat.open && roomKey() === k && !document.hidden;
+  // v117 chat windows: each conversation can pop out into its own small window above the dock (desktop).
+  const POPS = []; // { ch, pid, name, min }
+  const DOCK_CH = [['global', 'chat'], ['banner', 'shield'], ['trade', 'coin'], ['help', 'help'], ['party', 'users']];
+  const POP_TIP = { global: 'Everyone in the Deep', banner: 'Your banner only', trade: 'Buying and selling', help: 'Questions and answers', party: 'Your party' };
+  const popRoom = p => p.ch === 'dm' ? 'dm' : p.ch === 'party' ? 'party:mine' : p.ch;
+  const popViewing = k => POPS.some(p => !p.min && popRoom(p) === k);
+  const viewing = k => !document.hidden && ((chat.open && roomKey() === k) || popViewing(k));
   function markSeen(k) {
     const l = chat.msgs[k] || []; if (!l.length) return;
     if (chat.ment) delete chat.ment[k];
@@ -4321,7 +4353,9 @@
   function whisperTo(pid, name) {
     if (!pid || pid === chat.me) return;
     if (chat.dmHidden[pid]) { delete chat.dmHidden[pid]; try { localStorage.setItem('lh_dm_hidden', JSON.stringify(chat.dmHidden)); } catch (e) {} }
-    chat.dmTo = { pid, name }; if (!chat.open) openChat(true);
+    chat.dmTo = { pid, name };
+    if (dockMode()) { openPop('dm', pid, name); return; }
+    if (!chat.open) openChat(true);
     setChannel('dm'); setTimeout(() => $('chatin').focus(), 50);
   }
   async function loadRooms() {
@@ -4346,7 +4380,7 @@
     $('btn-chat').addEventListener('click', () => openChat(true));
     $('chatmin').addEventListener('click', () => openChat(false));
     // The chat window stays as you left it: open or tucked away.
-    try { if (localStorage.getItem('lh_chat') === '1' && matchMedia('(min-width:721px)').matches) setTimeout(() => openChat(true), 1500); } catch (e) {}
+    try { if (localStorage.getItem('lh_chat') === '1' && !dockMode() && matchMedia('(min-width:721px)').matches) setTimeout(() => openChat(true), 1500); } catch (e) {}
     $('chatch').addEventListener('click', e => { const b = e.target.closest('[data-ch]'); if (b) setChannel(b.dataset.ch); });
     $('chatroom').addEventListener('change', e => { chat.leader = e.target.value || null; paintChat(); pollChat(); });
     $('chatlog').addEventListener('click', e => {
@@ -4354,13 +4388,7 @@
       const lk = e.target.closest('[data-link]'); if (lk) { previewItem(lk.dataset.link); return; }
       const dw = e.target.closest('[data-dm]'); if (dw) { whisperTo(dw.dataset.dm, dw.dataset.dmname); return; }
       const w = e.target.closest('[data-from]'); if (!w || w.dataset.from === chat.me) return;
-      const from = w.dataset.from, id = w.dataset.id, name = w.dataset.name;
-      modal('<h2>' + esc(name) + '</h2><p>Mute hides everything this player says, on this device. Report flags this message for review; messages with several reports are hidden for everyone.</p><div class="row"><button class="btn" id="c-dm">Whisper</button><button class="btn ghost" id="c-mute">Mute ' + esc(name) + '</button><button class="btn danger" id="c-rep">Report message</button><button class="btn ghost" id="c-x">Cancel</button></div>', md => {
-        md.querySelector('#c-mute').onclick = () => { chat.muted.add(from); try { localStorage.setItem('lanternhold.muted', JSON.stringify([...chat.muted])); } catch (e) {} closeModal(); paintChat(); toast('lock', 'Muted', 'You won’t see messages from ' + name + '.', ''); };
-        md.querySelector('#c-rep').onclick = async () => { closeModal(); try { await chatCall('POST', '/report', { ch: chat.ch, leader: chat.leader || undefined, id }); } catch (e) {} toast('lock', 'Reported', 'Thanks. We’ll keep an eye on it.', ''); };
-        md.querySelector('#c-x').onclick = closeModal;
-        md.querySelector('#c-dm').onclick = () => { closeModal(); whisperTo(from, name); };
-      });
+      whoMenu(w.dataset.from, w.dataset.id, w.dataset.name, chat.ch, chat.leader);
     });
     // New whisper: pick from players you've seen in chat, so nobody has to hunt for a name to tap.
     function newWhisper() {
@@ -4382,33 +4410,7 @@
       }
       if (e.target.closest('#dm-new')) { newWhisper(); return; } const c = e.target.closest('[data-dmpick]'); if (c) { chat.dmTo = { pid: c.dataset.dmpick, name: c.dataset.dmname }; paintChat(); $('chatin').focus(); } });
     setTimeout(bgPoll, 4000);
-    // ---------- chat dock (v117, player ask: "make the chat bar more like Torn's") ----------
-    // On wide screens a bar along the bottom holds a tab per channel and one per recent whisper, each with its own
-    // unread or @ count, so every conversation is one click away. Tapping a tab opens chat right there.
-    const dock = document.createElement('div'); dock.id = 'chatdock'; dock.className = 'chatdock'; dock.hidden = true; document.body.appendChild(dock);
-    const DOCK_CH = ['global', 'banner', 'trade', 'help', 'party'];
-    function paintDock() {
-      const on = CL && signedIn() && S.hero && !chat.open && matchMedia('(min-width:721px)').matches;
-      dock.hidden = !on; document.body.classList.toggle('hasdock', !!on); if (!on) return;
-      const ment = k => (chat.ment && chat.ment[k]) || 0;
-      const badge = (n, m) => m ? '<i class="dk ment">@' + (m > 1 ? m : '') + '</i>' : n ? '<i class="dk">' + (n > 99 ? '99+' : n) + '</i>' : '';
-      const dl = chat.msgs.dm || [], people = dmPartners(dl).filter(p => !(chat.dmHidden[p.pid] && p.last <= chat.dmHidden[p.pid])).slice(0, 6);
-      const h = DOCK_CH.map(k => '<button class="dtab' + (ment(k) ? ' hot' : '') + '" data-dock="' + k + '">' + CH_NAME[k] + badge(WATCH.includes(k) ? unread(k) : 0, ment(k)) + '</button>').join('') +
-        (people.length ? '<span class="dsep"></span>' : '') +
-        people.map(p => { const n = dl.filter(m => m.from === p.pid && m.id > (chat.dmSeen[p.pid] || chat.seen.dm || '')).length;
-          return '<button class="dtab dm' + (n ? ' hot' : '') + '" data-dockdm="' + esc(p.pid) + '" data-dname="' + esc(p.name) + '"><b class="dav">' + esc(p.name.charAt(0).toUpperCase()) + '</b>' + esc(p.name) + badge(n, 0) + '<span class="dx" data-dockx="' + esc(p.pid) + '" title="Close" aria-label="Close chat with ' + esc(p.name) + '">&times;</span></button>'; }).join('') +
-        '<button class="dtab dnew" data-docknew="1" title="New whisper" aria-label="New whisper">+</button>';
-      if (dock.dataset.h !== h) { dock.innerHTML = h; dock.dataset.h = h; }
-    }
-    dock.addEventListener('click', e => {
-      const x = e.target.closest('[data-dockx]');
-      if (x) { e.stopPropagation(); const pid = x.dataset.dockx, l = (chat.msgs.dm || []).filter(m => dmOther(m).pid === pid);
-        chat.dmHidden[pid] = l.length ? l[l.length - 1].id : '0'; try { localStorage.setItem('lh_dm_hidden', JSON.stringify(chat.dmHidden)); } catch (e2) {} if (chat.dmTo && chat.dmTo.pid === pid) chat.dmTo = null; paintDock(); return; }
-      const c = e.target.closest('[data-dock]'); if (c) { openChat(true); setChannel(c.dataset.dock); return; }
-      const d = e.target.closest('[data-dockdm]'); if (d) { whisperTo(d.dataset.dockdm, d.dataset.dname); return; }
-      if (e.target.closest('[data-docknew]')) { openChat(true); setChannel('dm'); newWhisper(); }
-    });
-    addEventListener('resize', () => paintDock()); dockPaint = paintDock;
+    initDock();
     // @ autocomplete: type @ and a few letters, then tap a name (or press Tab / Enter) to fill it in.
     const atBox = document.createElement('div'); atBox.className = 'atbox'; atBox.id = 'atbox'; atBox.hidden = true; $('chatform').appendChild(atBox);
     let atSel = 0, atList = [];
@@ -4454,6 +4456,140 @@
       inp.disabled = false; inp.focus();
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (chat.open) pollChat(); bgPoll(); });
+  }
+  function whoMenu(from, id, name, ch, leader) {
+      modal('<h2>' + esc(name) + '</h2><p>Mute hides everything this player says, on this device. Report flags this message for review; messages with several reports are hidden for everyone.</p><div class="row"><button class="btn" id="c-dm">Whisper</button><button class="btn ghost" id="c-mute">Mute ' + esc(name) + '</button><button class="btn danger" id="c-rep">Report message</button><button class="btn ghost" id="c-x">Cancel</button></div>', md => {
+        md.querySelector('#c-mute').onclick = () => { chat.muted.add(from); try { localStorage.setItem('lanternhold.muted', JSON.stringify([...chat.muted])); } catch (e) {} closeModal(); paintChat(); paintPops(true); toast('lock', 'Muted', 'You won’t see messages from ' + name + '.', ''); };
+        md.querySelector('#c-rep').onclick = async () => { closeModal(); try { await chatCall('POST', '/report', { ch, leader: leader || undefined, id }); } catch (e) {} toast('lock', 'Reported', 'Thanks. We’ll keep an eye on it.', ''); };
+        md.querySelector('#c-x').onclick = closeModal;
+        md.querySelector('#c-dm').onclick = () => { closeModal(); whisperTo(from, name); };
+      });
+  }
+  // ---------- chat dock and chat windows (v117, John: "do it like Torn's setup so chats have a little popout window") ----------
+  // Desktop: a bar pinned bottom-right with an icon button per channel and a tab per whisper (avatar, name, close),
+  // each with its unread or @ count. Clicking one pops that conversation into its own small window above the bar;
+  // several can be open at once, each minimizes to its title. The page keeps room for the bar so it never covers the game.
+  function dockMode() { return !!(CL && signedIn() && S.hero && matchMedia('(min-width:721px)').matches); }
+  var lastPop, popsWrap, dockEl, popTimer; // no initializers: initDock() runs before this line
+  function popId(p) { return p.ch === 'dm' ? 'dm:' + p.pid : p.ch; }
+  const popId_ = p => p.ch === 'dm' ? 'dm:' + p.pid : p.ch;
+  function popEl(p) { return popsWrap.querySelector('[data-pop="' + CSS.escape(popId(p)) + '"]'); }
+  const popEl_ = p => popsWrap.querySelector('[data-pop="' + CSS.escape(popId(p)) + '"]');
+  function popSave() { try { localStorage.setItem('lh_pops', JSON.stringify(POPS.map(p => ({ ch: p.ch, pid: p.pid, name: p.name, min: p.min })))); } catch (e) {} }
+  function popList(p) { const l = (chat.msgs[popRoom(p)] || []).filter(m => !chat.muted.has(m.from)); return p.ch === 'dm' ? l.filter(m => dmOther(m).pid === p.pid) : l; }
+  function openPop(ch, pid, name) {
+    let p = POPS.find(q => q.ch === ch && (ch !== 'dm' || q.pid === pid));
+    if (p) p.min = false; else { p = { ch, pid, name, min: false }; POPS.push(p); }
+    if (pid && chat.dmHidden[pid]) { delete chat.dmHidden[pid]; try { localStorage.setItem('lh_dm_hidden', JSON.stringify(chat.dmHidden)); } catch (e) {} }
+    // At most three windows stay open; the oldest open one tucks down to its title.
+    const open = POPS.filter(q => !q.min); if (open.length > 3) open[0].min = true;
+    lastPop = p; popSave(); paintPops(true); pollPops();
+    const el = popEl(p); if (el) setTimeout(() => { const i = el.querySelector('input'); if (i) i.focus(); }, 30);
+    return p;
+  }
+  function closePop(p) { const i = POPS.indexOf(p); if (i >= 0) POPS.splice(i, 1); if (lastPop === p) lastPop = null; popSave(); paintPops(true); }
+  function popBody(p) {
+    const l = popList(p);
+    if (p.ch === 'dm') { let prev = null; return l.length ? l.map(m => { const mine = m.from === chat.me, first = !prev || prev.from !== m.from; prev = m; return '<div class="bub' + (mine ? ' mine' : '') + (first ? ' first' : '') + '"><span>' + renderText(m.text) + '</span></div>'; }).join('') : '<div class="chatempty"><p>Start your conversation with ' + esc(p.name) + '. Only the two of you can see it.</p></div>'; }
+    return l.length ? l.map(msgLine).join('') : '<div class="chatempty"><p>' + (p.ch === 'help' ? 'Stuck on something? Ask here.' : p.ch === 'trade' ? 'Post what you have or what you need.' : p.ch === 'party' ? 'Talk to your party.' : 'Quiet down here. Say hello.') + '</p></div>';
+  }
+  function paintPops(force) {
+    if (!popsWrap) return;
+    const on = dockMode(); popsWrap.hidden = !on || !POPS.length; if (!on) return;
+    const ids = POPS.map(popId).join('|');
+    if (force || popsWrap.dataset.ids !== ids) {
+      // Keep half-typed text when the set of windows changes.
+      const keep = {}; popsWrap.querySelectorAll('[data-pop]').forEach(el => { keep[el.dataset.pop] = el.querySelector('input').value; });
+      popsWrap.innerHTML = POPS.map(p => { const t = p.ch === 'dm' ? esc(p.name) : CH_NAME[p.ch];
+        return '<section class="cpop' + (p.ch === 'dm' ? ' dm' : '') + '" data-pop="' + esc(popId(p)) + '"><header data-pmin="1" title="Minimize or open">' + (p.ch === 'dm' ? '<b class="dav">' + esc(p.name.charAt(0).toUpperCase()) + '</b>' : icon((DOCK_CH.find(d => d[0] === p.ch) || [0, 'chat'])[1])) + '<b class="ptit">' + t + '</b><i class="pk"></i><button class="pbtn" data-pmin="1" aria-label="Minimize">&#8211;</button><button class="pbtn" data-px="1" aria-label="Close">&times;</button></header>' +
+          '<div class="cplog"></div><form class="cpform"><input maxlength="200" autocomplete="off" placeholder="' + (p.ch === 'dm' ? 'Whisper to ' + esc(p.name) : p.ch === 'help' ? 'Ask a question...' : 'Say something') + '"><button class="btn small">Send</button></form><p class="cpnote" hidden></p></section>'; }).join('');
+      popsWrap.dataset.ids = ids;
+      popsWrap.querySelectorAll('[data-pop]').forEach(el => { if (keep[el.dataset.pop]) el.querySelector('input').value = keep[el.dataset.pop]; });
+    }
+    for (const p of POPS) {
+      const el = popEl(p); if (!el) continue; el.classList.toggle('min', !!p.min);
+      const k = popRoom(p), l = popList(p);
+      const n = p.ch === 'dm' ? l.filter(m => m.from === p.pid && m.id > (chat.dmSeen[p.pid] || chat.seen.dm || '')).length : (WATCH.includes(k) ? unread(k) : 0), mm = (chat.ment && chat.ment[k]) || 0;
+      el.querySelector('.pk').outerHTML = '<i class="pk">' + (p.min && (n || mm) ? (mm ? '@' : n > 99 ? '99+' : n) : '') + '</i>';
+      if (p.min) continue;
+      const log = el.querySelector('.cplog'), h = popBody(p);
+      if (log.dataset.h !== h) { const atB = log.scrollHeight - log.scrollTop - log.clientHeight < 40; log.innerHTML = h; log.dataset.h = h; if (atB || !log.dataset.s) { log.scrollTop = log.scrollHeight; log.dataset.s = 1; } }
+      if (!document.hidden) { if (p.ch === 'dm') { if (l.length) chat.dmSeen[p.pid] = l[l.length - 1].id; } else markSeen(k); }
+    }
+  }
+  async function pollPops() {
+    clearTimeout(popTimer);
+    if (!dockMode() || !POPS.some(p => !p.min)) return;
+    if (!document.hidden) {
+      const rooms = [...new Set(POPS.filter(p => !p.min).map(popRoom))];
+      for (const k of rooms) {
+        try { const first = !chat.polled[k], add = mergeMsgs(k, await chatCall('GET', '/chat?ch=' + k.split(':')[0] + '&since=' + encodeURIComponent(chat.since[k] || '0'))); chat.polled[k] = 1; if (!first && k !== 'dm') pingMentions(k, add); fetchLooks((chat.msgs[k] || []).map(m => m.from)).then(n => { if (n) paintPops(); }); }
+        catch (e) { if (e.status === 403) POPS.filter(p => popRoom(p) === k).forEach(p => { const el = popEl(p), nt = el && el.querySelector('.cpnote'); if (nt) { nt.hidden = false; nt.textContent = k === 'help' ? 'Help chat opens very soon. Ask in Global for now.' : 'You can’t read this room right now.'; } }); }
+      }
+      paintPops(); paintUnread();
+    }
+    popTimer = setTimeout(pollPops, CHAT_POLL_OPEN);
+  }
+  function paintDock() {
+    if (!dockEl) return;
+    const on = dockMode();
+    if (on && chat.open) openChat(false);
+    dockEl.hidden = !on; document.body.classList.toggle('hasdock', on); if (!on) { if (popsWrap) popsWrap.hidden = true; return; }
+    const ment = k => (chat.ment && chat.ment[k]) || 0, isOpen = id => POPS.some(p => popId(p) === id && !p.min);
+    const badge = (n, m) => m ? '<i class="dk ment">@' + (m > 1 ? m : '') + '</i>' : n ? '<i class="dk">' + (n > 99 ? '99+' : n) + '</i>' : '';
+    const dl = chat.msgs.dm || [], people = dmPartners(dl).filter(p => !(chat.dmHidden[p.pid] && p.last <= chat.dmHidden[p.pid]));
+    for (const p of POPS) if (p.ch === 'dm' && !people.some(q => q.pid === p.pid)) people.unshift({ pid: p.pid, name: p.name, last: '' });
+    const h = people.slice(0, 5).map(p => { const n = dl.filter(m => m.from === p.pid && m.id > (chat.dmSeen[p.pid] || chat.seen.dm || '')).length;
+        return '<button class="dtab dm' + (n ? ' hot' : '') + (isOpen('dm:' + p.pid) ? ' on' : '') + '" data-dockdm="' + esc(p.pid) + '" data-dname="' + esc(p.name) + '"><b class="dav">' + esc(p.name.charAt(0).toUpperCase()) + '</b><span class="dn">' + esc(p.name) + '</span>' + badge(n, 0) + '<span class="dx" data-dockx="' + esc(p.pid) + '" title="Close" aria-label="Close chat with ' + esc(p.name) + '">&times;</span></button>'; }).join('') +
+      '<button class="dico dnew" data-docknew="1" title="New whisper" aria-label="New whisper">' + icon('user') + '<b>+</b></button>' +
+      DOCK_CH.map(([k, ic]) => '<button class="dico' + (ment(k) ? ' hot' : '') + (isOpen(k) ? ' on' : '') + '" data-dock="' + k + '" title="' + CH_NAME[k] + ': ' + POP_TIP[k] + '" aria-label="' + CH_NAME[k] + '">' + icon(ic) + badge(WATCH.includes(k) ? unread(k) : 0, ment(k)) + '</button>').join('');
+    if (dockEl.dataset.h !== h) { dockEl.innerHTML = h; dockEl.dataset.h = h; }
+    paintPops();
+  }
+  function initDock() {
+    dockEl = document.createElement('div'); dockEl.id = 'chatdock'; dockEl.className = 'chatdock'; dockEl.hidden = true; document.body.appendChild(dockEl);
+    popsWrap = document.createElement('div'); popsWrap.id = 'chatpops'; popsWrap.className = 'chatpops'; popsWrap.hidden = true; document.body.appendChild(popsWrap);
+    try { (JSON.parse(localStorage.getItem('lh_pops') || '[]') || []).slice(0, 6).forEach(p => { if (p && (p.ch === 'dm' ? p.pid : CH_NAME[p.ch])) POPS.push({ ch: p.ch, pid: p.pid, name: String(p.name || '').slice(0, 24), min: !!p.min }); }); } catch (e) {}
+    const toggle = id => { const p = POPS.find(q => popId(q) === id); if (p && !p.min) { p.min = true; popSave(); paintDock(); paintPops(); return true; } return false; };
+    dockEl.addEventListener('click', e => {
+      const x = e.target.closest('[data-dockx]');
+      if (x) { e.stopPropagation(); const pid = x.dataset.dockx, l = (chat.msgs.dm || []).filter(m => dmOther(m).pid === pid);
+        chat.dmHidden[pid] = l.length ? l[l.length - 1].id : '0'; try { localStorage.setItem('lh_dm_hidden', JSON.stringify(chat.dmHidden)); } catch (e2) {}
+        const p = POPS.find(q => q.ch === 'dm' && q.pid === pid); if (p) closePop(p); paintDock(); return; }
+      const c = e.target.closest('[data-dock]'); if (c) { if (!toggle(c.dataset.dock)) openPop(c.dataset.dock); paintDock(); return; }
+      const d = e.target.closest('[data-dockdm]'); if (d) { if (!toggle('dm:' + d.dataset.dockdm)) openPop('dm', d.dataset.dockdm, d.dataset.dname); paintDock(); return; }
+      if (e.target.closest('[data-docknew]')) newWhisperPick();
+    });
+    popsWrap.addEventListener('click', e => {
+      const el = e.target.closest('[data-pop]'); if (!el) return; const p = POPS.find(q => popId(q) === el.dataset.pop); if (!p) return; lastPop = p;
+      if (e.target.closest('[data-px]')) { closePop(p); paintDock(); return; }
+      if (e.target.closest('[data-pmin]')) { p.min = !p.min; popSave(); paintPops(); paintDock(); if (!p.min) pollPops(); return; }
+      const lk = e.target.closest('[data-link]'); if (lk) { previewItem(lk.dataset.link); return; }
+      const w = e.target.closest('[data-from]'); if (w && w.dataset.from !== chat.me) whoMenu(w.dataset.from, w.dataset.id, w.dataset.name, p.ch, null);
+    });
+    popsWrap.addEventListener('focusin', e => { const el = e.target.closest('[data-pop]'); if (el) lastPop = POPS.find(q => popId(q) === el.dataset.pop) || lastPop; });
+    popsWrap.addEventListener('submit', async e => {
+      e.preventDefault(); const el = e.target.closest('[data-pop]'), p = el && POPS.find(q => popId(q) === el.dataset.pop); if (!p || !S.hero) return;
+      const inp = el.querySelector('input'), nt = el.querySelector('.cpnote'); let text = inp.value.trim(); if (!text) return;
+      for (const l of chat.links) text = text.replace(l.label, l.token); text = text.replace(/\[\[(?!i:)/g, '[');
+      inp.disabled = true;
+      try { await chatCall('POST', '/chat', { ch: p.ch, to: p.ch === 'dm' ? p.pid : undefined, text, name: S.hero.name, cls: S.hero.cls }); inp.value = ''; chat.links = []; nt.hidden = true; pollPops(); }
+      catch (err) { nt.hidden = false; nt.textContent = { slow: 'Easy there. One message every few seconds.', links: 'Links aren’t allowed in chat.', name: 'Your hero’s name can’t be used in chat.', room: 'You can’t post in that party.', to: 'That player can’t get whispers right now.' }[err.code] || 'Message not sent. Try again in a moment.'; }
+      inp.disabled = false; inp.focus();
+    });
+    addEventListener('resize', () => paintDock()); dockPaint = paintDock;
+    paintDock(); setTimeout(() => { paintDock(); pollPops(); }, 1200);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) pollPops(); });
+  }
+  // New whisper from the dock: pick someone who has chatted lately.
+  function newWhisperPick() {
+    const seen = new Map();
+    for (const k of Object.keys(chat.msgs)) for (const m of chat.msgs[k]) if (m.from && m.from !== 'sys' && m.from !== chat.me && !chat.muted.has(m.from) && k !== 'dm') seen.set(m.from, { pid: m.from, name: m.name, id: m.id });
+    const people = [...seen.values()].sort((a, b) => a.id < b.id ? 1 : -1).slice(0, 24);
+    modal('<h2>New whisper</h2>' + (people.length ? '<p>Players who have been chatting lately.</p><div class="dmpicklist">' + people.map(p => '<button class="btn ghost small" data-pick="' + esc(p.pid) + '" data-pname="' + esc(p.name) + '">' + esc(p.name) + '</button>').join('') + '</div>' : '<p>Nobody has chatted lately. Open Global from the bar and players show up here once they post.</p>') + '<div class="row"><button class="btn ghost" id="dp-x">Close</button></div>', md => {
+      md.querySelector('#dp-x').onclick = closeModal;
+      md.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { closeModal(); whisperTo(b.dataset.pick, b.dataset.pname); });
+    });
   }
   // ---------- map of the Lantern Deep ----------
   // A one-screen world map of the fifteen regions, and a close-up of each region with its ten floors and a dossier.
@@ -5293,7 +5429,9 @@
       'One inventory: every spare piece in one list. Filter by weapons, off-hands, armour or jewellery, by rarity and by who can use it, and sort by best, level, rarity, type or newest. Each item shows which classes can use it.',
       'The banner lantern: the more Grand War territories your banner holds right now, the stronger you are here. +1% damage, health, healing and gold per territory, up to +15%. Hover the lantern at the top right to see it.',
       '@ mentions are loud now: a toast, a chime, a flashing @you line, a glowing chat button and a count on the browser tab.',
-      'A chat bar along the bottom on wider screens, with a tab for each channel and each whisper, each with its own unread count.',
+      'Chat bar on wider screens, bottom right: an icon for each channel and a tab for each whisper, each with its unread or @ count. Click one and that chat pops out in its own small window. Keep several open at once; click a title to tuck it away. The game leaves room for the bar, so it never covers your skills.',
+      'The Armorer and the Enchanter use the same filters as your pack on every tab: weapons, off-hands, armour or jewellery, rarity, who can use it, and sort. Scrap and mass merge only touch what the filters show.',
+      'Big and ultrawide screens: the game grows with your screen and the fight scene keeps a sensible shape, so your party is bigger and no longer stands under a giant empty wall.',
       'Mercy Corps wounded companions have their own art: a bandaged medic on a bedroll.'] },
     { v: 116, date: 'November 24, 2026', title: 'Specialist shops and a Help channel', items: [
       'The Armorer’s forge: every merge at the Armorer carries 25% less risk than merging in the field. The Armorer now has a Mass merge tab too.',

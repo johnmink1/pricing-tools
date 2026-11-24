@@ -119,7 +119,9 @@ There is no working AWS CLI. The cloud container's keys are invalid, and VENGEAN
     - Inventory: one grid with `INV` filters (kind, rarity, who) and sorts, saved in localStorage `lh_inv`. Class dots on tiles; `typeBlock`/`typeFx` on item cards.
     - Banner lantern: the war site `/api/nexus.json` now has `live.held` per alliance (bot #218/#219). `S.warLive` and core `terrBonus` give +1% per territory, capped at 15%, folded into `sidePerk`. The `#bannerlamp` tooltip shows it.
     - @mentions: always toast and chime, flash the line with an `@you` tag, glow the chat button, show a "(n) @" tab title while hidden, and poll every 55 s while hidden.
-    - Chat dock `#chatdock` (≥721 px): channel tabs plus up to 6 whisper tabs with counts and close buttons. It replaces the chat button on wide screens.
+    - Chat dock `#chatdock` + chat windows `#chatpops` (≥721 px, signed in; John: "like Torn's"): bottom-right bar with an icon per channel (`DOCK_CH`) and up to 5 whisper tabs; each opens its own window (`POPS`, `openPop`, saved in `lh_pops`), max 3 open, the rest minimized to their title. Windows poll their own rooms (`pollPops`) and count as viewing for unread/@ (`popViewing`). The big chat panel is phone-only now. `body.hasdock` shortens `#app` by `--dockh` so the bar never covers the skills. `initDock()` runs before the module's `var` lines, so those vars must stay without initializers.
+    - Armorer/Enchanter filters: `SF` state (`lh_shopf`), `sfBar`/`sfApply`/`sfList` on every counter list; `shopScrap()`/`shopMass()` make scrap, smelt and shop mass merge act only on what the filters show.
+    - Big screens: at ≥1700×1100 `#app` grows to min(100%, 190vh, 2600px) and the battle arena is capped at 66cqw tall (3:2), tested at 3440×1440 and 2560×1440.
     - Wounded art: vector `ART.wounded`, drawn by `drawWounded`.
     - Server bits waiting on CloudShell: `infra/chat` (help room) and the `market`/`mail` item whitelist (`ty`, plus enchants i–l, which were being stripped before). Until they're deployed, Help says it opens soon and a traded item falls back to its class's default type.
 

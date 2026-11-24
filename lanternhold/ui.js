@@ -1,4 +1,4 @@
-/* lh-build 202611241521 */
+/* lh-build 202611241528 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -1087,6 +1087,9 @@
       } else if (e.type === 'pack') {
         floatText('Ambush!', 'crit', 0.5, 0.3);
         if (!(S.stats.packs > 0)) toast('sword', 'Ambush!', e.n + ' monsters have teamed up to jump your party. They hit harder and strike the back first, but they pay ' + (e.n * L.PACK_GOLD) + ' times the gold, ' + (e.n * L.PACK_XP) + ' times the hero XP and often drop gear.', 'feat');
+      } else if (e.type === 'beast') {
+        const lo = L.LORE.find(x => x.id === e.key), nm2 = lo ? lo.title : 'this foe';
+        toast('skull', 'Bestiary mastery: ' + nm2 + ' ' + e.tier + '/' + L.BEAST_MAX, '+' + e.tier + '% damage and hero XP against ' + nm2 + '. ' + (e.tier < L.BEAST_MAX ? 'Next step at ' + fmt((e.tier + 1) * L.BEAST_STEP) + ' kills.' : 'Fully mastered.'), 'feat');
       } else if (e.type === 'herolevel') {
         sfx.relic(); floatText('Hero level ' + e.lv + '!', 'crit', 0.5, 0.25);
         toast('star', L.memberById('you').name + ' reached hero level ' + e.lv, (e.pts === 1 ? 'A new stat point' : e.pts + ' new stat points') + ' to spend on the character sheet in the Skills tab.', 'feat');
@@ -2362,6 +2365,14 @@
   }
 
   // ---------- journal: story and lore ----------
+  // Bestiary mastery: kills of each kind, the bonus they give and the next step (John, 24 Nov 2026).
+  const beastTag = id => { const t = L.beastTier(S, id); return t ? '<span class="bmt">+' + t + '%</span>' : ''; };
+  function beastBar(id) {
+    const n = (S.bk && S.bk[id]) || 0, t = L.beastTier(S, id), max = t >= L.BEAST_MAX, nx = (t + 1) * L.BEAST_STEP;
+    const pc = max ? 100 : Math.floor((n - t * L.BEAST_STEP) / L.BEAST_STEP * 100);
+    return '<div class="bmast"><div class="bmrow"><b>Mastery ' + t + '/' + L.BEAST_MAX + '</b><span>' + fmt(n) + ' defeated' + (max ? ' · fully mastered' : ' · next +1% at ' + fmt(nx)) + '</span></div>' +
+      '<div class="bmbar"><i style="width:' + pc + '%"></i></div><small>' + (t ? '+' + t + '% damage and hero XP against them.' : 'Every ' + fmt(L.BEAST_STEP) + ' defeated adds +1% damage and hero XP against them, up to +' + L.BEAST_MAX + '%.') + '</small></div>';
+  }
   function updateJournal() {
     const seen = L.STORY.filter(b => S.story.seen[b.id]);
     let h = '<h3 class="sub">The story so far</h3><div class="scenes">' +
@@ -2371,7 +2382,7 @@
     for (const lo of L.LORE) (groups[lo.group] = groups[lo.group] || []).push(lo);
     for (const g in groups) {
       h += '<h3 class="sub">' + g + '</h3><div class="lore">' + groups[g].map(lo => S.lore[lo.id]
-        ? '<details><summary>' + esc(lo.title) + '</summary><p>' + esc(lo.text) + '</p></details>'
+        ? '<details><summary>' + esc(lo.title) + (g === 'Bestiary' ? beastTag(lo.id) : '') + '</summary><p>' + esc(lo.text) + '</p>' + (g === 'Bestiary' ? beastBar(lo.id) : '') + '</details>'
         : '<div class="lorelock">' + icon('lock') + ' Not yet discovered</div>').join('') + '</div>';
     }
     $('journal').innerHTML = h;
@@ -2964,7 +2975,7 @@
         '<p class="setnote">Pick tracks, set the volume or mute from the <button class="linkbtn" id="s-musicpanel">music player</button> (the note button at the top).</p>' : '') +
       '<p style="margin-top:16px">Your progress saves automatically in this browser. Copy a backup to move it to another device.</p>' +
       '<div class="row"><button class="btn ghost" id="s-export">Copy backup</button><button class="btn ghost" id="s-import">Load backup</button><button class="btn danger" id="s-reset">Erase progress</button></div>' +
-      '<div class="row"><button class="btn ghost" id="s-intro">Watch the intro</button></div>' +
+      '<div class="row"><button class="btn ghost" id="s-intro">Watch the intro</button>' + (fsOk() ? '<button class="btn ghost" id="s-full">' + (fsEl() ? 'Leave full screen' : 'Play full screen') + '</button>' : '') + '</div>' +
       '<div id="s-extra"></div>' +
       (window.LH_SUPPORT_URL ? '<p style="margin-top:16px">Lanternhold is free with no ads. If you enjoy it, you can <a style="color:var(--gold)" target="_blank" rel="noopener" href="' + window.LH_SUPPORT_URL + '">buy the developer a coffee</a>. Thank you.</p>' : '') +
       '<p class="credits">Lanternhold &middot; A Grand War game by Born 2 Game, LLC. &copy; 2026 Born 2 Game, LLC. Made with care, no ads, no tracking.</p>' +
@@ -2975,6 +2986,7 @@
           m.querySelector('#s-musicpanel').onclick = () => { closeModal(); LHMusic.open(); };
         }
         m.querySelector('#s-close').onclick = () => { save(); closeModal(); };
+        m.querySelector('#s-full') && (m.querySelector('#s-full').onclick = () => { save(); closeModal(); toggleFull(); });
         m.querySelector('#s-intro').onclick = () => { save(); closeModal(); if (window.LHIntro) LHIntro.play(); };
         m.querySelector('#s-export').onclick = () => {
           save(); const code = btoa(unescape(encodeURIComponent(localStorage.getItem(SAVE_KEY) || '')));
@@ -5057,11 +5069,34 @@
     while (n < 4 && top.scrollWidth > top.clientWidth + 1) top.classList.add('fit' + (++n));
   }
   addEventListener('resize', fitTop); setInterval(fitTop, 1500); setTimeout(fitTop, 50);
+  // ---------- Full screen (John, 24 Nov 2026): the whole game fills the screen, no browser bars. Esc leaves. ----------
+  const FS_IN = 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5', FS_OUT = 'M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5';
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const fsOk = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  function toggleFull() {
+    const d = document.documentElement;
+    try {
+      if (fsEl()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else { const r = (d.requestFullscreen || d.webkitRequestFullscreen).call(d, { navigationUI: 'hide' }); r && r.catch && r.catch(() => toast('lock', 'Full screen is not available', 'Your browser blocked it. Try F11 on a computer.', 'warn')); }
+    } catch (e) { toast('lock', 'Full screen is not available', 'Your browser blocked it. Try F11 on a computer.', 'warn'); }
+  }
+  function paintFull() {
+    const b = $('btn-full'); if (!b) return; b.hidden = !fsOk();
+    const on = !!fsEl(); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Leave full screen' : 'Full screen');
+    b.dataset.tip = on ? 'Leave full screen (or press Esc)' : 'Full screen: hide the browser and fill your screen (Esc to leave)';
+    $('fullpath').setAttribute('d', on ? FS_OUT : FS_IN); document.body.classList.toggle('isfull', on); fitTop();
+  }
+  $('btn-full') && $('btn-full').addEventListener('click', toggleFull);
+  document.addEventListener('fullscreenchange', paintFull); document.addEventListener('webkitfullscreenchange', paintFull); paintFull();
   $('btn-notes').addEventListener('click', openBell); paintNoteDot();
 
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 109, date: 'November 24, 2026', title: 'Bestiary mastery and full screen', items: [
+      'Bestiary mastery: every 500 of one kind of creature you defeat gives +1% damage and +1% hero XP against that kind, up to +10% at 5,000. Open a creature’s page in the Codex Journal to see your count, a progress bar and the next step. Counting starts today.',
+      'The XP bar breakdown shows your Bestiary bonus against the foe you are fighting.',
+      'New full screen button at the top right (also in Settings). The game fills your whole screen with no browser bars, and spreads out wider so you can see more. Press Esc or the button again to leave.'] },
     { v: 108, date: 'November 24, 2026', title: 'Victor’s Banner', items: [
       'The alliance that wins a Grand War season now holds the Nexus in Lanternhold too. Every hero under its banner gets +8% damage, health, healing and gold, and fallen allies get back up in 10 seconds instead of 15.',
       'It lasts until the next season is crowned. Look for the crown line under your marching order once Season 1 ends.'] },

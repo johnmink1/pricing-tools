@@ -1,4 +1,4 @@
-/* lh-build 202611232327 */
+/* lh-build 202611240148 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -328,7 +328,7 @@
       foe: null, lantern: 0, foeSwing: 0,
       stats: { kills: 0, bossKills: 0, clicks: 0, chests: 0, goldEarned: 0, rekindles: 0, playTime: 0, crits: 0, wipes: 0, revives: 0 },
       settings: { sound: true, buy: 1, notation: 'short' },
-      lastSeen: Date.now(), created: Date.now(), pace: 2, grand: {}, mast: {}, mastE: {}, gone: {}, pendingJoin: null, rosterUps: 0,
+      lastSeen: Date.now(), created: Date.now(), pace: 3, grand: {}, mast: {}, mastE: {}, gone: {}, pendingJoin: null, rosterUps: 0,
     };
   }
 
@@ -563,8 +563,9 @@
     { id: 'jset',     lv: 25, name: 'Job sets',          icon: 'hammer', desc: 'Guardians and chests start dropping job set pieces.' },
   ];
   const JOB_SLOT_LV = [10, 15, 20, 25, 30, 35];
-  // The hero level needed to go past each region's guardian into the next one (floors 1-10, 11-20, ...).
-  const REGION_LV = [1, 3, 6, 9, 12, 15, 18, 20, 22, 25, 28, 31, 34, 37, 40];
+  // Region trials (John, 2026-11-24, replacing hero-level region gates): to go past a region's guardian into the
+  // next region, beat that guardian and defeat TRIAL_ELITES alliance elites in the region. Act One has 15 regions.
+  const REGIONS = 15, TRIAL_ELITES = 10;
   const ROSTER_BASE = 4, ROSTER_LV = [10, 20, 30], ROSTER_BUY_MAX = 3, ROSTER_COST = 300;
   const ROSTER_ITEMS = ['r.a', 'r.b', 'r.c'];  // one-time Sigil purchases on the wardrobe route
   const heroLv = s => s.hero ? heroLevel(s).lv : 1;
@@ -573,9 +574,11 @@
   const nextUnlock = s => UNLOCKS.find(u => !canUse(s, u.id)) || null;
   function newUnlocks(s, before, after) { return UNLOCKS.filter(u => u.lv > before && u.lv <= after && !(s.grand && s.grand[u.id])); }
   function jobSlots(s) { const lv = heroLv(s); return Math.max((s.grand && s.grand.jslots) || 0, JOB_SLOT_LV.filter(x => lv >= x).length); }
-  const regionNo = f => Math.min(REGION_LV.length - 1, Math.floor((Math.max(1, f) - 1) / 10));
-  // 0 when floor f is open; otherwise the hero level it needs. Floors you have already reached stay open.
-  function regionNeed(s, f) { if (f <= (s.maxFloorEver || 1)) return 0; const need = REGION_LV[regionNo(f)] || 0; return heroLv(s) >= need ? 0 : need; }
+  const regionNo = f => Math.min(REGIONS - 1, Math.floor((Math.max(1, f) - 1) / 10));
+  function trialOf(s, r) { const g = !!(((s.mast || {})[r] || 0) & 1), e = Math.min(TRIAL_ELITES, (s.mastE || {})[r] || 0); return { guardian: g, elites: e, done: g && e >= TRIAL_ELITES }; }
+  // 0 when floor f is open; otherwise the number (1-based) of the region whose trial still has to be finished.
+  // Floors you have already reached stay open.
+  function regionNeed(s, f) { if (f <= (s.maxFloorEver || 1)) return 0; const r = regionNo(f); if (r < 1 || f > REGIONS * 10) return 0; return trialOf(s, r - 1).done ? 0 : r; }
   const companions = s => s.unlocked.filter(id => id !== 'you');
   function rosterCap(s) { const lv = heroLv(s); return ROSTER_BASE + ROSTER_LV.filter(x => lv >= x).length + Math.min(ROSTER_BUY_MAX, s.rosterUps || 0); }
   // Story recruits wait here when the campfire is full: keep them by dismissing someone for good, or turn them away.
@@ -625,9 +628,17 @@
     if ((s.stats && s.stats.rekindles) || s.embers > 0) g.rekindle = 1;
     if (s.bag.some(it => it.jset)) g.jset = 1;
     s.mast = s.mast || {};
-    for (let r = 0; r < REGION_LV.length; r++) if (s.maxFloorEver > r * 10 + 10) s.mast[r] = (s.mast[r] || 0) | 1;
-    for (const it of s.bag) if (it.rset != null && it.rset < REGION_LV.length) s.mast[it.rset] = (s.mast[it.rset] || 0) | 4;
+    for (let r = 0; r < REGIONS; r++) if (s.maxFloorEver > r * 10 + 10) s.mast[r] = (s.mast[r] || 0) | 1;
+    for (const it of s.bag) if (it.rset != null && it.rset < REGIONS) s.mast[it.rset] = (s.mast[it.rset] || 0) | 4;
     s.pace = 2;
+  }
+  // Pacing v3 (region trials): anyone held at a level gate gets through. The trial counts as done for every region
+  // up to the one they are in, so beating its guardian (again, if need be) opens the next region.
+  function trialMigrate(s) {
+    if (s.pace >= 3) return;
+    s.mastE = s.mastE || {};
+    for (let r = 0; r <= regionNo(s.maxFloorEver || 1); r++) s.mastE[r] = Math.max(TRIAL_ELITES, s.mastE[r] || 0);
+    s.pace = 3;
   }
   function statVal(s, key) {
     const c = heroCls(s), pri = STAT_CLASS[c] || [];
@@ -981,7 +992,7 @@
     let it = null;
     const rk = foe.boss ? 'boss' : foe.chest ? 'chest' : foe.elite ? 'elite' : foe.pack ? 'pack' : 'foe';
     if (!foe.goblin && r() < RSET_DROP[rk] * loot) it = rollRegionSet(s, f, r);
-    if (it) { s.lore['rset_' + it.rset] = Date.now(); if (it.rset < REGION_LV.length) masteryMark(s, it.rset, 4, events); }
+    if (it) { s.lore['rset_' + it.rset] = Date.now(); if (it.rset < REGIONS) masteryMark(s, it.rset, 4, events); }
     else if (f >= 20 && canUse(s, 'jset') && (foe.boss ? r() < 0.03 * loot : foe.chest ? r() < 0.008 * loot : false)) it = rollJobSet(s, f, r);
     else if (foe.boss) {
       if (f >= 15 && r() < 0.06 * loot) it = rollGear(s, f, { set: true }, r);
@@ -1771,7 +1782,7 @@
     const foe = s.foe, f = s.floor;
     let g = foeGold(f, foe.boss) * goldMult(s);
     if (foe.chest) { g *= 10 * (1 + relicVal(s, 'tooth')); s.stats.chests++; }
-    if (foe.elite) { g *= 3; unlockLore(s, 'war_' + foe.side, events); const rn = regionNo(f); s.mastE = s.mastE || {}; s.mastE[rn] = (s.mastE[rn] || 0) + 1; if (s.mastE[rn] >= MASTERY_ELITES) masteryMark(s, rn, 2, events); }
+    if (foe.elite) { g *= 3; unlockLore(s, 'war_' + foe.side, events); const rn = regionNo(f); s.mastE = s.mastE || {}; s.mastE[rn] = (s.mastE[rn] || 0) + 1; if (s.mastE[rn] >= MASTERY_ELITES) masteryMark(s, rn, 2, events); if (rn < REGIONS - 1 && (rn + 1) * 10 + 1 > s.maxFloorEver && s.mastE[rn] <= TRIAL_ELITES) events && events.push({ type: 'trial', region: rn, elites: s.mastE[rn], guardian: trialOf(s, rn).guardian }); }
     if (foe.pack) { g *= foe.pack * PACK_GOLD * (1 + sk(s, 'spoils')); s.stats.packs = (s.stats.packs || 0) + 1; s.stats.kills += foe.pack - 1; }
     if (foe.goblin) {
       g *= GOBLIN_GOLD; s.stats.goblins = (s.stats.goblins || 0) + 1;
@@ -2165,13 +2176,13 @@
     for (const id in s.gear) for (const k in OLD) if (s.gear[id][k]) { s.gear[id][OLD[k]] = s.gear[id][k]; delete s.gear[id][k]; } s.lore = Object.assign({ hold: 1 }, o.lore || {});
     registerHero(s);
     s.pace = o.pace || 0; s.grand = o.grand || {}; s.mast = o.mast || {}; s.mastE = o.mastE || {}; s.gone = o.gone || {}; s.rosterUps = o.rosterUps || 0;
-    paceMigrate(s);
+    paceMigrate(s); trialMigrate(s);
     for (const id of s.party) if (id && (s.hp[id] == null || s.hp[id] <= 0)) s.hp[id] = maxHpOf(s, id);
     return s;
   }
 
   const api = {
-    UNLOCKS, JOB_SLOT_LV, REGION_LV, ROSTER_BASE, ROSTER_LV, ROSTER_BUY_MAX, ROSTER_COST, ROSTER_ITEMS, MASTERY, MASTERY_ELITES, MASTERY_PER, heroLv, unlockOf, canUse, nextUnlock, newUnlocks, jobSlots, regionNo, regionNeed, companions, rosterCap, dismissCompanion, acceptRecruit, declineRecruit, masteryStars, masteryVal, paceMigrate,
+    UNLOCKS, JOB_SLOT_LV, REGIONS, TRIAL_ELITES, trialOf, ROSTER_BASE, ROSTER_LV, ROSTER_BUY_MAX, ROSTER_COST, ROSTER_ITEMS, MASTERY, MASTERY_ELITES, MASTERY_PER, heroLv, unlockOf, canUse, nextUnlock, newUnlocks, jobSlots, regionNo, regionNeed, companions, rosterCap, dismissCompanion, acceptRecruit, declineRecruit, masteryStars, masteryVal, paceMigrate,
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, atMainCamp, regionTop, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, TRAIT_FX, CAMP_TRAITS, traitsOf, traitState, traitVal, traitText, campTrait, tonicById, tonicLeft, tonicVal, drinkTonic,
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,

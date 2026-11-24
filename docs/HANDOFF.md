@@ -1,0 +1,110 @@
+# Lanternhold handoff (24 Nov 2026)
+
+This handoff stands on its own for the new Lanternhold project. It is current as of **v102, build 202611241413**, live at https://lanternhold.born2gamellc.com.
+
+## Where the code lives
+
+**`johnmink1/pricing-tools`** is the source of truth. Edit only here.
+
+| Path | What it is |
+|---|---|
+| `lanternhold/core.js` | All game rules: classes, foes, loot, crafting, events, the `api` export list. Any new function must be added to that big export list at the bottom. |
+| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v103**. |
+| `lanternhold/style.css`, `index.html` | Styles and markup. |
+| `lanternhold/vector.js` | Illustrated SVG sprites (`ART.enchanter`, `ART.armorer`, classes, foes). |
+| `lanternhold/sprites.js` | Pixel fallback sprites and `itemIcon`. |
+| `lanternhold/intro.js`, `music.js` | Intro story and the soundtrack player. |
+| `lanternhold/stamp.py` | Writes a new build number into `version.json` and the asset query strings. Run it before every release. |
+| `lanternhold-wiki/build.js` | Generates the public wiki (`/wiki`) from the game files. Never hand-edit the wiki. Check with `node lanternhold-wiki/build.js` and then `rm -rf out`. |
+| `lanternhold-music/` | The music renderer. |
+| `infra/lanternhold-accounts.yaml` | CloudFormation stack `lanternhold` in us-east-1. It holds Cognito, DynamoDB, the HTTP API and the inline Lambdas. |
+| `infra/lambda/*.js` | Lambda sources: heroes, market, mail, admin, profile, warden, exchange, store, perks, authchal, wixlogin, invite, worldboss, looks, reset. `python3 infra/build.py` minifies them into the YAML. The inline limit is 4 KB each. |
+| `infra/chat`, `infra/ring` | Chat and Ember Ring (PvP) server code. |
+
+**`johnmink1/lanternhold`** is only the GitHub Pages mirror. Its `deploy.yml` copies `lanternhold/` from pricing-tools and builds the wiki. It runs every ~10 minutes, or on demand.
+
+## How to release
+
+1. Run `git fetch origin main && git checkout -B claude/lanternhold-vNNN origin/main`.
+2. Make the edits and add a `PATCH_NOTES` entry in ui.js. You can skip the patch note for admin-only changes.
+3. Run `python3 lanternhold/stamp.py`.
+4. Test locally:
+   - Start a server with `cd lanternhold && python3 -m http.server 8777`.
+   - Test with Playwright on desktop (1280x800) and iPhone 13.
+   - Use floor 51 for tests, because floor 50 is a boss floor.
+   - `window.LHDebug = { S, save, L, events }` is available in the page. `migrate()` resets `s.foe` on load, so inject foes through `LHDebug.S`, not through the save.
+5. Open a PR into `main` and squash-merge it. Threads merge their own PRs.
+6. Publish by running `deploy.yml` on `johnmink1/lanternhold` with workflow_dispatch, ref `main`.
+   - Sometimes it needs a second trigger.
+   - `.github/workflows/lanternhold-publish.yml` in pricing-tools tries to start it automatically, but the `LANTERNHOLD_DEPLOY_TOKEN` secret has not worked.
+7. Verify by fetching `https://lanternhold.born2gamellc.com/version.json?t=<now>` and matching the build number.
+
+House rules:
+- Family-friendly content.
+- Never show a bare "Level": say "power level" (training) or "hero level" (XP).
+- Track every change against a before-baseline and report whether it helped.
+- Lanternhold stays **off the store Discord**: the bot's LANTERNHOLD_DISCORD switch is off. John plans a separate Lanternhold Discord.
+
+## AWS
+
+Everything is in account 500041422762, region us-east-1. The CloudFormation stack is named `lanternhold`, functions are named `lanternhold-<name>`, and the trade table is `lanternhold-trade`.
+
+There is no working AWS CLI. The cloud container's keys are invalid, and VENGEANCE has no CLI. Deploy server code through **AWS CloudShell** in John's Brave, once John has signed in to the console:
+- Write files with `echo <base64> | base64 -d > file`.
+- Then `aws lambda update-function-code`.
+- A later stack update from `main` carries the same code.
+
+**Admins** are members of the Cognito group `admins`.
+- The Admin tab in the game shows only for them, using the `cognito:groups` claim. It has players, ban/unban, Sigil grants, resets, server wipe, Grand War link approvals and the audit log.
+- `infra/lambda/admin.js` gates the server side.
+
+**Lantern Keeper:** `/leaderboard` returns `keeper` when an admin's hero was seen in the last 3 minutes. Keepers get +25%, and a small lantern shows top-right in the arena.
+- This was deployed 24 Nov by John via CloudShell: the Lambda code plus an inline policy `lanternhold-keeper` on the admin role.
+
+**Sigil store:**
+- Purchases credit only when the game calls `POST /store/sync` (`store.js`) with the buyer's Wix member token. There is no webhook.
+- Don't hand-grant a purchase with `/admin/grant`, because a later sync would credit it again.
+- Sync logs are in CloudWatch under `/aws/lambda/lanternhold-store`.
+
+**Lanternholder** costs 500 Sigils for 30 days, or $4.99/month.
+
+## Live as of v102
+
+- **v86–v91:** mana and stamina, wearer-only enchants, Ghost Lantern, status effects (burn, poison, stun, disarm), mastery XP, shielded foes, wandering merchant, bounty board, Lantern Keeper.
+- **v92–v98:** XP bar tooltip, Keeper lantern, ambushes at 6% (×2 XP per creature), XP in the fight log, Lanternholder rename, Sigil shop.
+- **v100:** XP for enchanting (8 × tier) and merging (6 × result; half on a failure).
+  - Mercy Corps encounters, floor 5+, active play only:
+    - **Rescue:** a monster holds a companion; freeing them gives +30% XP for 15 minutes.
+    - **Wounded:** healers heal the companion to full within 45 seconds, for +15% damage and healing for 15 minutes.
+  - About 1–1.5 of each per 4 hours.
+- **v101:** **Admin event spawner** in the Admin tab, under "Test random events". It has one button each for:
+  - Loot Goblin, Ghost Lantern, merchant, shielded foe, ambush, alliance elite, chest, Mercy rescue, Mercy wounded.
+  - Any special attack, picked from a dropdown.
+
+  It only changes the admin's own save. It uses core `spawnEvent(s, kind, now, rng, events, sp)` and `SPAWN_EVENTS`.
+- **v102:** the Hold's tents (John: "just deploy what you think is best"):
+  - **Shops at battle scale.** The party stands at its fight positions, and the shopkeeper stands where a monster would, at monster scale, behind a counter with a sign. The tabs in the counter panel are the only controls. The v99 speech bubble is gone.
+  - **The Armorer (new):**
+    - Upgrade: gold, one level at a time.
+    - Merge: pick an item, then a copy, then confirm with the odds.
+    - Scrap for gold: `smelt` pays 2× the scrap gold and gives no Dust.
+    - The header button switches between the Enchanter and the Armorer.
+    - Core uses `visitEnchanter(s, now, kind)` and `s.shopK`. Neither `enchAt` nor `shopK` is ever saved.
+  - **Camp card ("In the Deep"):** one big Return to camp button, then a row with Enchanter, Armorer, Store and Draught.
+  - **The Hold view:** tapping The Hold on the Map of the Deep opens a scene with four tents (Campfire, Enchanter, Armorer, Store). Each tent takes you there.
+
+## Open asks and things to watch
+
+- **John's verdict on v102.** He rejected the v98 and v99 shop screens ("horrible", "hard to follow"). v102 follows mockup Option A, the Hold view, and In the Deep option 2.
+  - The mockups are in the old project folder `lanternhold/mockups-shops/`: `option-A-tabs-in-counter.png`, `option-B-board-above-shopkeeper.png`, `hold-view-on-map.png`, `in-the-deep-card.png`.
+  - If he wants Option B instead, put a wooden action board above the shopkeeper on the canvas and leave the panel with just the list.
+- **Should upgrade and merge move to the Armorer only?** They still also work from the Gear tab's item window, which needs a camp. Enchanting already works only at the Enchanter.
+- The Hold view has no walking animation yet. Tapping a tent opens that place straight away.
+- **Feedback to collect from John:**
+  - Ghost Lantern frequency, stun annoyance, and whether healers run out of mana.
+  - Ambush frequency and the gold it gives.
+  - Mercy Corps rarity.
+  - The shop feel.
+- The `LANTERNHOLD_DEPLOY_TOKEN` secret, so deploys start on merge.
+- A separate Lanternhold Discord, which John will set up later.
+- itch.io page: born2gamellc.itch.io/lanternhold. John is signed in in Brave, and the upload is a small wrapper zip that plays the live site.

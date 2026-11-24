@@ -1,4 +1,4 @@
-/* lh-build 202611241612 */
+/* lh-build 202611241658 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -65,7 +65,13 @@
   const WAR_KEY = { covenant: 'covenant', ascendancy: 'radiant', tide: 'tide' };
   const warWinOn = s => !!(s && s.warWin && s.warWin.side && sideOf(s) === s.warWin.side);
   const reviveMs = s => (warWinOn(s) ? WARWIN_REVIVE : REVIVE_TIME) * 1000;
-  const sidePerk = (s, k) => sidePerk0(s, k) * (mercyOn(s) ? 1 + (MERCY_FX[k] || 0) : 1) * (warWinOn(s) ? 1 + (WARWIN_FX[k] || 0) : 1);
+  // Banner lantern (John, 2026-11-24): the more Grand War territories your banner holds right now, the bigger its buff:
+  // +1% damage, health, healing and gold per territory, up to +15%. s.warLive = { held: { side: n }, total, week } comes
+  // from the war site's /api/nexus.json and refreshes every 15 minutes.
+  const TERR_PER = 0.01, TERR_MAX = 0.15, TERR_KEYS = { dps: 1, hp: 1, heal: 1, gold: 1 };
+  const terrHeld = s => (s && s.warLive && s.warLive.held && s.warLive.held[sideOf(s)]) || 0;
+  const terrBonus = s => Math.min(TERR_MAX, TERR_PER * terrHeld(s));
+  const sidePerk = (s, k) => sidePerk0(s, k) * (mercyOn(s) ? 1 + (MERCY_FX[k] || 0) : 1) * (warWinOn(s) ? 1 + (WARWIN_FX[k] || 0) : 1) * (TERR_KEYS[k] ? 1 + terrBonus(s) : 1);
   // Banner kin: every other party member who marches under your banner amplifies your banner perk by 40%.
   const KIN_AMP = 0.4;
   const bannerKin = s => { const d = sideOf(s); if (!d || !s.party) return 0; let n = 0; for (const id of s.party) { if (!id || id === 'you') continue; const m = memberById(id); if (m && m.side === d) n++; } return n; };
@@ -472,6 +478,7 @@
     let d = c.dps * scale(s, id) * partyMult(s) * gearMult(s, id, 'dps');
     if (id === 'you') { d *= (HERO_DPS[m.cls] || 1) * (1 + sk(s, 'dps')); const fu = fxOn(s, 'fury', now); if (fu) d *= fu; }
     if (m.cls === 'mage' && abilityActive(s, id, now)) d *= (setBonus(s, id) >= 3 ? 6 : 4) * (id === 'you' ? 1 + sk(s, 'power') : 1);
+    d *= (1 + wearVal(s, id, 'crit') + (m.cls === 'healer' ? 0 : wearVal(s, id, 'power'))) * (s.foe && (s.foe.boss || s.foe.world) ? 1 + wearVal(s, id, 'boss') : 1);
     const cc = s.cc && ccOf(s, id, now); if (cc) d *= cc.k === 'stun' ? 0 : CC.disarm.dmg;
     return d * (1 - ghostSap(s, 'dps', now));
   }
@@ -486,7 +493,7 @@
   function healPerSec(s, id) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id); if (m.cls !== 'healer') return 0;
-    return (CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0))) * keeperMult(s) * (1 - ghostSap(s, 'heal')) * (s.cc && ccOf(s, id) ? (ccOf(s, id).k === 'stun' ? 0 : CC.disarm.heal) : 1);
+    return (CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + wearVal(s, id, 'heal')) * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0))) * keeperMult(s) * (1 - ghostSap(s, 'heal')) * (s.cc && ccOf(s, id) ? (ccOf(s, id).k === 'stun' ? 0 : CC.disarm.heal) : 1);
   }
   // Mana and stamina (John, 2026-11-24). Healers, mages and necromancers run on mana; rogues and tanks on stamina.
   // Every ability costs some. A healer also spends mana to heal: run dry and it stops healing and only attacks
@@ -962,13 +969,51 @@
   };
   // How much of an item's power goes to damage and to health. Healers turn their damage share into healing too.
   const WEIGHT = { main: { dps: 1, hp: 0 }, off: { dps: 0.4, hp: 0 }, head: { dps: 0, hp: 0.4 }, neck: { dps: 0.5, hp: 0.5 }, chest: { dps: 0, hp: 1 }, robe: { dps: 0.2, hp: 1.5 }, legs: { dps: 0, hp: 0.5 }, feet: { dps: 0.2, hp: 0.2 }, ring: { dps: 0.25, hp: 0 } };
-  const weightOf = it => it.slot === 'off' && it.cls === 'tank' ? { dps: 0, hp: 0.5 } : WEIGHT[it.slot];
+  const weightOf = it => it.slot === 'off' && tyOf(it) === 'shield' ? { dps: 0, hp: 0.5 } : WEIGHT[it.slot];
+  // Item types (John, 2026-11-24: "make it like an actual dungeon crawler system... give them a purpose"). Weapons and
+  // off-hands have a type with its own job; armour goes by weight; rings and trinkets fit anyone. `cls` lists who can
+  // use it; `fx` are per-wearer bonuses (crit and power raise the wearer's damage, boss only against bosses and guardians,
+  // heal the wearer's healing, then the old per-wearer keys leech, block, def, regen, dodge). Class sets, Legendary sets
+  // and the Goblin's sack stay tied to the class they were made for.
+  const ITYPES = {
+    sword:       { name: 'Sword',           slot: 'main', cls: ['tank', 'rogue'],            fx: { leech: 0.02 },               txt: '+2% life steal' },
+    dagger:      { name: 'Dagger',          slot: 'main', cls: ['rogue'],                    fx: { crit: 0.05 },                txt: '+5% critical hits' },
+    mace:        { name: 'Mace',            slot: 'main', cls: ['tank', 'healer'],           fx: { boss: 0.08 },                txt: '+8% damage to bosses and guardians' },
+    morningstar: { name: 'Morningstar',     slot: 'main', cls: ['tank'],                     fx: { power: 0.15 },               txt: 'Hardest hitter: +15% damage' },
+    staff:       { name: 'Staff',           slot: 'main', cls: ['healer', 'mage'],           fx: { power: 0.1, heal: 0.1 },     txt: '+10% healing or spell power' },
+    wand:        { name: 'Wand',            slot: 'main', cls: ['mage', 'necro'],            fx: { regen: 0.1, crit: 0.03 },    txt: '+10% mana regen, +3% critical hits' },
+    scepter:     { name: 'Scepter',         slot: 'main', cls: ['necro', 'healer'],          fx: { power: 0.1, heal: 0.1 },     txt: '+10% ability power' },
+    shield:      { name: 'Shield',          slot: 'off',  cls: ['tank'],                     fx: { block: 0.04 },               txt: '+4% block' },
+    parry:       { name: 'Parrying dagger', slot: 'off',  cls: ['rogue'],                    fx: { dodge: 0.03 },               txt: '+3% dodge' },
+    tome:        { name: 'Tome',            slot: 'off',  cls: ['healer', 'necro'],          fx: { heal: 0.08, leech: 0.02 },   txt: '+8% healing and life drain' },
+    orb:         { name: 'Orb',             slot: 'off',  cls: ['mage'],                     fx: { crit: 0.04 },                txt: '+4% critical hits' },
+    plate:       { name: 'Plate',           slot: 'armor', cls: ['tank'],                    fx: { def: 0.01 },                 txt: '+1% defense' },
+    leather:     { name: 'Leather',         slot: 'armor', cls: ['rogue'],                   fx: { dodge: 0.01 },               txt: '+1% dodge' },
+    cloth:       { name: 'Cloth',           slot: 'armor', cls: ['healer', 'mage', 'necro'], fx: { regen: 0.03 },               txt: '+3% mana regen' },
+    jewel:       { name: 'Jewellery',       slot: 'jewel', cls: null,                        fx: {},                            txt: '' },
+  };
+  const TY_MAIN = { tank: ['mace', 'sword', 'morningstar'], healer: ['staff', 'mace', 'scepter'], rogue: ['dagger', 'sword'], mage: ['wand', 'staff'], necro: ['scepter', 'wand'] };
+  const TY_OFF = { tank: ['shield'], healer: ['tome'], rogue: ['parry'], mage: ['orb'], necro: ['tome'] };
+  const TY_ARMOR = { tank: 'plate', rogue: 'leather', healer: 'cloth', mage: 'cloth', necro: 'cloth' };
+  function tyOf(it) {
+    if (!it) return null;
+    if (it.ty && ITYPES[it.ty]) return it.ty;
+    if (it.slot === 'ring' || it.slot === 'neck') return 'jewel';
+    if (it.slot === 'main') return TY_MAIN[it.cls] ? TY_MAIN[it.cls][0] : 'sword';
+    if (it.slot === 'off') return TY_OFF[it.cls] ? TY_OFF[it.cls][0] : 'shield';
+    return TY_ARMOR[it.cls] || 'cloth';
+  }
+  const classLocked = it => !!(it.set || it.wb != null || it.gob || it.rar === 'goblin');
+  // Which classes can use an item: null means everyone.
+  const usersOf = it => classLocked(it) ? [it.cls] : it.rset != null ? null : (ITYPES[tyOf(it)] || {}).cls || null; // region sets fit any class
+  const usable = (cls, it) => { const u = usersOf(it); return !u || u.includes(cls); };
   // Old saves used weapon, armor and trinket.
   function normItem(it) {
     if (!it) return it;
     if (it.slot === 'weapon') it.slot = 'main';
     else if (it.slot === 'armor') it.slot = CLOTH[it.cls] && !it.set ? 'robe' : 'chest';
     else if (it.slot === 'trinket') it.slot = 'neck';
+    if (!it.ty || !ITYPES[it.ty]) it.ty = tyOf(Object.assign({}, it, { ty: null }));
     if (typeof it.en !== 'string') { if (it.uid) rollEnch(it, seeded(it.uid)); else it.en = ''; }
     else if (enchList(it).length > sockets(it) || !/^([a-l][1-9])*$/.test(it.en)) it.en = enchStr(enchList(it).slice(0, sockets(it)));
     return it;
@@ -1073,8 +1118,11 @@
     if (it.rset != null && REGION_SETS[it.rset]) return REGION_SETS[it.rset].word + ' ' + rsetPiece(it);
     if (it.jset) return JOB_SETS[it.jset].pieces[it.slot];
     if (it.set) return SETS.find(x => x.id === it.set).pieces[it.slot];
-    return RARITY.find(r => r.id === it.rar).prefix + BASES[it.cls][it.slot];
+    return RARITY.find(r => r.id === it.rar).prefix + baseName(it);
   }
+  // A weapon whose type is not its class's usual one gets that type's own name (a tank's Morningstar, a rogue's Sword).
+  const TY_BASE = { sword: { tank: 'Knight’s Longsword', rogue: 'Duelist’s Sabre' }, mace: { healer: 'Pilgrim’s Mace' }, morningstar: { tank: 'Iron Morningstar' }, staff: { mage: 'Ashwood Staff' }, wand: { necro: 'Bone Wand' }, scepter: { healer: 'Sunlit Scepter' } };
+  const baseName = it => (TY_BASE[it.ty] && TY_BASE[it.ty][it.cls]) || BASES[it.cls][it.slot];
   const DROP_W = [['main', 2], ['off', 1.5], ['head', 1.5], ['neck', 1], ['chest', 1.5], ['legs', 1.5], ['feet', 1.5], ['ring', 1.5]];
   function rollSlot(cls, r) {
     let x = r() * 12;
@@ -1096,6 +1144,7 @@
     const p = r() + boost * 0.15 * d;
     rar = p > 0.995 - 0.03 * d ? 'epic' : p > 0.94 - 0.08 * d ? 'rare' : p > 0.7 - 0.12 * d ? 'fine' : 'common';
     const it = { uid: Date.now().toString(36) + (uidSeq++), cls, slot, rar, ilvl: f, up: 0 };
+    if (slot === 'main') { const l = TY_MAIN[cls] || ['sword']; it.ty = r() < 0.5 ? l[0] : l[Math.floor(r() * l.length)]; }
     if (r() < (AFFIX_CHANCE[rar] || 0)) it.aff = { j: JOB_KEYS[Math.floor(r() * JOB_KEYS.length)], v: Math.round((0.1 + r() * 0.2) * (rar === 'epic' ? 1.5 : 1) * 100) / 100 };
     return rollEnch(it, r);
   }
@@ -1219,11 +1268,11 @@
   // companion could use, is scrapped (John, 2026-11-23: auto-scrap kept almost every drop before).
   function isUpgrade(s, it) {
     return s.party.some(id => {
-      const m = id && memberById(id); if (!m || m.cls !== it.cls || isGuest(s, id) || !canWear(s, id, it)) return false;
+      const m = id && memberById(id); if (!m || !usable(m.cls, it) || isGuest(s, id) || !canWear(s, id, it)) return false;
       const r = replaces(s, id, it);
       if (r.length) return itemScore(it) > r.reduce((a, x) => a + itemScore(x), 0);
       // an open slot only counts if the pack has no spare piece at least this good to fill it
-      return !s.bag.some(x => x !== it && x.cls === it.cls && x.slot === it.slot && !wearer(s, x.uid) && canWear(s, id, x) && itemScore(x) >= itemScore(it));
+      return !s.bag.some(x => x !== it && usable(m.cls, x) && x.slot === it.slot && !wearer(s, x.uid) && canWear(s, id, x) && itemScore(x) >= itemScore(it));
     });
   }
   function autoScrapBase(s, it) {
@@ -1256,7 +1305,7 @@
   const robeOn = (s, id) => { const c = equipped(s, id).chest, it = c && itemOf(s, c); return !!(it && it.slot === 'robe'); };
   function equip(s, id, uid, pos) {
     const it = itemOf(s, uid); if (!it) return false;
-    const m = memberById(id); if (!m || m.guest || m.cls !== it.cls || !canWear(s, id, it)) return false;
+    const m = memberById(id); if (!m || m.guest || !usable(m.cls, it) || !canWear(s, id, it)) return false;
     const g = s.gear[id] = s.gear[id] || {};
     const held = p => slotLocked(s, id, p) && g[p] !== uid;
     const open = openPos(s, id).filter(p => fitsPos(it.slot, p));
@@ -1361,9 +1410,12 @@
     if (wearCache.s !== s || now - wearCache.t > 500) wearCache = { s, t: now, v: {} };
     if (wearCache.v[id]) return wearCache.v[id];
     const v = {}, g = (s.gear && s.gear[id]) || {};
-    for (const p in g) { const it = itemOf(s, g[p]); if (!it || (p === 'legs' && robeOn(s, id))) continue; for (const x of enchList(it)) { const d = ENCH[x.id]; if (!d.per) continue; v[d.k] = Math.min(d.cap, (v[d.k] || 0) + enchVal1(x)); } }
+    for (const p in g) { const it = itemOf(s, g[p]); if (!it || (p === 'legs' && robeOn(s, id))) continue; for (const x of enchList(it)) { const d = ENCH[x.id]; if (!d.per) continue; v[d.k] = Math.min(d.cap, (v[d.k] || 0) + enchVal1(x)); }
+      // the item type's own job (v117)
+      const tf = (ITYPES[tyOf(it)] || {}).fx || {}; for (const k in tf) v[k] = Math.min(TY_CAP[k] || 1, (v[k] || 0) + tf[k]); }
     return (wearCache.v[id] = v);
   }
+  const TY_CAP = { leech: 0.1, block: 0.3, def: 0.35, dodge: 0.2, crit: 0.2 };
   const wearVal = (s, id, key) => (id && s.gear && s.bag && !String(id).startsWith('p_') ? wearTotals(s, id)[key] || 0 : 0);
   const enchVal = (s, key) => (s.gear && s.bag ? enchTotals(s)[key] || 0 : 0);
   const enchDirty = () => { enCache = { s: null, t: 0, v: null }; wearCache = { s: null, t: 0, v: {} }; };
@@ -1392,7 +1444,7 @@
   // Merging (John, 2026-11-23): two copies of the same item fuse into one a level higher (+1), keeping the higher
   // item level and the better camp-job affix. Every merge can fail and destroy BOTH pieces. The risk climbs with the
   // level you are merging up to; your hero's Luck and Intelligence points shave it down (by up to half).
-  const mergeKey = it => [it.cls, it.slot, it.rar, it.set || '', it.jset || '', it.rset != null ? it.rset : ''].join('|');
+  const mergeKey = it => [it.cls, it.slot, tyOf(it), it.rar, it.set || '', it.jset || '', it.rset != null ? it.rset : ''].join('|');
   const mergeable = (a, b) => !!a && !!b && a !== b && a.wb == null && b.wb == null && mergeKey(a) === mergeKey(b) && Math.max(a.up, b.up) < UP_MAX;
   function mergeRisk(s, a, b) {
     const to = Math.max(a.up, b.up) + 1, base = Math.min(0.9, 0.08 + 0.06 * (to - 1));
@@ -1435,7 +1487,7 @@
   function lockedSlots(s, id) { return openPos(s, id).filter(p => slotLocked(s, id, p)).length; }
   function bestKit(s, id) {
     const m = memberById(id); if (!m || m.guest) return {};
-    const pool = s.bag.filter(it => it.cls === m.cls && canWear(s, id, it) && (!wearer(s, it.uid) || (wearer(s, it.uid) === id && !it.lk)));
+    const pool = s.bag.filter(it => usable(m.cls, it) && canWear(s, id, it) && (!wearer(s, it.uid) || (wearer(s, it.uid) === id && !it.lk)));
     const open = openPos(s, id).filter(p => !slotLocked(s, id, p)), kit = {}, job = jobFree(s, id) && jobOf(s, id), jid = job && job.id;
     // a companion working a camp job keeps gear that helps that job
     const score = it => itemScore(it) + (jid && (it.jset === jid || (it.aff && it.aff.j === jid)) ? 10 : 0);
@@ -2233,7 +2285,7 @@
   // Damage after dodges, armour, shields and guards. Returns -1 for a dodge.
   function soak(s, t, dmg, now, rng) {
     const m = memberById(t), c = CLASSES[m.cls];
-    if (c.dodge && (rng || Math.random)() < c.dodge + (setBonus(s, t) >= 2 ? 0.1 : 0) + (t === 'you' ? sk(s, 'dodge') : 0)) return -1;
+    { const dg = (c.dodge || 0) + wearVal(s, t, 'dodge'); if (dg > 0 && (rng || Math.random)() < dg + (c.dodge && setBonus(s, t) >= 2 ? 0.1 : 0) + (c.dodge && t === 'you' ? sk(s, 'dodge') : 0)) return -1; }
     const bl = wearVal(s, t, 'block'); if (bl > 0 && (rng || Math.random)() < bl) return -2;
     if (c.armor) dmg *= 1 - c.armor;
     dmg *= 1 - wearVal(s, t, 'def');
@@ -2756,8 +2808,8 @@
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, WB_SETS, WB_SLOTS, WB_PCT, WB_TWO, WB_FOUR, wbUpCost, wbCounts, wbBonus, shardsOf, makeLegend, SPAWN_EVENTS, spawnEvent, visiting, visitEnchanter, leaveEnchanter, SMELT_MULT, smeltValue, smelt, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, BEAST_STEP, BEAST_PER, BEAST_MAX, beastKey, beastTier, beastBonus, MERCY_FX, mercyOn, WARWIN_FX, WARWIN_REVIVE, WAR_KEY, warWinOn, reviveMs, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, SHOP_FX, FIELD_FX, atShop, enchCostAt, fieldTier, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, WB_SETS, WB_SLOTS, WB_PCT, WB_TWO, WB_FOUR, wbUpCost, wbCounts, wbBonus, shardsOf, makeLegend, SPAWN_EVENTS, spawnEvent, visiting, visitEnchanter, leaveEnchanter, SMELT_MULT, smeltValue, smelt, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, BEAST_STEP, BEAST_PER, BEAST_MAX, beastKey, beastTier, beastBonus, MERCY_FX, mercyOn, WARWIN_FX, WARWIN_REVIVE, WAR_KEY, warWinOn, TERR_PER, TERR_MAX, terrHeld, terrBonus, reviveMs, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, ITYPES, tyOf, usersOf, usable, classLocked, SHOP_FX, FIELD_FX, atShop, enchCostAt, fieldTier, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

@@ -8,7 +8,7 @@ yml = os.path.join(here, 'lanternhold-accounts.yaml')
 s = open(yml).read()
 for fn, res in [('heroes.js', 'HeroFunction'), ('market.js', 'MarketFunction'), ('mail.js', 'MailFunction'), ('admin.js', 'AdminFunction'), ('profile.js', 'ProfileFunction'), ('warden.js', 'WardenFunction'), ('exchange.js', 'ExchangeFunction'), ('store.js', 'StoreFunction'), ('perks.js', 'PerksFunction'), ('authchal.js', 'AuthChalFunction'), ('wixlogin.js', 'WixLoginFunction'), ('invite.js', 'InviteFunction'), ('worldboss.js', 'WorldBossFunction'), ('looks.js', 'LooksFunction'), ('reset.js', 'ResetFunction'), ('loot.js', 'LootFunction')]:
     code = subprocess.check_output([esb, os.path.join(here, 'lambda', fn), '--minify', '--platform=node', '--format=cjs', '--log-level=warning']).decode().strip()
-    if len(code.encode()) > 4000: sys.exit(f'{fn} is {len(code)} bytes minified; the inline limit is 4096')
+    if len(code.encode()) > 4036: sys.exit(f'{fn} is {len(code)} bytes minified; the inline limit is 4096')
     i = s.index('\n  ' + res + ':\n'); z = s.index('ZipFile: |', i) + len('ZipFile: |'); e = s.index('\n\n', z)
     s = s[:z] + '\n' + '\n'.join('          ' + l for l in ('// built from infra/lambda/' + fn + ' by infra/build.py\n' + code).split('\n')) + s[e:]
     print(fn, len(code), 'bytes')

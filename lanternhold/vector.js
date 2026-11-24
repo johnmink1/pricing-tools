@@ -1,4 +1,4 @@
-/* lh-build 202611241407 */
+/* lh-build 202611241413 */
 /* Lanternhold illustrated sprites. Each sprite is drawn as layered SVG (outline, shading, rim light, detail),
    tinted per companion or biome, rendered once to an image and then drawn on the arena canvas. */
 (function (root) {
@@ -255,6 +255,41 @@
       // a gold rim on the hood
       
       L_('M42 60 Q40 32 60 24 Q80 30 78 60', '#f5c242', 1.2, ' opacity=".75"'),
+    ].join('');
+  } };
+  // The Armorer (John, 2026-11-24): a broad smith with a braided red beard, leather apron and a hammer on his shoulder.
+  ART.armorer = { w: 120, h: 160, draw(c) {
+    const shirt = c.mat('#c8b48a'), apron = c.mat('#6b4426'), apronD = c.t('#3a2414'), skin = c.lg([SK.mid, SK.dark], 0, 0, 1, 1);
+    const beard = c.lg(['#e0703a', '#b8461e', '#7a2a10'], 0, 0, 0, 1), iron = c.lg(['#e6edf5', '#9aa6b8', '#5a6478'], 0, 0, 1, 1), wood = c.lg(['#9a6a3a', '#5a3a1c'], 0, 0, 1, 0);
+    return [
+      // legs and boots
+      P('M44 120 H58 V150 H44Z', c.mat('#4a3a2a')), P('M62 120 H76 V150 H62Z', c.mat('#4a3a2a')),
+      P('M40 146 H60 V156 H38Z', c.mat('#2a1e14')), P('M60 146 H80 L82 156 H60Z', c.mat('#2a1e14')),
+      // broad torso in a work shirt
+      P('M30 70 Q28 100 36 124 H84 Q92 100 90 70 Q60 58 30 70Z', shirt),
+      // leather apron with a pocket and rivets
+      P('M38 78 H82 L86 140 Q60 146 34 140Z', apron), Pn('M62 78 H82 L86 140 Q74 144 64 144Z', apronD, ' opacity=".4"'),
+      P('M48 108 H72 V122 H48Z', c.mat('#5a3820'), ' stroke-width="1.6"'), C(50, 110, 1.2, '#f5c242'), C(70, 110, 1.2, '#f5c242'),
+      L_('M38 80 Q60 72 82 80', '#3a2414', 2.2),
+      // big forearms, sleeves rolled
+      P('M30 72 Q18 86 20 104 L32 106 Q34 92 40 84Z', shirt), Eo(24, 108, 7, 6, skin),
+      P('M90 72 Q102 80 100 96 L90 100 Q88 88 82 82Z', shirt), Eo(96, 98, 7, 6, skin),
+      L_('M20 98 Q26 96 32 99 M90 92 Q96 90 100 93', '#a8946a', 1.4),
+      // a hammer in his fist
+      G(P('M-2 0 H2 V38 H-2Z', wood) + P('M-10 36 H10 V48 H-10Z', iron) + L_('M-8 38 H8', '#ffffff', 1, ' opacity=".6"'), 'translate(97 100) rotate(-12)'),
+      // head: bald, bushy brows, a braided red beard
+      P('M44 42 Q44 24 60 22 Q76 24 76 42 Q76 56 60 60 Q44 56 44 42Z', skin),
+      Pn('M50 26 Q60 22 70 26 Q66 24 60 24 Q54 24 50 26Z', '#ffffff', ' opacity=".35"'),
+      Eo(43, 44, 3.4, 4.6, skin, ' stroke-width="1.6"'), Eo(77, 44, 3.4, 4.6, skin, ' stroke-width="1.6"'),
+      P('M48 36 Q53 32 58 35 L58 37 Q53 35 48 38Z', '#b8461e', ' stroke-width="1"'), P('M62 35 Q67 32 72 36 L72 38 Q67 35 62 37Z', '#b8461e', ' stroke-width="1"'),
+      E(53, 41, 1.9, 2.2, '#1a2440'), E(67, 41, 1.9, 2.2, '#1a2440'), C(53.6, 40.3, 0.7, '#ffffff'), C(67.6, 40.3, 0.7, '#ffffff'),
+      P('M57 44 Q60 50 63 44Z', SK.dark, ' stroke-width="1"'),
+      P('M44 44 Q46 56 52 54 Q56 58 60 55 Q64 58 68 54 Q74 56 76 44 Q80 62 72 76 Q66 84 62 98 L58 98 Q54 84 48 76 Q40 62 44 44Z', beard),
+      P('M52 50 Q60 46 68 50 Q60 55 52 50Z', '#e0703a', ' stroke-width="1"'),
+      L_('M54 62 Q58 70 59 80 M66 62 Q63 70 61 80', '#7a2a10', 1),
+      P('M57 82 H63 V86 H57Z', iron, ' stroke-width="1"'), P('M57 90 H63 V94 H57Z', iron, ' stroke-width="1"'),
+      // soot smudge
+      E(70, 48, 3, 1.6, '#3a2a20', ' opacity=".35"'),
     ].join('');
   } };
   ART.necro = { w: 120, h: 160, draw(c) {

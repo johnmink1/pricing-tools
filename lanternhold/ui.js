@@ -1,4 +1,4 @@
-/* lh-build 202611240225 */
+/* lh-build 202611240229 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -15,7 +15,28 @@
     try { const raw = localStorage.getItem(SAVE_KEY); if (raw) return L.migrate(JSON.parse(raw)); } catch (e) {}
     return null;
   }
+  // ---------- one tab at a time ----------
+  // Two open copies of the game each kept saving their own state over the other, so a claim, a setting or a tonic
+  // made in one tab came undone on refresh (John, 2026-11-24). The newest tab plays; older tabs stop saving and say so.
+  let dormant = false;
+  const TAB_ID = Math.random().toString(36).slice(2);
+  let tabChan = null;
+  try { tabChan = new BroadcastChannel('lanternhold-tabs'); } catch (e) {}
+  function goDormant() {
+    if (dormant) return; save(); dormant = true;
+    const d = document.createElement('div'); d.id = 'tablock';
+    d.innerHTML = '<div><h2>Lanternhold is open in another tab</h2><p>Only one tab can play at a time, so your progress never gets mixed up. This tab has stopped and saved.</p><button class="btn" id="tablock-go">Play here instead</button></div>';
+    document.body.appendChild(d);
+    d.querySelector('#tablock-go').onclick = () => location.reload();
+  }
+  if (tabChan) {
+    tabChan.onmessage = e => { if (e.data && e.data.t === 'hello' && e.data.id !== TAB_ID) goDormant(); };
+    tabChan.postMessage({ t: 'hello', id: TAB_ID });
+  }
+  window.addEventListener('storage', e => { if (e.key === 'lh_tab' && e.newValue && e.newValue.split(':')[0] !== TAB_ID) goDormant(); });
+  try { localStorage.setItem('lh_tab', TAB_ID + ':' + Date.now()); } catch (e) {}
   function save() {
+    if (dormant) return;
     S.lastSeen = Date.now();
     const o = Object.assign({}, S); delete o.foe;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(o)); } catch (e) {}
@@ -2329,7 +2350,7 @@
     S = L.newState(); location.reload();
   }
   async function pushCloud(quiet) {
-    if (!CL || !signedIn() || !S.hero) return;
+    if (!CL || !signedIn() || !S.hero || dormant) return;
     try {
       const o = saveObj();
       await api('PUT', { data: JSON.stringify(o), floor: o.maxFloorEver, created: o.created || 0 });
@@ -4123,6 +4144,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 78, date: 'November 24, 2026', title: 'One tab at a time', items: [
+      'If Lanternhold is open in two tabs, the older one now stops and says so. Before, both kept saving over each other, so quest claims, auto-scrap and tonics could come undone after a refresh.',
+      'Tap Play here instead on a stopped tab to pick it back up.'] },
     { v: 77, date: 'November 24, 2026', title: 'Tonic stacks stay visible', items: [
       'An active tonic now shows how many more of it you carry next to its timer, so drinking one no longer makes the rest of your stack seem to disappear. Tap it to drink another and add time.',
       'If a tonic is already near its 60-minute cap, tapping it tells you so instead of doing nothing.'] },

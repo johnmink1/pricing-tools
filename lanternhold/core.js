@@ -1,4 +1,4 @@
-/* lh-build 202611241259 */
+/* lh-build 202611241302 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -735,12 +735,14 @@
     return t;
   }
   function gainXp(s, foe, events) {
-    if (!s.hero) return;
+    if (!s.hero) return 0;
     const base = (1 + s.floor / 25) * (foe.boss ? 15 : foe.chest ? 2 : foe.elite ? 4 : 1) * (foe.pack ? foe.pack * PACK_XP : 1);
     const before = heroLevel(s).lv;
-    s.hxp += base * (1 + sk(s, 'xp') + masteryXp(s)) * keeperMult(s);
+    const xp = base * (1 + sk(s, 'xp') + masteryXp(s)) * keeperMult(s);
+    s.hxp += xp;
     const after = heroLevel(s).lv;
     if (after > before && events) events.push({ type: 'herolevel', lv: after, from: before, pts: pointsFor(after) - pointsFor(before) });
+    return xp;
   }
   // Total of one effect from your hero's tree, Grand War aura and character stats. It only counts while your hero is in the party.
   // Tonics from the Quartermaster: small timed buffs, one of each at a time; drinking again adds time up to an hour.
@@ -2024,9 +2026,9 @@
     s.gold += g; s.stats.goldEarned += g; s.stats.kills++;
     bountyCount(s, 'kill', foe, f);
     if (s.dots) for (const id in s.dots) if (--s.dots[id].n <= 0) delete s.dots[id];
-    gainXp(s, foe, events);
+    const xp = gainXp(s, foe, events);
     // first: this kill opens the way down (not a repeat kill while farming a floor already cleared)
-    events && events.push({ type: 'kill', gold: g, foe, first: !!foe.boss && s.floor >= s.maxFloor });
+    events && events.push({ type: 'kill', gold: g, xp, foe, first: !!foe.boss && s.floor >= s.maxFloor });
     unlockLore(s, foe.boss ? 'boss' : 'foe_' + foe.sprite, events);
     if (foe.boss && f % 10 === 0) unlockLore(s, 'g' + (Math.floor((f - 1) / 10) % BIOMES.length), events);
     dropGear(s, foe, rng, events);

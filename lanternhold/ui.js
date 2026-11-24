@@ -1,4 +1,4 @@
-/* lh-build 202611241259 */
+/* lh-build 202611241302 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -716,7 +716,7 @@
     switch (e.type) {
       case 'hit': if (e.crit && !e.auto) flog('fight', '<b>Critical strike</b> for ' + fmt(e.dmg), 'crit', 1500); break;
       case 'foehit': flogTaken += e.dmg || 0; if (S.foe && S.foe.boss && e.target !== 'minion') flog('party', nm(e.target) + ' takes ' + fmt(e.dmg) + ' from ' + esc(S.foe.name), 'bh' + e.target, 4000); break;
-      case 'kill': { const f = e.foe || {}; flog('fight', (f.boss ? '<b>Guardian down:</b> ' : f.chest ? 'Opened ' : 'Defeated ') + esc(f.name || 'a foe') + ' <em>+' + fmt(e.gold || 0) + ' gold' + (flogTaken ? ', party took ' + fmt(flogTaken) : '') + '</em>'); flogTaken = 0; break; }
+      case 'kill': { const f = e.foe || {}; flog('fight', (f.boss ? '<b>Guardian down:</b> ' : f.chest ? 'Opened ' : 'Defeated ') + esc(f.name || 'a foe') + (f.pack ? ' (' + f.pack + ' foes)' : '') + ' <em>+' + fmt(e.gold || 0) + ' gold' + (e.xp ? ', +' + (e.xp < 10 ? (Math.round(e.xp * 10) / 10) : fmt(Math.round(e.xp))) + ' XP' : '') + (flogTaken ? ', party took ' + fmt(flogTaken) : '') + '</em>'); flogTaken = 0; break; }
       case 'ability': flog('party', nm(e.id) + ' uses <b>' + esc(e.name || (L.CLASSES[e.cls] && L.CLASSES[e.cls].ability.name) || 'an ability') + '</b>' + (e.dmg ? ' for ' + fmt(e.dmg) : ''), 'ab' + e.id, 2000); break;
       case 'fall': flog('party', '<b class="bad">' + nm(e.id) + ' falls</b>'); break;
       case 'revive': flog('party', '<b class="good">' + nm(e.id) + ' is back up</b>'); break;
@@ -4481,6 +4481,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 95, date: 'November 24, 2026', title: 'XP in the fight log', items: [
+      'The fight log now shows the hero XP each kill gave you, with all your bonuses counted, next to the gold: "Defeated Gloop +120 gold, +6.4 XP". Ambushes also show how many foes were in the group.',
+    ] },
     { v: 94, date: 'November 24, 2026', title: 'More ambushes', items: [
       'Ambushes (groups of 2 to 4 monsters) now come twice as often: 6% of fights from floor 3, up from 3%.',
       'The ambush tag now shows its XP bonus. Each monster in the group adds 2× hero XP, so an ambush of 3 gives XP ×6 (and 6× gold). Hover the tag (or tap it) for the details.',

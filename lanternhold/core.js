@@ -1,4 +1,4 @@
-/* lh-build 202611240432 */
+/* lh-build 202611240515 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -449,7 +449,12 @@
     const m = memberById(id);
     return Math.max(1, CLASSES[m.cls].hp * scale(s, id) * (1 + relicVal(s, 'ward')) * (1 + masteryVal(s, 'hp')) * (1 + EMBER_HP * s.embers) * gearMult(s, id, 'hp') * sidePerk(s, 'hp') * (1 + campBonus(s, 'hp')) * (1 + sk(s, 'php') + (id === 'you' ? sk(s, 'hp') : 0)));
   }
-  function partyMult(s) { return emberMult(s) * (1 + masteryVal(s, 'dps')) * (1 + kup(s, 'edge')) * (1 + FEAT_PER * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')) * (1 + sk(s, 'pdps')); }
+  // The Lantern Keeper (John, 2026-11-24): while the store owner's verified account is online, every hero gets
+  // +KEEPER to damage, healing, gold, hero XP and gear finds. The page learns it from the server (s.keeper.until).
+  const KEEPER = 0.25;
+  const keeperOn = s => !!(s.keeper && s.keeper.until > (s.clock || Date.now()));
+  const keeperMult = s => keeperOn(s) ? 1 + KEEPER : 1;
+  function partyMult(s) { return keeperMult(s) * emberMult(s) * (1 + masteryVal(s, 'dps')) * (1 + kup(s, 'edge')) * (1 + FEAT_PER * featCount(s)) * (1 + relicVal(s, 'crown')) * sidePerk(s, 'dps') * (1 + campBonus(s, 'dps')) * (1 + sk(s, 'pdps')); }
   // Your own hero hits harder as a tank or healer, so every class can carry a run at a similar pace.
   const HERO_DPS = { tank: 3, healer: 5 };
   function memberDps(s, id, now) {
@@ -472,7 +477,7 @@
   function healPerSec(s, id) {
     if (!id || s.down[id] || !lvl(s, id)) return 0;
     const m = memberById(id); if (m.cls !== 'healer') return 0;
-    return (CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0))) * (1 - ghostSap(s, 'heal')) * (s.cc && ccOf(s, id) ? (ccOf(s, id).k === 'stun' ? 0 : CC.disarm.heal) : 1);
+    return (CLASSES.healer.heal * scale(s, id) * gearMult(s, id, 'heal') * (1 + relicVal(s, 'censer')) * (1 + EMBER_HP * s.embers) * (1 + FEAT_PER * featCount(s)) * sidePerk(s, 'heal') * (1 + campBonus(s, 'heal')) * (1 + sk(s, 'pheal') + (id === 'you' ? sk(s, 'heal') : 0))) * keeperMult(s) * (1 - ghostSap(s, 'heal')) * (s.cc && ccOf(s, id) ? (ccOf(s, id).k === 'stun' ? 0 : CC.disarm.heal) : 1);
   }
   // Mana and stamina (John, 2026-11-24). Healers, mages and necromancers run on mana; rogues and tanks on stamina.
   // Every ability costs some. A healer also spends mana to heal: run dry and it stops healing and only attacks
@@ -485,7 +490,7 @@
   function spendRes(s, id, n) { const v = resOf(s, id); if (v < n) return false; s.res[id] = v - n; return true; }
   const oom = (s, id) => !!(s.oom && s.oom[id]);
   function clickDamage(s, now) { return (1 + totalDps(s, now) * 0.05) * (1 + relicVal(s, 'whet')); }
-  function goldMult(s) { return emberMult(s) * (1 + masteryVal(s, 'gold')) * (1 + gearGold(s)) * (1 + kup(s, 'purse')) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
+  function goldMult(s) { return keeperMult(s) * emberMult(s) * (1 + masteryVal(s, 'gold')) * (1 + gearGold(s)) * (1 + kup(s, 'purse')) * (1 + relicVal(s, 'locket')) * sidePerk(s, 'gold') * (1 + campBonus(s, 'gold')) * (1 + sk(s, 'gold')); }
   function critChance(s) { return 0.04 + relicVal(s, 'dice') + sk(s, 'crit'); }
   function lanternTime(s) { return BASE_LANTERN + kup(s, 'oil') + relicVal(s, 'lamp') + campBonus(s, 'lamp') + sk(s, 'lantern'); }
   function chestChance(s) { return 0.03 + relicVal(s, 'moth') + sk(s, 'chest'); }
@@ -733,7 +738,7 @@
     if (!s.hero) return;
     const base = (1 + s.floor / 25) * (foe.boss ? 15 : foe.chest ? 2 : foe.elite ? 4 : 1) * (foe.pack ? foe.pack * 2 : 1);
     const before = heroLevel(s).lv;
-    s.hxp += base * (1 + sk(s, 'xp') + masteryXp(s));
+    s.hxp += base * (1 + sk(s, 'xp') + masteryXp(s)) * keeperMult(s);
     const after = heroLevel(s).lv;
     if (after > before && events) events.push({ type: 'herolevel', lv: after, from: before, pts: pointsFor(after) - pointsFor(before) });
   }
@@ -1109,6 +1114,7 @@
       ['Class skills', skBase(s, 'loot') - st - au], ['Luck', st], ['War aura', au], ['Seeker’s Charm', tonicVal(s, 'loot')],
       ['Companion traits', traitVal(s, 'loot')], ['Enchants', enchVal(s, 'loot')], ['Forager at camp', campBonus(s, 'loot')],
     ].filter(x => x[1] > 1e-9);
+    if (keeperOn(s)) parts.push(['Lantern Keeper', KEEPER]);
     return { parts, total: 1 + parts.reduce((a, x) => a + x[1], 0) };
   }
   // Odds of each rarity from rollGear at floor f with a given boost.
@@ -1885,6 +1891,112 @@
     if (!s.daily || s.daily.day !== day) s.daily = { day, base: Object.assign({}, s.stats), got: 0 };
     return dailyQuests(day).map((q, i) => { const have = Math.max(0, (s.stats[q.stat] || 0) - (s.daily.base[q.stat] || 0)); return { i, id: q.id, text: q.text.replace('{n}', q.n.toLocaleString('en-US')), have: Math.min(have, q.n), n: q.n, done: have >= q.n, got: !!(s.daily.got & (1 << i)) }; });
   }
+  // ---------- Bounty board (John, 2026-11-24) ----------
+  // Three bounties at a time, fresh every BOUNTY_HOURS. They are built for your hero from the floors you have reached,
+  // so some send you back up to farm older floors. Finished bounties left unclaimed are paid out when the board turns over.
+  const BOUNTY_FLOOR = 5, BOUNTY_HOURS = 4, BOUNTY_MS = BOUNTY_HOURS * 3600e3;
+  const bountyWin = (t = Date.now()) => Math.floor(t / BOUNTY_MS);
+  function bountyRng(seed) { let h = 2166136261; for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619); return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; }; }
+  function makeBounties(s, w) {
+    const r = bountyRng(w + ':' + ((s.hero && s.hero.name) || '') + ':' + (s.created || 0));
+    const top = Math.max(1, s.maxFloor || 1), topR = regionNo(top);
+    const pickRegion = () => Math.max(0, topR - Math.floor(r() * Math.min(3, topR + 1)));
+    const span = rn => [rn * 10 + 1, Math.min(top, rn * 10 + 10)];
+    const kinds = ['hunt', 'hunt', 'region', 'guardian', 'chest'];
+    if (top >= 20) kinds.push('elite');
+    if (top >= SHIELD_FLOOR + 3) kinds.push('shield');
+    const out = [];
+    while (out.length < 3 && kinds.length) {
+      const k = kinds.splice(Math.floor(r() * kinds.length), 1)[0];
+      if (k === 'hunt') {
+        const rn = pickRegion(), [a, b] = span(rn), bi = BIOMES[rn % BIOMES.length];
+        const fo = bi.foe && r() < 0.7 ? bi.foe : FOES[Math.floor(r() * FOES.length)], sig = fo === bi.foe;
+        if (out.some(x => x.k === 'hunt' && x.sp === fo.id)) continue;
+        out.push({ k, sp: fo.id, name: fo.name, a, b, n: sig ? 30 : 12, have: 0 });
+      } else if (k === 'region') { const rn = pickRegion(), [a, b] = span(rn); out.push({ k, a, b, n: 60, have: 0, rname: BIOMES[rn % BIOMES.length].name }); }
+      else if (k === 'guardian') { const bf = Math.max(BOSS_EVERY, Math.floor(top / BOSS_EVERY) * BOSS_EVERY - BOSS_EVERY * Math.floor(r() * 3)); out.push({ k, a: bf, b: bf, n: 3, have: 0 }); }
+      else if (k === 'chest') out.push({ k, n: 6, have: 0 });
+      else if (k === 'elite') out.push({ k, n: 6, have: 0 });
+      else if (k === 'shield') out.push({ k, n: 4, have: 0 });
+    }
+    return out;
+  }
+  function bountyReward(s, b) {
+    const mins = { hunt: 6, region: 5, guardian: 5, chest: 4, elite: 6, shield: 4 }[b.k] || 4;
+    return { gold: Math.max(50, Math.round(offlineGoldPerSec(s) * 60 * mins)), dust: Math.round(3 + (s.maxFloor || 1) * 0.3) };
+  }
+  // Rolls the board over when the window changes (paying out finished, unclaimed bounties) and returns it.
+  function bountyState(s, now) {
+    const w = bountyWin(now);
+    if ((s.maxFloor || 1) < BOUNTY_FLOOR) return { w, list: [], locked: true };
+    if (!s.bounty || s.bounty.w !== w) {
+      const paid = [];
+      if (s.bounty && Array.isArray(s.bounty.list)) for (const b of s.bounty.list) if (b.have >= b.n && !b.got) paid.push(claimBounty(s, b));
+      s.bounty = { w, list: makeBounties(s, w) };
+      if (paid.length) s.bounty.paid = paid;
+    }
+    return s.bounty;
+  }
+  function claimBounty(s, b, rng) {
+    const rw = bountyReward(s, b); b.got = 1;
+    s.gold += rw.gold; s.dust = (s.dust || 0) + rw.dust; s.stats.bounties = (s.stats.bounties || 0) + 1;
+    if ((rng || Math.random)() < 0.25) { const t = TONICS[Math.floor((rng || Math.random)() * TONICS.length)]; s.items[t.id] = (s.items[t.id] || 0) + 1; rw.tonic = t.name; }
+    return rw;
+  }
+  function claimBountyAt(s, i, now) { const st = bountyState(s, now), b = st.list[i]; if (!b || b.got || b.have < b.n) return null; return claimBounty(s, b); }
+  function bountyCount(s, ev, foe, f) {
+    if (!s.bounty || !Array.isArray(s.bounty.list) || s.bounty.w !== bountyWin()) return;
+    for (const b of s.bounty.list) {
+      if (b.got || b.have >= b.n) continue;
+      let add = 0;
+      if (ev === 'kill' && foe && !foe.world && !foe.goblin) {
+        const m = foe.pack || 1, inR = b.a == null || (f >= b.a && f <= b.b);
+        if (b.k === 'hunt' && foe.sprite === b.sp && inR) add = m;
+        else if (b.k === 'region' && !foe.chest && !foe.boss && inR) add = m;
+        else if (b.k === 'guardian' && foe.boss && f === b.a) add = 1;
+        else if (b.k === 'chest' && foe.chest) add = 1;
+        else if (b.k === 'elite' && foe.elite) add = 1;
+      } else if (ev === 'shield' && b.k === 'shield') add = 1;
+      if (add) b.have = Math.min(b.n, b.have + add);
+    }
+  }
+  const flr = b => b.a === b.b ? 'on floor ' + b.a : 'on floors ' + b.a + '–' + b.b;
+  const bountyText = b => b.k === 'hunt' ? 'Defeat ' + b.n + ' ' + b.name + 's ' + flr(b)
+    : b.k === 'region' ? 'Defeat ' + b.n + ' monsters ' + flr(b)
+    : b.k === 'guardian' ? 'Defeat the floor ' + b.a + ' guardian ' + b.n + ' times'
+    : b.k === 'chest' ? 'Open ' + b.n + ' treasure chests'
+    : b.k === 'elite' ? 'Defeat ' + b.n + ' alliance elites'
+    : 'Break ' + b.n + ' monster shields with your strikes';
+
+  // ---------- Wandering merchant (John, 2026-11-24) ----------
+  // Only while you are playing: now and then a merchant sets up beside the fight for MERCH_LIFE seconds with one deal
+  // at MERCH_OFF off. Buy it or let it go; missing it costs nothing.
+  const MERCH_FLOOR = 5, MERCH_LIFE = 120, MERCH_EVERY = 1500, MERCH_COOL = 900, MERCH_OFF = 0.5;
+  function merchOffer(s, rng) {
+    const r = rng || Math.random, opts = ['tonic', 'tonic', 'draught', 'dust'];
+    if ((s.maxFloorEver || 0) >= 10) opts.push('oil');
+    const k = opts[Math.floor(r() * opts.length)];
+    if (k === 'tonic') { const t = TONICS[Math.floor(r() * TONICS.length)]; const was = shopPrice(s, t.id) * 2; return { k, id: t.id, n: 2, name: '2 × ' + t.name, desc: t.desc, was, price: Math.round(was * (1 - MERCH_OFF)) }; }
+    if (k === 'draught' || k === 'oil') { const it = SHOP.find(x => x.id === k); const was = shopPrice(s, k) * 3; return { k, id: k, n: 3, name: '3 × ' + it.name, desc: it.desc, was, price: Math.round(was * (1 - MERCH_OFF)) }; }
+    const n = Math.round(20 + (s.maxFloorEver || 1) * 1.5), was = Math.max(80, Math.round(offlineGoldPerSec(s) * 60 * 6));
+    return { k: 'dust', n, name: n + ' Dust', desc: 'Dust for enchanting, without scrapping a thing.', was, price: Math.round(was * (1 - MERCH_OFF)) };
+  }
+  function merchantTick(s, now, active, rng, events) {
+    rng = rng || Math.random;
+    if (s.merchant && now >= s.merchant.until) { s.merchant = null; s.merchNext = now + MERCH_COOL * 1000; events && events.push({ type: 'merchgone' }); return; }
+    if (s.merchant || !active || (s.maxFloorEver || 0) < MERCH_FLOOR || resting(s, now)) return;
+    if (now < (s.merchNext || 0) || rng() >= 1 / (MERCH_EVERY * 2)) return;
+    s.merchant = { at: now, until: now + MERCH_LIFE * 1000, offer: merchOffer(s, rng) };
+    events && events.push({ type: 'merchant' });
+  }
+  function merchantBuy(s, now) {
+    const m = s.merchant; if (!m || now >= m.until) return null;
+    const o = m.offer; if (s.gold < o.price) return null;
+    s.gold -= o.price; s.items = s.items || {};
+    if (o.k === 'dust') s.dust = (s.dust || 0) + o.n; else s.items[o.id] = (s.items[o.id] || 0) + o.n;
+    s.merchant = null; s.merchNext = now + MERCH_COOL * 1000; s.stats.merchant = (s.stats.merchant || 0) + 1;
+    return o;
+  }
   function killFoe(s, now, rng, events) {
     const foe = s.foe, f = s.floor;
     let g = foeGold(f, foe.boss) * goldMult(s);
@@ -1899,6 +2011,7 @@
       if ((rng || Math.random)() < GOBLIN_SACK_CHANCE) { const sack = rollGoblinSack(s, f, rng || Math.random); s.bag.push(sack); s.stats.sacks = (s.stats.sacks || 0) + 1; events && events.push({ type: 'goblinsack', item: sack }); }
     }
     s.gold += g; s.stats.goldEarned += g; s.stats.kills++;
+    bountyCount(s, 'kill', foe, f);
     if (s.dots) for (const id in s.dots) if (--s.dots[id].n <= 0) delete s.dots[id];
     gainXp(s, foe, events);
     // first: this kill opens the way down (not a repeat kill while farming a floor already cleared)
@@ -2300,7 +2413,7 @@
     if (crit) { dmg *= 5; s.stats.crits++; }
     if (!auto) s.stats.clicks++;
     events && events.push({ type: 'hit', dmg, crit, auto });
-    if (s.foe && s.foe.shield > 0 && !auto) { s.foe.shield = Math.max(0, s.foe.shield - SHIELD_TAP * (crit ? 2 : 1)); if (s.foe.shield <= 0) { s.stats.shields = (s.stats.shields || 0) + 1; events && events.push({ type: 'shieldbreak', tap: true }); } }
+    if (s.foe && s.foe.shield > 0 && !auto) { s.foe.shield = Math.max(0, s.foe.shield - SHIELD_TAP * (crit ? 2 : 1)); if (s.foe.shield <= 0) { s.stats.shields = (s.stats.shields || 0) + 1; bountyCount(s, 'shield'); events && events.push({ type: 'shieldbreak', tap: true }); } }
     const sc0 = s.wb ? s.wb.score : 0;
     damageFoe(s, dmg, now, rng, events);
     if (s.wb && !auto) s.wb.ck = (s.wb.ck || 0) + s.wb.score - sc0;
@@ -2418,7 +2531,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

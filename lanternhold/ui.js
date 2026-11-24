@@ -1,4 +1,4 @@
-/* lh-build 202611240432 */
+/* lh-build 202611240515 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2324,6 +2324,41 @@
     el.setAttribute('aria-label', 'Ghost Lantern: sapping ' + sap + '% party ' + L.GHOST_STATS[g.k] + '. Tap to shatter it.');
     el.classList.toggle('fading', left <= 5);
   }
+  // ---------- Wandering merchant (John, 2026-11-24) ----------
+  const MERCH_SVG = '<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M20 4c-8 0-12 7-12 14v4h24v-4c0-7-4-14-12-14z" fill="#5a3b6e" stroke="#c9a6e8" stroke-width="1.6"/><ellipse cx="20" cy="19" rx="7" ry="6" fill="#1a1222"/><circle cx="17.5" cy="19" r="1.4" fill="#ffd27a"/><circle cx="22.5" cy="19" r="1.4" fill="#ffd27a"/>' +
+    '<path d="M9 22h22l3 24H6z" fill="#4a2f5c" stroke="#c9a6e8" stroke-width="1.6"/><path d="M24 30h10v12H24z" fill="#a8743a" stroke="#ffd27a" stroke-width="1.4" rx="2"/><path d="M26 30v-3h6v3" stroke="#ffd27a" stroke-width="1.4" fill="none"/><circle cx="29" cy="36" r="1.6" fill="#ffd27a"/></svg>';
+  let merchOpen = false;
+  function paintMerchant() {
+    let el = $('merchant'); const m = S.merchant, now = Date.now();
+    if (!m || now >= m.until) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('button'); el.id = 'merchant'; el.className = 'merchant'; el.type = 'button';
+      el.innerHTML = MERCH_SVG + '<small></small>';
+      ['pointerdown', 'mousedown', 'touchstart'].forEach(ev => el.addEventListener(ev, e => e.stopPropagation()));
+      el.addEventListener('click', e => { e.stopPropagation(); openMerchant(); });
+      arena.appendChild(el);
+    }
+    const left = Math.ceil((m.until - now) / 1000);
+    el.querySelector('small').textContent = 'Deal · ' + fmtTime(left);
+    el.setAttribute('aria-label', 'Wandering merchant: one deal at half price, ' + left + ' seconds left');
+    el.classList.toggle('fading', left <= 15);
+  }
+  function openMerchant() {
+    const m = S.merchant; if (!m) return; const o = m.offer, can = S.gold >= o.price;
+    merchOpen = true;
+    modal('<div class="merchbox"><div class="merchhead">' + MERCH_SVG + '<div><h2>Wandering merchant</h2><small>“Just passing through. One deal, and I’m gone.”</small></div></div>' +
+      '<div class="merchdeal"><b>' + esc(o.name) + '</b><small>' + esc(o.desc) + '</small><div class="merchprice"><s>' + fmt(o.was) + ' gold</s> <b>' + fmt(o.price) + ' gold</b> <span class="off">' + Math.round(L.MERCH_OFF * 100) + '% off</span></div></div>' +
+      '<p class="note">Leaves in ' + fmtTime(Math.ceil((m.until - Date.now()) / 1000)) + '. ' + (o.k === 'dust' ? 'Dust goes straight to your purse.' : 'Tonics show up under the fight, Draughts next to Return to camp, and Oil in guardian fights.') + '</p>' +
+      '<div class="row"><button class="btn ghost" id="mc-no">Not now</button><button class="btn" id="mc-buy"' + (can ? '' : ' disabled') + '>' + (can ? 'Buy for ' + fmt(o.price) + ' gold' : 'Need ' + fmt(o.price - S.gold) + ' more gold') + '</button></div></div>', md => {
+        md.querySelector('#mc-no').onclick = () => { merchOpen = false; closeModal(); };
+        md.querySelector('#mc-buy').onclick = () => {
+          const r = L.merchantBuy(S, Date.now()); merchOpen = false; closeModal();
+          if (!r) { toast('coin', 'The merchant shrugs', 'Not enough gold, or the merchant already left.', 'warn'); return; }
+          sfx.buy(); save(); paintMerchant();
+          toast('coin', 'Bought ' + r.name, 'Saved ' + fmt(r.was - r.price) + ' gold. The merchant tips a hood and slips away.', 'loot');
+        };
+      });
+  }
   function breakGhost() {
     const r = L.ghostBreak(S, Date.now());
     const el = $('ghostlamp'); if (el) el.remove();
@@ -2336,15 +2371,20 @@
   setInterval(() => {
     if (!S || !S.hero) return;
     const now = Date.now(), ev = [];
-    try { L.ghostTick(S, now, !document.hidden && now - lastAct < 90000, Math.random, ev); } catch (e) { return; }
+    const act = !document.hidden && now - lastAct < 90000;
+    try { L.ghostTick(S, now, act, Math.random, ev); L.merchantTick(S, now, act, Math.random, ev); } catch (e) { return; }
     for (const e of ev) {
       if (e.type === 'ghost') {
         sfx.boss && sfx.boss();
         if (!(S.stats.ghostSeen > 0)) { S.stats.ghostSeen = 1; toast('lantern', 'A Ghost Lantern drifts in', 'It slowly saps your party’s ' + L.GHOST_STATS[e.k] + ', up to 10%. Tap it in the fight to shatter it for a reward. Leave it and it fades on its own.', ''); }
         floatText('A Ghost Lantern drifts in!', 'nexus', 0.5, 0.12);
       } else if (e.type === 'ghostgone') floatText('The Ghost Lantern fades', 'auto', 0.5, 0.14);
+      else if (e.type === 'merchant') {
+        tone(523, 0.12, 'triangle', 0.04); setTimeout(() => tone(659, 0.12, 'triangle', 0.04), 120);
+        toast('coin', 'A wandering merchant stops by', 'One deal at ' + Math.round(L.MERCH_OFF * 100) + '% off, for the next ' + Math.round(L.MERCH_LIFE / 60) + ' minutes. Tap the merchant beside the fight to see it.', '');
+      } else if (e.type === 'merchgone') { floatText('The merchant moves on', 'auto', 0.18, 0.14); if (merchOpen) closeModal(); }
     }
-    paintGhost();
+    paintGhost(); paintMerchant();
   }, 500);
   arena.addEventListener('pointerdown', e => { e.preventDefault(); doStrike(e); });
   arena.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); doStrike(); } });
@@ -2438,9 +2478,14 @@
   // ---------- players online (heroes seen in the last 3 minutes) ----------
   async function loadOnline() {
     if (!CL || document.hidden) return;
-    try { const r = await fetch(CL.api.replace(/\/$/, '') + '/leaderboard'); if (!r.ok) return; const j = await r.json(); if (typeof j.online !== 'number') return; $('onlinect').textContent = Math.max(j.online, signedIn() && S.hero ? 1 : 0).toLocaleString('en-US'); $('online').hidden = false; } catch (e) {}
+    try { const r = await fetch(CL.api.replace(/\/$/, '') + '/leaderboard'); if (!r.ok) return; const j = await r.json(); if (j.keeper) { const was = L.keeperOn(S); S.keeper = { name: String(j.keeper).slice(0, 20), until: Date.now() + 150000 }; if (!was) { paintKeeper(); toast('lantern', 'The Lantern Keeper is here', S.keeper.name + ' is online: +25% damage, healing, gold, hero XP and gear finds for every hero while they stay.', 'feat'); } } else if (S.keeper) { S.keeper = null; paintKeeper(); } if (typeof j.online !== 'number') return; $('onlinect').textContent = Math.max(j.online, signedIn() && S.hero ? 1 : 0).toLocaleString('en-US'); $('online').hidden = false; } catch (e) {}
   }
   $('online').addEventListener('click', () => switchTab('guild'));
+  function paintKeeper() {
+    const el = $('keeperbar'); if (!el) return; const on = L.keeperOn(S);
+    el.hidden = !on; if (on) el.innerHTML = icon('lantern') + '<span><b>The Lantern Keeper is here.</b> ' + esc(S.keeper.name) + ' is online: <b>+' + Math.round(L.KEEPER * 100) + '%</b> damage, healing, gold, hero XP and gear finds for every hero.</span>';
+  }
+  setInterval(paintKeeper, 15000);
   setTimeout(loadOnline, 2000); setInterval(loadOnline, 60000);
   { const tt = $('taptip'); if (tt) ['click', 'pointerdown', 'mousedown', 'touchstart'].forEach(ev => tt.addEventListener(ev, e => e.stopPropagation())); }
   // ---------- settings ----------
@@ -3141,7 +3186,8 @@
     } catch (e) {}
     claiming = false;
   }
-  const questsReady = () => { const q = L.questState(S); const got = S.daily.got; return q.filter(x => x.done && !x.got).length + (q.every(x => x.got) && !(got & 8) ? 1 : 0); };
+  const bountyReady = () => { try { return L.bountyState(S, Date.now()).list.filter(b => b.have >= b.n && !b.got).length; } catch (e) { return 0; } };
+  const questsReady = () => { const q = L.questState(S); const got = S.daily.got; return q.filter(x => x.done && !x.got).length + (q.every(x => x.got) && !(got & 8) ? 1 : 0) + bountyReady(); };
   function paintQuests() {
     const q = L.questState(S), b = $('quests'); if (!b) return;
     const n = q.filter(x => x.got).length, rd = questsReady(), all = n === 3 && (S.daily.got & 8);
@@ -3149,18 +3195,37 @@
     b.classList.toggle('ready', rd > 0); b.classList.toggle('done', !rd && !!all);
     b.title = rd ? 'Daily quests: ' + rd + (rd === 1 ? ' reward' : ' rewards') + ' ready to claim' : all ? 'Daily quests: all done for today' : 'Daily quests: ' + n + ' of 3 done';
   }
+  function bountyHtml() {
+    const st = L.bountyState(S, Date.now()), left = (st.w + 1) * L.BOUNTY_MS - Date.now();
+    if (st.paid && st.paid.length) { const g = st.paid.reduce((a, x) => a + x.gold, 0), d = st.paid.reduce((a, x) => a + x.dust, 0); toast('star', 'Bounties paid out', 'Finished bounties from the last board: +' + fmt(g) + ' gold, +' + fmt(d) + ' Dust.', 'loot'); delete st.paid; save(); }
+    const rows = st.list.map((b, i) => {
+      const rw = L.bountyReward(S, b), done = b.have >= b.n, go = b.a && !b.got && !done ? Math.min(S.maxFloor, b.a === b.b ? b.a : Math.max(b.a, Math.min(b.b, S.floor >= b.a && S.floor <= b.b ? S.floor : b.a))) : 0;
+      return '<li class="quest bounty' + (b.got ? ' got' : done ? ' done' : '') + '"><div><b>' + esc(L.bountyText(b)) + '</b><div class="qbar"><i style="width:' + Math.round(b.have / b.n * 100) + '%"></i></div><small>' + b.have + ' / ' + b.n + ' · ' + fmt(rw.gold) + ' gold + ' + rw.dust + ' Dust</small></div>' +
+        (b.got ? '<span class="qok">Paid</span>' : done ? '<button class="btn small" data-bty="' + i + '">Claim</button>' : go ? '<button class="btn small ghost" data-farm="' + go + '">' + (S.floor === go ? 'Farming here' : 'Go to floor ' + go) + '</button>' : '') + '</li>';
+    }).join('');
+    if (st.locked) return '<h3 class="sub">Bounty board</h3><p class="note small">The bounty board opens when you reach floor ' + L.BOUNTY_FLOOR + '.</p>';
+    return '<h3 class="sub">Bounty board</h3><p class="note small">New bounties in ' + Math.floor(left / 36e5) + 'h ' + Math.floor(left % 36e5 / 6e4) + 'm. Built from the floors you have reached. Finished ones you forget to claim are paid when the board changes. Rewards: gold, Dust and sometimes a tonic.</p><ul class="quests">' + rows + '</ul>';
+  }
   function openQuests() {
     const q = L.questState(S), got = S.daily.got, allGot = q.every(x => x.got), msLeft = Date.parse(L.questDay() + 'T00:00:00Z') + 864e5 - Date.now();
     const pct = v => (Math.round(v * 10000) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + '%';
     const row = x => '<li class="quest' + (x.got ? ' got' : x.done ? ' done' : '') + '"><div><b>' + esc(x.text) + '</b><div class="qbar"><i style="width:' + Math.round(x.have / x.n * 100) + '%"></i></div><small>' + x.have.toLocaleString('en-US') + ' / ' + x.n.toLocaleString('en-US') + '</small></div>' +
       (x.got ? '<span class="qok">' + sigil + '+' + L.QUEST_REWARD + '</span>' : '<button class="btn small" data-q="' + x.i + '"' + (x.done ? '' : ' disabled') + '>' + sigil + ' Claim ' + L.QUEST_REWARD + '</button>') + '</li>';
-    modal('<div class="maphead"><div><h2>Daily quests</h2><small>New quests in ' + Math.max(1, Math.floor(msLeft / 36e5)) + 'h ' + Math.floor(msLeft % 36e5 / 6e4) + 'm. Same quests for every hero.</small></div><button class="iconbtn" id="dq-x" aria-label="Close">&times;</button></div>' +
+    modal('<div class="maphead"><div><h2>Quests and bounties</h2><small>New quests in ' + Math.max(1, Math.floor(msLeft / 36e5)) + 'h ' + Math.floor(msLeft % 36e5 / 6e4) + 'm. Same quests for every hero.</small></div><button class="iconbtn" id="dq-x" aria-label="Close">&times;</button></div>' +
+      bountyHtml() + '<h3 class="sub">Daily quests</h3>' +
       '<ul class="quests">' + q.map(row).join('') +
       '<li class="quest bonus' + (got & 8 ? ' got' : allGot ? ' done' : '') + '"><div><b>Finish all three</b><small>A bonus for clearing the day.</small></div>' + (got & 8 ? '<span class="qok">' + sigil + '+' + L.QUEST_BONUS + '</span>' : '<button class="btn small" data-q="3"' + (allGot ? '' : ' disabled') + '>' + sigil + ' Claim ' + L.QUEST_BONUS + '</button>') + '</li></ul>' +
       (signedIn() ? '' : '<p class="note">Sign in to claim quest rewards. Your progress still counts.</p>') +
       '<h3 class="sub">Finding Sigils</h3><p class="note">Now and then a treasure chest or a guardian holds 1 to 3 Sigils. Your odds: <b>' + pct(L.sigilChance(S, 'chest')) + '</b> per chest and <b>' + pct(L.sigilChance(S, 'boss')) + '</b> per guardian. Every 30 floors of your deepest descent adds 0.01%, up to 0.05%, and the Kindling upgrade Sigil Sense adds 0.01% per rank. You can bank up to ' + L.SIGIL_DROP_DAY + ' found Sigils a day.</p>' +
       '<div class="row"><button class="btn ghost" id="dq-ok">Close</button></div>', md => {
         md.querySelector('#dq-x').onclick = closeModal; md.querySelector('#dq-ok').onclick = closeModal;
+        md.querySelectorAll('[data-bty]').forEach(btn => btn.onclick = () => {
+          const r = L.claimBountyAt(S, +btn.dataset.bty, Date.now()); if (!r) return;
+          sfx.relic(); save(); paintQuests();
+          toast('star', 'Bounty paid', '+' + fmt(r.gold) + ' gold and +' + fmt(r.dust) + ' Dust' + (r.tonic ? ', plus a ' + r.tonic : '') + '.', 'loot');
+          openQuests();
+        });
+        md.querySelectorAll('[data-farm]').forEach(btn => btn.addEventListener('click', () => setTimeout(closeModal, 50)));
         md.querySelectorAll('[data-q]').forEach(btn => btn.onclick = async () => {
           if (!signedIn()) { toast('user', 'Sign in first', 'Quest rewards go to your account wallet.', 'warn'); return; }
           const i = +btn.dataset.q; btn.disabled = true;
@@ -4183,6 +4248,17 @@
         'Every tap on the fight knocks about ' + Math.round(L.SHIELD_TAP * 100) + '% off the shield, and a critical tap twice that. About ' + Math.round(1 / L.SHIELD_TAP) + ' taps break it.',
         'If you are not tapping, the shield wears away on its own in about ' + L.SHIELD_DECAY.foe + ' seconds (' + L.SHIELD_DECAY.boss + ' for a guardian). Guardians raise it once more at half health.',
         'The health bar shows how much shield is left, and the bubble around the foe cracks as it weakens.']],
+      ['Wandering merchant', 'i:coin', 'Now and then a merchant stops beside the fight with one deal at half price.', [
+        'Only while you are playing, from floor ' + L.MERCH_FLOOR + '. The merchant stays ' + Math.round(L.MERCH_LIFE / 60) + ' minutes.',
+        'Tap the merchant to see the deal: two tonics, Campfire Draughts or Lantern Oil, or a pile of Dust, all at ' + Math.round(L.MERCH_OFF * 100) + '% off.',
+        'Buy it or let it go. Missing the merchant costs nothing.']],
+      ['Bounty board', 'i:star', 'Three bounties at a time, new every ' + L.BOUNTY_HOURS + ' hours. Open it from the Quests button.', [
+        'Bounties are built for your hero from the floors you have reached: hunt a kind of monster on certain floors, beat a guardian a few times, open chests, defeat alliance elites or break monster shields.',
+        'Some send you back up to older floors. Tap <b>Go to floor</b> on a bounty to farm there (Descend automatically turns off).',
+        'Each pays gold and Dust, sometimes a tonic too. Finished bounties you forget to claim are paid when the board changes.']],
+      ['The Lantern Keeper', 'i:lantern', 'When the store owner is online, every hero gets a boost.', [
+        'While the Lantern Keeper is online, every hero gets <b>+' + Math.round(L.KEEPER * 100) + '%</b> damage, healing, gold, hero XP and gear finds.',
+        'A gold banner over the fight shows when it is on. It ends a couple of minutes after the Keeper leaves.']],
       ['Ghost Lantern', 'i:lantern', 'Now and then a Ghost Lantern drifts into the fight. Tap it to shatter it for a reward.', [
         'It only appears while you are playing (from floor ' + L.GHOST_FLOOR + '), never while you are away.',
         'While it floats there it slowly saps your party’s damage or healing, up to ' + Math.round(L.GHOST_MAX * 100) + '% at most. The tag under it shows how much and how long it has left.',
@@ -4396,6 +4472,12 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 91, date: 'November 24, 2026', title: 'Merchant, bounties and the Lantern Keeper', items: [
+      'New: the wandering merchant. Now and then, while you play, a merchant stops beside the fight for 2 minutes with one deal at half price: tonics, Campfire Draughts, Lantern Oil or Dust. Tap the merchant to see it.',
+      'New: the bounty board, in the Quests window. Three bounties at a time, new every 4 hours, built from the floors you have reached: hunt certain monsters on certain floors, beat a guardian a few times, open chests and more. Each pays gold and Dust, sometimes a tonic.',
+      'Bounties that send you back up have a Go to floor button. Finished bounties you forget to claim are paid when the board changes.',
+      'New: the Lantern Keeper. When the store owner is online, every hero gets +25% damage, healing, gold, hero XP and gear finds. A gold banner over the fight shows when it is on.'
+    ] },
     { v: 90, date: 'November 24, 2026', title: 'Shielded foes', items: [
       'New: shielded monsters. From floor 12 some monsters, and many guardians, fight inside a pale blue shield. While it is up your party deals 65% less damage.',
       'Tap the fight to break it: each tap knocks about 10% off (a critical tap 20%), so about 10 taps does it, and your party is back to full strength.',

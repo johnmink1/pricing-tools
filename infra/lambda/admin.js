@@ -27,7 +27,15 @@ exports.handler = async (e) => {
     const top = all.filter(i => i.name && i.fl && !i.ban)
       .map(i => ({ name: i.name.S, cls: i.cls.S, level: +i.lv.N, floor: +i.fl.N, side: i.sd ? i.sd.S : 'unsworn' }))
       .sort((a, c) => c.floor - a.floor || c.level - a.level).slice(0, 50);
-    return { statusCode: 200, headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60' }, body: JSON.stringify({ top, online }) };
+    // The Lantern Keeper (John, 2026-11-24): a member of the Cognito "admins" group with a hero seen in the last 3 minutes
+    // switches on a +25% buff for every player. Only the group decides it, never a hero name.
+    let keeper = null;
+    try {
+      const ad = new Set(((await idp.send(new C.ListUsersInGroupCommand({ UserPoolId: POOL, GroupName: 'admins' }))).Users || []).map(u => u.Username));
+      const k = all.find(i => i.u && ad.has(i.u.S) && i.name && !i.ban && i.seen && Date.now() - i.seen.N < 18e4);
+      if (k) keeper = k.name.S;
+    } catch (x) {}
+    return { statusCode: 200, headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60' }, body: JSON.stringify({ top, online, keeper }) };
   }
   const cl = e.requestContext.authorizer && e.requestContext.authorizer.jwt && e.requestContext.authorizer.jwt.claims;
   if (!cl || !String(cl['cognito:groups'] || '').includes('admins')) return res(403, { error: 'admin only' });

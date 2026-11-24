@@ -1,4 +1,4 @@
-/* lh-build 202611241244 */
+/* lh-build 202611241253 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2063,5 +2063,7 @@ body.resting .taptip{display:none}
 .merchdeal{margin:14px 0 8px;padding:12px 14px;border:1px solid #6b4f2a;border-radius:12px;background:linear-gradient(180deg,#24180e,#160f09);display:flex;flex-direction:column;gap:4px}
 .merchprice{margin-top:6px;font-size:15px}.merchprice s{color:var(--muted);margin-right:6px}.merchprice .off{margin-left:6px;font-size:11px;font-weight:800;color:#1a1208;background:#ffd27a;border-radius:999px;padding:1px 7px}
 .quest.bounty .btn.ghost{white-space:nowrap}
-.keeperbar{display:flex;align-items:center;gap:8px;margin:6px auto 0;max-width:100%;padding:6px 12px;border-radius:999px;border:1px solid #a8822e;background:linear-gradient(90deg,#2a1e08,#3a2a0c);color:#ffe7b0;font-size:13px}
-.keeperbar[hidden]{display:none}.keeperbar svg{width:16px;height:16px;flex:none;color:#ffd27a}
+.klant{position:absolute;right:10px;top:10px;z-index:5;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;border:1px solid #a8822e;background:radial-gradient(circle,#3a2a0cee,#1a1206dd);color:#ffd27a;cursor:help;box-shadow:0 0 12px rgba(255,190,90,.55);animation:kglow 2.6s ease-in-out infinite}
+.klant[hidden]{display:none}.klant svg{width:18px;height:18px}
+@keyframes kglow{50%{box-shadow:0 0 20px rgba(255,200,100,.85)}}
+@media (prefers-reduced-motion:reduce){.klant{animation:none}}

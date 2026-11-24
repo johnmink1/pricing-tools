@@ -35,8 +35,14 @@ exports.handler = async (e) => {
     await db.send(new D.PutItemCommand({ TableName: T, Item: { pk: S('wix#' + mid), sk: S('link'), u: S(cl.sub), name: S(name), at: N(Date.now()) },
       ConditionExpression: 'attribute_not_exists(pk) OR u = :u', ExpressionAttributeValues: { ':u': S(cl.sub) } }));
   } catch (x) { if (x.name === 'ConditionalCheckFailedException') return res(409, { error: 'taken' }); throw x; }
+  // Wix caps this list at 50 a page (limit=100 is a 400, which broke every sync until 24 Nov 2026), so page through.
   let orders = [];
-  try { orders = (await wix('/pricing-plans/v2/member/orders?limit=100', tok)).orders || []; } catch (x) { return res(502, { error: 'orders' }); }
+  try {
+    for (let off = 0; off < 500; off += 50) {
+      const pg = (await wix('/pricing-plans/v2/member/orders?limit=50&offset=' + off, tok)).orders || [];
+      orders = orders.concat(pg); if (pg.length < 50) break;
+    }
+  } catch (x) { console.log('orders', x.st || x.message); return res(502, { error: 'orders' }); }
   let added = 0;
   for (const o of orders) {
     const n = PACK[o.planId];

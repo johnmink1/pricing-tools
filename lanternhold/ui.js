@@ -1,4 +1,4 @@
-/* lh-build 202611241356 */
+/* lh-build 202611241407 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2719,9 +2719,10 @@
     floatText('Shattered! ' + (r.kind === 'tonic' ? r.name : what), 'skill', 0.5, 0.18);
     toast('lantern', 'Ghost Lantern shattered', 'It left behind ' + what + (r.kind === 'tonic' ? '. Drink it from the tonic bar under the fight.' : '.') + ' Your party is back to full strength.', 'loot');
   }
+  const ambientQ = [];
   setInterval(() => {
     if (!S || !S.hero) return;
-    const now = Date.now(), ev = [];
+    const now = Date.now(), ev = ambientQ.splice(0);
     const act = !document.hidden && now - lastAct < 90000;
     if (act) S.actAt = now;
     try { L.ghostTick(S, now, act, Math.random, ev); L.merchantTick(S, now, act, Math.random, ev); } catch (e) { return; }
@@ -3801,7 +3802,27 @@
       });
     }
   });
-  document.querySelector('.tabs [data-tab="admin"]').addEventListener('click', () => loadAdmin());
+  document.querySelector('.tabs [data-tab="admin"]').addEventListener('click', () => { paintSpawner(); loadAdmin(); });
+  // Event spawner (John, 2026-11-24): force a random event into your own fight to test it. Only your own save changes.
+  let spawnSp = 'slam';
+  function paintSpawner() {
+    const box = $('admspawn'); if (!box) return;
+    if (!isAdmin()) { box.innerHTML = ''; return; }
+    box.innerHTML = '<h3 class="sub">Test random events</h3><p class="note">Spawns the event into your own fight right now, skipping the usual floor rules and odds. Only your game changes; other players never see it.</p>' +
+      '<div class="adm-spawn">' + L.SPAWN_EVENTS.filter(x => x[0] !== 'special').map(x => '<button class="btn small ghost" data-spawn="' + x[0] + '" title="' + esc(x[2]) + '"><b>' + esc(x[1]) + '</b><small>' + esc(x[2]) + '</small></button>').join('') + '</div>' +
+      '<div class="adm-bar adm-sp"><select id="adm-sp">' + Object.keys(L.SPECIALS).map(k => '<option value="' + k + '"' + (k === spawnSp ? ' selected' : '') + '>' + esc(L.SPECIALS[k].name) + (L.SPECIALS[k].cc ? ' (' + L.SPECIALS[k].cc + ')' : L.SPECIALS[k].dot ? ' (' + L.SPECIALS[k].dot + ')' : '') + '</option>').join('') + '</select><button class="btn small" data-spawn="special">Spawn special attack</button></div>';
+  }
+  $('tab-admin').addEventListener('change', e => { if (e.target.id === 'adm-sp') spawnSp = e.target.value; });
+  $('tab-admin').addEventListener('click', e => {
+    const b = e.target.closest('[data-spawn]'); if (!b || !isAdmin() || !S || !S.hero) return;
+    const k = b.dataset.spawn, ev = [], err = L.spawnEvent(S, k, Date.now(), Math.random, ev, spawnSp);
+    if (err) { toast('lock', 'Not right now', err, ''); return; }
+    for (const x of ev) if (x.type === 'ghost' || x.type === 'merchant') ambientQ.push(x); else events.push(x);
+    handleEvents(); save();
+    if (innerWidth < 760 && arena.scrollIntoView) arena.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const name = (L.SPAWN_EVENTS.find(x => x[0] === k) || [])[1];
+    toast('star', name + ' spawned', k === 'special' ? L.SPECIALS[spawnSp].name + ' winds up in about 3 seconds.' : 'It is in your fight now.', 'feat');
+  });
 
   // ---------- leaderboard ----------
   let lbAt = 0;

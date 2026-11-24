@@ -1,4 +1,4 @@
-/* lh-build 202611241356 */
+/* lh-build 202611241407 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -2356,6 +2356,65 @@
     else { const t = TONICS[Math.floor(rng() * TONICS.length)]; s.items[t.id] = (s.items[t.id] || 0) + 1; out = { kind: 'tonic', id: t.id, name: t.name }; }
     return out;
   }
+  // Admin test tool (John, 2026-11-24): force one of the random events into your own fight right now.
+  // Only touches this save; floor rules and cooldowns are skipped, but nothing else changes.
+  const SPAWN_EVENTS = [
+    ['goblin', 'Loot Goblin', 'A thief that grabs an unworn item and runs.'],
+    ['ghost', 'Ghost Lantern', 'Saps damage or healing until you tap it.'],
+    ['merchant', 'Wandering merchant', 'One deal at half price for 2 minutes.'],
+    ['shield', 'Shielded foe', 'A foe behind a magic shield.'],
+    ['pack', 'Ambush', 'Three monsters jump the party at once.'],
+    ['elite', 'Alliance elite', 'A Grand War warband soldier.'],
+    ['chest', 'Treasure chest', 'A chest to crack open.'],
+    ['rescue', 'Mercy Corps rescue', 'A monster holding a Mercy Corps companion.'],
+    ['wounded', 'Mercy Corps wounded', 'A hurt companion your healers can save.'],
+    ['special', 'Special attack', 'A foe that uses the move you pick.'],
+  ];
+  function spawnEvent(s, kind, now, rng, events, sp) {
+    const r = rng || Math.random, f = s.floor;
+    if (visiting(s)) return 'Leave the Enchanter first.';
+    if (resting(s, now)) return 'You are resting at camp. Head back into the Deep first.';
+    if (nexusOn(s) || (s.wb && s.wb.until > now)) return 'Finish the Nexus or world boss fight first.';
+    if (kind === 'ghost') {
+      if (s.ghost) return 'A Ghost Lantern is already here.';
+      if (!s.foe) { s.foe = makeFoe(s, r); s.foeSwing = 0; s.foeGap = 0; }
+      const k = s.party.some(id => id && healPerSec(s, id) > 0) && r() < 0.35 ? 'heal' : 'dps';
+      s.ghost = { at: now, until: now + GHOST_LIFE * 1000, k, x: 0.25 + r() * 0.5 };
+      events && events.push({ type: 'ghost', k }); return null;
+    }
+    if (kind === 'merchant') {
+      if (s.merchant) return 'The merchant is already here.';
+      s.merchant = { at: now, until: now + MERCH_LIFE * 1000, offer: merchOffer(s, r) };
+      events && events.push({ type: 'merchant' }); return null;
+    }
+    if (isBossFloor(f)) return 'Floor ' + f + ' is a boss floor. Move to another floor to spawn foes.';
+    if (s.foe && (s.foe.goblin || s.foe.wounded)) return 'Finish the current event first.';
+    let foe;
+    if (kind === 'goblin') {
+      foe = goblinFoe(s, !!(s.goblin && s.goblin.item));
+    } else if (kind === 'wounded') {
+      const who = MERCY_NAMES[Math.floor(r() * MERCY_NAMES.length)], max = Math.max(200, partyHeal(s) * AID_SEC / 0.9);
+      foe = { name: who + ', wounded', who, wounded: 1, sprite: 'healer', boss: false, chest: false, elite: false, side: null, ambush: 0, pack: 0, hp: max * 0.1, max, hue: 0, atk: 0, mods: [], ward: 0, wardAt: 0, aidT: 0, sp: null };
+    } else if (kind === 'chest') {
+      const hp = foeHp(f, false) * 0.5;
+      foe = { sp: null, spAt: 0, spWind: null, name: 'Treasure Chest', sprite: 'chest', boss: false, chest: true, elite: false, side: null, ambush: 0, pack: 0, hp, max: hp, hue: biomeOf(f).hue, atk: 0, mods: [], ward: 0, wardAt: 0 };
+    } else {
+      for (let i = 0; i < 60; i++) { foe = makeFoe(s, r); if (!foe.chest && !foe.goblin && !foe.pack && !foe.world && !foe.elite) break; }
+      if (foe.chest || foe.goblin || foe.world) return 'Could not make a foe here. Try again.';
+      foe.mods = foe.mods.filter(m => m !== 'shield'); foe.pack = 0;
+      const b = biomeOf(f);
+      if (kind === 'shield') foe.mods.push('shield');
+      else if (kind === 'pack') { foe.pack = 3; foe.ambush = 2; foe.hp = foe.max = foeHp(f, false) * 3 * 0.85; foe.atk = foeDps(f, false) * FOE_SWING * 1.6; }
+      else if (kind === 'elite') { foe.elite = true; foe.side = b.war.side; foe.name = b.war.units[Math.floor(r() * b.war.units.length)]; foe.sprite = ['skeleton', 'ghost', 'eye'][Math.floor(r() * 3)]; foe.hp = foe.max = foeHp(f, false) * 2.5; foe.atk = foeDps(f, false) * FOE_SWING * 1.3; foe.hue = b.hue + 40; }
+      else if (kind === 'rescue') { foe.rescue = MERCY_NAMES[Math.floor(r() * MERCY_NAMES.length)]; foe.hp *= 1.5; foe.max = foe.hp; }
+      else if (kind === 'special') { if (!SPECIALS[sp]) return 'Pick a special attack.'; foe.sp = sp; foe.spAt = now + 3000; foe.spWind = null; }
+      else return 'Unknown event.';
+    }
+    s.foe = foe; s.foeSwing = 0; s.foeGap = 0;
+    if (foe.wounded || foe.rescue) events && events.push({ type: 'mercy', kind: foe.wounded ? 'wounded' : 'rescue', who: foe.who || foe.rescue });
+    if (foe.pack) events && events.push({ type: 'pack', n: foe.pack, name: foe.name });
+    return null;
+  }
   function tick(s, dt, now, rng, events) {
     s.stats.playTime += dt; s.clock = now;
     nxTick(s, dt, now, events);
@@ -2616,7 +2675,7 @@
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, visiting, visitEnchanter, leaveEnchanter, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, SPAWN_EVENTS, spawnEvent, visiting, visitEnchanter, leaveEnchanter, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

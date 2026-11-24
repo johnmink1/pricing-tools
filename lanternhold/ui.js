@@ -1,4 +1,4 @@
-/* lh-build 202611240515 */
+/* lh-build 202611241244 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -119,7 +119,7 @@
   });
   document.addEventListener('pointerout', e => { if (tipFor && !tipFor.contains(e.relatedTarget)) { clearTimeout(tipHide); tipHide = setTimeout(hideTip, 60); } });
   document.addEventListener('click', e => {
-    const i = e.target.closest('.tipi') || (!fine.matches && e.target.closest('.trait[data-tip]'));
+    const i = e.target.closest('.tipi') || (!fine.matches && e.target.closest('.trait[data-tip],.cxp[data-tip]'));
     if (i) { e.preventDefault(); e.stopPropagation(); if (tipFor === i) hideTip(); else { showTip(i); clearTimeout(tipHide); tipHide = setTimeout(hideTip, 5000); } return; }
     if (!fine.matches) hideTip();
   }, true);
@@ -3251,6 +3251,15 @@
   const STAT_LBL = { pdps: 'party damage', crit: 'crit chance', dodge: 'dodge', php: 'party health', power: 'ability power', pheal: 'party healing', cd: 'faster abilities', gold: 'gold', loot: 'loot', chest: 'chest chance', sig: 'Sigil odds', spoils: 'ambush spoils' };
   const pctTxt = v => { const p = v * 100; return '+' + (p >= 1 ? Math.round(p * 10) / 10 : p >= 0.01 ? Math.round(p * 100) / 100 : Math.round(p * 10000) / 10000) + '%'; };
   const statMod = sc => { const m = Math.floor((sc - 10) / 2); return (m >= 0 ? '+' : '') + m; };
+  // XP bar breakdown: every bonus to hero XP and the total rate (John, 2026-11-24).
+  const xpRate = () => { const b = L.xpBonus(S); return (Math.round(b.total * 100) / 100).toFixed(2); };
+  function xpTip() {
+    const b = L.xpBonus(S), pc = v => '+' + (Math.round(v * 1000) / 10) + '%';
+    const lines = ['XP bonuses'].concat(b.parts.length ? b.parts.map(x => x[0] + ': ' + pc(x[1])) : ['None yet. Region mastery stars, Scholar’s Ink and some skills, traits and enchants raise it.']);
+    if (b.mult > 1) lines.push('Lantern Keeper online: ×' + b.mult);
+    lines.push('Total: ×' + xpRate() + ' hero XP' + (b.parts.length > 1 || b.mult > 1 ? ' (' + pc(b.add) + (b.mult > 1 ? ', then ×' + b.mult : '') + ')' : ''));
+    return lines.join('\n');
+  }
   function paintSheet() {
     const box = $('charsheet'); if (!box) return;
     const cls = L.heroCls(S);
@@ -3266,7 +3275,7 @@
     };
     box.innerHTML = '<div class="chead"><div><h3>' + esc(L.memberById('you').name) + ', hero level ' + h.lv + ' ' + c.name + '</h3><small>Earns XP from every fight ' + tipI('Your hero earns XP even when they sit out. Bigger foes give more. Each level gives a stat point.') + '</small></div>' +
       '<div class="kbal cpts' + (pts ? ' on' : '') + '">' + icon('star') + '<b>' + pts + '</b><small>' + (pts === 1 ? 'Point' : 'Points') + '</small></div></div>' +
-      '<div class="cxp"><i style="width:' + Math.min(100, h.xp / h.need * 100).toFixed(1) + '%"></i><span>' + fmt(Math.floor(h.xp)) + ' / ' + fmt(h.need) + ' XP to level ' + (h.lv + 1) + '</span></div>' +
+      '<div class="cxp" data-tip="' + esc(xpTip()) + '"><i style="width:' + Math.min(100, h.xp / h.need * 100).toFixed(1) + '%"></i><span>' + fmt(Math.floor(h.xp)) + ' / ' + fmt(h.need) + ' XP to level ' + (h.lv + 1) + '<em class="cxr">XP &times;' + xpRate() + '</em></span></div>' +
       '<div class="cgrid">' + L.STATS.map(row).join('') + '</div>' +
       '<div class="kfoot"><span>About stats ' + tipI('Favoured stats count half again. Stats work while your hero is in the party. A reset costs ' + L.RESPEC_COST + ' ' + TOKEN + '.') + '</span>' + ((S.attr && Object.keys(S.attr).length) ? '<button class="btn ghost small" id="c-reset">Reset stats</button>' : '') + '</div>';
   }
@@ -4472,6 +4481,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 92, date: 'November 24, 2026', title: 'See your XP bonuses', items: [
+      'The XP bar on your character sheet now shows your total hero XP rate, like XP ×1.18. Hover the bar (or tap it on a phone) to see every bonus that adds to it: class skills, war aura, Scholar’s Ink, Lantern Surge, companion traits, enchants and region mastery, plus the Lantern Keeper when he is online.',
+    ] },
     { v: 91, date: 'November 24, 2026', title: 'Merchant, bounties and the Lantern Keeper', items: [
       'New: the wandering merchant. Now and then, while you play, a merchant stops beside the fight for 2 minutes with one deal at half price: tonics, Campfire Draughts, Lantern Oil or Dust. Tap the merchant to see it.',
       'New: the bounty board, in the Quests window. Three bounties at a time, new every 4 hours, built from the floors you have reached: hunt certain monsters on certain floors, beat a guardian a few times, open chests and more. Each pays gold and Dust, sometimes a tonic.',

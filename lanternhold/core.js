@@ -1,4 +1,4 @@
-/* lh-build 202611240418 */
+/* lh-build 202611240419 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -685,6 +685,9 @@
     s.mast[r] = had | bit; events && events.push({ type: 'mastery', region: r, goal: MASTERY.find(m => m.bit === bit) });
   }
   function masteryStars(s, r) { const v = (s.mast || {})[r] || 0; return (v & 1 ? 1 : 0) + (v & 2 ? 1 : 0) + (v & 4 ? 1 : 0); }
+  // Hero XP from mastery (John, 2026-11-24): every star is +1% hero XP, and a region with all three stars adds +2% more.
+  const MASTERY_XP = 0.01, MASTERY_FULL_XP = 0.02;
+  function masteryXp(s) { let t = 0; for (const r in (s.mast || {})) { const n = masteryStars(s, r); t += n * MASTERY_XP + (n === 3 ? MASTERY_FULL_XP : 0); } return t; }
   function masteryVal(s, k) { const g = MASTERY.find(m => m.k === k); if (!g) return 0; let n = 0; for (const r in (s.mast || {})) if (s.mast[r] & g.bit) n++; return n * MASTERY_PER; }
   // Saves from before pacing v2 keep their hero level, the features they have already used and their mastery so far.
   function paceMigrate(s) {
@@ -725,7 +728,7 @@
     if (!s.hero) return;
     const base = (1 + s.floor / 25) * (foe.boss ? 15 : foe.chest ? 2 : foe.elite ? 4 : 1) * (foe.pack ? foe.pack * 2 : 1);
     const before = heroLevel(s).lv;
-    s.hxp += base * (1 + sk(s, 'xp'));
+    s.hxp += base * (1 + sk(s, 'xp') + masteryXp(s));
     const after = heroLevel(s).lv;
     if (after > before && events) events.push({ type: 'herolevel', lv: after, from: before, pts: pointsFor(after) - pointsFor(before) });
   }
@@ -2394,7 +2397,7 @@
   }
 
   const api = {
-    UNLOCKS, JOB_SLOT_LV, REGIONS, TRIAL_ELITES, trialOf, ROSTER_BASE, ROSTER_LV, ROSTER_BUY_MAX, ROSTER_COST, ROSTER_ITEMS, MASTERY, MASTERY_ELITES, MASTERY_PER, heroLv, unlockOf, canUse, nextUnlock, newUnlocks, jobSlots, regionNo, regionNeed, companions, rosterCap, fireCap, PARTY_SEATS, dismissCompanion, acceptRecruit, declineRecruit, masteryStars, masteryVal, paceMigrate,
+    UNLOCKS, JOB_SLOT_LV, REGIONS, TRIAL_ELITES, trialOf, ROSTER_BASE, ROSTER_LV, ROSTER_BUY_MAX, ROSTER_COST, ROSTER_ITEMS, MASTERY, MASTERY_ELITES, MASTERY_PER, MASTERY_XP, MASTERY_FULL_XP, masteryXp, heroLv, unlockOf, canUse, nextUnlock, newUnlocks, jobSlots, regionNo, regionNeed, companions, rosterCap, fireCap, PARTY_SEATS, dismissCompanion, acceptRecruit, declineRecruit, masteryStars, masteryVal, paceMigrate,
     reqLevel, canWear, JOBS, jobValue, jobFree, campBonus, jobOf, assignJob, jobText,
     CAMP_FLOOR, atCamp, atMainCamp, regionTop, campLeft, SHOP, shopPrice, buyShop, useDraught, useOil, TONICS, TONIC_CAP, ITEM_SIGILS, TRAIT_FX, CAMP_TRAITS, traitsOf, traitState, traitVal, traitText, campTrait, tonicById, tonicLeft, tonicVal, drinkTonic,
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,

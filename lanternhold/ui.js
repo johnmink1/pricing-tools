@@ -1,4 +1,4 @@
-/* lh-build 202611240315 */
+/* lh-build 202611240318 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -792,7 +792,7 @@
         const f = e.foe, spr = sprite(f.sprite, f.chest ? 0 : f.hue, true);
         foeAnim.dying = { spr, t: tAnim, x: foeAnim.cx - foeAnim.w / 2, y: foeAnim.cy - foeAnim.h / 2, w: foeAnim.w, h: foeAnim.h };
         burst(foeAnim.cx, foeAnim.cy, f.boss ? 50 : f.chest ? 40 : 14, f.chest || f.boss ? ['#f2c14e', '#fff0a0', '#c8952a'] : ['#f2c14e', '#fff0a0', '#9b8a70'], f.boss ? 70 : 45);
-        if (f.boss) { sfx.boss(); if (!(S.maxFloor % 10 === 0 && L.regionNeed(S, S.maxFloor + 1))) toast('crown', f.name + ' defeated', 'The way down is open.', ''); }
+        if (f.boss) { sfx.boss(); if (e.first && !(S.maxFloor % 10 === 0 && L.regionNeed(S, S.maxFloor + 1))) toast('crown', f.name + ' defeated', 'The way down is open.', ''); }
       } else if (e.type === 'loot') {
         const it = e.item;
         if (it.rar !== 'common') { toast('gear-trinket', L.gearName(it), L.RARITY.find(r => r.id === it.rar).name + ' ' + L.SLOT_NAME[it.slot].toLowerCase() + ' for a ' + L.CLASSES[it.cls].name, 'loot ' + it.rar); sfx.relic(); }
@@ -4220,6 +4220,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 83, date: 'November 24, 2026', title: 'Quieter guardian farming', items: [
+      'The "guardian defeated, the way down is open" pop-up now shows only the first time you beat a guardian, not on every kill while you farm it.'
+    ] },
     { v: 82, date: 'November 24, 2026', title: 'Farming guardians, and a cleaner top bar', items: [
       'With Descend automatically off, beating a guardian now keeps you on its floor so you can farm it again. Before, a guardian kill always pushed you down a floor.',
       'The top bar fits itself to your screen and zoom: it drops labels and then the title before anything can overlap. The online count no longer sits on the Lanternhold title.',

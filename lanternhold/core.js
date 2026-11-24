@@ -1,4 +1,4 @@
-/* lh-build 202611240315 */
+/* lh-build 202611240318 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -1837,7 +1837,8 @@
     s.gold += g; s.stats.goldEarned += g; s.stats.kills++;
     if (s.dots) for (const id in s.dots) if (--s.dots[id].n <= 0) delete s.dots[id];
     gainXp(s, foe, events);
-    events && events.push({ type: 'kill', gold: g, foe });
+    // first: this kill opens the way down (not a repeat kill while farming a floor already cleared)
+    events && events.push({ type: 'kill', gold: g, foe, first: !!foe.boss && s.floor >= s.maxFloor });
     unlockLore(s, foe.boss ? 'boss' : 'foe_' + foe.sprite, events);
     if (foe.boss && f % 10 === 0) unlockLore(s, 'g' + (Math.floor((f - 1) / 10) % BIOMES.length), events);
     dropGear(s, foe, rng, events);

@@ -1,4 +1,4 @@
-/* lh-build 202611241343 */
+/* lh-build 202611241356 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2162,3 +2162,8 @@ body.atench #ghostlamp,body.atench #merchant,body.atench #spwarn,body.atench .fl
 .lhway b{display:flex;align-items:center;gap:4px;font-size:20px;color:var(--gold)}.lhway b i{font-style:normal;font-size:13px;color:var(--muted);font-weight:600}.lhway b .sigil{width:20px;height:20px}
 .lhway span{color:var(--muted);font-size:13px;flex:1}.lhway .btn{margin-top:6px;width:100%;justify-content:center}
 @media (max-width:420px){.lhways{grid-template-columns:1fr}}
+/* v100: Mercy Corps encounters */
+.tag.mercy{background:#0f2a1c;color:#a7f3c4;border-color:#2f7a4f}
+.bar.hp.aid #hpbar{background:linear-gradient(90deg,#2f9e63,#7ee0a5)}
+.bar.lantern.aid #lanternbar{background:linear-gradient(90deg,#3b82f6,#93c5fd)}
+.tonic.mercy{cursor:default;border-color:#2f7a4f;background:#0f2a1c;color:#bff5d4}.tonic.mercy svg{color:#7ee0a5}

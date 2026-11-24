@@ -1,4 +1,4 @@
-/* lh-build 202611240418 */
+/* lh-build 202611240419 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -816,7 +816,7 @@
         if (e.elites >= L.TRIAL_ELITES) { sfx.relic(); toast('map', 'Region trial complete', e.guardian ? 'Beat ' + trialName(e.region) + '\u2019s guardian once more and the way down opens.' : 'Now beat ' + trialName(e.region) + '\u2019s guardian to open the way down.', 'feat'); }
         else floatText('Trial ' + e.elites + '/' + L.TRIAL_ELITES, 'skill', FOE_X, 0.22);
       } else if (e.type === 'mastery') {
-        sfx.relic(); toast('star', 'Region mastery: ' + e.goal.name, (L.BIOMES[e.region] || { name: 'Region' }).name + ': +' + Math.round(L.MASTERY_PER * 100) + '% ' + e.goal.fx + ' for good.', 'feat');
+        sfx.relic(); toast('star', 'Region mastery: ' + e.goal.name, (L.BIOMES[e.region] || { name: 'Region' }).name + ': +' + Math.round(L.MASTERY_PER * 100) + '% ' + e.goal.fx + ' and +' + Math.round(L.MASTERY_XP * 100) + '% hero XP for good.' + (L.masteryStars(S, e.region) === 3 ? ' Region fully mastered: +' + Math.round(L.MASTERY_FULL_XP * 100) + '% more hero XP.' : ''), 'feat');
       } else if (e.type === 'sealed') {
         if (!sealedToast) { sealedToast = true; toast('lock', 'The way is sealed', 'Act One ends here. The Rift Threshold opens again with Season 2 of the Grand War. Your party holds the landing and keeps earning.', 'feat'); }
       } else if (e.type === 'revive') {
@@ -1002,13 +1002,13 @@
   // Region mastery: three goals in each region you have reached.
   function masteryHtml() {
     const top = Math.min(L.REGIONS, Math.max(1, Math.ceil(S.maxFloorEver / 10)));
-    let h = '<div class="mastery"><h3 class="sub">Region mastery</h3><p class="note small">Each region has three goals. Every one you finish gives +' + Math.round(L.MASTERY_PER * 100) + '% to its stat for good: ' + L.MASTERY.map(g => g.name.toLowerCase() + ' to ' + g.fx).join(', ') + '.</p><div class="mlist">';
+    let h = '<div class="mastery"><h3 class="sub">Region mastery</h3><p class="note small">Each region has three goals. Every one you finish gives +' + Math.round(L.MASTERY_PER * 100) + '% to its stat for good: ' + L.MASTERY.map(g => g.name.toLowerCase() + ' to ' + g.fx).join(', ') + '. Every goal also adds +' + Math.round(L.MASTERY_XP * 100) + '% hero XP, and a region with all three adds +' + Math.round(L.MASTERY_FULL_XP * 100) + '% more.</p><div class="mlist">';
     for (let r = 0; r < top; r++) {
       const v = (S.mast || {})[r] || 0, el = Math.min(L.MASTERY_ELITES, (S.mastE || {})[r] || 0), b = L.BIOMES[r] || { name: 'Region ' + (r + 1) };
       h += '<div class="mrow"><div class="mname"><b>' + esc(b.name) + '</b><small>Floors ' + (r * 10 + 1) + '-' + (r * 10 + 10) + '</small></div><div class="mgoals">' +
         L.MASTERY.map(g => '<span class="mg' + (v & g.bit ? ' done' : '') + '" data-tip="' + esc(g.desc + ': +' + Math.round(L.MASTERY_PER * 100) + '% ' + g.fx) + '">' + icon(v & g.bit ? 'star' : 'lock') + esc(g.name) + (g.bit === 2 && !(v & 2) ? ' ' + el + '/' + L.MASTERY_ELITES : '') + '</span>').join('') + '</div><em>' + L.masteryStars(S, r) + '/3</em></div>';
     }
-    return h + '</div><p class="note small">Totals: +' + Math.round(L.masteryVal(S, 'dps') * 100) + '% damage, +' + Math.round(L.masteryVal(S, 'hp') * 100) + '% health, +' + Math.round(L.masteryVal(S, 'gold') * 100) + '% gold.</p></div>';
+    return h + '</div><p class="note small">Totals: +' + Math.round(L.masteryVal(S, 'dps') * 100) + '% damage, +' + Math.round(L.masteryVal(S, 'hp') * 100) + '% health, +' + Math.round(L.masteryVal(S, 'gold') * 100) + '% gold, +' + Math.round(L.masteryXp(S) * 100) + '% hero XP.</p></div>';
   }
   // A story companion arrives at a full campfire: keep them by dismissing someone for good, add a spot with Sigils, or turn them away.
   let recruitOpen = false;
@@ -4082,7 +4082,8 @@
       ['Region mastery', 'i:map', 'Every region has three goals. Each one finished is +1% for good.', [
         '<b>Guardian</b>: beat the region\'s last guardian (+1% damage).',
         '<b>Warbands</b>: defeat 20 alliance elites in the region (+1% health).',
-        '<b>Relic gear</b>: find a piece of the region\'s set (+1% gold).']],
+        '<b>Relic gear</b>: find a piece of the region\'s set (+1% gold).',
+        'Every goal also gives <b>+1% hero XP</b>, and finishing all three in a region gives <b>+2% more</b> (+5% hero XP per fully mastered region).']],
       ['While you are away', 'i:refresh', 'The game keeps earning when you close it.', [
         'You earn <b>a quarter</b> of your usual gold for up to <b>8 hours</b>.',
         '<b>Night Watch</b> (Skills tab) stretches that up to 3 days.',
@@ -4368,6 +4369,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 89, date: 'November 24, 2026', title: 'Mastery hero XP', items: [
+      'Region mastery now speeds up hero levels too. Every mastery goal adds +1% hero XP, and a region with all three goals done adds +2% more (+5% per fully mastered region).',
+      'It counts the mastery you already have, so many heroes get a boost right away. Your total shows under Region mastery in the Codex.'
+    ] },
     { v: 88, date: 'November 24, 2026', title: 'Burns, poison, stuns and disarms', items: [
       'Burning now hurts heroes in cloth (healers, mages, necromancers) twice as much. Tanks in plate take a quarter less.',
       'Poison now bites everyone a quarter harder, except necromancers, who take only a quarter of it.',

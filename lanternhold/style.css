@@ -1,4 +1,4 @@
-/* lh-build 202611241743 */
+/* lh-build 202611241750 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2156,7 +2156,8 @@ body.atench #ghostlamp,body.atench #merchant,body.atench #spwarn,body.atench .fl
   body.atench .stage .foe{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
   body.atench #enchpanel{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:auto}
   body.atench #enchpanel>*{flex:none}
-  body.atench #enchpanel .ewlist{flex:1 1 auto;min-height:90px;max-height:none}
+  /* v117 fix (John: two scrollbars): the counter scrolls as one; lists don't scroll on their own. */
+  body.atench #enchpanel .ewlist{flex:none;max-height:none;overflow:visible}
 }
 .enchvisit .merchhead img{width:46px;height:62px;object-fit:contain;flex:none}
 /* v97: profile account tiles and the Sigil shop */

@@ -1,4 +1,4 @@
-/* lh-build 202611241743 */
+/* lh-build 202611241750 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -2090,9 +2090,8 @@
       const all = L.massMergePlan(S, mmCap), plan = all.filter(p => sfPass(p.a)), exp = plan.reduce((a, p) => a + p.risk, 0), fexp = plan.reduce((a, p) => a + L.mergeRisk(S, p.a, p.b).field, 0);
       return head + perk + '<h3 class="ewq">Merge all your spare pairs at once?</h3><p class="ewhint">Copies of the same item merge in pairs, best with next best. Worn and locked items are left alone. Each pair rolls on its own; a loss destroys both pieces.</p>' +
         '<div class="ewchips">' + [1, 2, 3, 5, 10].map(n => '<button class="ewchip' + (n === mmCap ? ' sel' : '') + '" data-awcap="' + n + '"><b>Up to +' + n + '</b></button>').join('') + '</div>' + (all.length ? sfBar(all.map(p => p.a), { noSort: 1 }) : '') +
-        (plan.length ? ewList(plan.map(p => ewItemRow(p.a, 'data-noop="1"', '+' + p.a.up + ' &amp; +' + p.b.up + ' &rarr; +' + p.to, '<span class="ewcost">' + riskTxt(p.risk) + ' risk</span>')), '') +
-          '<div class="ewsum"><div class="mgodds"><div><small>Merges</small><b>' + plan.length + '</b></div><div class="ok"><small>Expected wins</small><b>' + (Math.round((plan.length - exp) * 10) / 10) + '</b></div><div class="bad"><small>Expected losses</small><b>' + (Math.round(exp * 10) / 10) + '</b></div></div>' +
-          '<p class="shopnote">In the field the same merges would expect ' + (Math.round(fexp * 10) / 10) + ' losses.</p><button class="btn danger" data-awgo="mass">Merge ' + plan.length + '</button></div>'
+        (plan.length ?           '<div class="ewsum"><div class="mgodds"><div><small>Merges</small><b>' + plan.length + '</b></div><div class="ok"><small>Expected wins</small><b>' + (Math.round((plan.length - exp) * 10) / 10) + '</b></div><div class="bad"><small>Expected losses</small><b>' + (Math.round(exp * 10) / 10) + '</b></div></div>' +
+          '<p class="shopnote">In the field the same merges would expect ' + (Math.round(fexp * 10) / 10) + ' losses.</p><button class="btn danger" data-awgo="mass">Merge ' + plan.length + '</button></div>' + ewList(plan.map(p => ewItemRow(p.a, 'data-noop="1"', '+' + p.a.up + ' &amp; +' + p.b.up + ' &rarr; +' + p.to, '<span class="ewcost">' + riskTxt(p.risk) + ' risk</span>')), '')
           : '<p class="ewempty">' + (all.length ? 'No pairs match these filters. Try All or Anyone.' : 'No spare pairs to merge up to +' + mmCap + '. Worn and locked items are skipped.') + '</p>');
     }
     let steps, cur = 0, body = '', picked = '';

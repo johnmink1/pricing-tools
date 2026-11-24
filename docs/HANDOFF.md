@@ -1,6 +1,6 @@
 # Lanternhold handoff (24 Nov 2026)
 
-This handoff stands on its own for the new Lanternhold project. It is current as of **v107**, live at https://lanternhold.born2gamellc.com.
+This handoff stands on its own for the new Lanternhold project. It is current as of **v108**, live at https://lanternhold.born2gamellc.com.
 
 ## Where the code lives
 
@@ -9,7 +9,7 @@ This handoff stands on its own for the new Lanternhold project. It is current as
 | Path | What it is |
 |---|---|
 | `lanternhold/core.js` | All game rules: classes, foes, loot, crafting, events, the `api` export list. Any new function must be added to that big export list at the bottom. |
-| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v108**. |
+| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v109**. |
 | `lanternhold/style.css`, `index.html` | Styles and markup. |
 | `lanternhold/vector.js` | Illustrated SVG sprites (`ART.enchanter`, `ART.armorer`, classes, foes). |
 | `lanternhold/sprites.js` | Pixel fallback sprites and `itemIcon`. |
@@ -104,6 +104,7 @@ There is no working AWS CLI. The cloud container's keys are invalid, and VENGEAN
   - **The stack update for this Lambda must be deployed through CloudShell.** Until it is, the game says "The shard stall opens soon." and loot claims retry later.
   - Also in v105: the Enchanter and Armorer scenes scale to the arena (`shopGeo()`: a 198 × 74 focus box fills the arena, the room grows around it; v106 shrank it from 100 so short, wide panels keep big sprites).
   - v107: the Store is a visited shop too (`S.shopK = 'store'`, keeper sprite `ART.quartermaster` "Old Thessaly", plank-wall room in `buildShop`). Its panel is `storePanelHtml()` with `SW.mode` tabs Tonics/Supplies; `openStore()` falls back to the old `openStoreModal()` when there is no hero. Each shop header (`.shophead .shopbtns`) has swap buttons to the other two shops.
+  - v108 Victor's Banner (John, 24 Nov 2026): heroes whose banner matches the last crowned Grand War season's Nexus holder get `WARWIN_FX` (+8% dps/hp/heal/gold, via `sidePerk`) and revive in `WARWIN_REVIVE` (10 s) through `reviveMs(s)`. The game reads `https://war.born2gamellc.com/api/nexus.json` (bot repo `koprulu/web.py` `build_nexus`, any-origin CORS, PR #217) every 15 min into `S.warWin = {side, season}`; `WAR_KEY` maps the war's `ascendancy` to the game's `radiant`. Nulls until Season 1 is crowned. It goes by in-game banner, not the verified commander link. Line `#winline` under Banner kin.
 
 ## Open asks and things to watch
 

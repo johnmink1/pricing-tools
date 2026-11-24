@@ -1,4 +1,4 @@
-/* lh-build 202611241515 */
+/* lh-build 202611241521 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -56,7 +56,16 @@
   // Mercy's Blessing: real-world donations to the Grand War's Mercy Corps light it for every player (the server keeps the clock).
   const MERCY_FX = { gold: 0.10, hp: 0.10, heal: 0.20 };
   const mercyOn = s => !!(s && s.mercy && s.mercy > Date.now());
-  const sidePerk = (s, k) => sidePerk0(s, k) * (mercyOn(s) ? 1 + (MERCY_FX[k] || 0) : 1);
+  // Victor's Banner (John, 24 Nov 2026): heroes under the banner of the alliance that won the last crowned Grand War
+  // season (it holds the Nexus) get +8% damage, health, healing and gold, and fallen allies get back up in 10 seconds
+  // instead of 15. It lasts until the next season is crowned. The war site's /api/nexus.json decides; the game keeps
+  // the answer in s.warWin = { side, season }. The war calls the Ascendancy what the game calls 'radiant'.
+  const WARWIN_FX = { dps: 0.08, hp: 0.08, heal: 0.08, gold: 0.08 };
+  const WARWIN_REVIVE = 10;
+  const WAR_KEY = { covenant: 'covenant', ascendancy: 'radiant', tide: 'tide' };
+  const warWinOn = s => !!(s && s.warWin && s.warWin.side && sideOf(s) === s.warWin.side);
+  const reviveMs = s => (warWinOn(s) ? WARWIN_REVIVE : REVIVE_TIME) * 1000;
+  const sidePerk = (s, k) => sidePerk0(s, k) * (mercyOn(s) ? 1 + (MERCY_FX[k] || 0) : 1) * (warWinOn(s) ? 1 + (WARWIN_FX[k] || 0) : 1);
   // Banner kin: every other party member who marches under your banner amplifies your banner perk by 40%.
   const KIN_AMP = 0.4;
   const bannerKin = s => { const d = sideOf(s); if (!d || !s.party) return 0; let n = 0; for (const id of s.party) { if (!id || id === 'you') continue; const m = memberById(id); if (m && m.side === d) n++; } return n; };
@@ -2213,7 +2222,7 @@
   }
   function hurtHero(s, t, dmg, now, events) {
     s.hp[t] = (s.hp[t] == null ? maxHpOf(s, t) : s.hp[t]) - dmg;
-    if (s.hp[t] <= 0) { s.hp[t] = 0; s.down[t] = now + REVIVE_TIME * 1000; if (s.dots) delete s.dots[t]; events && events.push({ type: 'fall', id: t }); return true; }
+    if (s.hp[t] <= 0) { s.hp[t] = 0; s.down[t] = now + reviveMs(s); if (s.dots) delete s.dots[t]; events && events.push({ type: 'fall', id: t }); return true; }
     return false;
   }
   function addDot(s, t, k, dps, events) {
@@ -2288,10 +2297,10 @@
     if (mods.includes('venom')) { s.poison = s.poison || {}; s.poison[t] = { dps: dmg * 0.12, until: now + 5000 }; events && events.push({ type: 'poison', id: t }); }
     if (mods.includes('cleave')) {
       const live = s.party.filter(id => id && !s.down[id]), nx = live[live.indexOf(t) + 1];
-      if (nx) { s.hp[nx] = (s.hp[nx] == null ? maxHpOf(s, nx) : s.hp[nx]) - dmg * 0.4; if (s.hp[nx] <= 0) { s.hp[nx] = 0; s.down[nx] = now + REVIVE_TIME * 1000; events && events.push({ type: 'fall', id: nx }); } }
+      if (nx) { s.hp[nx] = (s.hp[nx] == null ? maxHpOf(s, nx) : s.hp[nx]) - dmg * 0.4; if (s.hp[nx] <= 0) { s.hp[nx] = 0; s.down[nx] = now + reviveMs(s); events && events.push({ type: 'fall', id: nx }); } }
     }
     if (s.hp[t] <= 0) {
-      s.hp[t] = 0; s.down[t] = now + REVIVE_TIME * 1000;
+      s.hp[t] = 0; s.down[t] = now + reviveMs(s);
       events && events.push({ type: 'fall', id: t });
       if (!alive(s).length) wipe(s, now, events);
     }
@@ -2518,7 +2527,7 @@
     if (s.poison) for (const id in s.poison) {
       const p = s.poison[id]; if (p.until <= now || s.down[id] || !s.party.includes(id)) { delete s.poison[id]; continue; }
       s.hp[id] -= p.dps * dt;
-      if (s.hp[id] <= 0) { s.hp[id] = 0; s.down[id] = now + REVIVE_TIME * 1000; delete s.poison[id]; events && events.push({ type: 'fall', id }); if (!alive(s).length) { wipe(s, now, events); return; } }
+      if (s.hp[id] <= 0) { s.hp[id] = 0; s.down[id] = now + reviveMs(s); delete s.poison[id]; events && events.push({ type: 'fall', id }); if (!alive(s).length) { wipe(s, now, events); return; } }
     }
     if (s.dots) for (const id in s.dots) {
       const d = s.dots[id]; if (s.down[id] || !s.party.includes(id)) { delete s.dots[id]; continue; }
@@ -2725,7 +2734,7 @@
     STATS, STAT_CLASS, STAT_BASE, STAT_AFFINITY, STAT_MAX, RESPEC_COST, statSpent, xpNeed, heroLevel, pointsFor, heroPoints, statScore, addStat, resetStats, statVal, PACK_CHANCE, PACK_GOLD,
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
-    clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, WB_SETS, WB_SLOTS, WB_PCT, WB_TWO, WB_FOUR, wbUpCost, wbCounts, wbBonus, shardsOf, makeLegend, SPAWN_EVENTS, spawnEvent, visiting, visitEnchanter, leaveEnchanter, SMELT_MULT, smeltValue, smelt, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
+    clickDamage, xpBonus, CRAFT_XP, craftXp, MERCY_FLOOR, MERCY_COOL, RESCUE_CHANCE, WOUNDED_CHANCE, MERCY_MIN, RESCUE_FX, AID_FX, AID_TIME, AID_SEC, AID_TAP, AID_HYMN, mercyFoe, mercyXpOn, mercyAidOn, WB_SETS, WB_SLOTS, WB_PCT, WB_TWO, WB_FOUR, wbUpCost, wbCounts, wbBonus, shardsOf, makeLegend, SPAWN_EVENTS, spawnEvent, visiting, visitEnchanter, leaveEnchanter, SMELT_MULT, smeltValue, smelt, PACK_XP, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, WARWIN_FX, WARWIN_REVIVE, WAR_KEY, warWinOn, reviveMs, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
     offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, KEEPER, keeperOn, keeperMult, BOUNTY_FLOOR, BOUNTY_HOURS, BOUNTY_MS, bountyWin, bountyState, bountyReward, claimBountyAt, bountyText, MERCH_FLOOR, MERCH_LIFE, MERCH_OFF, merchantTick, merchantBuy, SHIELD_FLOOR, SHIELD_CUT, SHIELD_TAP, SHIELD_DECAY, DOT_VS, dotMult, CC, ccOf, stunned, disarmed, addCC, GHOST_FLOOR, GHOST_LIFE, GHOST_MAX, GHOST_STATS, ghostSap, ghostTick, ghostBreak, HERO_DPS, RES_KIND, RES_MAX, RES_REGEN, AB_COST, SPEC_COST, HEAL_DRAIN, RES_WAKE, resKind, resOf, resRegen, oom, wearTotals, wearVal, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

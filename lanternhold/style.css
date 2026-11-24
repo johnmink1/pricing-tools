@@ -1,4 +1,4 @@
-/* lh-build 202611241515 */
+/* lh-build 202611241521 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1433,6 +1433,8 @@ h3.sub .tipi{vertical-align:2px}
 .kin{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:13.5px}
 .kin>span{color:var(--muted)}
 .kin>span b{color:var(--text)}
+.kin>b{white-space:nowrap}
+.kin.victor{border-style:solid;box-shadow:0 0 0 1px color-mix(in srgb,var(--side,#f5c242) 30%,transparent) inset}.kin.victor svg.vi{width:15px;height:15px;color:var(--side,#f5c242);flex:none}
 .kin .tipi{margin-left:auto}
 /* tabs: fit all of them without clipping */
 @media (min-width:901px) and (max-width:1600px){.tabs button{padding:10px 9px 11px;font-size:13.5px}.tabs button svg{display:none}}

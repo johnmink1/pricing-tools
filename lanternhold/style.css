@@ -1,4 +1,4 @@
-/* lh-build 202611240515 */
+/* lh-build 202611241244 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1197,6 +1197,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 @keyframes cpulse{50%{box-shadow:0 0 0 5px rgba(245,194,66,.08)}}
 .cxp{position:relative;height:22px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;margin-bottom:12px}
 .cxp i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,var(--gold2),var(--gold));opacity:.55}
+.cxp{cursor:help}
+.cxp .cxr{font-style:normal;margin-left:8px;color:var(--text);font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .cxp span{position:relative;display:block;text-align:center;font-size:12px;line-height:20px;color:var(--text);font-variant-numeric:tabular-nums}
 .cgrid{display:grid;gap:6px}
 .cstat{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--panel);border:1px solid var(--line)}
@@ -1405,7 +1407,7 @@ button.stat.quests.done{color:var(--good);background:rgba(143,207,106,.08);borde
 .top .iconbtn,.top .account{height:40px}
 .top .support{height:40px}
 /* tooltips */
-.tip{position:fixed;z-index:9999;max-width:260px;padding:8px 11px;border-radius:9px;background:#0c1322f5;border:1px solid var(--line2);color:var(--text);font:500 13px/1.4 var(--body);box-shadow:0 10px 28px rgba(0,0,0,.5);pointer-events:none;animation:tipin .12s ease-out}
+.tip{position:fixed;z-index:9999;white-space:pre-line;max-width:260px;padding:8px 11px;border-radius:9px;background:#0c1322f5;border:1px solid var(--line2);color:var(--text);font:500 13px/1.4 var(--body);box-shadow:0 10px 28px rgba(0,0,0,.5);pointer-events:none;animation:tipin .12s ease-out}
 .tip[hidden]{display:none}
 .tip::before{content:"";position:absolute;top:-6px;left:var(--ax,50%);width:10px;height:10px;transform:translateX(-50%) rotate(45deg);background:#0c1322;border-left:1px solid var(--line2);border-top:1px solid var(--line2)}
 .tip.up::before{top:auto;bottom:-6px;transform:translateX(-50%) rotate(225deg)}

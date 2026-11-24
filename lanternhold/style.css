@@ -1,4 +1,4 @@
-/* lh-build 202611241551 */
+/* lh-build 202611241558 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2151,8 +2151,9 @@ body.atench #ghostlamp,body.atench #merchant,body.atench #spwarn,body.atench .fl
 .ewsum p b,.ewsum p svg{display:inline}.ewsum p svg{display:inline-block}
 @media (min-width:901px) and (min-height:620px){
   body.atench .stagehead{flex:none}
-  body.atench .stage .arena{min-height:min(290px,40vh)}
-  body.atench .stage .foe{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  /* v114: the shop scene keeps its 16:10 shape (shrinking on short screens) instead of stretching to fill tall ones */
+  body.atench .stage .arena{flex:0 1 auto;aspect-ratio:16/10;min-height:min(290px,40vh)}
+  body.atench .stage .foe{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
   body.atench #enchpanel{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:auto}
   body.atench #enchpanel>*{flex:none}
   body.atench #enchpanel .ewlist{flex:1 1 auto;min-height:90px;max-height:none}
@@ -2217,3 +2218,12 @@ body.atench #ghostlamp,body.atench #merchant,body.atench #spwarn,body.atench .fl
 .top.fit5{gap:5px}.top.fit5 .iconbtn{width:34px;min-width:34px}
 body.isfull #app{max-width:min(1840px,100%)}
 body{overflow-x:clip}
+/* v114 @mentions */
+.chatform{position:relative}
+.atbox{position:absolute;left:10px;bottom:calc(100% + 4px);display:flex;flex-direction:column;min-width:180px;max-width:calc(100% - 20px);background:var(--bg2);border:1px solid var(--line2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.45);overflow:hidden;z-index:5}
+.atbox[hidden]{display:none}
+.atbox button{all:unset;cursor:pointer;padding:8px 12px;font-size:14px;color:var(--text)}
+.atbox button.on,.atbox button:hover{background:color-mix(in srgb,#f5c242 18%,transparent);color:#ffe7a3}
+.msg b.at{color:#9ec7ff;font-weight:700}.msg b.at.me{color:#f5c242}
+.msg.ment{background:color-mix(in srgb,#f5c242 12%,transparent);border-left:3px solid #f5c242;border-radius:6px}
+#chatch [data-ch].ment{box-shadow:inset 0 -2px 0 #f5c242}

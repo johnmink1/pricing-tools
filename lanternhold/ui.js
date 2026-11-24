@@ -1,4 +1,4 @@
-/* lh-build 202611241316 */
+/* lh-build 202611241325 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -459,6 +459,84 @@
     }
   }
 
+  // ---------- the Enchanter's shop (John, 2026-11-24): the party leaves the Deep and walks into the shop ----------
+  let shopBg = null, shopKey = '', enchImg = null;
+  function buildShop() {
+    const c = document.createElement('canvas'); c.width = Math.round(W * R); c.height = Math.round(H * R);
+    const g = c.getContext('2d'); g.scale(R, R);
+    const floorY = Math.round(H * 0.72);
+    // back wall: dark plum plaster with timber beams
+    let lg = g.createLinearGradient(0, 0, 0, floorY); lg.addColorStop(0, '#1c1230'); lg.addColorStop(1, '#2e1f45'); g.fillStyle = lg; g.fillRect(0, 0, W, floorY);
+    g.fillStyle = '#3a2618'; for (let x = 0; x < W; x += 60) g.fillRect(x, 0, 5, floorY);
+    g.fillRect(0, 10, W, 4);
+    // shelves of bottles and books behind the counter
+    const shelf = (x, y, w) => {
+      g.fillStyle = '#5a3a22'; g.fillRect(x, y, w, 3); g.fillStyle = '#2a1a0e'; g.fillRect(x, y + 3, w, 1.5);
+      let seed = Math.round(x * 7 + y * 13);
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let bx = x + 3; bx < x + w - 5; bx += 6 + rnd() * 4) {
+        const k = rnd();
+        if (k < 0.55) { const col = ['#a78bfa', '#60a5fa', '#34d399', '#f472b6', '#fbbf24'][Math.floor(rnd() * 5)], bh = 6 + rnd() * 5;
+          g.fillStyle = col; g.globalAlpha = 0.85; g.fillRect(bx, y - bh, 4, bh); g.globalAlpha = 1; g.fillStyle = '#d6c7a1'; g.fillRect(bx + 1, y - bh - 2, 2, 2); }
+        else { const bh = 7 + rnd() * 4; g.fillStyle = ['#7c2d12', '#1e3a8a', '#14532d', '#581c87'][Math.floor(rnd() * 4)]; g.fillRect(bx, y - bh, 4, bh); g.fillStyle = 'rgba(255,220,150,.35)'; g.fillRect(bx, y - bh + 2, 4, 1); }
+      }
+    };
+    const sx = Math.round(W * 0.5), sw = Math.round(W * 0.46);
+    shelf(sx, 40, sw); shelf(sx, 62, sw); shelf(sx, 84, sw);
+    // a round window with moonlight on the left
+    const wx = Math.round(W * 0.2), wy = 46;
+    g.fillStyle = '#3a2618'; g.beginPath(); g.arc(wx, wy, 17, 0, Math.PI * 2); g.fill();
+    const wg = g.createRadialGradient(wx, wy, 2, wx, wy, 15); wg.addColorStop(0, '#9fb7ff'); wg.addColorStop(1, '#2b3a6b'); g.fillStyle = wg; g.beginPath(); g.arc(wx, wy, 14, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#3a2618'; g.lineWidth = 2; g.beginPath(); g.moveTo(wx - 14, wy); g.lineTo(wx + 14, wy); g.moveTo(wx, wy - 14); g.lineTo(wx, wy + 14); g.stroke();
+    // the doorway the party came in by
+    g.fillStyle = '#120b1c'; g.beginPath(); g.moveTo(4, floorY); g.lineTo(4, floorY - 44); g.quadraticCurveTo(20, floorY - 58, 36, floorY - 44); g.lineTo(36, floorY); g.fill();
+    g.strokeStyle = '#5a3a22'; g.lineWidth = 2.5; g.stroke();
+    // floorboards
+    lg = g.createLinearGradient(0, floorY, 0, H); lg.addColorStop(0, '#4a2f1c'); lg.addColorStop(1, '#22150c'); g.fillStyle = lg; g.fillRect(0, floorY, W, H - floorY);
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; for (let y = floorY + 6; y < H; y += 7) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    // a rug in front of the counter
+    g.fillStyle = '#5b21b6'; g.globalAlpha = 0.55; g.beginPath(); g.ellipse(W * 0.5, floorY + 18, 46, 7, 0, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+    return c;
+  }
+  function drawEnchShop(now) {
+    if (shopKey !== W + 'x' + H) { shopBg = buildShop(); shopKey = W + 'x' + H; }
+    if (!enchImg) { enchImg = new Image(); enchImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(ENCH_SVG.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="104" ')); }
+    ctx.drawImage(shopBg, 0, 0, W, H);
+    const floorY = Math.round(H * 0.72), cx = Math.round(W * 0.62), cTop = Math.round(floorY - Math.max(18, H * 0.14)), eh = Math.max(56, H * 0.46), ew = eh * 40 / 52;
+    // the Enchanter behind the counter, swaying a little, orb glowing
+    const sway = Math.sin(tAnim * 1.3) * 0.8;
+    if (enchImg.complete && enchImg.naturalWidth) ctx.drawImage(enchImg, cx - ew / 2, cTop - eh * 0.72 + sway, ew, eh);
+    const ox = cx + ew * 0.33, oy = cTop - eh * 0.72 + eh * 0.58 + sway, og = ctx.createRadialGradient(ox, oy, 0, ox, oy, 22 + Math.sin(tAnim * 3) * 3);
+    og.addColorStop(0, 'rgba(216,180,254,.55)'); og.addColorStop(1, 'rgba(167,139,250,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = og; ctx.fillRect(ox - 30, oy - 30, 60, 60); ctx.globalCompositeOperation = 'source-over';
+    // the counter
+    let lg = ctx.createLinearGradient(0, cTop, 0, floorY); lg.addColorStop(0, '#7a4a26'); lg.addColorStop(1, '#3a2010');
+    ctx.fillStyle = lg; ctx.fillRect(cx - 40, cTop, 80, floorY - cTop + 2);
+    ctx.fillStyle = '#9a6a3a'; ctx.fillRect(cx - 43, cTop - 3, 86, 4);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; for (let i = -30; i <= 30; i += 20) ctx.fillRect(cx + i, cTop + 4, 1.2, floorY - cTop - 4);
+    // a candle and an open book on the counter
+    ctx.fillStyle = '#e7d7b0'; ctx.fillRect(cx - 34, cTop - 9, 3, 6); flame(ctx, cx - 32.5, cTop - 9, 5 + Math.sin(tAnim * 8) * 0.8, Math.sin(tAnim * 5));
+    ctx.fillStyle = '#f5ecd2'; ctx.fillRect(cx - 24, cTop - 5, 9, 3); ctx.fillRect(cx - 14, cTop - 5, 9, 3); ctx.fillStyle = '#6b4f2a'; ctx.fillRect(cx - 15, cTop - 5, 1, 3);
+    // your hero walks in from the doorway and stops at the counter
+    const m = L.memberById('you');
+    if (m) {
+      const t = Math.min(1, (now - (S.enchAt || now)) / 1800), x0 = 20, x1 = cx - 60, hx = x0 + (x1 - x0) * (1 - Math.pow(1 - t, 2));
+      const spr = sprite(m.cls, lookHue(m), false), w2 = spr.lw * 2, h2 = spr.lh * 2, step = t < 1 ? Math.abs(Math.sin(tAnim * 9)) * 1.6 : Math.sin(tAnim * 1.6) * 0.5;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(hx, floorY + 5, 11, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.drawImage(spr, hx - w2 / 2, floorY + 6 - h2 - step, w2, h2);
+      ctx.fillStyle = '#f5c242'; ctx.beginPath(); ctx.moveTo(hx - 2, floorY - h2 + 0.5 - step); ctx.lineTo(hx + 2, floorY - h2 + 0.5 - step); ctx.lineTo(hx, floorY - h2 + 3 - step); ctx.fill();
+    }
+    // drifting sparkles from the orb
+    if (Math.random() < 0.25) particles.push({ x: ox + (Math.random() - 0.5) * 6, y: oy, vx: (Math.random() - 0.5) * 10, vy: -10 - Math.random() * 10, life: 1.2 + Math.random(), age: 0, c: Math.random() < 0.5 ? '#c4b5fd' : '#f0abfc', s: 1 });
+    const dt = 1 / 60;
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i]; p.age += dt; if (p.age > p.life) { particles.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      ctx.globalAlpha = Math.min(1, (p.life - p.age) * 1.5); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, 0.7, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // ---------- the Nexus breach (click-rhythm brake, core.js NX_*) ----------
   // The back wall cracks as the meter fills, violet light leaks through, then the Nexus Guardian steps out.
   const NX_CRACKS = (() => {
@@ -540,6 +618,7 @@
     const nowMs = Date.now();
     document.body.classList.toggle('resting', L.resting(S, nowMs));
     if (L.resting(S, nowMs)) { drawCamp(nowMs); requestAnimationFrame(render); return; }
+    if (L.visiting(S)) { drawEnchShop(nowMs); requestAnimationFrame(render); return; }
     const b = L.biomeOf(S.floor);
     const key = b.name + W + 'x' + H;
     if (key !== bgKey) { bgCanvas = buildBackground(b, Math.floor((S.floor - 1) / 10) + 3); bgKey = key; }
@@ -1100,7 +1179,7 @@
       });
   }
   function campBarHtml() {
-    const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now()), store = '<button class="btn ghost small" data-camp="ench" data-tip="Visit the Enchanter to enchant and disenchant gear. The dive pauses while you are there.">Enchanter</button><button class="btn ghost small" data-camp="store" data-tip="Draughts, lantern oil and tonics.">Store</button>';
+    const n = (S.items && S.items.draught) || 0, left = L.campLeft(S, Date.now()), store = '<button class="btn ghost small" data-camp="ench" data-tip="Go to the Enchanter’s shop to enchant and disenchant gear. You come back to this floor when you leave.">Enchanter</button><button class="btn ghost small" data-camp="store" data-tip="Draughts, lantern oil and tonics.">Store</button>';
     if (S.floor <= L.CAMP_FLOOR) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Main camp</b><small>Everything can change here</small></div>' + (S.maxFloor > 1 || S.campReturn ? '<button class="btn small" data-camp="down" data-tip="Head back down. You start at the top of the region you left.">' + downLabel() + '</button>' : '') + store + '</div>';
     if (left > 0) return '<div class="campbar on"><span class="cb-ic">' + icon('flame') + '</span><div><b>Field camp · ' + Math.ceil(left) + 's</b><small>Change gear, then carry on</small></div>' + store + '</div>';
     const top = Math.min(S.maxFloor, L.regionTop(S.floor));
@@ -1697,8 +1776,8 @@
         const locked = () => { toast('lock', 'This item is locked', 'Unlock it first to sell, send or salvage it.', 'warn'); };
         md.querySelector('#i-lk').onclick = () => { const on = L.toggleLock(S, uid); sfx.buy(); save(); updateGear(true); itemModal(uid); toast('lock', on ? 'Item locked' : 'Item unlocked', on ? L.gearName(it) + ' is safe from mass scrap, auto-sell and the Loot Goblin' + (w ? ', and Equip best leaves it in its slot.' : '.') : L.gearName(it) + ' can be scrapped and sold again.', ''); };
         const gate = f => () => { if (it.lk) return locked(); if (!gateUse('sell')) return; if (!signedIn()) { closeModal(); toast('lock', 'Sign in to trade', 'The market and mail need a free account.', 'warn'); authForm('in'); return; } f(uid); };
-        const en = md.querySelector('#i-ench'); if (en) en.onclick = () => atEnchanter(() => enchantPicker({ dst: uid }));
-        const ds = md.querySelector('#i-dis'); if (ds) ds.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to disenchant it.', 'warn'); if (w) return toast('flare', 'Take it off first', 'Worn gear cannot be disenchanted.', 'warn'); atEnchanter(() => enchantPicker({ src: uid })); };
+        const en = md.querySelector('#i-ench'); if (en) en.onclick = () => L.visiting(S) ? enchantPicker({ dst: uid, home: true }) : atEnchanter('on');
+        const ds = md.querySelector('#i-dis'); if (ds) ds.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to disenchant it.', 'warn'); if (w) return toast('flare', 'Take it off first', 'Worn gear cannot be disenchanted.', 'warn'); L.visiting(S) ? enchantPicker({ src: uid, home: true }) : atEnchanter('dis'); };
         const mg = md.querySelector('#i-merge'); if (mg) mg.onclick = () => { if (it.lk) return toast('lock', 'This item is locked', 'Unlock it first to merge it.', 'warn'); mergePicker(uid); };
         const mk = md.querySelector('#i-mkt'); if (mk) mk.onclick = gate(sellItem);
         const sd = md.querySelector('#i-send'); if (sd) sd.onclick = gate(sendItem);
@@ -1762,12 +1841,12 @@
           md.querySelectorAll('[data-dst]').forEach(e => e.onclick = () => { dst = e.dataset.dst; slot = -1; draw(); });
           md.querySelectorAll('[data-src]').forEach(e => e.onclick = () => { src = e.dataset.src; idx = +e.dataset.i; draw(); });
           md.querySelectorAll('[data-sl]').forEach(e => e.onclick = () => { slot = +e.dataset.sl; draw(); });
-          md.querySelector('#en-back').onclick = () => o.home ? enchanterModal() : itemModal(o.src || o.dst);
+          md.querySelector('#en-back').onclick = () => o.home ? (closeModal(), paintEnchPanel()) : itemModal(o.src || o.dst);
           md.querySelector('#en-go').onclick = () => {
             const r = L.disenchant(S, src, idx, dst, slot); if (!r) return;
             save(); updateGear(true); updateSeats(true); sfx.relic();
             toast('star', 'Enchant moved', enchName(r.moved) + ' is now on ' + L.gearName(r.item) + '. -' + fmt(r.cost) + ' Dust', '');
-            if (o.home) enchanterModal(); else itemModal(r.item.uid);
+            if (o.home) { closeModal(); paintEnchPanel(); } else itemModal(r.item.uid);
           };
         });
     };
@@ -1780,17 +1859,19 @@
   const ENCH_SVG = '<svg viewBox="0 0 40 52" aria-hidden="true"><defs><radialGradient id="eorb"><stop offset="0" stop-color="#e9d5ff"/><stop offset=".55" stop-color="#a78bfa"/><stop offset="1" stop-color="#6d28d9" stop-opacity="0"/></radialGradient></defs>' +
     '<path d="M20 3 10 20h20z" fill="#4c1d95"/><circle cx="20" cy="22" r="6" fill="#f2d3b1"/><path d="M8 50c1-14 5-22 12-22s11 8 12 22z" fill="#5b21b6"/><path d="M20 28v22" stroke="#c4b5fd" stroke-width="1.4"/>' +
     '<path d="M14 20h12" stroke="#c4b5fd" stroke-width="2"/><circle cx="33" cy="30" r="7" fill="url(#eorb)"/><circle cx="33" cy="30" r="2.6" fill="#f5f3ff"/><path d="M28 36l-3 6" stroke="#f2d3b1" stroke-width="3" stroke-linecap="round"/></svg>';
-  function atEnchanter(then) {
-    if (L.visiting(S)) { then && then(); return; }
-    modal('<div class="merchbox enchvisit"><div class="merchhead">' + ENCH_SVG + '<div><h2>That is done at the Enchanter</h2><small>Enchanting and disenchanting happen on a visit. Your party stops diving while you are there and carries on from floor ' + S.floor + ' when you leave.</small></div></div>' +
-      '<div class="row"><button class="btn ghost" id="ev-no">Not now</button><button class="btn" id="ev-go">' + icon('star') + ' Visit the Enchanter</button></div></div>', md => {
+  function atEnchanter(t) {
+    if (t) enchTab = t;
+    if (L.visiting(S)) { closeModal(); paintEnchOv(); return; }
+    modal('<div class="merchbox enchvisit"><div class="merchhead">' + ENCH_SVG + '<div><h2>That is done at the Enchanter</h2><small>Enchanting and disenchanting happen in the Enchanter’s shop. Your party leaves the Deep while you are there and goes back to floor ' + S.floor + ' when you leave.</small></div></div>' +
+      '<div class="row"><button class="btn ghost" id="ev-no">Not now</button><button class="btn" id="ev-go">' + icon('star') + ' Go to the Enchanter</button></div></div>', md => {
         md.querySelector('#ev-no').onclick = closeModal;
-        md.querySelector('#ev-go').onclick = () => { visitEnch(); if (then) then(); };
+        md.querySelector('#ev-go').onclick = () => { visitEnch(); };
       });
   }
   function visitEnch() {
     if (!L.visitEnchanter(S, Date.now())) return false;
-    sfx.relic(); paintEnchOv(); updatePanel(true);
+    closeModal(); sfx.relic(); particles.length = 0; paintEnchOv(); updatePanel(true);
+    toast('star', 'You enter the Enchanter’s shop', 'The party leaves the Deep for now. Pick what to work on above the counter, then Leave shop to go back to floor ' + S.floor + '.', '');
     return true;
   }
   function leaveEnch() {
@@ -1798,44 +1879,53 @@
     closeModal(); sfx.buy(); paintEnchOv(); updatePanel(true); save();
     toast('star', 'Back to the dive', 'The party leaves the Enchanter and carries on from floor ' + S.floor + '.', '');
   }
-  function enchanterModal() {
-    if (!L.visiting(S)) visitEnch();
+  // Opening the Enchanter (button, item tools) walks the party into the shop. Everything happens in the scene and in
+  // the counter panel below it; only the final "which enchant, which socket" step uses the picker.
+  function enchanterModal(t) {
+    if (t) enchTab = t;
+    if (!L.visiting(S)) visitEnch(); else { closeModal(); paintEnchOv(); }
+    const a = $('arena'); if (a && a.scrollIntoView && innerWidth < 900) a.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+  let enchTab = 'on';
+  function enchPanelHtml() {
     const free = x => !x.lk && !L.wearer(S, x.uid);
     const srcs = S.bag.filter(x => free(x) && L.enchList(x).length);
     const dsts = S.bag.filter(x => L.sockets(x)).sort((a, b) => (!!L.wearer(S, b.uid) - !!L.wearer(S, a.uid)) || ((L.sockets(b) - L.enchList(b).length) - (L.sockets(a) - L.enchList(a).length)) || (L.itemScore(b) - L.itemScore(a)));
-    const open = dsts.reduce((n, x) => n + Math.max(0, L.sockets(x) - L.enchList(x).length), 0);
     const row = (x, act) => '<div class="pkrow r-' + x.rar + '" data-' + act + '="' + x.uid + '" role="button" tabindex="0"><div class="tile r-' + x.rar + '"><img class="iimg" src="' + SP.itemIcon(x.cls, x.slot, x.rar) + '" alt="">' + (x.up ? '<i class="upn">+' + x.up + '</i>' : '') + '</div><span class="pkt"><b>' + esc(L.gearName(x)) + (x.up ? ' +' + x.up : '') + '</b><small>' + (L.enchList(x).map(enchName).join(', ') || 'No enchants yet') + (L.wearer(S, x.uid) ? ' &middot; <i class="worn">worn by ' + esc(L.memberById(L.wearer(S, x.uid)).name) + '</i>' : '') + '</small></span><span class="cmp eq">' + L.enchList(x).length + '/' + L.sockets(x) + '</span></div>';
-    let tab = enchTab;
-    const body = () => tab === 'dis'
-      ? '<p class="note small">Pick an item to break down. One of its enchants moves to another item, and the item itself is destroyed. Worn and locked items are left out.</p><div class="mglist">' + (srcs.length ? srcs.slice(0, 80).map(x => row(x, 'edis')).join('') : '<p class="note">Nothing to disenchant. Spare items with enchants show up here.</p>') + '</div>'
-      : '<p class="note small">Pick an item to enchant, worn or not. You then choose an enchant from a spare item to move into one of its sockets.</p><div class="mglist">' + (dsts.length ? dsts.slice(0, 80).map(x => row(x, 'eon')).join('') : '<p class="note">None of your items has an enchant socket yet. Rarer gear and gear from deeper floors has more.</p>') + '</div>';
-    const draw = () => modal('<div class="merchbox picker enchvisit"><div class="merchhead">' + ENCH_SVG + '<div><h2>The Enchanter</h2><small>“Sit, rest your blades. Nothing down there will move until you do.”</small></div></div>' +
-      '<div class="evbal"><span>' + icon('dust') + ' <b>' + fmt(S.dust || 0) + '</b> Dust</span><span>' + open + ' open ' + (open === 1 ? 'socket' : 'sockets') + '</span><span>' + srcs.length + ' spare enchanted ' + (srcs.length === 1 ? 'item' : 'items') + '</span></div>' +
-      '<div class="fseg evtabs"><button data-et="on" class="' + (tab === 'on' ? 'on' : '') + '">Enchant</button><button data-et="dis" class="' + (tab === 'dis' ? 'on' : '') + '">Disenchant</button><button data-et="scrap">Scrap for Dust</button></div>' + body() +
-      '<p class="note small">Moving an enchant costs Dust: ' + [1, 2, 3].map(t => fmt(L.enchCost({ id: 'might', t })) + ' for tier ' + ROMAN9[t]).join(', ') + ', and more for higher tiers.</p>' +
-      '<div class="row"><button class="btn ghost" id="ev-stay">Close (stay here)</button><button class="btn" id="ev-leave">Leave and keep diving</button></div></div>', md => {
-        md.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { if (b.dataset.et === 'scrap') { closeModal(); openScrap(); return; } tab = enchTab = b.dataset.et; draw(); });
-        md.querySelectorAll('[data-eon]').forEach(e => e.onclick = () => enchantPicker({ dst: e.dataset.eon, home: true }));
-        md.querySelectorAll('[data-edis]').forEach(e => e.onclick = () => enchantPicker({ src: e.dataset.edis, home: true }));
-        md.querySelector('#ev-stay').onclick = closeModal;
-        md.querySelector('#ev-leave').onclick = leaveEnch;
-      });
-    draw();
+    const list = enchTab === 'dis'
+      ? (srcs.length ? srcs.slice(0, 60).map(x => row(x, 'edis')).join('') : '<p class="note">Nothing to disenchant. Spare items with enchants show up here.</p>')
+      : (dsts.length ? dsts.slice(0, 60).map(x => row(x, 'eon')).join('') : '<p class="note">None of your items has an enchant socket yet. Rarer gear and gear from deeper floors has more.</p>');
+    return '<div class="ephead"><div><b>The Enchanter’s counter</b><small>' + (enchTab === 'dis' ? 'Pick a spare item to break down. One enchant moves to another item; this one is destroyed.' : 'Pick an item to enchant, worn or not. Then choose a spare enchant to move into it.') + '</small></div><span class="epdust">' + icon('dust') + '<b>' + fmt(S.dust || 0) + '</b> Dust</span></div>' +
+      '<div class="mglist eplist">' + list + '</div><p class="note small">Moving an enchant costs Dust: 5 for tier I, 20 for II, 45 for III, and more for higher tiers.</p>';
   }
-  let enchTab = 'on';
-  // While visiting, the battle scene shows the Enchanter's table instead of a fight.
+  function paintEnchPanel() {
+    const el = $('enchpanel'); if (!el) return; const on = L.visiting(S);
+    el.hidden = !on; if (!on) { el.dataset.h = ''; return; }
+    const h = enchPanelHtml(); if (el.dataset.h === h) return;
+    el.innerHTML = h; el.dataset.h = h;
+  }
+  $('enchpanel') && $('enchpanel').addEventListener('click', e => {
+    const on = e.target.closest('[data-eon]'), ds = e.target.closest('[data-edis]');
+    if (on) enchantPicker({ dst: on.dataset.eon, home: true }); else if (ds) enchantPicker({ src: ds.dataset.edis, home: true });
+  });
+  // In the shop the action buttons hang above the Enchanter, where the monsters usually stand.
   function paintEnchOv() {
     let el = $('enchov'); const on = L.visiting(S);
     if (!el) {
       if (!on) return;
       el = document.createElement('div'); el.id = 'enchov'; el.className = 'enchov';
       el.addEventListener('pointerdown', e => e.stopPropagation());
-      el.addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-ev]'); if (!b) return; if (b.dataset.ev === 'open') enchanterModal(); else leaveEnch(); });
+      el.addEventListener('click', e => {
+        e.stopPropagation(); const b = e.target.closest('[data-ev]'); if (!b) return; const a = b.dataset.ev;
+        if (a === 'leave') leaveEnch(); else if (a === 'scrap') openScrap(); else { enchTab = a; paintEnchOv(); paintEnchPanel(); }
+      });
       $('arena').appendChild(el);
     }
     el.hidden = !on; document.body.classList.toggle('atench', on);
-    if (on && !el.dataset.h) { el.innerHTML = '<div class="evfig">' + ENCH_SVG + '</div><div class="evtxt"><b>At the Enchanter</b><small>The dive is paused on floor ' + S.floor + '.</small></div><div class="evrow"><button class="evb main" data-ev="open">Enchant gear</button><button class="evb" data-ev="leave">Leave</button></div>'; el.dataset.h = '1'; }
-    if (!on) delete el.dataset.h;
+    paintEnchPanel();
+    if (!on) { el.dataset.h = ''; return; }
+    const h = '<div class="evrow" aria-label="The Enchanter"><button class="evb' + (enchTab === 'on' ? ' main' : '') + '" data-ev="on">Enchant</button><button class="evb' + (enchTab === 'dis' ? ' main' : '') + '" data-ev="dis">Disenchant</button><button class="evb" data-ev="scrap">Scrap for Dust</button><button class="evb leave" data-ev="leave">Leave shop</button></div>';
+    if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; }
   }
   // ---------- merge: two copies of the same item become one at +1, or both are lost ----------
   function mergePicker(uid) {
@@ -4406,7 +4496,7 @@
         'Fine items have 1 socket, rare 2, epic 3 and set pieces 2. Items from floor 30 and floor 80 on get one more each, up to 4. Common items get sockets from floor 30.',
         'Enchants: <b>Might</b> (damage), <b>Vigor</b> (health), <b>Keen</b> (crits), <b>Fortune</b> (gold), <b>Finder</b> (gear drops), <b>Mending</b> (healing), <b>Warding</b> (less damage taken) and <b>Wick</b> (lantern time) help the whole party. Tiers run I to IX, higher from deeper floors.',
         'Four enchants help <b>only the hero wearing the item</b>: <b>Flow</b> (mana or stamina regen, up to +100%), <b>Leech</b> (life steal, up to 8%), <b>Bulwark</b> (block chance, up to 25%) and <b>Plating</b> (defense, up to 30% less damage). Rings and trinkets roll Flow and Leech more often, armor and shields roll Bulwark and Plating more often, and weapons roll Leech.',
-        'Enchanting happens at <b>the Enchanter</b>. Press <b>Enchanter</b> on the battle screen, or Enchant on an item, to visit. The dive pauses while you are there (nobody fights and you keep your floor). Press <b>Leave</b> to carry on.',
+        'Enchanting happens in <b>the Enchanter’s shop</b>. Press <b>Enchanter</b> on the battle screen, or Enchant on an item, and your party leaves the Deep for the shop. Pick Enchant, Disenchant or Scrap above the counter and choose an item from the counter below. <b>Leave shop</b> takes you back to the same floor.',
         '<b>Disenchant</b> destroys an item and moves one of its enchants into a socket on another item of any class. A full socket can be overwritten. At the Enchanter you can enchant worn gear too.',
         'Moving an enchant costs <b>Dust</b>: 5 for tier I, 20 for II, 45 for III and so on (5 &times; tier&sup2;).',
         'Merging two items keeps the best enchants of both, as many as the result has sockets.']],
@@ -4568,6 +4658,11 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 98, date: 'November 24, 2026', title: 'The Enchanter’s shop', items: [
+      'Visiting the Enchanter now takes your party out of the Deep and into the Enchanter’s shop. Your hero walks in through the door to the counter, and the Enchanter waits behind it among shelves of glowing bottles.',
+      'The shop’s buttons hang above the Enchanter, where monsters usually stand: Enchant, Disenchant, Scrap for Dust and Leave shop. The counter below the scene lists your items; pick one to work on it.',
+      'Leave shop takes the party straight back to the floor you left.',
+    ] },
     { v: 97, date: 'November 24, 2026', title: 'A clearer Sigil shop', items: [
       'Lanternholder is now the one name for premium. Get it with 500 Sigils for 30 days (nothing renews), or as the $4.99 monthly membership. The old Lantern Pass is the same thing under its new name, and any days you had are kept.',
       'The Sigil shop is laid out in three parts: what Sigils are for (Lanternholder, Bag of Holding, Wardrobe, profile looks, the Sigil exchange), Lanternholder with both ways to get it side by side, and the Sigil packs.',

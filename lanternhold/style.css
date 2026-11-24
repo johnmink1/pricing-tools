@@ -1,4 +1,4 @@
-/* lh-build 202611240332 */
+/* lh-build 202611240351 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -2029,3 +2029,9 @@ body.resting .taptip{display:none}
 .notetabs button:hover{border-color:var(--accent);color:var(--text)}
 .notetabs button.on{border-color:var(--gold);color:var(--text);background:color-mix(in srgb,var(--gold) 12%,var(--panel))}
 .notetabs button em{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--gold)}
+/* v86 mana / stamina */
+.resbar{height:3px;margin-top:3px;background:#0a0d12;border-radius:2px;overflow:hidden}
+.resbar i{display:block;height:100%;transition:width .3s}
+.r-mana i{background:#5aa8ff}.r-stamina i{background:#e9b84a}
+.resbar.dry i{animation:mflick .8s infinite}
+.skill.lack{opacity:.65}

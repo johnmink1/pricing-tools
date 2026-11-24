@@ -1,4 +1,4 @@
-/* lh-build 202611240243 */
+/* lh-build 202611240256 */
 /* Lanternhold: An Idle Descent — game rules and state (no DOM). v2: party of five, foes strike back, story. */
 (function (root) {
   'use strict';
@@ -122,6 +122,44 @@
     swift:  { name: 'Swift', desc: 'Attacks harder and faster' },
   };
   const MOD_KEYS = Object.keys(MODS);
+  // Special attacks (John, 2026-11-24): guardians, and some monsters, wind up a big move every so often.
+  // kind 'all' hits the whole party, 'splash' hits a hero and the ones beside them, 'pos' marks one spot in the line
+  // (tanks cannot draw it away). A dot leaves a burn or poison that keeps ticking for DOT_FIGHTS fights.
+  const SPECIALS = {
+    slam:    { name: 'Ground Slam',     kind: 'all',    mult: 0.24,  desc: 'Slams the ground and hits the whole party' },
+    breath:  { name: 'Fire Breath',     kind: 'all',    mult: 0.18,  dot: 'burn',   desc: 'Breathes fire over the whole party and sets them burning' },
+    mark:    { name: 'Death Mark',      kind: 'pos',    mult: 1.32,  desc: 'Marks one spot in your line, then strikes it hard. Tanks cannot draw it away' },
+    gorge:   { name: 'Belly Flop',      kind: 'splash', mult: 0.72,  desc: 'Crashes onto a hero and the heroes beside them' },
+    rotcloud:{ name: 'Rot Cloud',       kind: 'all',    mult: 0.12,  dot: 'poison', desc: 'Breathes rot over the whole party and poisons them' },
+    spores:  { name: 'Choking Spores',  kind: 'all',    mult: 0.09, dot: 'poison', desc: 'Fills the air with spores that poison the whole party' },
+    bonespear:{ name: 'Bone Spear',     kind: 'pos',    mult: 1.44,  desc: 'Hurls a spear at one spot in your line' },
+    magma:   { name: 'Magma Wave',      kind: 'all',    mult: 0.21, dot: 'burn',   desc: 'Floods the floor with magma: hits everyone and burns' },
+    tidal:   { name: 'Tidal Crash',     kind: 'all',    mult: 0.3,  desc: 'A wall of water hits the whole party' },
+    roots:   { name: 'Grasping Roots',  kind: 'pos',    mult: 0.96,  dot: 'poison', desc: 'Roots burst up under one spot in your line and poison it' },
+    void:    { name: 'Void Mark',       kind: 'pos',    mult: 1.56,  desc: 'Marks one spot in your line with the void, then strikes it' },
+    shards:  { name: 'Shard Storm',     kind: 'splash', mult: 0.66,  desc: 'Bursts into glass that hits a hero and the heroes beside them' },
+    charge:  { name: 'Shield Charge',   kind: 'splash', mult: 0.78,  desc: 'Charges into the line, hitting a hero and the heroes beside them' },
+    beam:    { name: 'Prism Beam',      kind: 'pos',    mult: 1.44,  dot: 'burn',   desc: 'Focuses a beam on one spot in your line and burns it' },
+    volley:  { name: 'Arrow Volley',    kind: 'all',    mult: 0.21, desc: 'Looses a volley that hits the whole party' },
+    eclipse: { name: 'Eclipse',         kind: 'all',    mult: 0.24,  dot: 'burn',   desc: 'Puts out the light: hits everyone and burns' },
+    acid:    { name: 'Acid Spit',       kind: 'splash', mult: 0.48,  dot: 'poison', desc: 'Spits acid on a hero and the heroes beside them' },
+    dive:    { name: 'Dive',            kind: 'pos',    mult: 0.96,  desc: 'Dives at one spot in your line, often the back' },
+    wail:    { name: 'Wail',            kind: 'all',    mult: 0.15, desc: 'A wail that hurts the whole party' },
+    venombite:{ name: 'Venom Bite',     kind: 'pos',    mult: 0.72,  dot: 'poison', desc: 'Bites one spot in your line and poisons it' },
+  };
+  // guardian signature moves by region, and the move each guardian body uses on the in-between boss floors
+  const BOSS_SPECIAL = ['gorge', 'rotcloud', 'spores', 'bonespear', 'magma', 'tidal', 'roots', 'void', 'shards', 'charge', 'tidal', 'rotcloud', 'beam', 'volley', 'eclipse'];
+  const BODY_SPECIAL = { golem: 'slam', wyrm: 'breath', lich: 'mark' };
+  const FOE_SPECIAL = { slime: 'acid', bat: 'dive', ghost: 'wail', eye: 'mark', shroom: 'spores', rat: 'venombite', thorn: 'acid', eel: 'tidal', sentinel: 'slam', prism: 'beam', hound: 'dive', riftling: 'void', shard: 'shards' };
+  const SPECIAL_FLOOR = 8, SPECIAL_CHANCE = 0.3, SPECIAL_WARN = 1.5, DOT_FIGHTS = 3;
+  const DOTS = { burn: { name: 'Burning', dps: 0.05 }, poison: { name: 'Poisoned', dps: 0.035 } };
+  function rollSpecial(f, boss, elite, sprite, b, r) {
+    if (boss) return (f % 10 === 0 && BOSS_SPECIAL[Math.floor((f - 1) / 10) % BOSS_SPECIAL.length]) || BODY_SPECIAL[sprite] || 'slam';
+    if (f < SPECIAL_FLOOR) return null;
+    if (elite) return r() < 0.6 ? 'volley' : null;
+    const sp = FOE_SPECIAL[sprite];
+    return sp && r() < SPECIAL_CHANCE ? sp : null;
+  }
   const ELITE_CHANCE = 0.12;
   const FOES = [
     { id: 'slime', name: 'Gloop' }, { id: 'rat', name: 'Gnawer' }, { id: 'bat', name: 'Flitterwing' },
@@ -456,7 +494,7 @@
     tank: [AB('roar', 'Taunting Roar', 40, 10, 'The party takes 40% less damage for 10s.', { shield: 0.4 }),
       AB('slam', 'Shield Slam', 18, 0, 'Strikes for 10 seconds of damage and shatters any ward.', { burst: 10, strip: 1 }),
       AB('bastion', 'Last Bastion', 60, 6, 'Heals the party for 30% and blocks 60% of damage for 6s.', { heal: 0.3, shield: 0.6 })],
-    healer: [AB('purify', 'Purify', 15, 0, 'Cures all poison and heals the party for 25%.', { cleanse: 1, heal: 0.25 }),
+    healer: [AB('purify', 'Purify', 15, 0, 'Cures all poison and burns and heals the party for 25%.', { cleanse: 1, heal: 0.25 }),
       AB('sanctum', 'Sanctified Ground', 45, 12, 'The party takes 30% less damage for 12s.', { shield: 0.3 }),
       AB('smite', 'Radiant Smite', 25, 8, 'The foe takes 30% more damage for 8s.', { vuln: 0.3 })],
     rogue: [AB('flurry', 'Shadow Flurry', 25, 6, 'Your hero deals triple damage for 6s.', { fury: 3 }),
@@ -784,7 +822,7 @@
     const fx = ab.fx; s.fx = s.fx || {};
     for (const k of ['shield', 'vuln', 'fury']) if (fx[k]) s.fx[k] = { v: fx[k], until: st.until };
     if (fx.heal) healParty(s, fx.heal, true);
-    if (fx.cleanse) s.poison = {};
+    if (fx.cleanse) { s.poison = {}; s.dots = {}; }
     if (fx.strip && s.foe) s.foe.ward = 0;
     let d = 0;
     if (fx.burst) { const c = CLASSES[heroCls(s)]; d = Math.max(c.dps, 1) * scale(s, 'you') * partyMult(s) * gearMult(s, 'you', 'dps') * (1 + sk(s, 'dps')) * fx.burst; }
@@ -795,7 +833,7 @@
   function wantsSpec(s, ab, now) {
     const foe = s.foe; if (!foe || foe.chest) return false;
     const fx = ab.fx;
-    if (fx.cleanse) return !!(s.poison && Object.keys(s.poison).length) || s.party.some(x => x && (s.hp[x] || 0) < maxHpOf(s, x) * 0.5);
+    if (fx.cleanse) return !!(s.poison && Object.keys(s.poison).length) || !!(s.dots && Object.keys(s.dots).length) || s.party.some(x => x && (s.hp[x] || 0) < maxHpOf(s, x) * 0.5);
     if (fx.strip) return foe.ward > 0 || foe.boss;
     if (fx.shield) return foe.boss || s.party.some(x => x && (s.hp[x] || 0) < maxHpOf(s, x) * 0.6);
     if (fx.heal) return s.party.some(x => x && (s.hp[x] || 0) < maxHpOf(s, x) * 0.6);
@@ -1657,7 +1695,8 @@
     let hpx = hp;
     if (pack) { hpx = hp * pack * 0.85; ambush = 2; }
     const mods = chest ? [] : rollMods(f, boss, elite, b, r);
-    return { name, sprite, boss, chest, elite, side, ambush, pack, hp: hpx, max: hpx, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) * (pack ? 1 + 0.3 * (pack - 1) : 1) * (mods.includes('swift') ? 1.35 : 1), mods, ward: 0, wardAt: 0 };
+    const sp = chest ? null : rollSpecial(f, boss, elite, sprite, b, r);
+    return { sp, spAt: 0, spWind: null, name, sprite, boss, chest, elite, side, ambush, pack, hp: hpx, max: hpx, hue: elite ? b.hue + 40 : b.hue, atk: chest ? 0 : foeDps(f, boss) * FOE_SWING * (elite ? 1.3 : 1) * (pack ? 1 + 0.3 * (pack - 1) : 1) * (mods.includes('swift') ? 1.35 : 1), mods, ward: 0, wardAt: 0 };
   }
   // Loot Goblin: a rare thief that fights back. Kill it before it flees, or it runs off with one unworn item from the pack
   // and hides a few floors deeper. Find it there and kill it to win the item back. Worn gear is never taken.
@@ -1796,6 +1835,7 @@
       if ((rng || Math.random)() < GOBLIN_SACK_CHANCE) { const sack = rollGoblinSack(s, f, rng || Math.random); s.bag.push(sack); s.stats.sacks = (s.stats.sacks || 0) + 1; events && events.push({ type: 'goblinsack', item: sack }); }
     }
     s.gold += g; s.stats.goldEarned += g; s.stats.kills++;
+    if (s.dots) for (const id in s.dots) if (--s.dots[id].n <= 0) delete s.dots[id];
     gainXp(s, foe, events);
     events && events.push({ type: 'kill', gold: g, foe });
     unlockLore(s, foe.boss ? 'boss' : 'foe_' + foe.sprite, events);
@@ -1875,6 +1915,65 @@
     return { id: live[0] };
   }
 
+  // Damage after dodges, armour, shields and guards. Returns -1 for a dodge.
+  function soak(s, t, dmg, now, rng) {
+    const m = memberById(t), c = CLASSES[m.cls];
+    if (c.dodge && (rng || Math.random)() < c.dodge + (setBonus(s, t) >= 2 ? 0.1 : 0) + (t === 'you' ? sk(s, 'dodge') : 0)) return -1;
+    if (c.armor) dmg *= 1 - c.armor;
+    if (m.cls === 'tank' && abilityActive(s, t, now)) dmg *= 0.3 * (t === 'you' ? 1 - sk(s, 'power') : 1);
+    dmg *= 1 - Math.min(0.5, sk(s, 'guard'));
+    dmg *= 1 - fxOn(s, 'shield', now);
+    return dmg;
+  }
+  function hurtHero(s, t, dmg, now, events) {
+    s.hp[t] = (s.hp[t] == null ? maxHpOf(s, t) : s.hp[t]) - dmg;
+    if (s.hp[t] <= 0) { s.hp[t] = 0; s.down[t] = now + REVIVE_TIME * 1000; if (s.dots) delete s.dots[t]; events && events.push({ type: 'fall', id: t }); return true; }
+    return false;
+  }
+  function addDot(s, t, k, dps, events) {
+    s.dots = s.dots || {};
+    const d = s.dots[t];
+    s.dots[t] = { k, dps: Math.max(dps, d && d.k === k ? d.dps : 0), n: DOT_FIGHTS };
+    events && events.push({ type: 'dot', id: t, k });
+  }
+  const specialEvery = foe => (foe.boss ? 10 : 12) * 1000;
+  // Wind up (telegraph), then unleash the foe's special. Called every tick while a foe with a special is up.
+  function specialTick(s, now, rng, events) {
+    const foe = s.foe, sp = foe && foe.sp && SPECIALS[foe.sp];
+    if (!sp || !foe.atk || foe.world) return;
+    if (!foe.spAt) { foe.spAt = now + (foe.boss ? 7000 : 5000); return; }
+    const live = s.party.filter(id => id && !s.down[id]);
+    if (!live.length) return;
+    if (!foe.spWind && now >= foe.spAt - SPECIAL_WARN * 1000) {
+      const r = rng || Math.random;
+      // a position move favours the back of the line
+      const pos = sp.kind === 'pos' ? Math.min(live.length - 1, Math.floor(Math.sqrt(r()) * live.length)) : -1;
+      foe.spWind = { pos };
+      events && events.push({ type: 'windup', sp: foe.sp, pos, target: pos >= 0 ? live[pos] : null });
+      return;
+    }
+    if (foe.spWind && now >= foe.spAt) {
+      const w = foe.spWind; foe.spWind = null; foe.spAt = now + specialEvery(foe);
+      let hits = [];
+      if (sp.kind === 'all') hits = live.map(id => [id, sp.mult]);
+      else if (sp.kind === 'pos') hits = [[live[Math.min(w.pos, live.length - 1)], sp.mult]];
+      else { const t = pickTarget(s, rng); const id = t && t.id !== 'minion' ? t.id : live[0], i = live.indexOf(id); hits = [[id, sp.mult]]; if (live[i - 1]) hits.push([live[i - 1], sp.mult * 0.5]); if (live[i + 1]) hits.push([live[i + 1], sp.mult * 0.5]); }
+      const enr = (foe.mods || []).includes('enrage') && foe.hp < foe.max * 0.3 ? 1.8 : 1;
+      const out = [];
+      for (const [id, mult] of hits) {
+        // never a one-shot: one special takes at most 35% of a hero's health (20% each when it hits everyone)
+        const d = Math.min(soak(s, id, foe.atk * mult * enr, now, rng), maxHpOf(s, id) * (sp.kind === 'all' ? 0.2 : 0.35));
+        if (d < 0) { out.push({ id, dodge: true }); continue; }
+        out.push({ id, dmg: d });
+        const fell = hurtHero(s, id, d, now, events);
+        if (!fell && sp.dot) addDot(s, id, sp.dot, foe.atk * DOTS[sp.dot].dps, events);
+      }
+      s.stats.specials = (s.stats.specials || 0) + 1;
+      events && events.push({ type: 'special', sp: foe.sp, kind: sp.kind, hits: out });
+      if (!alive(s).length) wipe(s, now, events);
+    }
+  }
+
   function foeAttack(s, now, rng, events) {
     const foe = s.foe; if (!foe || !foe.atk) return;
     const pick = pickTarget(s, rng);
@@ -1894,12 +1993,8 @@
       events && events.push({ type: 'foehit', target: 'minion', dmg });
       return;
     }
-    const m = memberById(t), c = CLASSES[m.cls];
-    if (c.dodge && (rng || Math.random)() < c.dodge + (setBonus(s, t) >= 2 ? 0.1 : 0) + (t === 'you' ? sk(s, 'dodge') : 0)) { events && events.push({ type: 'dodge', target: t }); return; }
-    if (c.armor) dmg *= 1 - c.armor;
-    if (m.cls === 'tank' && abilityActive(s, t, now)) dmg *= 0.3 * (t === 'you' ? 1 - sk(s, 'power') : 1);
-    dmg *= 1 - Math.min(0.5, sk(s, 'guard'));
-    dmg *= 1 - fxOn(s, 'shield', now);
+    dmg = soak(s, t, dmg, now, rng);
+    if (dmg < 0) { events && events.push({ type: 'dodge', target: t }); return; }
     s.hp[t] = (s.hp[t] == null ? maxHpOf(s, t) : s.hp[t]) - dmg;
     events && events.push({ type: 'foehit', target: t, dmg, behind: !!pick.behind });
     if (mods.includes('venom')) { s.poison = s.poison || {}; s.poison[t] = { dps: dmg * 0.12, until: now + 5000 }; events && events.push({ type: 'poison', id: t }); }
@@ -1917,7 +2012,7 @@
   function wipe(s, now, events) {
     // Falling to the world boss just ends the assault; the damage dealt still counts.
     if (s.foe && s.foe.world) { for (const id of s.party) if (id) { delete s.down[id]; s.hp[id] = maxHpOf(s, id) * 0.6; } s.minions = []; endAssault(s, events, true); return; }
-    s.stats.wipes++;
+    s.stats.wipes++; s.dots = {};
     events && events.push({ type: 'wipe', name: s.foe ? s.foe.name : '' });
     for (const id of s.party) if (id) { delete s.down[id]; s.hp[id] = maxHpOf(s, id) * 0.6; }
     s.minions = [];
@@ -1936,6 +2031,7 @@
     s.abil[id] = st;
     if (m.cls === 'healer') {
       healParty(s, 0.45 * pw, true);
+      s.dots = {};
       const fallen = s.party.filter(x => x && s.down[x]).slice(0, (sb >= 3 ? 5 : 1) + (me ? sk(s, 'revive') : 0));
       for (const f of fallen) { delete s.down[f]; s.hp[f] = maxHpOf(s, f) * 0.5; s.stats.revives++; events && events.push({ type: 'revive', id: f }); }
     } else if (m.cls === 'rogue') {
@@ -1975,7 +2071,7 @@
     if (s.unlocked.length && !(s.traits && s.unlocked.every(id => s.traits[id]))) for (const id of s.unlocked) traitsOf(s, id);
     if (resting(s, now)) {
       for (const id of s.party) if (id) { delete s.down[id]; const mx = maxHpOf(s, id); s.hp[id] = Math.min(mx, (s.hp[id] || 0) + mx * 0.25 * (1 + campTrait(s, 'rest')) * dt); }
-      s.minions = []; s.lantern = 0;
+      s.minions = []; s.lantern = 0; s.dots = {};
       return;
     }
     // story recruits and revivals
@@ -2008,6 +2104,10 @@
       s.hp[id] -= p.dps * dt;
       if (s.hp[id] <= 0) { s.hp[id] = 0; s.down[id] = now + REVIVE_TIME * 1000; delete s.poison[id]; events && events.push({ type: 'fall', id }); if (!alive(s).length) { wipe(s, now, events); return; } }
     }
+    if (s.dots) for (const id in s.dots) {
+      const d = s.dots[id]; if (s.down[id] || !s.party.includes(id)) { delete s.dots[id]; continue; }
+      if (hurtHero(s, id, d.dps * dt, now, events) && !alive(s).length) { wipe(s, now, events); return; }
+    }
     // healing
     for (const hid of s.party) {
       const hps = healPerSec(s, hid); if (!(hps > 0)) continue;
@@ -2019,6 +2119,8 @@
     // abilities
     if (s.autoCast) for (const id of s.party) if (id && !s.down[id]) { const st = s.abil[id]; if ((!st || st.readyAt <= now) && wantsCast(s, id, now)) castAbility(s, id, now, events); }
     if (s.autoCast && !s.down.you) for (const ab of heroSpecs(s)) { const st = s.abil['you:' + ab.id]; if ((!st || st.readyAt <= now) && wantsSpec(s, ab, now)) castSpec(s, ab.id, now, events); }
+    specialTick(s, now, rng, events);
+    if (!alive(s).length || !s.foe) return;
     // foe swings
     if (s.foe && s.foe.atk) {
       s.foeSwing += dt;
@@ -2193,7 +2295,7 @@
     VERSION, CLASSES, CLASS_ORDER, MEMBERS, SIDES, FORMATION, POS_NAME, moveMember, autoFormation, formationNotes, healReach, betterFor, equipBest, slotLocked, lockedSlots, SIDE_ORDER, sideOf, BIOMES, FOES, RELICS, FEATS, STORY, FOES_PER_FLOOR, BOSS_EVERY, REKINDLE_FLOOR, MILESTONES, PARTY_SIZE, REVIVE_TIME,
     newState, migrate, isBossFloor, biomeOf, depthCycle, foeHp, foeGold, foeDps, memberById, trainCost, maxAffordable, memberDps, totalDps, maxHpOf, healPerSec,
     clickDamage, NX_WIN, NX_RATE, NX_REG_RATE, NX_CV, NX_BUILD, NX_CALM, NX_LEAVE, nxRead, nxTick, nexusOn, relicVal, lanternTime, embersFor, SPECS, heroSpecs, castSpec, fxOn, packCount, OFFLINE_BASE, OFFLINE_MAX, offlineWindow, offlineEarnPerSec, autoTrain, KINDLE_UPS, kup, kupCost, buyKup, CLASS_CHANGE_COST, changeClass, SKILL_TREES, skillById, skillCost, skillText, sk, AURAS, AURA_TIER, HONOR_FX, warAura, MERCY_FX, mercyOn, SURGE_FX, surgeOn, KIN_AMP, bannerKin, SIGIL_CHEST, SIGIL_BOSS, SIGIL_DROP_DAY, sigilLuck, sigilChance, QUESTS, QUEST_REWARD, QUEST_BONUS, questDay, dailyQuests, questState, PASS_COST, PASS_DAYS, PASS_BAG, BOH_COST, PASS_OFFLINE, passOn, skillSpent, canLearn, learnSkill, resetSkills, skillPointsFor, heroCls, tick, strike, train, recruit, seat, unseat, castAbility, rekindle, checkFeats, gotoFloor, nextStory, currentGoal, chapterOf,
-    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
+    offlineGoldPerSec, regold, WB_TIME, WB_COOL, WB_HP1, WB_CAP, wbWindow, wbName, wbPhase, startAssault, endAssault, GOBLIN_FLOOR, GOBLIN_CHANCE, GOBLIN_TIME, GOBLIN_GOLD, ECON_AT, campCost, CAMP_FREE_FLOOR, resting, MODS, SPECIALS, SPECIAL_WARN, SPECIAL_FLOOR, SPECIAL_CHANCE, DOTS, DOT_FIGHTS, BOSS_SPECIAL, BODY_SPECIAL, FOE_SPECIAL, specialTick, ACT_ONE_END, ACT_TWO_AT, actTwoOpen, JOB_SETS, JOB_SET_TWO, JOB_SET_THREE, jobGear, jobSetCount, rollJobSet, rollGear, SLOTS, POS, SLOT_NAME, posType, fitsPos, normItem, itemStats, itemScore, weightOf, wornAt, wornPos, openPos, replaces, robeOn, bestKit, gearPctOf, bagCap, BAG_STEP, BAG_UPS_MAX, bagUpCost, buyBag, unlockCost, unlockSlot, unlocksOf, CLOTH, RARITY, SETS, LORE, GEAR_CAP, UP_MAX, gearName, gearPct, equip, unequip, upgrade, upgradeCost, salvage, salvageValue, toggleLock, mergeable, mergeRisk, mergeItems, massMergePlan, isUpgrade, autoScrapHit, autoScrapPack, REGION_SETS, RSET_SLOTS, rsetTwo, rsetFour, rsetCounts, rsetBonus, gearGold, regionSetAt, rollRegionSet, rollGoblinSack, GOBLIN_SACK_CHANCE, GOBLIN_SACK_GOLD, RSET_DROP, lootBonus, rarOdds, regionLoot, dustValue, enchCost, ENCH, sockets, enchList, enchText, enchTotals, disenchant, enchDirty, wearer, itemOf, setCount, setBonus, gearMult, startGame, addGuest, dismissGuest, registerHero, isGuest, NPC_POWER, milestoneMult, nextMilestone, abilityActive, abilityDuration, featCount, critChance, partyMult, lvl, alive,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LH = api;

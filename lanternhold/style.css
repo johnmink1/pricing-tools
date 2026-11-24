@@ -1,4 +1,4 @@
-/* lh-build 202611240243 */
+/* lh-build 202611240256 */
 :root{
   --bg:#04070d; --bg2:#080d17; --panel:#0b1220; --panel2:#111a2c; --line:#1f2a3d; --line2:#2a3650;
   --text:#e8eef8; --muted:#8b98ad; --dim:#5f6b80;
@@ -1985,3 +1985,14 @@ body.resting .taptip{display:none}
   .stagehead .mapbtn{flex:none;font-size:0;gap:0;padding:5px 9px}
   .stagehead .mapbtn svg{width:16px;height:16px}
 }
+/* special attacks: wind-up warning and the foe's special chip */
+.spwarn{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:4;pointer-events:none;max-width:calc(100% - 24px);padding:6px 14px;border-radius:999px;background:rgba(40,6,8,.88);border:1px solid #ff5a4a;color:#ffe2dc;font-size:13px;font-weight:600;text-align:center;box-shadow:0 0 18px rgba(255,70,60,.45);animation:spw .45s ease-in-out infinite alternate}
+.spwarn b{color:#fff;font-weight:800}
+.spwarn.burn{border-color:#ff8a3d;box-shadow:0 0 18px rgba(255,122,61,.5)}
+.spwarn.poison{border-color:#8fd16a;background:rgba(10,30,8,.88);box-shadow:0 0 18px rgba(143,209,106,.4)}
+.spwarn[hidden]{display:none}
+@keyframes spw{from{opacity:.75}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.spwarn{animation:none}}
+.foemods .mod.m-sp{background:#2a0e10;border-color:#a8382e;color:#ffd0c8}
+.foemods .mod.m-sp.m-burn{background:#2e1408;border-color:#c8602a;color:#ffd2b0}
+.foemods .mod.m-sp.m-poison{background:#122410;border-color:#4a8a2a;color:#d4f0c0}

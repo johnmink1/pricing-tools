@@ -1,4 +1,4 @@
-/* lh-build 202611240243 */
+/* lh-build 202611240256 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -258,6 +258,14 @@
   function leaveArena(id) { const a = memberAnim[id], m = L.memberById(id); if (a && m) leavers.push({ cls: m.cls, hue: lookHue(m), x: a.x - 12, y: a.y - 8, t: tAnim }); }
   const mAnim = id => (memberAnim[id] = memberAnim[id] || { hit: 0, lunge: 0, x: 0, y: 0 });
   const FRONT = { tank: 0, rogue: 1, mage: 2, necro: 3, healer: 4 };
+  // who a marked-position special will land on (the same spot in the line the core picked)
+  function spTarget() { const w = S.foe && S.foe.spWind; if (!w || w.pos < 0) return null; const live = S.party.filter(id => id && !S.down[id]); return live[Math.min(w.pos, live.length - 1)] || null; }
+  // the wind-up warning across the top of the arena
+  function spWarn(text, cls) {
+    let el = $('spwarn'); if (!el) { el = document.createElement('div'); el.id = 'spwarn'; arena.appendChild(el); }
+    el.className = 'spwarn ' + (cls || ''); el.innerHTML = text; el.hidden = false;
+    clearTimeout(spWarn.t); spWarn.t = setTimeout(() => { el.hidden = true; }, (L.SPECIAL_WARN || 1.5) * 1000 + 700);
+  }
   function partyLayout() {
     const floorY = Math.round(H * 0.7);
     const seated = S.party.filter(Boolean);
@@ -316,6 +324,24 @@
       ctx.fillStyle = down ? '#555' : hp > 0.5 ? '#8fcf6a' : hp > 0.25 ? '#e9c34a' : '#e8604a';
       if (hp > 0) { rrect(ctx, p.x + 2.5, p.y + 35.1, Math.max(1.8, 19 * hp), 1.8, 0.9); ctx.fill(); }
       if (p.id === 'you') { ctx.fillStyle = '#f5c242'; ctx.beginPath(); ctx.moveTo(p.x + 10, p.y - 5.5); ctx.lineTo(p.x + 14, p.y - 5.5); ctx.lineTo(p.x + 12, p.y - 3); ctx.fill(); }
+      // a special attack winding up: a red ring under whoever it will land on
+      const wd = S.foe && S.foe.spWind, spd = wd && L.SPECIALS[S.foe.sp];
+      if (spd && !down && (spd.kind === 'all' || (spd.kind === 'pos' && spTarget() === p.id))) {
+        const k = 0.5 + 0.5 * Math.sin(tAnim * 14);
+        ctx.strokeStyle = 'rgba(255,70,60,' + (0.55 + 0.4 * k) + ')'; ctx.lineWidth = spd.kind === 'pos' ? 1.4 : 0.9;
+        ctx.beginPath(); ctx.ellipse(p.x + 12, p.y + 32, 11 + k * 2, 3 + k * 0.6, 0, 0, Math.PI * 2); ctx.stroke();
+        if (spd.kind === 'pos') { ctx.fillStyle = 'rgba(255,80,70,' + (0.7 + 0.3 * k) + ')'; ctx.beginPath(); ctx.moveTo(p.x + 9, p.y - 17); ctx.lineTo(p.x + 15, p.y - 17); ctx.lineTo(p.x + 12, p.y - 13); ctx.fill(); }
+      }
+      // burns and poisons: a small badge with the fights left
+      const dt2 = S.dots && S.dots[p.id];
+      if (dt2 && !down) {
+        const bx = p.x + 12, by = p.y - (p.id === "you" ? 10 : 6), col = dt2.k === 'burn' ? '#ff7a3d' : '#8fd16a';
+        ctx.fillStyle = 'rgba(4,7,13,0.85)'; ctx.beginPath(); ctx.arc(bx, by, 3.6, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = col; ctx.lineWidth = 0.7; ctx.stroke();
+        ctx.fillStyle = col; ctx.font = '700 5px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(dt2.n), bx, by + 0.3);
+        ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+        if (Math.random() < 0.06) burst(p.x + 12, p.y + 12, 1, dt2.k === 'burn' ? ['#ff7a3d', '#ffd26a'] : ['#8fd16a', '#c9f0a0'], 10);
+      }
     }
     // the party's lantern hangs beside the lead hero, in the style chosen in the Wardrobe
     if (lay.length) {
@@ -662,6 +688,7 @@
       case 'revive': flog('party', '<b class="good">' + nm(e.id) + ' is back up</b>'); break;
       case 'dodge': flog('party', nm(e.target) + ' dodges', 'dg' + e.target, 5000); break;
       case 'poison': flog('party', nm(e.id) + ' is poisoned', 'ps' + e.id, 6000); break;
+      case 'special': { const sp = L.SPECIALS[e.sp] || {}, hit = e.hits.filter(h => !h.dodge); flog('fight', '<b class="bad">' + esc((S.foe && S.foe.name) || 'The foe') + ': ' + esc(sp.name || 'special') + '</b> hits ' + (e.kind === 'all' ? 'the whole party' : hit.map(h => nm(h.id)).join(', ') || 'nobody') + (hit.length ? ' for ' + fmt(hit.reduce((a, h) => a + h.dmg, 0)) : '') + (sp.dot ? ' and leaves them ' + (sp.dot === 'burn' ? 'burning' : 'poisoned') + ' for ' + L.DOT_FIGHTS + ' fights' : '')); break; }
       case 'ambush': if (e.first) flog('fight', e.guarded ? nm(e.target) + ' guards the rear from an ambush' : '<b class="bad">Ambush!</b> ' + nm(e.target) + ' is hit from behind'); break;
       case 'pack': flog('fight', '<b class="bad">Ambush pack:</b> ' + e.n + ' monsters attack together'); break;
       case 'ward': flog('fight', 'The foe raises a ward', 'ward', 4000); break;
@@ -725,6 +752,20 @@
         const a = mAnim(e.target); floatText('Dodge', 'dodge', a.x / W, (a.y - 6) / H);
       } else if (e.type === 'fall') {
         const a = mAnim(e.id); floatText(L.memberById(e.id).name + ' falls', 'hurt', a.x / W, (a.y - 10) / H);
+      } else if (e.type === 'windup') {
+        const sp = L.SPECIALS[e.sp]; if (!sp) continue;
+        const who = e.target ? L.memberById(e.target) : null;
+        spWarn('<b>' + esc(sp.name) + '</b>' + (sp.kind === 'all' ? ' incoming: the whole party' : sp.kind === 'pos' && who ? ' marks ' + esc(who.name) + ' (spot ' + (e.pos + 1) + ')' : ' incoming'), sp.dot || '');
+        tone(180, 0.25, 'sawtooth', 0.03, 120);
+        if (!S.stats.spSeen) { S.stats.spSeen = 1; toast('skull', 'Special attacks', 'Guardians, and some monsters, wind up a big move every few seconds. A red ring shows who it will hit. Shields and a tank\u2019s guard soften it, and a healer\u2019s ability or Purify clears burns and poison.', 'warn'); }
+      } else if (e.type === 'special') {
+        const sp = L.SPECIALS[e.sp] || {}, col = sp.dot === 'burn' ? ['#ff7a3d', '#ffd26a', '#ff3d2a'] : sp.dot === 'poison' ? ['#8fd16a', '#c9f0a0', '#4a8a2a'] : ['#ff8a78', '#ffe0c0', '#c84a3a'];
+        foeAnim.lunge = tAnim + 0.25; foeAnim.shake = tAnim + 0.2;
+        for (const h of e.hits) { const a = mAnim(h.id); if (h.dodge) { floatText('Dodge', 'dodge', a.x / W, (a.y - 6) / H); continue; } a.hit = tAnim + 0.18; floatText('-' + fmt(h.dmg), 'hurt', a.x / W, (a.y - 4) / H); burst(a.x, a.y, 10, col, 32); }
+        floatText(sp.name || 'Special', 'crit', FOE_X - 0.1, 0.28);
+        sfx.thud(); tone(90, 0.3, 'square', 0.04, 60);
+      } else if (e.type === 'dot') {
+        const a = mAnim(e.id); if (Math.random() < 0.6) floatText(e.k === 'burn' ? 'Burning' : 'Poisoned', e.k === 'burn' ? 'crit' : 'heal', a.x / W, (a.y - 14) / H);
       } else if (e.type === 'poison') {
         const a = mAnim(e.id); if (Math.random() < 0.5) floatText('Poisoned', 'heal', a.x / W, (a.y - 12) / H);
       } else if (e.type === 'ward') {
@@ -2066,7 +2107,7 @@
       $('foename').textContent = f.pack ? f.name + ' and ' + (f.pack - 1) + ' more' : f.name;
       if (f.goblin && !f.seen) { f.seen = 1; goblinArrives(f); }
       const tag = $('foetag'); tag.textContent = f.world ? 'World boss' : f.goblin ? 'Thief' : f.pack ? 'Ambush ×' + f.pack : f.boss ? 'Guardian' : f.chest ? 'Treasure' : f.elite ? L.SIDES[f.side].name : ''; tag.className = 'tag' + (f.world ? ' world' : '') + (f.goblin ? ' thief' : '') + (f.chest ? ' chest' : '') + (f.pack ? ' ambush' : f.elite ? ' war w-' + f.side : '');
-      { const mk = (f.mods || []).join(','); if (mk !== lastModKey) { lastModKey = mk; $('foemods').innerHTML = (f.mods || []).map(m => '<span class="mod m-' + m + '" title="' + esc(L.MODS[m].desc) + '">' + esc(L.MODS[m].name) + '</span>').join(''); } }
+      { const sp = f.sp && L.SPECIALS[f.sp], mk = (f.mods || []).join(',') + '|' + (f.sp || ''); if (mk !== lastModKey) { lastModKey = mk; $('foemods').innerHTML = (sp ? '<span class="mod m-sp' + (sp.dot ? ' m-' + sp.dot : '') + '" title="' + esc(sp.desc + (sp.dot ? '. ' + (sp.dot === 'burn' ? 'Burns' : 'Poison') + ' last ' + L.DOT_FIGHTS + ' fights.' : '.')) + '">' + esc(sp.name) + '</span>' : '') + (f.mods || []).map(m => '<span class="mod m-' + m + '" title="' + esc(L.MODS[m].desc) + '">' + esc(L.MODS[m].name) + '</span>').join(''); } }
       if (f.world && S.wb) {
         const ph = L.wbPhase(wbState().total + S.wb.score), pct = ph.into / ph.need * 100;
         $('hpbar').style.width = Math.max(0, 100 - pct) + '%'; $('wardbar').style.width = '0%';
@@ -3957,6 +3998,10 @@
         '<b>Enraged</b>: hits harder when hurt. <b>Warded</b>: a shield soaks damage first.',
         '<b>Regenerating</b>: heals over time. <b>Venomous</b>: poisons its target.',
         '<b>Cleaving</b>: also hits whoever stands behind. <b>Swift</b>: attacks faster.']],
+      ['Special attacks', 's:wyrm,lich', 'Guardians, and some monsters past floor 8, wind up a big move every 10 seconds or so.', [
+        'A red banner names it and a <b>red ring</b> shows who it will hit: the whole party, a hero and the ones beside them, or one marked spot in your line.',
+        'Marked spots ignore your tank, so keep the back of the line healthy. Shields and a tank\u2019s guard still soften every hit.',
+        '<b>Burns</b> and <b>poison</b> keep ticking for ' + L.DOT_FIGHTS + ' fights. The badge over a hero counts them down. A healer\u2019s ability, Purify or the campfire clears them.']],
       ['Ambushes', 's:hound,bat,riftling', 'Sometimes 2 to 4 monsters team up and jump the party.', [
         'Shown as <b>Ambush ×2</b> to <b>×4</b>. More health, harder hits, rear first.',
         'Pays several times the gold, better gear odds and extra XP. Luck makes it bigger.']],
@@ -4144,6 +4189,13 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 80, date: 'November 24, 2026', title: 'Special attacks', items: [
+      'Every guardian now has a special attack it winds up every 10 seconds or so. Each region guardian has its own signature move, like Furnace-Heart\u2019s Magma Wave or the Root Mother\u2019s Grasping Roots.',
+      'Some monsters past floor 8 have one too: acid that splashes the heroes beside the target, bats that dive at the back of the line, spores that poison everyone.',
+      'A red banner warns you, and a red ring shows who will be hit. Marked spots cannot be drawn away by a tank.',
+      'Burns and poison now last ' + L.DOT_FIGHTS + ' fights, with a countdown badge over each hero. A healer\u2019s ability, Purify or a rest at the campfire clears them.',
+      'No special can take more than about a third of a hero\u2019s health in one go, so they hurt without one-shotting anyone.'
+    ] },
     { v: 79, date: 'November 24, 2026', title: 'A tidier battle header', items: [
       'Floor, Map of the Deep, your chapter goal and the world boss now sit in one framed panel on top of the battle, instead of floating above it.',
       'The header is shorter, so the battle scene gets more room (about 70 px more on a laptop).'

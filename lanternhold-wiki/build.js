@@ -240,6 +240,7 @@ ref({
         ['Soldiers', b.war.units.map(esc).join(', ')],
         b.foe ? ['Native monster', '<a href="/wiki/bestiary/#' + b.foe.id + '">' + esc(b.foe.name) + '</a>'] : null,
         b.mod ? ['Signature trick', esc(L.MODS[b.mod].name) + ' <small>' + esc(L.MODS[b.mod].desc) + '</small>'] : null,
+        L.BOSS_SPECIAL && L.SPECIALS[L.BOSS_SPECIAL[i]] ? ['Guardian attack', esc(L.SPECIALS[L.BOSS_SPECIAL[i]].name) + ' <small>' + esc(L.SPECIALS[L.BOSS_SPECIAL[i]].desc) + '</small>'] : null,
         (L.REGION_SETS || [])[i] ? ['Region set', '<a href="/wiki/sets/#rset-' + i + '">' + esc(L.REGION_SETS[i].name) + '</a>'] : null,
       ]) + '</div></div></div></li>';
   }).join('') + '</ol>' + related(['bestiary', 'world-boss']),
@@ -260,12 +261,19 @@ ref({
       '<h2 id="guardians">Guardians</h2>' + (bl ? '<p>' + esc(bl.text) + '</p>' : '') + '<div class="grid3">' + ['golem', 'wyrm', 'lich'].map(s => '<div class="mini center">' + pic(s, 0, s) + '</div>').join('') + '</div>' +
       '<p>Beat a guardian before the lantern runs out (' + 30 + ' seconds to start). Each region guardian is listed on <a href="/wiki/regions/">Regions</a>.</p>' +
       '<h2 id="tricks">Monster tricks</h2>' + table(['Trick', 'What it does'], Object.values(L.MODS).map(m => ['<b>' + esc(m.name) + '</b>', esc(m.desc)])) +
+      '<h2 id="specials">Special attacks</h2><p>Every guardian, and about ' + pct(L.SPECIAL_CHANCE || 0.3) + ' of monsters from floor ' + L.SPECIAL_FLOOR + ', winds up a special attack every 10 to 12 seconds. A red banner and a red ring under the target give you ' + L.SPECIAL_WARN + ' seconds of warning. Burns and poison keep ticking for ' + L.DOT_FIGHTS + ' fights; a healer\u2019s ability, Purify or the campfire clears them. One special never takes more than 35% of a hero\u2019s health (20% each when it hits the whole party).</p>' +
+        table(['Attack', 'Used by', 'What it does'], Object.entries(L.SPECIALS).map(([id, sp]) => { const by = [];
+          L.BOSS_SPECIAL.forEach((x, i) => { if (x === id) by.push(L.BIOMES[i].boss); });
+          for (const [b, x] of Object.entries(L.BODY_SPECIAL)) if (x === id) by.push({ golem: 'Stone Sentinel', wyrm: 'Tunnel Wyrm', lich: 'Bone Hierarch' }[b]);
+          for (const [f, x] of Object.entries(L.FOE_SPECIAL)) if (x === id) { const fo = L.FOES.find(q => q.id === f) || (L.BIOMES.find(q => q.foe && q.foe.id === f) || {}).foe; if (fo) by.push(fo.name); }
+          if (id === 'volley') by.push('Grand War soldiers');
+          return ['<b>' + esc(sp.name) + '</b>', esc([...new Set(by)].join(', ')), esc(sp.desc) + (sp.dot ? ' (' + (sp.dot === 'burn' ? 'burn' : 'poison') + ', ' + L.DOT_FIGHTS + ' fights)' : '')]; })) +
       '<h2 id="ambush">Ambushes</h2><p>From floor ' + L.PACK_FLOOR + ', ' + pct(L.PACK_CHANCE) + ' of fights are ambush packs of 2 to 4 monsters. They hit the rear of your marching order first and pay ' + L.PACK_GOLD + '× gold each.</p>' +
       '<h2 id="loot-goblin">Loot Goblin</h2><div class="grid2">' + card('goblin-card', 'Loot Goblin', { pic: pic('goblin', 0, 'Loot Goblin'), body: kv([['Appears from', 'Floor ' + L.GOBLIN_FLOOR], ['Time to kill', L.GOBLIN_TIME + ' seconds'], ['Reward', L.GOBLIN_GOLD + '× gold']]) + '<p>If it escapes it steals one item from your pack (never worn or locked gear) and hides a few floors deeper.</p>' }) +
       card('chest', 'Treasure chests', { pic: pic('chest', 0, 'Treasure chest'), body: (cl ? '<p>' + esc(cl.text) + '</p>' : '') }) + '</div>' + related(['regions', 'world-boss']);
   },
   index: () => { for (const f of L.FOES) addSearch('bestiary', f.name, f.id, (loreBy('foe_' + f.id) || {}).text, 'Monster'); for (const b of L.BIOMES) if (b.foe) addSearch('bestiary', b.foe.name, b.foe.id, 'Native to ' + b.name + '. ' + ((loreBy('foe_' + b.foe.id) || {}).text || ''), 'Monster');
-    for (const m of Object.values(L.MODS)) addSearch('bestiary', m.name, 'tricks', 'Monster trick: ' + m.desc, 'Trick'); addSearch('bestiary', 'Loot Goblin', 'loot-goblin', 'A rare thief from floor ' + L.GOBLIN_FLOOR + '. Kill it within ' + L.GOBLIN_TIME + ' seconds.', 'Monster'); addSearch('bestiary', 'Ambushes', 'ambush', 'Packs of 2 to 4 monsters', 'Combat'); },
+    for (const m of Object.values(L.MODS)) addSearch('bestiary', m.name, 'tricks', 'Monster trick: ' + m.desc, 'Trick'); for (const sp of Object.values(L.SPECIALS || {})) addSearch('bestiary', sp.name, 'specials', 'Special attack: ' + sp.desc, 'Attack'); addSearch('bestiary', 'Loot Goblin', 'loot-goblin', 'A rare thief from floor ' + L.GOBLIN_FLOOR + '. Kill it within ' + L.GOBLIN_TIME + ' seconds.', 'Monster'); addSearch('bestiary', 'Ambushes', 'ambush', 'Packs of 2 to 4 monsters', 'Combat'); },
 });
 
 // ---- Gear ----

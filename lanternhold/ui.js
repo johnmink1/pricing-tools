@@ -1,4 +1,4 @@
-/* lh-build 202611241515 */
+/* lh-build 202611241521 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -3737,6 +3737,29 @@
       : '<b>Banner kin</b><span>Recruit allies of ' + esc(d.name) + '</span>' + tipI('Companions or players who fly the banner of ' + d.name + ' each make your banner perk (' + d.perk + ') 40% stronger.');
   }
   setInterval(paintKin, 2000); setTimeout(paintKin, 600);
+  // ---------- Victor's Banner: the alliance that won the last crowned Grand War season (John, 24 Nov 2026) ----------
+  const WAR_SITE = 'https://war.born2gamellc.com';
+  function paintWin() {
+    const el = $('winline'); if (!el) return;
+    const w = S.warWin, d = w && L.SIDES[w.side];
+    if (!d || !S.hero) { el.hidden = true; return; }
+    el.hidden = false; el.style.setProperty('--side', d.color);
+    const fx = Math.round(L.WARWIN_FX.dps * 100);
+    el.innerHTML = icon('crown').replace('<svg', '<svg class="vi"') + (L.warWinOn(S)
+      ? '<b>Victor’s Banner</b><span>+' + fx + '% damage, health, healing and gold. Fallen allies rise in <b>' + L.WARWIN_REVIVE + 's</b></span>' + tipI(d.name + ' won Grand War Season ' + w.season + ' and holds the Nexus. Every hero under its banner gets this until the next season is crowned.')
+      : '<b>' + esc(d.name) + ' holds the Nexus</b><span>Victor’s Banner for its heroes</span>' + tipI(d.name + ' won Grand War Season ' + w.season + '. Heroes under its banner get +' + fx + '% damage, health, healing and gold, and fallen allies rise in ' + L.WARWIN_REVIVE + ' seconds, until the next season is crowned. Your play here counts for your banner in the Grand War too.'));
+  }
+  async function loadWarWin() {
+    try {
+      const r = await fetch(WAR_SITE + '/api/nexus.json'); if (!r.ok) return;
+      const m = await r.json(), side = m && L.WAR_KEY[m.nexus];
+      const next = side ? { side, season: m.season } : null, was = S.warWin;
+      S.warWin = next;
+      if (next && (!was || was.season !== next.season) && L.warWinOn(S)) toast('crown', 'Victor’s Banner', L.SIDES[side].name + ' won Grand War Season ' + next.season + '. Your heroes get +' + Math.round(L.WARWIN_FX.dps * 100) + '% damage, health, healing and gold until the next season.', 'feat');
+      paintWin(); updatePanel(true);
+    } catch (e) {}
+  }
+  setTimeout(loadWarWin, 3000); setInterval(loadWarWin, 9e5); setInterval(paintWin, 5000);
   // ---------- Character sheet: hero level, XP and stats ----------
   const STAT_LBL = { pdps: 'party damage', crit: 'crit chance', dodge: 'dodge', php: 'party health', power: 'ability power', pheal: 'party healing', cd: 'faster abilities', gold: 'gold', loot: 'loot', chest: 'chest chance', sig: 'Sigil odds', spoils: 'ambush spoils' };
   const pctTxt = v => { const p = v * 100; return '+' + (p >= 1 ? Math.round(p * 10) / 10 : p >= 0.01 ? Math.round(p * 100) / 100 : Math.round(p * 10000) / 10000) + '%'; };
@@ -4968,6 +4991,9 @@
       ['Mercy’s Blessing', 'i:cross', 'Real donations to the Grand War’s Mercy Corps bless every player.', [
         '<b>+10% gold</b>, <b>+10% health</b>, <b>+20% healing</b> while it burns.',
         'Each $10, 5 food items or toy adds 2 hours, up to 7 days.']],
+      ['Victor’s Banner', 'i:crown', 'The alliance that wins a Grand War season holds the Nexus, and its heroes here get stronger.', [
+        '<b>+8% damage, health, healing and gold</b>, and fallen allies get back up in <b>10 seconds</b> instead of 15.',
+        'Fly that alliance’s banner to get it. It lasts until the next season is crowned.']],
       ['Grand War aura', 'i:shield', 'Verified Grand War commanders carry a class aura.', [
         '2% to 10% by war rank. Honors add more.',
         'Set your commander name on your profile’s Grand War tab. Auras are earned, never bought.']],
@@ -5036,6 +5062,9 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 108, date: 'November 24, 2026', title: 'Victor’s Banner', items: [
+      'The alliance that wins a Grand War season now holds the Nexus in Lanternhold too. Every hero under its banner gets +8% damage, health, healing and gold, and fallen allies get back up in 10 seconds instead of 15.',
+      'It lasts until the next season is crowned. Look for the crown line under your marching order once Season 1 ends.'] },
     { v: 107, date: 'November 24, 2026', title: 'Visit the Store', items: [
       'The Store is now a shop you walk into, like the Enchanter and the Armorer. Old Thessaly runs the counter, with shelves of glowing tonics behind her.',
       'Tonics and Supplies sit in tabs under the scene. Buy and drink without leaving the shop.',

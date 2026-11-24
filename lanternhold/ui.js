@@ -1,4 +1,4 @@
-/* lh-build 202611241551 */
+/* lh-build 202611241558 */
 /* Lanternhold — browser front end. */
 (function () {
   'use strict';
@@ -4042,6 +4042,26 @@
   // Unread tracking: the newest message id you have looked at, per channel. Whispers remember it across visits.
   try { chat.seen.dm = localStorage.getItem('lh_seen_dm') || ''; } catch (e) {}
   const CHAT_POLL_BG = 20000, WATCH = ['dm', 'global'];
+  // Everyone you could @: players seen in any chat lately, newest first, plus players recruited into your party.
+  function knownChatters() {
+    const seen = new Map();
+    for (const k of Object.keys(chat.msgs)) for (const m of chat.msgs[k]) if (m.from && m.from !== 'sys' && m.from !== chat.me && m.name) seen.set(m.from, { pid: m.from, name: m.name, id: m.id || '' });
+    const out = [...seen.values()].sort((a, b) => a.id < b.id ? 1 : -1);
+    for (const g of S.guests || []) if (g.name && !out.some(p => p.name === g.name)) out.push({ pid: g.id, name: g.name, id: '' });
+    return out;
+  }
+  // @mentions (John, 24 Nov 2026): Banner and Trade are checked in the background too, only to catch pings.
+  const BG_ROOMS = ['dm', 'global', 'banner', 'trade'];
+  const CH_NAME = { global: 'Global', banner: 'Banner', trade: 'Trade', party: 'Party', dm: 'Whispers' };
+  const mentionsMe = m => { if (!S.hero || !m || m.from === chat.me || m.from === 'sys' || chat.muted.has(m.from)) return false;
+    const t = String(m.text || '').toLowerCase(), n = '@' + S.hero.name.toLowerCase(); let i = t.indexOf(n);
+    while (i >= 0) { const c = t[i + n.length]; if (!c || !/[a-z'\-]/.test(c)) return true; i = t.indexOf(n, i + 1); } return false; };
+  chat.ment = {};
+  function pingMentions(k, add) {
+    const hits = add.filter(mentionsMe); if (!hits.length) return;
+    const m = hits[hits.length - 1], ch = CH_NAME[k.split(':')[0]] || 'chat';
+    if (!viewing(k)) { chat.ment[k] = (chat.ment[k] || 0) + hits.length; toast('chat', m.name + ' mentioned you in ' + ch, String(m.text).replace(ITEM_TOKEN, '[item]').slice(0, 90), 'feat'); try { sfx.coin(); } catch (e) {} }
+  }
   try { JSON.parse(localStorage.getItem('lanternhold.muted') || '[]').forEach(x => chat.muted.add(x)); } catch (e) {}
   const roomKey = () => chat.ch + (chat.ch === 'party' ? ':' + (chat.leader || 'mine') : '');
   async function chatCall(method, path, body) {
@@ -4083,14 +4103,23 @@
     inp.value = inp.value.slice(0, at) + (at && inp.value[at - 1] !== ' ' ? ' ' : '') + label + ' ' + inp.value.slice(at);
     inp.focus(); return true;
   }
+  // @Name in a message: highlight the names of players seen in chat (and your own), longest first.
+  function markAts(h) {
+    if (h.indexOf('@') < 0) return h;
+    const names = new Set(knownChatters().map(p => p.name)); if (S.hero) names.add(S.hero.name);
+    const list = [...names].filter(Boolean).sort((a, b) => b.length - a.length).map(n => esc(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (!list.length) return h;
+    const me = S.hero ? esc(S.hero.name).toLowerCase() : '';
+    return h.replace(new RegExp('@(' + list.join('|') + ')(?![A-Za-z])', 'gi'), (x, n) => '<b class="at' + (n.toLowerCase() === me ? ' me' : '') + '">@' + n + '</b>');
+  }
   function renderText(t) {
     let out = '', last = 0, m; ITEM_TOKEN.lastIndex = 0;
     while ((m = ITEM_TOKEN.exec(t))) {
-      out += esc(t.slice(last, m.index)); last = ITEM_TOKEN.lastIndex;
+      out += markAts(esc(t.slice(last, m.index))); last = ITEM_TOKEN.lastIndex;
       const it = itemFromToken(m);
       out += it ? '<button class="ilink r-' + it.rar + '" data-link="' + esc(m[0]) + '">[' + esc(itemLabel(it)) + ']</button>' : esc(m[0]);
     }
-    return out + esc(t.slice(last));
+    return out + markAts(esc(t.slice(last)));
   }
   function previewItem(tok) {
     ITEM_TOKEN.lastIndex = 0; const m = ITEM_TOKEN.exec(tok), it = m && itemFromToken(m); if (!it) return;
@@ -4115,7 +4144,7 @@
     const dm = chat.ch === 'dm';
     if (dm) return paintWhispers(log, list, atBottom);
     $('dmto').hidden = true;
-    log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
+    log.innerHTML = list.length ? list.map(m => m.from === 'sys' ? '<div class="msg sys ' + esc(m.cls) + '">' + icon('flame') + '<span>' + esc(m.text) + '</span></div>' : '<div class="msg' + (m.from === chat.me ? ' mine' : '') + (mentionsMe(m) ? ' ment' : '') + '"><button class="who c-' + esc(m.cls) + '" data-from="' + esc(m.from) + '" data-id="' + esc(m.id) + '" data-name="' + esc(m.name) + '">' + chatName(m) + '</button><span>' + renderText(m.text) + '</span></div>').join('')
       : '<div class="chatempty"><p>' + (chat.ch === 'trade' ? 'Nobody is trading yet. Post what you have or what you need.' : chat.ch === 'banner' ? 'Banner chat. Only heroes who march under ' + ((L.SIDES[S.hero.side] || {}).name || 'your banner') + ' can read this.' : chat.ch === 'party' ? 'Your party chat. Players whose heroes you recruit, or who recruit yours, can talk here.' : chat.ch === 'dm' ? 'No whispers yet. Tap a player’s name in any channel and choose Whisper to message them privately.' : 'Quiet down here. Say hello.') + '</p></div>';
     if (atBottom || list.length < 25) log.scrollTop = log.scrollHeight;
   }
@@ -4128,24 +4157,26 @@
   const viewing = k => chat.open && roomKey() === k && !document.hidden;
   function markSeen(k) {
     const l = chat.msgs[k] || []; if (!l.length) return;
+    if (chat.ment) delete chat.ment[k];
     chat.seen[k] = l[l.length - 1].id; if (k === 'dm') try { localStorage.setItem('lh_seen_dm', chat.seen.dm); } catch (e) {}
   }
   const unread = k => (chat.msgs[k] || []).filter(m => m.id > (chat.seen[k] || '') && m.from !== chat.me && m.from !== 'sys' && !chat.muted.has(m.from)).length;
   function paintUnread() {
-    const n = WATCH.reduce((a, k) => a + unread(k), 0), d = $('chatdot');
+    const n = WATCH.reduce((a, k) => a + unread(k), 0) + Object.keys(chat.ment || {}).filter(k => !WATCH.includes(k)).reduce((a, k) => a + chat.ment[k], 0), d = $('chatdot');
     d.hidden = !n || chat.open; d.textContent = n > 9 ? '9+' : n || '';
     $('btn-chat').setAttribute('aria-label', n ? 'Open chat, ' + n + ' unread' : 'Open chat');
-    document.querySelectorAll('#chatch [data-ch]').forEach(b => { const k = b.dataset.ch; b.classList.toggle('unread', WATCH.includes(k) && k !== roomKey() && unread(k) > 0); });
+    document.querySelectorAll('#chatch [data-ch]').forEach(b => { const k = b.dataset.ch; b.classList.toggle('unread', WATCH.includes(k) && k !== roomKey() && unread(k) > 0); b.classList.toggle('ment', k !== roomKey() && !!(chat.ment && chat.ment[k])); });
   }
   // While chat is closed (or on another channel), check Whispers and Global now and then for the unread bubble.
   async function bgPoll() {
     clearTimeout(chat.bg);
     if (CL && signedIn() && S.hero && !document.hidden) {
-      for (const k of WATCH) {
+      for (const k of BG_ROOMS) {
         if (viewing(k)) continue;
         try {
           const first = !chat.polled[k], add = mergeMsgs(k, await chatCall('GET', '/chat?ch=' + k + '&since=' + encodeURIComponent(chat.since[k] || '0')));
           chat.polled[k] = 1; if (first && k !== 'dm') markSeen(k);
+          if (!first && k !== 'dm') pingMentions(k, add);
           if (k === 'dm' && !first) { const w = add.filter(m => m.from !== chat.me && !chat.muted.has(m.from)).pop(); if (w) toast('chat', 'Whisper from ' + w.name, w.text.replace(ITEM_TOKEN, '[item]').slice(0, 90), ''); }
         } catch (e) { if (k === 'dm' && e.status === 403) { const t = document.querySelector('#chatch [data-ch="dm"]'); if (t) t.hidden = true; } }
       }
@@ -4159,7 +4190,7 @@
     const k = roomKey();
     try {
       const q = '?ch=' + chat.ch + (chat.ch === 'party' && chat.leader ? '&leader=' + chat.leader : '') + '&since=' + encodeURIComponent(chat.since[k] || '0');
-      mergeMsgs(k, await chatCall('GET', '/chat' + q)); chat.polled[k] = 1;
+      { const first = !chat.polled[k], add = mergeMsgs(k, await chatCall('GET', '/chat' + q)); if (!first && k.split(':')[0] !== 'dm') pingMentions(k, add); } chat.polled[k] = 1;
       if (k === roomKey()) { paintChat(); if (viewing(k)) markSeen(k); paintUnread(); }
       fetchLooks((chat.msgs[k] || []).map(m => m.from)).then(n => { if (n && k === roomKey()) paintChat(); });
     } catch (e) { if (e.status === 403) { chatNote('You are no longer in that party.', true); } }
@@ -4261,6 +4292,32 @@
       }
       if (e.target.closest('#dm-new')) { newWhisper(); return; } const c = e.target.closest('[data-dmpick]'); if (c) { chat.dmTo = { pid: c.dataset.dmpick, name: c.dataset.dmname }; paintChat(); $('chatin').focus(); } });
     setTimeout(bgPoll, 4000);
+    // @ autocomplete: type @ and a few letters, then tap a name (or press Tab / Enter) to fill it in.
+    const atBox = document.createElement('div'); atBox.className = 'atbox'; atBox.id = 'atbox'; atBox.hidden = true; $('chatform').appendChild(atBox);
+    let atSel = 0, atList = [];
+    const atQuery = () => { const inp = $('chatin'), v = inp.value.slice(0, inp.selectionStart == null ? inp.value.length : inp.selectionStart), m = v.match(/(^|\s)@([A-Za-z' \-]{0,16})$/); return m ? { q: m[2], at: v.length - m[2].length - 1 } : null; };
+    function paintAt() {
+      const a = atQuery(), mine = S.hero ? S.hero.name.toLowerCase() : '';
+      atList = a ? knownChatters().filter(p => p.name.toLowerCase() !== mine && p.name.toLowerCase().startsWith(a.q.toLowerCase())).slice(0, 6) : [];
+      if (a && a.q.includes(' ') && !atList.length) atList = [];
+      atBox.hidden = !atList.length; if (atSel >= atList.length) atSel = 0;
+      atBox.innerHTML = atList.map((p, i) => '<button type="button" class="' + (i === atSel ? 'on' : '') + '" data-atname="' + esc(p.name) + '">@' + esc(p.name) + '</button>').join('');
+    }
+    function pickAt(name) {
+      const inp = $('chatin'), a = atQuery(); if (!a) return;
+      const end = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+      inp.value = inp.value.slice(0, a.at) + '@' + name + ' ' + inp.value.slice(end);
+      const pos = a.at + name.length + 2; inp.setSelectionRange(pos, pos); atBox.hidden = true; atList = []; inp.focus();
+    }
+    $('chatin').addEventListener('input', paintAt);
+    $('chatin').addEventListener('keydown', e => {
+      if (atBox.hidden || !atList.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); atSel = (atSel + (e.key === 'ArrowDown' ? 1 : atList.length - 1)) % atList.length; paintAt(); }
+      else if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); pickAt(atList[atSel].name); }
+      else if (e.key === 'Escape') { atBox.hidden = true; }
+    });
+    $('chatin').addEventListener('blur', () => setTimeout(() => { atBox.hidden = true; }, 150));
+    atBox.addEventListener('mousedown', e => { const b = e.target.closest('[data-atname]'); if (b) { e.preventDefault(); pickAt(b.dataset.atname); } });
     $('chatform').addEventListener('submit', async e => {
       e.preventDefault();
       const inp = $('chatin'); let text = inp.value.trim(); if (!text || !S.hero) return;
@@ -5108,6 +5165,10 @@
   // ---------- patch notes ----------
   // Newest first. Bump `v` for each release; players see the notes once after updating.
   const PATCH_NOTES = [
+    { v: 114, date: 'November 24, 2026', title: '@ mentions in chat', items: [
+      'Type @ in chat and start a name to mention another player. Pick from the list with a tap, Tab or Enter.',
+      'When someone mentions you in Global, Banner, Trade or Party, you get a pop-up and a sound, it goes in the bell, and the chat button and channel tab light up. The message is highlighted in gold.',
+      'Fixed: on tall screens the Enchanter and Armorer scenes stretched very tall on the Scrap tab. Every shop scene now keeps its shape on every tab.'] },
     { v: 113, date: 'November 24, 2026', title: 'Faster hero levels', items: [
       'Hero levels come much faster: about twice as fast early on and four to seven times as fast from level 20. Your hero keeps all the XP it has, so most heroes jump up several levels right away.',
       'Every part of the game opens sooner: Gear at 2, the Campfire at 3, Map travel and Market buying at 5, Camp jobs at 6, the Players Guild at 8, the Ember Ring at 10, Market selling at 12, Rekindling at 15, and the world boss and job sets at 18.',

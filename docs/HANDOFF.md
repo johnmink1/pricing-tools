@@ -1,6 +1,6 @@
 # Lanternhold handoff (24 Nov 2026)
 
-This handoff stands on its own for the new Lanternhold project. It is current as of **v113**, live at https://lanternhold.born2gamellc.com.
+This handoff stands on its own for the new Lanternhold project. It is current as of **v114**, live at https://lanternhold.born2gamellc.com.
 
 ## Where the code lives
 
@@ -9,7 +9,7 @@ This handoff stands on its own for the new Lanternhold project. It is current as
 | Path | What it is |
 |---|---|
 | `lanternhold/core.js` | All game rules: classes, foes, loot, crafting, events, the `api` export list. Any new function must be added to that big export list at the bottom. |
-| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v114**. |
+| `lanternhold/ui.js` | All UI, the in-game Delver's Guide (`GUIDE`) and `PATCH_NOTES` (newest first). The next version is **v115**. |
 | `lanternhold/style.css`, `index.html` | Styles and markup. |
 | `lanternhold/vector.js` | Illustrated SVG sprites (`ART.enchanter`, `ART.armorer`, classes, foes). |
 | `lanternhold/sprites.js` | Pixel fallback sprites and `itemIcon`. |
@@ -107,6 +107,7 @@ There is no working AWS CLI. The cloud container's keys are invalid, and VENGEAN
   - v108 Victor's Banner (John, 24 Nov 2026): heroes whose banner matches the last crowned Grand War season's Nexus holder get `WARWIN_FX` (+8% dps/hp/heal/gold, via `sidePerk`) and revive in `WARWIN_REVIVE` (10 s) through `reviveMs(s)`. The game reads `https://war.born2gamellc.com/api/nexus.json` (bot repo `koprulu/web.py` `build_nexus`, any-origin CORS, PR #217) every 15 min into `S.warWin = {side, season}`; `WAR_KEY` maps the war's `ascendancy` to the game's `radiant`. Nulls until Season 1 is crowned. It goes by in-game banner, not the verified commander link. Line `#winline` under Banner kin.
   - v109 Bestiary mastery (John, 24 Nov 2026): kills per Bestiary kind in `s.bk` (key `beastKey(foe)` = 'boss' or 'foe_'+sprite, packs count each foe, world boss/wounded excluded); `beastTier` = floor(n/`BEAST_STEP` 500), max `BEAST_MAX` 10, +`BEAST_PER` 1% each to damage (in `damageFoe` mult) and hero XP (`gainXp`, plus an `xpBonus` part for the current foe). Event 'beast' toasts each step; Journal Bestiary pages show `beastBar`. Full screen: `#btn-full` + Settings button, `toggleFull()`, `body.isfull` widens `#app` to 1840px; the button always shows (v110 added `.fit5`, which narrows the icon buttons) except where the Fullscreen API is missing (iPhone Safari). v111: if the browser grants fullscreen but keeps the window size (seen in John's Brave while Claude in Chrome controls it), a toast says to press F11. v112: `body.isfull` (wide layout) is set by `paintWide()` from the real window size (fills ≥95% of the screen and ≥1500 px wide), so F11 gets it and fake full screen never does; `#app` max is min(1840px,100%), body has overflow-x:clip, and a ResizeObserver on the arena re-runs `resize()` whenever it changes size.
   - v113 pacing v3 (John, 24 Nov 2026: leveling too slow, too long to reach the other parts of the game): `XP_A` 330→160, `XP_POW` 2.27→1.9; unlocks gear 2, camp 3, map/buy 5, jobs 6, guild 8, ring 10, sell 12, rekindle 15, boss/jset 18 (were 3/5/8/8/10/12/15/18/20/25/25); `JOB_SLOT_LV` [6,10,15,20,25,30]. Estimated steady play: level 10 in ~2 h (was 8), 20 in ~11 h (was 59). Level is derived from total `hxp`, so existing heroes jump up (old 12 → new 18). No server-side level gates exist.
+  - v114 @mentions (John, 24 Nov 2026), client only: `knownChatters()` feeds the `#atbox` autocomplete (Tab/Enter/arrows); `mentionsMe(m)` matches `@HeroName`; `pingMentions` toasts (so it lands in the bell), plays a sound, and sets `chat.ment[room]` for the chat-button count and the gold tab underline. bgPoll now also polls banner and trade (`BG_ROOMS`) to catch pings. Party pings only arrive while that party room is polled. Shop scenes are fixed at 16:10 in shop mode (`body.atench .stage .arena{flex:0 1 auto;aspect-ratio:16/10}`), so tall screens no longer stretch them.
 
 ## Open asks and things to watch
 
